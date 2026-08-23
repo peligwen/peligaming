@@ -13,22 +13,32 @@ peligaming/
   wrangler.jsonc          Cloudflare Worker config (static assets only)
   public/                 Everything in here is served as-is
     index.html            The tools index (renders from tools.js)
-    tools.js              Tool manifest — the only file to edit when adding a tool
+    tools.js              Tool manifest — edit when adding a tool
     404.html              Not-found page
     tools/
-      runescape/          One folder per game
+      runescape/          One folder per game; built/exported tool HTML
       skyrim/
+  tools-src/              React (.jsx) tool sources, bundled by build:tools
+  scripts/build-tools.mjs Bundles each tools-src entry into public/tools/
 ```
 
-No build step, no dependencies, no framework. `public/` is served verbatim.
+Deploys are still zero-build: `public/` is served verbatim, and built tool
+HTML is committed. The only build step is local, when a React tool changes.
 
 ## Adding a tool
 
-1. Export the tool from claude.ai (artifact → download as HTML) and save it as
-   `public/tools/<game>/<tool-name>.html`.
+1. Get the tool file in place:
+   - **Plain HTML artifact** (claude.ai → artifact → download as HTML): save
+     it as `public/tools/<game>/<tool-name>.html`. Done.
+   - **React/JSX artifact**: save the source under `tools-src/<game>/`, add
+     an entry to the `TOOLS` list in `scripts/build-tools.mjs`, then run
+     `npm install` (first time) and `npm run build:tools`. Commit both the
+     source and the built HTML in `public/tools/`. The build bundles React
+     and any imported libraries (recharts, etc. — add new ones to
+     `devDependencies`) and includes a Tailwind pass so artifact utility
+     classes work.
 2. Add an entry to that game's `tools` array in `public/tools.js`
-   (name, description, path). Remove the `placeholder: true` flag if you're
-   replacing a placeholder.
+   (name, description, path).
 
 To add a whole new game, add a new object to the `games` array in
 `public/tools.js` with a name, emoji icon, accent color, and `tools` array,
