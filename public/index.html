@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>peligaming — gaming tools index</title>
+  <meta name="description" content="Companion tools for the games I play — calculators, planners, and trackers. Part of the peliglot family.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-border: #21262d;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --brand: #58a6ff;
+    }
+
+    body {
+      background: var(--bg);
+      background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(88, 166, 255, 0.10), transparent);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .wrap {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 48px 24px 64px;
+    }
+
+    header { margin-bottom: 44px; }
+
+    .wordmark {
+      font-size: 40px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .wordmark .accent { color: var(--brand); }
+
+    .tagline {
+      color: var(--text-dim);
+      font-size: 16px;
+      margin-top: 6px;
+      max-width: 560px;
+    }
+
+    .family-pill {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 4px 12px;
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+      font-size: 13px;
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .family-pill:hover, .family-pill:focus-visible {
+      border-color: var(--brand);
+      color: var(--text);
+    }
+
+    .game { margin-bottom: 40px; }
+
+    .game-head {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--game-accent, var(--panel-border));
+    }
+
+    .game-icon { font-size: 22px; }
+
+    .game-name {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .game-count {
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    a.card {
+      display: block;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color 0.15s, transform 0.15s;
+    }
+
+    a.card:hover, a.card:focus-visible {
+      border-color: var(--game-accent, var(--brand));
+      transform: translateY(-2px);
+      outline: none;
+    }
+
+    a.card.placeholder { border-style: dashed; }
+
+    .card-title {
+      font-weight: 700;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    .card-desc {
+      color: var(--text-dim);
+      font-size: 13.5px;
+      margin-top: 6px;
+    }
+
+    .card-go {
+      color: var(--game-accent, var(--brand));
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+
+    .empty {
+      color: var(--text-dim);
+      border: 1px dashed var(--panel-border);
+      border-radius: 10px;
+      padding: 32px;
+      text-align: center;
+    }
+
+    footer {
+      margin-top: 56px;
+      padding-top: 20px;
+      border-top: 1px solid var(--panel-border);
+      color: var(--text-dim);
+      font-size: 13px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 18px;
+    }
+
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 480px) {
+      .wrap { padding: 32px 16px 48px; }
+      .wordmark { font-size: 32px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="wordmark">🎮 peli<span class="accent">gaming</span></div>
+      <p class="tagline">Companion tools for the games I play — calculators, planners, and trackers.</p>
+      <a class="family-pill" href="https://peliglot.com">part of the peliglot family →</a>
+    </header>
+
+    <main id="games">
+      <noscript><p class="empty">This index needs JavaScript to render the tool list.</p></noscript>
+    </main>
+
+    <footer>
+      <span>a peliglot project</span>
+      <a href="https://github.com/peligwen/peligaming">source on GitHub</a>
+    </footer>
+  </div>
+
+  <script src="tools.js"></script>
+  <script>
+    (function () {
+      var root = document.getElementById('games');
+      var games = (window.PELIGAMING && window.PELIGAMING.games) || [];
+
+      if (games.length === 0) {
+        var empty = document.createElement('p');
+        empty.className = 'empty';
+        empty.textContent = 'No tools yet — add one in tools.js.';
+        root.appendChild(empty);
+        return;
+      }
+
+      games.forEach(function (game) {
+        var section = document.createElement('section');
+        section.className = 'game';
+        section.style.setProperty('--game-accent', game.accent || '');
+
+        var head = document.createElement('div');
+        head.className = 'game-head';
+
+        var icon = document.createElement('span');
+        icon.className = 'game-icon';
+        icon.textContent = game.icon || '🕹️';
+
+        var name = document.createElement('h2');
+        name.className = 'game-name';
+        name.textContent = game.name;
+
+        var count = document.createElement('span');
+        count.className = 'game-count';
+        var n = (game.tools || []).length;
+        count.textContent = n + (n === 1 ? ' tool' : ' tools');
+
+        head.appendChild(icon);
+        head.appendChild(name);
+        head.appendChild(count);
+        section.appendChild(head);
+
+        var grid = document.createElement('div');
+        grid.className = 'cards';
+
+        (game.tools || []).forEach(function (tool) {
+          var card = document.createElement('a');
+          card.className = 'card' + (tool.placeholder ? ' placeholder' : '');
+          card.href = tool.path;
+
+          var title = document.createElement('div');
+          title.className = 'card-title';
+          title.textContent = tool.name;
+
+          if (tool.placeholder) {
+            var badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.textContent = 'placeholder';
+            title.appendChild(badge);
+          }
+
+          var desc = document.createElement('div');
+          desc.className = 'card-desc';
+          desc.textContent = tool.description || '';
+
+          var go = document.createElement('div');
+          go.className = 'card-go';
+          go.textContent = 'open →';
+
+          card.appendChild(title);
+          card.appendChild(desc);
+          card.appendChild(go);
+          grid.appendChild(card);
+        });
+
+        section.appendChild(grid);
+        root.appendChild(section);
+      });
+    })();
+  </script>
+</body>
+</html>

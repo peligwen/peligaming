@@ -1,0 +1,14 @@
+{
+  "name": "peligaming",
+  "compatibility_date": "2026-08-23",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "public",
+    "not_found_handling": "404-page"
+  }
+  // Custom subdomain — uncomment once you're ready to attach it to the
+  // peliglot.com zone (the zone must exist in the same Cloudflare account):
+  // ,"routes": [{ "pattern": "gaming.peliglot.com", "custom_domain": true }]
+}
