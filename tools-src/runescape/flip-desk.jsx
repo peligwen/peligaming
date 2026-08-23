@@ -5,8 +5,12 @@ import {
   LineChart, Line,
 } from "recharts";
 
-/* ================= baked snapshot (captured 20 Aug 2026, OSRS Wiki real-time prices) ================= */
-const SNAPSHOT = {"ts":1787256798,"items":[[7936,"Pure essence",30000,0,1,1,1701405,126652635,100.0,1686],[52,"Arrow shaft",7000,1,1,2,411071,17828938,0.0,7],[314,"Feather",30000,0,2,3,5264562,171989093,50.0,6],[1779,"Flax",13000,1,2,2,161014,12055660,0.0,4],[558,"Mind rune",18000,0,3,3,1179418,39912950,0.0,5],[227,"Vial of water",13000,0,3,4,168300,18244533,0.0,10],[884,"Iron arrow",7000,0,3,4,139130,7242944,33.33,5],[1993,"Jug of wine",6000,0,3,4,201629,6635470,14.29,13],[1939,"Swamp tar",13000,1,4,4,164388,8836481,0.0,5],[559,"Body rune",18000,0,4,5,147306,8206687,12.5,9],[313,"Fishing bait",8000,0,4,5,71607,7591477,11.11,14],[882,"Bronze arrow",7000,0,4,4,48038,3723591,10.0,11],[221,"Eye of newt",13000,0,4,4,36077,1901887,33.33,5],[556,"Air rune",50000,0,5,6,2706311,258199938,0.0,5],[554,"Fire rune",50000,0,5,5,2363189,165931480,0.0,5],[555,"Water rune",50000,0,5,6,3187150,161343898,0.0,7],[557,"Earth rune",50000,0,5,6,987281,72738399,9.09,6],[888,"Mithril arrow",7000,0,6,6,262994,15783835,0.0,5],[1783,"Bucket of sand",13000,1,7,7,56590,4972081,6.67,6],[4696,"Dust rune",18000,1,8,8,624195,15640517,0.0,9],[809,"Mithril dart",7000,1,8,9,247521,14644288,6.67,6],[886,"Steel arrow",7000,0,8,8,97074,3711361,0.0,5],[4820,"Iron nails",13000,1,9,10,83540,1734894,16.67,5],[807,"Iron dart",7000,1,9,11,17801,1905968,15.79,9],[53,"Headless arrow",11000,1,11,12,536705,19554714,0.0,11],[1517,"Maple logs",15000,0,11,12,272073,18926363,0.0,6],[1937,"Jug of water",13000,0,14,15,366829,11941822,7.14,5],[27616,"Ancient essence",300000,1,18,18,865777,81427440,2.86,5],[1941,"Swamp paste",13000,1,20,23,231215,6920335,33.33,6],[890,"Adamant arrow",11000,0,26,27,185692,14676886,1.85,4],[4699,"Lava rune",18000,1,27,29,371822,12471756,16.67,10],[810,"Adamant dart",11000,1,28,30,232699,20301477,0.0,6],[1539,"Steel nails",13000,0,30,31,124239,4932496,0.0,5],[28157,"Forester's ration",6000,1,35,43,409095,7022445,15.79,73],[892,"Rune arrow",11000,1,42,47,625893,26721435,1.18,5],[11875,"Broad bolts",7000,1,54,55,101440,1856638,13.45,7],[440,"Iron ore",13000,0,69,70,116850,9331874,0.71,5],[2357,"Gold bar",10000,0,81,86,306826,16251629,2.33,5],[1775,"Molten glass",13000,1,87,93,89939,5027041,0.0,6],[379,"Lobster",6000,0,92,96,15873,984779,0.53,5],[562,"Chaos rune",18000,0,103,105,2145763,99473367,0.48,4],[9075,"Astral rune",25000,1,107,111,396522,22207366,1.38,6],[1515,"Yew logs",12000,0,109,112,156205,10661003,1.35,5],[1761,"Soft clay",13000,0,114,115,218908,3933498,3.77,7],[563,"Law rune",18000,0,123,127,944403,28433422,1.6,5],[564,"Cosmic rune",18000,0,124,125,527523,21129119,1.23,5],[10127,"Dashing kebbit fur",10000,1,128,167,3523,162976,-1,25],[21326,"Amethyst arrow",11000,1,132,145,550775,15656193,0.72,5],[9243,"Diamond bolts (e)",11000,1,136,142,145585,3511626,1.09,6],[561,"Nature rune",18000,0,146,149,1506880,49697901,0.68,5],[453,"Coal",13000,0,147,149,808392,49941139,1.33,4],[1739,"Cowhide",13000,0,149,178,5103,395082,8.28,8],[444,"Gold ore",30000,0,150,154,544587,24658239,0.33,5],[31967,"Oak repair kit",13000,1,152,206,92,33556,40.14,117],[9242,"Ruby bolts (e)",11000,1,156,158,69163,2838967,2.28,7],[7946,"Monkfish",13000,1,159,160,76473,1611451,1.54,9],[12934,"Zulrah's scales",30000,1,161,166,1769444,64378845,0.61,5],[1777,"Bow string",13000,1,167,168,129642,5199510,0.3,13],[30800,"Demonic tallow",11000,1,183,228,44239,379132,7.55,13],[560,"Death rune",25000,0,185,188,2075985,77622848,0.0,4],[1609,"Opal",13000,1,223,259,1444,138866,6.64,8],[225,"Limpwurt root",13000,0,226,226,85820,2160556,0.45,4],[532,"Big bones",3000,0,240,241,21229,963761,6.42,5],[11069,"Gold bracelet",18000,1,241,275,3726,331486,-1,46],[6705,"Potato with cheese",13000,1,263,299,1363,148102,5.57,10],[867,"Adamant knife",11000,1,287,338,74,80936,-1,22],[20849,"Dragon thrownaxe",11000,1,308,347,18411,177437,15.15,38],[29895,"Frozen tear",13000,1,321,558,5494,152653,40.87,6],[565,"Blood rune",25000,1,335,338,3603563,110266258,0.15,5],[4460,"Cup of hot water",13000,1,355,395,100,90389,-1,53],[8778,"Oak plank",13000,1,390,394,112641,9096276,0.89,5],[3144,"Cooked karambwan",10000,1,414,426,121779,3007347,2.2,6],[10816,"Raw yak meat",11000,1,421,776,0,53127,-1,221],[2162,"King worm",13000,1,441,520,6225,94200,-1,23],[21352,"Amethyst javelin tips",10000,1,539,590,990,1035269,1.64,45],[12640,"Amylase crystal",11000,1,579,599,45012,2206416,1.85,11],[2353,"Steel bar",10000,0,580,589,234798,8191560,0.52,4],[21802,"Revenant cave teleport",15000,1,639,674,4885,223515,0.23,9],[22266,"Redwood shield",18000,1,643,729,702,60531,-1,69],[4842,"Relicym's balm(4)",2000,1,662,931,782,26579,19.13,5],[383,"Raw shark",15000,1,692,700,123998,4425063,1.51,6],[21090,"Opal necklace",10000,1,701,950,1001,20668,-1,119],[231,"Snape grass",13000,1,709,710,60862,3609361,0.71,4],[21336,"Amethyst arrow(p++)",11000,1,715,795,601,72757,4.33,30],[181,"Superantipoison(3)",2000,1,735,970,153,22689,-1,47],[5641,"Rune dart(p++)",11000,1,754,891,0,23410,-1,364],[1513,"Magic logs",12000,1,786,800,178169,7242056,1.58,4],[22929,"Dragonfruit",11000,1,806,888,2491,67202,-1,13],[22603,"Basalt",10000,1,844,936,24768,273527,6.18,41],[8015,"Bones to peaches (tablet)",10000,1,894,949,22972,156801,3.61,6],[21146,"Necklace of passage(5)",10000,1,902,997,1124,43086,8.19,21],[385,"Shark",10000,1,980,990,166700,4304666,0.55,4],[5296,"Toadflax seed",600,1,1000,1000,2772,157003,2.55,6],[824,"Rune dart tip",11000,1,1011,1040,33770,1141841,0.53,10],[7196,"Raw admiral pie",13000,1,1172,1339,0,50590,-1,549],[29110,"Raw pyre fox",13000,1,1208,1331,9710,195308,8.04,14],[29125,"Raw kyatt",13000,1,1210,1349,2813,153126,7.52,10],[11232,"Dragon dart tip",11000,1,1322,1322,50646,3510074,0.34,7],[10034,"Red chinchompa",7000,1,1380,1422,65507,2780610,0.5,9],[24951,"Ourania teleport (tablet)",10000,1,1512,2000,139,20451,17.13,15],[211,"Grimy avantoe",13000,1,1541,1568,24511,677412,3.45,10],[1753,"Green dragonhide",13000,1,1547,1553,18923,541283,0.1,15],[8782,"Mahogany plank",13000,1,1787,1817,293046,15231768,0.69,5],[1751,"Blue dragonhide",13000,1,1814,1828,19712,832738,1.14,16],[13441,"Anglerfish",10000,1,1825,1854,102436,3151988,0.86,6],[2361,"Adamantite bar",10000,0,1879,1888,180380,7312995,1.08,4],[27272,"Lily of the Sands",13000,1,1902,2050,2217,67847,1.32,21],[3402,"Asyn remains",7500,1,2017,3894,5,4056,-1,72],[213,"Grimy kwuarm",13000,1,2060,2198,22184,797638,0.65,11],[21105,"Topaz amulet (u)",10000,1,2076,2242,49,84202,1.67,23],[11228,"Dragon arrow(p+)",11000,1,2098,2363,417,35630,-1,132],[31469,"Cotton yarn",13000,1,2245,2399,2052,73230,-1,63],[19613,"Arceuus library teleport (tablet)",10000,1,2373,2656,216,22859,5.81,21],[21905,"Dragon bolts",11000,1,2660,2664,25876,2019152,0.7,6],[24598,"Blighted super restore(4)",2000,1,2827,2881,20330,969562,0.16,5],[11959,"Black chinchompa",11000,1,3089,3089,63345,1638433,0.24,5],[536,"Dragon bones",7500,1,3128,3200,136028,5060769,0.17,4],[12408,"Piscatoris teleport",10000,1,3172,3487,1270,21894,0.45,5],[26368,"Nihil dust",11000,1,3214,3376,2834,63870,-1,100],[6689,"Saradomin brew(2)",2000,1,3328,4322,62,5747,-1,91],[12775,"Annakarl teleport (tablet)",10000,1,3393,3994,714,73855,6.59,7],[11240,"Young impling jar",18000,1,3513,3828,229,59332,-1,39],[11242,"Gourmet impling jar",18000,1,3736,3899,11253,244665,0.73,12],[31435,"Ironwood plank",13000,1,3790,3995,962,236530,1.81,12],[19619,"Salve graveyard teleport (tablet)",10000,1,3798,4143,667,29432,9.5,6],[12625,"Stamina potion(4)",2000,1,3851,3859,11987,582034,0.31,5],[11250,"Nature impling jar",18000,1,4001,4332,3101,30920,4.01,15],[10476,"Purple sweets",10000,1,5173,5270,10866,624840,1.13,30],[207,"Grimy ranarr weed",11000,1,5803,5819,25133,1109564,0.19,5],[30100,"Huasca potion (unf)",10000,1,6100,6450,80,42792,5.1,47],[6051,"Magic roots",11000,1,7052,7895,137,12016,3.92,86],[6685,"Saradomin brew(4)",2000,1,7055,7150,53342,1621967,0.06,4],[3051,"Grimy snapdragon",11000,1,7301,7304,17671,645629,0.62,5],[12907,"Anti-venom(3)",2000,1,8076,11888,36,3504,-1,48],[25419,"Urium remains",7500,1,8112,8445,4163,95183,0.67,14],[9245,"Onyx bolts (e)",11000,1,8476,8488,24115,971758,0.14,6],[1397,"Air battlestaff",18000,1,8795,8795,96109,1358277,0.38,5],[2434,"Prayer potion(4)",2000,1,9270,9270,65934,2148288,0.26,5],[3024,"Super restore(4)",2000,1,10001,10001,50280,1250858,0.01,5],[451,"Runite ore",4500,0,10201,10240,58069,2815870,0.22,5],[1683,"Dragonstone amulet (u)",10000,1,10530,11275,22,27802,-1,5],[1702,"Dragonstone amulet",10000,1,11041,11835,584,44388,2.77,8],[11968,"Skills necklace(6)",10000,1,11825,12294,323,30402,1.7,7],[12695,"Super combat potion(4)",2000,1,12060,12293,19297,791723,0.7,5],[2363,"Runite bar",10000,0,12215,12222,42774,2963493,0.04,4],[1631,"Uncut dragonstone",10000,1,14713,14847,5609,174793,1.13,20],[1333,"Rune scimitar",70,0,15181,15245,1158,70080,1.51,5],[5304,"Torstol seed",200,1,16330,16894,3445,85189,3.17,9],[28931,"Searing page",11000,1,18457,18999,6368,138433,0.36,9],[23685,"Divine super combat potion(4)",2000,1,18700,18750,32382,424649,0.88,7],[30134,"Prayer regeneration potion(1)",2000,1,20182,21969,308,4855,4.21,25],[5295,"Ranarr seed",200,1,30565,31327,6432,254903,1.44,4],[1127,"Rune platebody",70,0,38276,38281,3879,198053,0.84,4],[5300,"Snapdragon seed",200,1,45271,46343,4600,165207,1.88,5],[29993,"Aldarium",13000,1,58426,60000,4186,170733,0.57,5],[21804,"Ancient crystal",250,1,148900,154250,38,2187,0.01,8],[6528,"Tzhaar-ket-om",70,1,150824,158345,63,2042,-1,15],[22866,"Dragonfruit sapling",200,1,157212,164049,179,12509,0.58,12],[25404,"Bloodbark body",70,1,216944,225947,167,3559,0.25,8],[22951,"Boots of Brimstone",70,1,239785,249999,46,1829,3.22,10],[24187,"Trouver parchment",500,1,260864,268731,184,2918,0.29,10],[12004,"Kraken tentacle",70,1,282920,293014,75,2398,0.21,6],[12002,"Occult necklace",8,1,340000,361538,140,4635,2.63,6],[11256,"Dragon impling jar",18000,1,440281,458207,593,5165,-1,20],[6568,"Obsidian cape",70,1,474500,490000,34,1634,0.63,8],[32038,"Large dragon keel parts",100,1,500000,520000,17,1597,2.54,103],[11920,"Dragon pickaxe",40,1,587204,606590,115,2634,0.61,5],[21902,"Dragon crossbow",70,1,652892,669256,254,5387,0.35,5],[4151,"Abyssal whip",70,1,773322,785634,249,6885,0.01,6],[8788,"Magic stone",11000,1,978735,1001000,139,3461,0.16,20],[20716,"Tome of Fire (empty)",15,1,1580551,1630990,71,2358,0.55,7],[6573,"Onyx",11000,1,2752094,2839995,1,281,-1,61],[6585,"Amulet of fury",8,1,2760575,2845090,186,4888,0.83,13],[6737,"Berserker ring",8,1,3710832,3815338,123,4117,1.05,8],[25975,"Lightbearer",8,1,3916368,4025822,83,2474,1.61,5],[13235,"Eternal boots",15,1,3999952,4098359,41,1347,0.09,7],[21079,"Arcane prayer scroll",5,1,5416854,5480554,16,564,0.52,9],[11802,"Armadyl godsword",8,1,6859927,7024842,61,1893,0.06,6],[24777,"Blood shard",8,1,7248349,7427129,96,1902,1.01,14],[12924,"Toxic blowpipe (empty)",8,1,9741680,10000000,99,2262,0.82,5],[22327,"Justiciar chestguard",8,1,10234961,10497649,15,384,1.22,8],[13190,"Old school bond",100,0,11444444,11853014,577,0,3.2,5],[13576,"Dragon warhammer",8,1,15844512,16206521,69,1724,0.27,6],[19529,"Zenyte shard",11000,1,16206010,16278764,26,362,0.06,25],[26219,"Osmumten's fang",8,1,16579005,16965000,78,2552,0.2,5],[11804,"Bandos godsword",8,1,17302211,17681176,93,1627,0.62,6],[22481,"Sanguinesti staff (uncharged)",8,1,17600000,17728739,36,1057,-1,5],[13239,"Primordial boots",15,1,18295195,18738192,73,1655,0.52,7],[19550,"Ring of suffering",8,1,18648968,19246555,43,861,0.36,10],[19547,"Necklace of anguish",8,1,19023508,19459682,91,1962,0.41,7],[19544,"Tormented bracelet",8,1,19114249,19213088,65,1226,0.47,12],[19553,"Amulet of torture",8,1,19236429,19236429,69,1698,0.18,5],[21034,"Dexterous prayer scroll",5,1,19919158,19919158,25,671,-1,21],[11832,"Bandos chestplate",8,1,22534724,23046877,84,2039,0.44,8],[22324,"Ghrazi rapier",8,1,23121054,23663843,30,916,1.05,14],[13237,"Pegasian boots",15,1,34124988,34918203,28,1019,0.46,6],[27690,"Voidwaker",70,1,37483000,37567941,62,1976,0.42,8],[13652,"Dragon claws",8,1,37858591,38280810,52,1271,0.81,6],[22978,"Dragon hunter lance",8,1,46493723,47650998,53,1355,0.5,6],[21021,"Ancestral robe top",8,1,97799999,99800000,19,376,1.06,32],[12817,"Elysian spirit shield",8,1,493840267,499691152,1,177,-1,26],[27277,"Tumeken's shadow (uncharged)",8,1,788600000,794684777,23,431,0.33,38],[20997,"Twisted bow",8,1,1395000000,1397400000,21,373,-1,27]]};
+/* ================= baked snapshot (captured 20 Aug 2026, OSRS Wiki real-time prices) =================
+   v1 schema (this capture): [id, name, limit, members, lastLow, lastHigh, 1hVol, 24hVol, drift%, staleMin]
+   v2 schema (scripts/capture-snapshot.mjs): adds 5m/1h volume-weighted averages and per-side volumes,
+   which lets offline mode use the same verified-average pricing as the live feed. */
+import SNAPSHOT_RAW from "./flip-desk-snapshot.json";
+const SNAPSHOT = SNAPSHOT_RAW;
 
 const API = "https://prices.runescape.wiki/api/v1/osrs";
 const SNAP_DATE = new Date(SNAPSHOT.ts * 1000);
@@ -14,7 +18,10 @@ const SNAP_DATE = new Date(SNAPSHOT.ts * 1000);
 /* ================= GE mechanics ================= */
 // 2% tax on the sale price of each item, rounded down, capped at 5m/item.
 // Items that sell below 50 gp are exempt — the classic penny-flipper edge.
-const geTax = (sell) => (sell < 50 ? 0 : Math.min(Math.floor(sell * 0.02), 5_000_000));
+// Items exempt from GE tax regardless of price (per the wiki's exemption list).
+const TAX_EXEMPT = new Set([13190]); // Old school bond
+const geTax = (sell, id) =>
+  (TAX_EXEMPT.has(id) || sell < 50 ? 0 : Math.min(Math.floor(sell * 0.02), 5_000_000));
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -27,9 +34,15 @@ const fmtGp = (n) => {
   if (x >= 1e9) return neg + (x / 1e9).toFixed(x >= 1e10 ? 1 : 2) + "b";
   if (x >= 1e6) return neg + (x / 1e6).toFixed(x >= 1e7 ? 1 : 2) + "m";
   if (x >= 10000) return neg + (x / 1000).toFixed(1) + "k";
+  // averaged prices go fractional on penny items — a 0.4 gp edge is not a 0 gp edge
+  if (x < 10 && x !== Math.round(x)) return neg + x.toFixed(1);
   return neg + Math.round(x).toLocaleString();
 };
-const fmtFull = (n) => (n == null ? "–" : Math.round(n).toLocaleString() + " gp");
+const fmtFull = (n) => {
+  if (n == null) return "–";
+  if (Math.abs(n) < 10 && n !== Math.round(n)) return n.toFixed(1) + " gp";
+  return Math.round(n).toLocaleString() + " gp";
+};
 const fmtQty = (n) => {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "m";
   if (n >= 10000) return (n / 1000).toFixed(0) + "k";
@@ -42,49 +55,127 @@ const agoStr = (min) => {
   return (min / 1440).toFixed(1) + "d ago";
 };
 
-/* ================= data shaping ================= */
-const rowToItem = (r) => ({
-  id: r[0], name: r[1], limit: r[2], members: !!r[3],
-  low: r[4], high: r[5], hv: r[6], dv: r[7],
-  vol: r[8] < 0 ? null : r[8], stale: r[9],
-});
+/* ================= data shaping =================
+   Every item is normalized to one record shape whatever the source:
+   latest  = last trade print per side (display/freshness only, never pricing)
+   m5 / h1 = windowed volume-weighted averages + per-side volumes (pricing)   */
+const rowToItem = (r) => SNAPSHOT.version === 2
+  ? {
+      id: r[0], name: r[1], limit: r[2], members: !!r[3],
+      latest: { low: r[4], high: r[5], lowT: r[6], highT: r[7] },
+      m5: r[8] == null ? null : { al: r[8], ah: r[9], lv: r[10], hv: r[11] },
+      h1: r[12] == null ? null : { al: r[12], ah: r[13], lv: r[14], hv: r[15] },
+      dv: r[16], snapVol: null, snapStale: null,
+    }
+  : { // v1 rows carry only the raw prints — priceable, but capped at confidence C
+      id: r[0], name: r[1], limit: r[2], members: !!r[3],
+      latest: { low: r[4], high: r[5], lowT: null, highT: null },
+      m5: null, h1: null, combinedHv: r[6], dv: r[7],
+      snapVol: r[8] < 0 ? null : r[8], snapStale: r[9],
+    };
 const BASE_ITEMS = SNAPSHOT.items.map(rowToItem);
 
 /* ================= the model =================
-   risk 0–100 from three observable pressures:
-   - fill risk: thin hourly flow → your offers sit unfilled
-   - drift risk: recent 5-min vs 1-hour price drift vs. your margin
-   - staleness: minutes since either side of the book last traded    */
-function assess(it) {
-  const tax = geTax(it.high);
-  const margin = it.high - it.low - tax;
-  const roi = it.low > 0 ? (margin / it.low) * 100 : 0;
-  const spread = it.low > 0 ? ((it.high - it.low) / it.low) * 100 : 0;
+   Pricing: the two /latest prints are asynchronous last trades, not a fillable
+   two-way quote — one bot dump or one impatient buyer skews them for everyone.
+   So buy/sell anchor to windowed volume-weighted averages instead: the 5-minute
+   window when both sides traded meaningfully, else the 1-hour window, else the
+   row is unpriceable and leaves the board. Raw prints only price v1-snapshot
+   rows, flagged confidence C. Crossed prints are a data-disagreement signal and
+   are never repaired by swapping.
 
-  const fillR = clamp(100 - Math.log10((it.hv || 0) + 1) * 20, 0, 100);
-  // penny items tick in whole gp, so % drift is noise — damp it
-  let v = it.vol == null ? 0.6 : it.vol;
-  if (it.high < 50) v = Math.min(v, 8);
-  const driftR = clamp((v / Math.max(Math.abs(roi), 0.15)) * 35, 0, 100);
-  const staleR = clamp((it.stale || 0) * 1.5, 0, 100);
+   Risk 0–100 from three pressures, each independent of the reward estimate:
+   - fill: the thinner ONE-SIDED hourly flow (your bid fills only from
+     insta-sellers, your ask only from insta-buyers)
+   - drift: 5m-vs-1h mid movement, judged against the spread it has to cross —
+     missing drift data is the thin-book case and scores conservative, not safe
+   - staleness: minutes since the older side last traded */
+function assess(it, nowSec) {
+  const { latest } = it;
+  const crossed = latest.low != null && latest.high != null && latest.high < latest.low;
+
+  const ok5 = it.m5 && it.m5.al && it.m5.ah && it.m5.lv >= 5 && it.m5.hv >= 5;
+  const ok1 = it.h1 && it.h1.al && it.h1.ah && it.h1.lv >= 1 && it.h1.hv >= 1;
+  const source = ok5 ? "5m" : ok1 ? "1h" : (it.snapStale != null ? "prints" : null);
+
+  let hidden = null;
+  let low, high;
+  if (source === "5m") { low = it.m5.al; high = it.m5.ah; }
+  else if (source === "1h") { low = it.h1.al; high = it.h1.ah; }
+  else if (source === "prints") {
+    low = latest.low; high = latest.high;
+    if (crossed) hidden = "crossed prints";
+  } else hidden = "one-sided book";
+
+  if (hidden) { low = latest.low ?? 0; high = latest.high ?? 0; }
+  if (high < low) { hidden = hidden || "crossed averages"; }
+
+  const tax = geTax(high, it.id);
+  const margin = high - low - tax;
+  const roi = low > 0 ? (margin / low) * 100 : 0;
+  const spread = low > 0 ? ((high - low) / low) * 100 : 0;
+
+  // A wide spread on a busy book is not an opportunity — real competition would
+  // have closed it. It means dislocated prints or a price in motion.
+  if (!hidden && high >= 50 && spread > 10 && it.dv > 20_000) hidden = "dislocated prints";
+
+  // one-sided accessible flow per hour; v1 rows only know the combined figure
+  const legFlow = it.h1 ? Math.min(it.h1.lv, it.h1.hv) : Math.floor((it.combinedHv || 0) / 4);
+  const buyFlow = it.h1 ? it.h1.lv : legFlow;
+  const sellFlow = it.h1 ? it.h1.hv : legFlow;
+  const hv = it.h1 ? it.h1.lv + it.h1.hv : (it.combinedHv || 0);
+
+  // drift: 5m mid vs 1h mid, only when both windows have both sides — a
+  // one-sided window would inject half-spread bounce into the metric
+  let drift = it.snapVol;
+  if (ok5 && ok1) {
+    const mid5 = (it.m5.al + it.m5.ah) / 2, mid1 = (it.h1.al + it.h1.ah) / 2;
+    drift = mid1 > 0 ? (Math.abs(mid5 - mid1) / mid1) * 100 : null;
+  } else if (it.snapStale == null) drift = null;
+  if (drift != null && high < 50) drift = Math.min(drift, 8); // penny ticks are noise
+
+  const stale = latest.lowT != null && latest.highT != null
+    ? Math.max(nowSec - latest.highT, nowSec - latest.lowT) / 60
+    : (it.snapStale ?? 999);
+
+  const fillR = clamp(100 - Math.log10(legFlow + 1) * 20, 0, 100);
+  const driftR = drift == null
+    ? 70 // no drift data = nobody traded recently = the risky case, not the calm one
+    : clamp(Math.max(drift * 2.5, (drift / Math.max(spread, 0.5)) * 40), 0, 100);
+  const staleR = clamp(stale * 1.5, 0, 100);
   const risk = Math.round(0.45 * fillR + 0.35 * driftR + 0.2 * staleR);
 
-  return { ...it, tax, margin, roi, spread, fillR, driftR, staleR, risk };
+  const tier = source === "prints" || drift == null || stale > 60 || crossed
+    ? "C" : source === "5m" && stale <= 15 ? "A" : "B";
+
+  return {
+    ...it, low, high, hv, tax, margin, roi, spread, crossed, source, hidden,
+    legFlow, buyFlow, sellFlow, vol: drift, stale: Math.round(stale),
+    fillR, driftR, staleR, risk, tier,
+  };
 }
 
 /* play = 0 patient 4-hour limits … 1 five-minute scalper */
 function playOut(a, budget, play) {
   const cycleH = lerp(4, 0.25, play);                    // round-trip you'll tolerate
-  const capacity = Math.max(1, Math.floor(a.hv * cycleH * 0.3)); // ~30% of the flow you touch
+  // ~10% of the thinner side's flow — you queue behind everyone who saw the
+  // same feed, and your bid fills fastest exactly when the price moves against you
+  const capacity = Math.max(0, Math.floor(a.legFlow * cycleH * 0.1));
   const afford = a.low > 0 ? Math.floor(budget / a.low) : 0;
   const qty = Math.max(0, Math.min(a.limit, afford, capacity));
   const perCycle = qty * a.margin;
   // buy limit gates you to `limit` units per 4h no matter how fast you churn
   const gpHr = qty > 0 ? Math.min(perCycle / cycleH, (a.limit * a.margin) / 4) : 0;
+  const gpHrLo = gpHr * 0.5;                             // honest floor, not a promise
   const capital = qty * a.low;
   const limitBound = qty === a.limit && cycleH < 4;
-  return { ...a, cycleH, qty, perCycle, gpHr, capital, afford, limitBound };
+  const buyH = qty > 0 ? qty / Math.max(a.buyFlow * 0.1, 1) : 0;
+  const sellH = qty > 0 ? qty / Math.max(a.sellFlow * 0.1, 1) : 0;
+  return { ...a, cycleH, qty, perCycle, gpHr, gpHrLo, capital, afford, limitBound, buyH, sellH };
 }
+
+// exported for model tests (scripts/); the page only uses the default export
+export { geTax, assess, playOut, rowToItem };
 
 const riskBucket = (r) => (r < 30 ? "low" : r < 60 ? "medium" : "high");
 const RISK_COLOR = { low: "#83CE70", medium: "#E0A43A", high: "#E26A5A" };
@@ -280,25 +371,23 @@ async function pullLive(signal) {
     fetchJson(`${API}/volumes`, signal),
   ]);
   let m5 = null;
-  try { m5 = await fetchJson(`${API}/5m`, signal); } catch (e) { /* drift falls back */ }
-  const now = Math.floor(Date.now() / 1000);
+  try { m5 = await fetchJson(`${API}/5m`, signal); } catch (e) { /* 1h pricing still works */ }
+  const win = (d) => d && (d.avgHighPrice || d.avgLowPrice)
+    ? { al: d.avgLowPrice ?? null, ah: d.avgHighPrice ?? null,
+        lv: d.lowPriceVolume || 0, hv: d.highPriceVolume || 0 }
+    : null;
   const out = {};
   for (const base of BASE_ITEMS) {
     const p = latest.data?.[base.id];
-    if (!p || !p.high || !p.low) continue;
-    let high = p.high, low = p.low;
-    if (high < low) { const t = high; high = low; low = t; }
-    const h = h1.data?.[base.id] || {};
-    const f = m5?.data?.[base.id] || {};
-    const hv = (h.highPriceVolume || 0) + (h.lowPriceVolume || 0);
-    const mid = (d) => (d.avgHighPrice && d.avgLowPrice ? (d.avgHighPrice + d.avgLowPrice) / 2 : d.avgHighPrice || d.avgLowPrice || null);
-    const m1 = mid(h), mf = mid(f);
-    const vol = m1 && mf ? Math.abs(mf - m1) / m1 * 100 : null;
-    const stale = Math.max(now - (p.highTime || now), now - (p.lowTime || now)) / 60;
+    const h = win(h1.data?.[base.id]);
+    const f = win(m5?.data?.[base.id]);
+    if (!p && !h) continue; // nothing traded recently on either feed — leave the board
     out[base.id] = {
-      low, high, hv,
+      latest: { low: p?.low ?? null, high: p?.high ?? null,
+                lowT: p?.lowTime ?? null, highT: p?.highTime ?? null },
+      m5: f, h1: h,
       dv: vols.data?.[base.id] ?? base.dv,
-      vol, stale: Math.round(stale),
+      snapVol: undefined, snapStale: undefined, combinedHv: undefined,
     };
   }
   if (Object.keys(out).length < 20) throw new Error("thin response");
@@ -314,6 +403,21 @@ const RiskBadge = ({ risk }) => {
     </span>
   );
 };
+
+/* data confidence: A = fresh 5-min averages both sides; B = 1-hour averages;
+   C = raw prints, stale, crossed, or missing drift — read, don't trade */
+const TIER_COLOR = { A: "#83CE70", B: "#E0A43A", C: "#E26A5A" };
+const TIER_TITLE = {
+  A: "confidence A — priced from fresh 5-min averages, both sides trading",
+  B: "confidence B — priced from 1-hour averages",
+  C: "confidence C — thin, stale, or unverified data; treat as unconfirmed",
+};
+const TierChip = ({ tier }) => (
+  <span className="fd-badge" title={TIER_TITLE[tier]}
+    style={{ color: TIER_COLOR[tier], borderColor: TIER_COLOR[tier] + "66", marginLeft: 5 }}>
+    {tier}
+  </span>
+);
 
 const ScatterTip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
@@ -334,7 +438,7 @@ const BarTip = ({ active, payload }) => {
   return (
     <div className="fd-tip">
       <b>{d.name}</b>
-      est. {fmtGp(d.gpHr)}/hr · {fmtQty(d.qty)} units per cycle<br />
+      est. {fmtGp(d.gpHrLo)}–{fmtGp(d.gpHr)}/hr · {fmtQty(d.qty)} units per cycle<br />
       capital {fmtGp(d.capital)} · ~{d.cycleH < 1 ? Math.round(d.cycleH * 60) + " min" : d.cycleH.toFixed(1) + " h"} per cycle
     </div>
   );
@@ -384,9 +488,13 @@ export default function FlipDesk() {
 
   /* merge snapshot + live, run the model */
   const assessed = useMemo(() => {
+    const now = Math.floor(Date.now() / 1000);
     return BASE_ITEMS.map((b) => {
       const l = liveMap?.[b.id];
-      return assess(l ? { ...b, ...l, vol: l.vol == null ? b.vol : l.vol } : b);
+      const a = assess(l ? { ...b, ...l } : b, now);
+      // live board must not silently fall back to days-old snapshot rows
+      if (liveMap && !l) return { ...a, hidden: a.hidden || "no recent trades", tier: "C" };
+      return a;
     });
   }, [liveMap]);
 
@@ -398,6 +506,7 @@ export default function FlipDesk() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return played.filter((p) =>
+      !p.hidden &&
       p.qty > 0 &&
       p.roi >= ctl.minRoi &&
       p.risk <= ctl.riskTol &&
@@ -430,7 +539,8 @@ export default function FlipDesk() {
     if (!n) return null;
     const penny = filtered.filter((x) => x.high < 50);
     const pennyFlow = penny.reduce((s, x) => s + x.dv, 0);
-    return { n, total: played.length, penny: penny.length, pennyFlow, top: best?.hr };
+    const veiled = played.filter((x) => x.hidden).length;
+    return { n, total: played.length, penny: penny.length, pennyFlow, veiled, top: best?.hr };
   }, [filtered, played, best]);
 
   const sel = useMemo(() => played.find((p) => p.id === selId) || null, [played, selId]);
@@ -504,6 +614,8 @@ export default function FlipDesk() {
               {SNAP_DATE.toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
               {snapAge > 1 ? ` (~${snapAge}h old)` : ""}. Margins drift by the minute — treat these numbers as a
               teaching tape, not an order book, and hit Refresh when you're back online.
+              {SNAPSHOT.version !== 2 && <> This snapshot predates verified-average pricing, so every row is priced
+              from raw last prints and capped at confidence <b>C</b>.</>}
             </span>
           </div>
         )}
@@ -512,7 +624,8 @@ export default function FlipDesk() {
         {read && (
           <p className="fd-read">
             {read.n} of {read.total} tracked items pass your desk rules.
-            {read.top && <> Best tape right now: <b>{read.top.name}</b> at ~<b>{fmtGp(read.top.gpHr)}/hr</b> on your settings.</>}
+            {read.veiled > 0 && <> {read.veiled} more are hidden — one-sided books, dislocated prints, or no verifiable data.</>}
+            {read.top && <> Best tape right now: <b>{read.top.name}</b> at <b>{fmtGp(read.top.gpHrLo)}–{fmtGp(read.top.gpHr)}/hr</b> on your settings.</>}
             {read.penny > 0 && <> {read.penny} tax-exempt penny items are moving ~{fmtQty(read.pennyFlow)} units a day between them.</>}
           </p>
         )}
@@ -575,19 +688,20 @@ export default function FlipDesk() {
           <div className="fd-score">
             <button className="fd-card" onClick={() => setSelId(best.hr.id)}>
               <div className="k">Top earner · est. gp/hr</div>
-              <div className="n">{best.hr.name}</div>
-              <div className="v">{fmtGp(best.hr.gpHr)}/hr <span>· {fmtQty(best.hr.qty)} @ {fmtGp(best.hr.low)}</span></div>
+              <div className="n">{best.hr.name}<TierChip tier={best.hr.tier} /></div>
+              <div className="v">{fmtGp(best.hr.gpHrLo)}–{fmtGp(best.hr.gpHr)}/hr <span>· {fmtQty(best.hr.qty)} @ {fmtGp(best.hr.low)}</span></div>
+              <div className="v" style={{ marginTop: 3 }}><span>popular pick — expect the margin to compress</span></div>
             </button>
             <button className="fd-card" onClick={() => setSelId(best.roi.id)}>
               <div className="k">Fattest ROI after tax</div>
-              <div className="n">{best.roi.name}</div>
+              <div className="n">{best.roi.name}<TierChip tier={best.roi.tier} /></div>
               <div className="v">{best.roi.roi.toFixed(1)}% <span>· {fmtGp(best.roi.margin)} on {fmtGp(best.roi.low)}</span></div>
             </button>
             <button className="fd-card" onClick={() => setSelId(best.safe.id)}>
               <div className="k">Safest steady line</div>
-              <div className="v" style={{ marginTop: 5 }}><RiskBadge risk={best.safe.risk} /></div>
+              <div className="v" style={{ marginTop: 5 }}><RiskBadge risk={best.safe.risk} /><TierChip tier={best.safe.tier} /></div>
               <div className="n">{best.safe.name}</div>
-              <div className="v">{fmtGp(best.safe.gpHr)}/hr <span>· {fmtQty(best.safe.dv)} traded/day</span></div>
+              <div className="v">{fmtGp(best.safe.gpHrLo)}–{fmtGp(best.safe.gpHr)}/hr <span>· {fmtQty(best.safe.dv)} traded/day</span></div>
             </button>
           </div>
         )}
@@ -676,9 +790,9 @@ export default function FlipDesk() {
                     <td className={p.roi > 0 ? "up" : "dn"}>{p.roi.toFixed(1)}%</td>
                     <td className="hide-sm mut">{fmtQty(p.limit)}</td>
                     <td className="hide-sm mut">{fmtQty(p.dv)}</td>
-                    <td><RiskBadge risk={p.risk} /></td>
+                    <td><RiskBadge risk={p.risk} /><TierChip tier={p.tier} /></td>
                     <td>{fmtGp(p.perCycle)}</td>
-                    <td style={{ color: "#F0B437" }}>{fmtGp(p.gpHr)}</td>
+                    <td style={{ color: "#F0B437" }}>{fmtGp(p.gpHrLo)}–{fmtGp(p.gpHr)}</td>
                   </tr>
                 ))}
                 {!sorted.length && (
@@ -700,10 +814,11 @@ export default function FlipDesk() {
           <div className="fd-notes">
             <p><b>The tax.</b> The Exchange takes 2% of the sale price of every item, rounded down, capped at 5m per item. Anything that sells under 50 gp is exempt — which is why a 1 gp margin on iron arrows or iron nails is a clean 25–33% ROI while a 1% margin on a whip is roughly break-even after tax.</p>
             <p><b>Buy limits.</b> Every item caps how many you can buy per rolling 4 hours. Limits are the real ceiling on gp/hr: a 7,000-limit penny item can out-earn a big-ticket flip you can only buy 8 of. The est/hr column is always capped by limit ÷ 4h.</p>
-            <p><b>Risk score.</b> Blended from three observable pressures: how thin the hourly flow is (will your offer fill?), how far the 5-minute price has drifted from the 1-hour average relative to your margin (will the move eat your edge?), and how stale the last trade is. Low ≤ 30, high ≥ 60. It measures fill-and-drift risk, not manipulation.</p>
+            <p><b>Pricing &amp; confidence.</b> Buy and sell targets come from volume-weighted averages — the 5-minute window when both sides are trading, else the 1-hour window — never from the two most recent raw trades. Those two prints are asynchronous; one bot dump or one impatient buyer can fake a spread nobody will ever fill. Rows are tagged <b>A</b> (fresh 5-min averages), <b>B</b> (1-hour averages), or <b>C</b> (thin, stale, or unverified data). Items with a one-sided book, crossed prints, or a wide spread on a busy book (a dislocation, not a gift) are hidden from the board entirely.</p>
+            <p><b>Risk score.</b> Blended from three observable pressures: how thin the <i>one-sided</i> hourly flow is (your bid only fills from insta-sellers, your ask only from insta-buyers), how fast the 5-minute price is moving versus the spread it must cross, and how stale the last trade is. Missing data raises the score — a silent book is the risky case, not the calm one. Low ≤ 30, high ≥ 60. It measures fill-and-drift risk, not manipulation.</p>
             <p><b>Playstyle.</b> Patient mode assumes ~4-hour round trips gated by buy limits — set offers, log off, collect. Scalper mode assumes ~15-minute round trips and only makes sense on books deep enough to fill you fast; that's the "actionable for 5 minutes" end of the dial.</p>
             <p><b>Two worked personas.</b> The <i>penny bulk</i> preset is the &lt;50 gp, tax-exempt, high-ROI grind — iron arrows, nails, feathers, essence. The <i>5-minute scalps</i> preset hunts deep-volume items where the spread refills constantly and your money is never parked.</p>
-            <p><b>What the numbers aren't.</b> Instant-buy and instant-sell prices are the last trades crossed, not guaranteed fills. Estimates assume you capture ~30% of hourly flow at best, which is generous on contested items. This is a lens for reading the market, not an order robot.</p>
+            <p><b>What the numbers aren't.</b> Averaged targets are still not guaranteed fills, and every reader of a public price feed is competing for the same edge — that's why gp/hr is shown as a range assuming ~10% capture of the thin side's flow, and why the top pick carries a compression warning. This is a lens for reading the market, not an order robot.</p>
           </div>
           <p className="fd-foot">
             prices &amp; volumes · OSRS Wiki real-time prices API (RuneLite) · snapshot baked {SNAP_DATE.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })} · not affiliated with Jagex
@@ -716,13 +831,21 @@ export default function FlipDesk() {
 
 /* ================= offer slip ================= */
 function OfferSlip({ sel, status, data, onClose }) {
-  const taxLine = sel.high < 50
+  const taxLine = sel.tax === 0 && TAX_EXEMPT.has(sel.id)
+    ? "exempt item — the Exchange takes nothing"
+    : sel.high < 50
     ? "exempt — sells under 50 gp"
-    : `2% of ${sel.high.toLocaleString()} = ${sel.tax.toLocaleString()} gp, rounded down`;
+    : `2% of ${Math.round(sel.high).toLocaleString()} = ${sel.tax.toLocaleString()} gp, rounded down`;
   const cycleStr = sel.cycleH < 1 ? Math.round(sel.cycleH * 60) + " min" : sel.cycleH.toFixed(1) + " h";
+  const srcLine = sel.source === "5m" ? "5-minute volume-weighted averages"
+    : sel.source === "1h" ? "1-hour volume-weighted averages"
+    : "raw last prints — unverified";
+  const fillLine = sel.qty > 0 && sel.source !== "prints"
+    ? ` Est. fill at your size: ~${sel.buyH < 1 ? Math.round(sel.buyH * 60) + "m" : sel.buyH.toFixed(1) + "h"} buy + ${sel.sellH < 1 ? Math.round(sel.sellH * 60) + "m" : sel.sellH.toFixed(1) + "h"} sell.`
+    : "";
   const bars = [
-    { k: "Fill risk", v: sel.fillR, note: fmtQty(sel.hv) + " traded last hour" },
-    { k: "Drift risk", v: sel.driftR, note: (sel.vol == null ? "~" : sel.vol.toFixed(1) + "%") + " 5m-vs-1h drift" },
+    { k: "Fill risk", v: sel.fillR, note: fmtQty(sel.legFlow) + "/hr on the thin side" },
+    { k: "Drift risk", v: sel.driftR, note: sel.vol == null ? "no drift data — scored cautious" : sel.vol.toFixed(1) + "% 5m-vs-1h drift" },
     { k: "Staleness", v: sel.staleR, note: "last trade " + agoStr(sel.stale) + (status === "snapshot" ? " at snapshot" : "") },
   ];
   return (
@@ -730,7 +853,7 @@ function OfferSlip({ sel, status, data, onClose }) {
       <div className="fd-sliphead">
         <h3>{sel.name}</h3>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <RiskBadge risk={sel.risk} />
+          <RiskBadge risk={sel.risk} /><TierChip tier={sel.tier} />
           <a className="fd-link" href={`https://prices.runescape.wiki/osrs/item/${sel.id}`} target="_blank" rel="noreferrer">wiki page ↗</a>
           <button className="fd-btn" onClick={onClose}>✕ close</button>
         </div>
@@ -738,13 +861,14 @@ function OfferSlip({ sel, status, data, onClose }) {
       <div className="fd-slipbody">
         <div className="fd-box">
           <h4>The Flip</h4>
-          <div className="fd-kv"><span>Buy at (insta-sell)</span><b>{fmtFull(sel.low)}</b></div>
-          <div className="fd-kv"><span>Sell at (insta-buy)</span><b>{fmtFull(sel.high)}</b></div>
+          <div className="fd-kv"><span>Buy target (avg insta-sell)</span><b>{fmtFull(sel.low)}</b></div>
+          <div className="fd-kv"><span>Sell target (avg insta-buy)</span><b>{fmtFull(sel.high)}</b></div>
           <div className="fd-kv"><span>GE tax</span><b className={sel.tax ? "r" : "g"}>{sel.tax ? "-" + fmtFull(sel.tax) : "0 gp"}</b></div>
           <div className="fd-kv" style={{ borderTop: "1px solid #3A2E1B", marginTop: 4, paddingTop: 7 }}>
             <span>Net per unit</span><b className={sel.margin > 0 ? "g" : "r"}>{fmtFull(sel.margin)} · {sel.roi.toFixed(1)}%</b>
           </div>
-          <p className="fd-note">{taxLine}. Buy limit {sel.limit.toLocaleString()} / 4h · {fmtQty(sel.dv)} traded in 24h.</p>
+          <p className="fd-note">Priced from {srcLine}. Last prints {fmtGp(sel.latest?.low)} / {fmtGp(sel.latest?.high)}.
+            {" "}{taxLine}. Buy limit {sel.limit.toLocaleString()} / 4h · {fmtQty(sel.dv)} traded in 24h.</p>
         </div>
         <div className="fd-box">
           <h4>Your Play</h4>
@@ -752,11 +876,12 @@ function OfferSlip({ sel, status, data, onClose }) {
           <div className="fd-kv"><span>Capital out</span><b>{fmtGp(sel.capital)} gp</b></div>
           <div className="fd-kv"><span>Profit / cycle</span><b className={sel.perCycle > 0 ? "g" : "r"}>{fmtGp(sel.perCycle)} gp</b></div>
           <div className="fd-kv"><span>Cycle time</span><b>~{cycleStr}</b></div>
-          <div className="fd-kv"><span>Est. rate</span><b className="au">{fmtGp(sel.gpHr)}/hr</b></div>
+          <div className="fd-kv"><span>Est. rate</span><b className="au">{fmtGp(sel.gpHrLo)}–{fmtGp(sel.gpHr)}/hr</b></div>
           <p className="fd-note">
             {sel.qty === sel.limit ? "Buy-limit bound — your bankroll could take more, the Exchange won't sell it to you. Consider a second line."
               : sel.qty === sel.afford ? "Bankroll bound — every coin is working. A bigger stack would buy up to the " + sel.limit.toLocaleString() + " limit."
-              : "Flow bound — the book is too thin to fill more than this per cycle at your pace."}
+              : "Flow bound — the thin side of the book won't fill more than this per cycle at your pace."}
+            {fillLine}
           </p>
         </div>
         <div className="fd-box">
