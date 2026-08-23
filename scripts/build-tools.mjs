@@ -22,6 +22,11 @@ const TOOLS = [
     out: 'public/tools/skyrim/enchanting-simulator.html',
     title: 'Skyrim Enchanting Simulator',
   },
+  {
+    entry: 'tools-src/skyrim/skyrim-alchemy-lab.jsx',
+    out: 'public/tools/skyrim/alchemy-lab.html',
+    title: 'Skyrim Alchemy Lab',
+  },
 ];
 
 for (const tool of TOOLS) {

@@ -50,6 +50,11 @@ window.PELIGAMING = {
           description: "Arcane Enchanter loadout planner — max-enchant magnitudes for every slot at 100 Enchanting.",
           path: "tools/skyrim/enchanting-simulator.html",
         },
+        {
+          name: "Alchemy Lab",
+          description: "Brewing planner — the best-value potions and poisons from your ingredient stock, ranked in septims.",
+          path: "tools/skyrim/alchemy-lab.html",
+        },
       ],
     },
   ],
