@@ -293,6 +293,7 @@ table.fd-t { border-collapse:collapse; width:100%; font-size:12.5px; min-width:7
 .fd-mem { color:#C9A0E8; font-size:10px; margin-left:6px; border:1px solid #5A4470; border-radius:2px; padding:0 4px; }
 .fd-f2p { color:#8FBCE0; font-size:10px; margin-left:6px; border:1px solid #3E5A70; border-radius:2px; padding:0 4px; }
 .fd-taxfree { color:var(--green); font-size:10px; margin-left:6px; border:1px solid #3E5A34; border-radius:2px; padding:0 4px; }
+.fd-unconf { color:var(--amber); font-size:10px; margin-left:6px; border:1px dashed #6E5426; border-radius:2px; padding:0 4px; cursor:help; }
 @media (max-width:700px){ .hide-sm{display:none} table.fd-t{min-width:560px} }
 
 /* expanded row */
@@ -352,8 +353,10 @@ async function pullLive(signal) {
   for (const base of BASE_ITEMS) {
     const p = latest.data?.[base.id];
     if (!p || !p.high || !p.low) continue;
-    let high = p.high, low = p.low;
-    if (high < low) { const t = high; high = low; low = t; }
+    const high = p.high, low = p.low;
+    // crossed tape (insta-buy below insta-sell) means one side is stale and the
+    // price is moving — swapping would fabricate a margin out of staleness
+    if (high < low) continue;
     const h = h1.data?.[base.id] || {};
     const f = m5?.data?.[base.id] || {};
     // highPriceVolume = trades at insta-buy (fills YOUR sell offer); lowPriceVolume = insta-sells (fills YOUR buy offer)
@@ -364,8 +367,12 @@ async function pullLive(signal) {
     const m1 = mid(h), mf = mid(f);
     const vol = m1 && mf ? Math.abs(mf - m1) / m1 * 100 : null;
     const stale = Math.max(now - (p.highTime || now), now - (p.lowTime || now)) / 60;
+    // a latest spread far wider than the hour's average is usually one bait or
+    // outlier print, not a margin you can capture — badge it, don't chase it
+    const avgSpread = h.avgHighPrice && h.avgLowPrice ? h.avgHighPrice - h.avgLowPrice : null;
+    const unconf = avgSpread != null && avgSpread >= 0 && high - low > Math.max(1.5 * avgSpread, avgSpread + 2);
     out[base.id] = {
-      low, high, hv, hvHi, hvLo, hvSplit: true,
+      low, high, hv, hvHi, hvLo, hvSplit: true, unconf,
       dv: vols.data?.[base.id] ?? base.dv,
       vol, stale: Math.round(stale),
     };
@@ -750,6 +757,7 @@ export default function FlipDesk() {
                         {p.name}
                         {p.tax === 0 && <span className="fd-taxfree">0% tax</span>}
                         {p.members ? <span className="fd-mem">P2P</span> : <span className="fd-f2p">F2P</span>}
+                        {p.unconf && <span className="fd-unconf" title="Latest spread is far wider than the hour's average — probably one outlier print. Probe with 1 before committing.">unconfirmed</span>}
                       </td>
                       <td>{fmtGp(p.buyP)}</td>
                       <td className="hide-sm">{fmtGp(p.sellP)}</td>
@@ -790,7 +798,7 @@ export default function FlipDesk() {
             <p><b>Offer pricing.</b> The GE queue is price-time priority. Quoting at the touch (buy at insta-sell, sell at insta-buy) takes the full spread but stands you behind everyone already there — figure ~25% of counter-flow finds you. Stepping even 1 gp inside jumps the entire queue at that price, so fills come far faster at 2 gp of margin given up. The pricing dial and each item's strategy table price this trade-off both ways.</p>
             <p><b>Playstyle.</b> The dial sets how long a round trip you'll tolerate: patient mode sizes stacks for ~4-hour cycles — set offers, log off, collect; scalper mode sizes them to turn in ~15 minutes and only makes sense on books deep enough to fill you fast.</p>
             <p><b>Two worked personas.</b> The <i>penny bulk</i> preset is the &lt;50 gp, tax-exempt, high-ROI grind — iron arrows, nails, feathers, essence. The <i>5-minute scalps</i> preset hunts deep-volume items where the spread refills constantly and your money is never parked.</p>
-            <p><b>What the numbers aren't.</b> Instant-buy and instant-sell prices are the last trades crossed, not guaranteed fills. Fill clocks assume the last hour's flow keeps its pace and that you capture ~25% of it at the touch (more when you price inside) — generous on contested items, and blind to the queue already ahead of you. This is a lens for reading the market, not an order robot.</p>
+            <p><b>What the numbers aren't.</b> Instant-buy and instant-sell prices are the last trades crossed, not guaranteed fills — a margin tagged <i>unconfirmed</i> means the latest spread is far wider than the hour's average, which usually smells like one outlier print: probe it with a single unit first. Fill clocks assume the last hour's flow keeps its pace and that you capture ~25% of it at the touch (more when you price inside) — generous on contested items, and blind to the queue already ahead of you. This is a lens for reading the market, not an order robot.</p>
           </div>
           <p className="fd-foot">
             prices &amp; volumes · OSRS Wiki real-time prices API (RuneLite) · snapshot baked {SNAP_DATE.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })} · not affiliated with Jagex
