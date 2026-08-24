@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid,
   Tooltip as RTooltip, ResponsiveContainer, BarChart, Bar, Cell,
-  LineChart, Line,
+  ComposedChart, Line,
 } from "recharts";
 
 /* ================= baked snapshot (captured 20 Aug 2026, OSRS Wiki real-time prices) ================= */
@@ -14,7 +14,9 @@ const SNAP_DATE = new Date(SNAPSHOT.ts * 1000);
 /* ================= GE mechanics ================= */
 // 2% tax on the sale price of each item, rounded down, capped at 5m/item.
 // Items that sell below 50 gp are exempt — the classic penny-flipper edge.
-const geTax = (sell) => (sell < 50 ? 0 : Math.min(Math.floor(sell * 0.02), 5_000_000));
+// Old School Bonds (13190) are exempt outright.
+const TAX_EXEMPT_IDS = new Set([13190]);
+const geTax = (sell, id) => (sell < 50 || TAX_EXEMPT_IDS.has(id) ? 0 : Math.min(Math.floor(sell * 0.02), 5_000_000));
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -41,11 +43,24 @@ const agoStr = (min) => {
   if (min < 1440) return (min / 60).toFixed(1) + "h ago";
   return (min / 1440).toFixed(1) + "d ago";
 };
+// duration in hours -> compact human string
+const fmtDur = (h) => {
+  if (h == null || !isFinite(h)) return "∞";
+  const m = h * 60;
+  if (m < 1) return "<1m";
+  if (m < 60) return Math.round(m) + "m";
+  if (h < 48) return (h < 10 ? h.toFixed(1) : Math.round(h)) + "h";
+  return Math.round(h / 24) + "d";
+};
+// colour a fill-time: fast fills green, slow fills red
+const durClass = (h) => (!isFinite(h) ? "dn" : h <= 0.25 ? "up" : h <= 2 ? "" : h <= 8 ? "wn" : "dn");
 
 /* ================= data shaping ================= */
 const rowToItem = (r) => ({
   id: r[0], name: r[1], limit: r[2], members: !!r[3],
   low: r[4], high: r[5], hv: r[6], dv: r[7],
+  // snapshot stores combined hourly flow; assume an even split until live data lands
+  hvLo: r[6] / 2, hvHi: r[6] / 2, hvSplit: false,
   vol: r[8] < 0 ? null : r[8], stale: r[9],
 });
 const BASE_ITEMS = SNAPSHOT.items.map(rowToItem);
@@ -56,12 +71,14 @@ const BASE_ITEMS = SNAPSHOT.items.map(rowToItem);
    - drift risk: recent 5-min vs 1-hour price drift vs. your margin
    - staleness: minutes since either side of the book last traded    */
 function assess(it) {
-  const tax = geTax(it.high);
+  const tax = geTax(it.high, it.id);
   const margin = it.high - it.low - tax;
   const roi = it.low > 0 ? (margin / it.low) * 100 : 0;
   const spread = it.low > 0 ? ((it.high - it.low) / it.low) * 100 : 0;
 
-  const fillR = clamp(100 - Math.log10((it.hv || 0) + 1) * 20, 0, 100);
+  // the thinner side of the book gates your round trip — a one-sided tape still strands you
+  const gateFlow = it.hvSplit ? Math.min(it.hvLo, it.hvHi) * 2 : (it.hv || 0);
+  const fillR = clamp(100 - Math.log10(gateFlow + 1) * 20, 0, 100);
   // penny items tick in whole gp, so % drift is noise — damp it
   let v = it.vol == null ? 0.6 : it.vol;
   if (it.high < 50) v = Math.min(v, 8);
@@ -72,18 +89,64 @@ function assess(it) {
   return { ...it, tax, margin, roi, spread, fillR, driftR, staleR, risk };
 }
 
-/* play = 0 patient 4-hour limits … 1 five-minute scalper */
-function playOut(a, budget, play) {
-  const cycleH = lerp(4, 0.25, play);                    // round-trip you'll tolerate
-  const capacity = Math.max(1, Math.floor(a.hv * cycleH * 0.3)); // ~30% of the flow you touch
-  const afford = a.low > 0 ? Math.floor(budget / a.low) : 0;
-  const qty = Math.max(0, Math.min(a.limit, afford, capacity));
-  const perCycle = qty * a.margin;
+/* ---- offer pricing & fill-time model ----
+   The GE queue is price-time priority. At the touch (buy at insta-sell, sell at
+   insta-buy) you sit behind everyone already quoted there — assume you capture
+   ~25% of the counter-flow. Stepping even 1 gp inside the spread jumps the whole
+   queue at that price, so capture leaps; deeper steps only outbid other steppers.
+   Your buy order fills from insta-sellers (hvLo), your sell from insta-buyers (hvHi). */
+const SHARE_TOUCH = 0.25;
+const shareOf = (step, maxStep) =>
+  step <= 0 ? SHARE_TOUCH : 0.7 + 0.2 * (maxStep > 0 ? step / maxStep : 1);
+
+/* one pricing scenario for an item: step gp inside the spread on each side.
+   fixedQty pins the stack size (strategy comparison); otherwise the stack is
+   sized to round-trip inside the attention window tolH. */
+function priceOut(a, budget, tolH, step, fixedQty) {
+  const maxStep = Math.max(0, Math.floor((a.high - a.low - 1) / 2));
+  step = clamp(step, 0, maxStep);
+  const buyP = a.low + step;
+  const sellP = a.high - step;
+  const tax = geTax(sellP, a.id);
+  const margin = sellP - buyP - tax;
+  const roi = buyP > 0 ? (margin / buyP) * 100 : 0;
+
+  const share = shareOf(step, maxStep);
+  const buyRate = a.hvLo * share;   // units/hour your buy offer absorbs
+  const sellRate = a.hvHi * share;
+  const afford = buyP > 0 ? Math.floor(budget / buyP) : 0;
+
+  // biggest stack that still round-trips inside your attention window
+  const hPerUnit = (buyRate > 0 ? 1 / buyRate : Infinity) + (sellRate > 0 ? 1 / sellRate : Infinity);
+  const qtyTol = isFinite(hPerUnit) ? Math.max(1, Math.floor(tolH / hPerUnit)) : 1;
+  const qty = fixedQty != null
+    ? Math.max(0, Math.min(fixedQty, a.limit))
+    : Math.max(0, Math.min(a.limit, afford, qtyTol));
+
+  const tBuyH = buyRate > 0 ? Math.max(qty / buyRate, 1 / 60) : Infinity;
+  const tSellH = sellRate > 0 ? Math.max(qty / sellRate, 1 / 60) : Infinity;
+  const cycleH = tBuyH + tSellH;
+  const perCycle = qty * margin;
   // buy limit gates you to `limit` units per 4h no matter how fast you churn
-  const gpHr = qty > 0 ? Math.min(perCycle / cycleH, (a.limit * a.margin) / 4) : 0;
-  const capital = qty * a.low;
-  const limitBound = qty === a.limit && cycleH < 4;
-  return { ...a, cycleH, qty, perCycle, gpHr, capital, afford, limitBound };
+  const gpHr = qty > 0 && isFinite(cycleH)
+    ? (margin >= 0 ? Math.min(perCycle / cycleH, (a.limit * margin) / 4) : perCycle / cycleH)
+    : 0;
+  const capital = qty * buyP;
+  return {
+    step, maxStep, buyP, sellP, tax, margin, roi, share,
+    tBuyH, tSellH, cycleH, qty, perCycle, gpHr, capital, afford,
+    limitBound: qty === a.limit && qty < Math.min(afford, qtyTol),
+  };
+}
+
+/* play = 0 patient 4-hour limits … 1 five-minute scalper
+   price = 0 quote at the touch … 1 meet mid-spread for near-instant fills */
+function playOut(a, budget, play, price) {
+  const tolH = lerp(4, 0.25, play); // round-trip you'll tolerate
+  const maxStep = Math.max(0, Math.floor((a.high - a.low - 1) / 2));
+  const step = Math.round(price * maxStep);
+  const p = priceOut(a, budget, tolH, step);
+  return { ...a, ...p, tolH, bookMargin: a.margin, bookRoi: a.roi };
 }
 
 const riskBucket = (r) => (r < 30 ? "low" : r < 60 ? "medium" : "high");
@@ -94,33 +157,23 @@ const PRESETS = [
   {
     key: "penny", label: "Penny bulk · tax-free",
     blurb: "Sub-50 gp items dodge the 2% tax entirely. One tick of margin on iron arrows or nails, moved in the tens of thousands.",
-    c: { budget: 200_000, play: 0.55, riskTol: 45, minRoi: 10, taxFree: true, f2p: false },
+    c: { budget: 200_000, play: 0.55, price: 0, riskTol: 45, minRoi: 10, taxFree: true, f2p: false },
   },
   {
     key: "scalp", label: "5-minute scalps",
     blurb: "Deep books that fill in minutes. You're paid for attention, not patience — reprice constantly, exit fast.",
-    c: { budget: 5_000_000, play: 1, riskTol: 75, minRoi: 0.8, taxFree: false, f2p: false },
+    c: { budget: 5_000_000, play: 1, price: 0.35, riskTol: 75, minRoi: 0.8, taxFree: false, f2p: false },
   },
   {
     key: "limits", label: "Steady 4-hour limits",
     blurb: "Set offers, walk away, collect. Ranked by what a full buy limit is worth, not by churn speed.",
-    c: { budget: 20_000_000, play: 0.08, riskTol: 50, minRoi: 1, taxFree: false, f2p: false },
+    c: { budget: 20_000_000, play: 0.08, price: 0, riskTol: 50, minRoi: 1, taxFree: false, f2p: false },
   },
   {
     key: "whale", label: "High roller",
     blurb: "Big-ticket gear where one flip pays like a boss drop — and one drift wipes a day. Thin books, wide nerves.",
-    c: { budget: 600_000_000, play: 0.35, riskTol: 90, minRoi: 0.4, taxFree: false, f2p: false },
+    c: { budget: 600_000_000, play: 0.35, price: 0.15, riskTol: 90, minRoi: 0.4, taxFree: false, f2p: false },
   },
-];
-
-const SORTS = [
-  { key: "gpHr", label: "est. gp/hr" },
-  { key: "roi", label: "ROI" },
-  { key: "perCycle", label: "gp / cycle" },
-  { key: "margin", label: "margin" },
-  { key: "dv", label: "24h volume" },
-  { key: "risk", label: "risk" },
-  { key: "low", label: "price" },
 ];
 
 /* ================= styles ================= */
@@ -234,19 +287,32 @@ table.fd-t { border-collapse:collapse; width:100%; font-size:12.5px; min-width:7
 .fd-t tbody tr { cursor:pointer; }
 .fd-t tbody tr:hover { background:#241C0E; }
 .fd-t tbody tr.sel { background:#2E2410; box-shadow:inset 3px 0 0 var(--gold); }
-.fd-t .up { color:var(--green); } .fd-t .dn { color:var(--red); } .fd-t .mut { color:var(--mut); }
+.fd-t .up { color:var(--green); } .fd-t .dn { color:var(--red); } .fd-t .mut { color:var(--mut); } .fd-t .wn { color:var(--amber); }
+.fd-caret { display:inline-block; width:14px; color:var(--gold-dim); font-size:10px; }
 .fd-badge { display:inline-block; font-size:10px; letter-spacing:.08em; padding:2px 7px; border-radius:2px; border:1px solid; font-family:var(--mono); }
 .fd-mem { color:#C9A0E8; font-size:10px; margin-left:6px; border:1px solid #5A4470; border-radius:2px; padding:0 4px; }
 .fd-f2p { color:#8FBCE0; font-size:10px; margin-left:6px; border:1px solid #3E5A70; border-radius:2px; padding:0 4px; }
 .fd-taxfree { color:var(--green); font-size:10px; margin-left:6px; border:1px solid #3E5A34; border-radius:2px; padding:0 4px; }
-@media (max-width:700px){ .hide-sm{display:none} table.fd-t{min-width:520px} }
+@media (max-width:700px){ .hide-sm{display:none} table.fd-t{min-width:560px} }
 
-/* offer slip */
-.fd-slip { border:1px solid var(--trim-hi); border-radius:5px; background:linear-gradient(180deg,#2C2212,#241C0F); margin-top:14px; overflow:hidden; }
-.fd-sliphead { background:linear-gradient(180deg,#3A2D15,#2E2410); padding:10px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid var(--trim-hi); flex-wrap:wrap; }
-.fd-sliphead h3 { margin:0; font-family:var(--disp); font-size:17px; color:var(--gold); letter-spacing:.04em; }
-.fd-slipbody { display:grid; grid-template-columns:1.1fr 1fr 1.2fr; gap:14px; padding:14px; }
-@media (max-width:860px){ .fd-slipbody{grid-template-columns:1fr} }
+/* expanded row */
+.fd-t tbody tr.fd-exprow, .fd-t tbody tr.fd-exprow:hover { background:#20180C; cursor:default; }
+.fd-t tbody tr.fd-exprow > td { padding:0; white-space:normal; text-align:left; }
+.fd-expand { padding:12px 14px 14px; border-top:1px solid var(--trim-hi); border-bottom:2px solid var(--trim-hi);
+  box-shadow:inset 3px 0 0 var(--gold); display:flex; flex-direction:column; gap:12px; }
+.fd-exphead { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.fd-exphead h3 { margin:0; font-family:var(--disp); font-size:17px; color:var(--gold); letter-spacing:.04em; }
+.fd-expgrid { display:grid; grid-template-columns:1.1fr 1fr 1.2fr; gap:12px; }
+@media (max-width:860px){ .fd-expgrid{grid-template-columns:1fr} }
+.fd-stepnote { font-style:normal; font-size:10px; color:var(--mut); margin-left:5px; }
+table.fd-strat { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px; min-width:520px; }
+.fd-t .fd-strat th { position:static; text-align:right; color:var(--gold-dim); font-family:var(--disp); font-weight:600;
+  font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; padding:4px 8px; border-bottom:1px solid var(--trim); cursor:default; background:none; }
+.fd-t .fd-strat th:first-child, .fd-t .fd-strat td:first-child { text-align:left; }
+.fd-t .fd-strat td { text-align:right; padding:5px 8px; border-bottom:1px solid #2A2113; white-space:nowrap; }
+.fd-t tbody .fd-strat tr, .fd-t tbody .fd-strat tr:hover { cursor:default; background:transparent; }
+.fd-t tbody .fd-strat tr.cur, .fd-t tbody .fd-strat tr.cur:hover { background:#2E2410; }
+.fd-t .fd-strat tr.cur td:first-child { box-shadow:inset 2px 0 0 var(--gold); color:var(--gold); }
 .fd-box { background:var(--inset); border:1px solid var(--trim); border-radius:4px; padding:11px 12px; }
 .fd-box h4 { margin:0 0 8px; font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--gold-dim); font-family:var(--disp); font-weight:600; }
 .fd-kv { display:flex; justify-content:space-between; font-family:var(--mono); font-size:12.5px; padding:3px 0; gap:10px; }
@@ -290,13 +356,16 @@ async function pullLive(signal) {
     if (high < low) { const t = high; high = low; low = t; }
     const h = h1.data?.[base.id] || {};
     const f = m5?.data?.[base.id] || {};
-    const hv = (h.highPriceVolume || 0) + (h.lowPriceVolume || 0);
+    // highPriceVolume = trades at insta-buy (fills YOUR sell offer); lowPriceVolume = insta-sells (fills YOUR buy offer)
+    const hvHi = h.highPriceVolume || 0;
+    const hvLo = h.lowPriceVolume || 0;
+    const hv = hvHi + hvLo;
     const mid = (d) => (d.avgHighPrice && d.avgLowPrice ? (d.avgHighPrice + d.avgLowPrice) / 2 : d.avgHighPrice || d.avgLowPrice || null);
     const m1 = mid(h), mf = mid(f);
     const vol = m1 && mf ? Math.abs(mf - m1) / m1 * 100 : null;
     const stale = Math.max(now - (p.highTime || now), now - (p.lowTime || now)) / 60;
     out[base.id] = {
-      low, high, hv,
+      low, high, hv, hvHi, hvLo, hvSplit: true,
       dv: vols.data?.[base.id] ?? base.dv,
       vol, stale: Math.round(stale),
     };
@@ -335,7 +404,7 @@ const BarTip = ({ active, payload }) => {
     <div className="fd-tip">
       <b>{d.name}</b>
       est. {fmtGp(d.gpHr)}/hr · {fmtQty(d.qty)} units per cycle<br />
-      capital {fmtGp(d.capital)} · ~{d.cycleH < 1 ? Math.round(d.cycleH * 60) + " min" : d.cycleH.toFixed(1) + " h"} per cycle
+      capital {fmtGp(d.capital)} · ~{fmtDur(d.cycleH)} per cycle
     </div>
   );
 };
@@ -391,8 +460,8 @@ export default function FlipDesk() {
   }, [liveMap]);
 
   const played = useMemo(
-    () => assessed.map((a) => playOut(a, ctl.budget, ctl.play)),
-    [assessed, ctl.budget, ctl.play]
+    () => assessed.map((a) => playOut(a, ctl.budget, ctl.play, ctl.price)),
+    [assessed, ctl.budget, ctl.play, ctl.price]
   );
 
   const filtered = useMemo(() => {
@@ -444,8 +513,9 @@ export default function FlipDesk() {
     fetchJson(`${API}/timeseries?timestep=5m&id=${sel.id}`, ctrl.signal)
       .then((j) => {
         if (dead) return;
-        const pts = (j.data || []).slice(-72).map((d) => ({
+        const pts = (j.data || []).slice(-288).map((d) => ({
           t: d.timestamp, hi: d.avgHighPrice, lo: d.avgLowPrice,
+          v: (d.highPriceVolume || 0) + (d.lowPriceVolume || 0),
         })).filter((d) => d.hi || d.lo);
         setSeries((s) => ({ ...s, [sel.id]: pts.length ? { pts } : { err: true } }));
       })
@@ -454,9 +524,9 @@ export default function FlipDesk() {
     return () => { dead = true; ctrl.abort(); };
   }, [sel, series]);
 
-  const clickSort = (k) => {
+  const clickSort = (k, dir = -1) => {
     if (sortKey === k) setSortDir((d) => -d);
-    else { setSortKey(k); setSortDir(-1); }
+    else { setSortKey(k); setSortDir(dir); }
   };
 
   const budgetSlider = Math.log10(ctl.budget);
@@ -464,6 +534,9 @@ export default function FlipDesk() {
     : ctl.play < 0.6 ? "mixed — check in hourly"
     : ctl.play < 0.85 ? "active — reprice often"
     : "scalping — 5-min churn";
+  const priceLabel = ctl.price < 0.05 ? "at the touch — full margin"
+    : ctl.price < 0.5 ? "step inside — jump the queue"
+    : "deep cut — speed over margin";
   const riskLabel = ctl.riskTol < 40 ? "careful" : ctl.riskTol < 70 ? "balanced" : "degen";
   const activePreset = PRESETS.find((p) => p.key === preset);
 
@@ -543,6 +616,12 @@ export default function FlipDesk() {
               <input className="fd-range" type="range" min={0} max={1} step={0.01}
                 value={ctl.play} onChange={(e) => setC({ play: +e.target.value })} aria-label="Playstyle" />
               <div className="fd-ends"><span>patient limits</span><span>5-min scalper</span></div>
+            </div>
+            <div className="fd-ctl">
+              <label>Offer pricing <b>{priceLabel}</b></label>
+              <input className="fd-range" type="range" min={0} max={1} step={0.01}
+                value={ctl.price} onChange={(e) => setC({ price: +e.target.value })} aria-label="Offer pricing" />
+              <div className="fd-ends"><span>full margin, slow fill</span><span>thin margin, fast fill</span></div>
             </div>
             <div className="fd-ctl">
               <label>Risk appetite <b>{riskLabel} ≤ {ctl.riskTol}</b></label>
@@ -643,56 +722,62 @@ export default function FlipDesk() {
 
         {/* table */}
         <section className="fd-panel">
-          <h2 className="fd-lab">The Board — {sorted.length} trades pass · tap a row for the offer slip</h2>
+          <h2 className="fd-lab">The Board — {sorted.length} trades pass · tap a row to open its ledger</h2>
           <div className="fd-tablewrap">
             <table className="fd-t">
               <thead>
                 <tr>
                   <th className={sortKey === "name" ? "on" : ""} onClick={() => clickSort("name")}>Item</th>
-                  <th className={sortKey === "low" ? "on" : ""} onClick={() => clickSort("low")}>Buy</th>
-                  <th className="hide-sm">Sell</th>
-                  <th className="hide-sm">Tax</th>
+                  <th className={sortKey === "buyP" ? "on" : ""} onClick={() => clickSort("buyP")}>Buy @</th>
+                  <th className="hide-sm">Sell @</th>
                   <th className={sortKey === "margin" ? "on" : ""} onClick={() => clickSort("margin")}>Net</th>
                   <th className={sortKey === "roi" ? "on" : ""} onClick={() => clickSort("roi")}>ROI</th>
+                  <th className={sortKey === "tBuyH" ? "on" : ""} onClick={() => clickSort("tBuyH", 1)}>Buy fill</th>
+                  <th className={(sortKey === "tSellH" ? "on " : "") + "hide-sm"} onClick={() => clickSort("tSellH", 1)}>Sell fill</th>
                   <th className="hide-sm">Limit</th>
                   <th className={(sortKey === "dv" ? "on " : "") + "hide-sm"} onClick={() => clickSort("dv")}>24h vol</th>
                   <th className={sortKey === "risk" ? "on" : ""} onClick={() => clickSort("risk")}>Risk</th>
-                  <th className={sortKey === "perCycle" ? "on" : ""} onClick={() => clickSort("perCycle")}>Gp/cycle</th>
+                  <th className={(sortKey === "perCycle" ? "on " : "") + "hide-sm"} onClick={() => clickSort("perCycle")}>Gp/cycle</th>
                   <th className={sortKey === "gpHr" ? "on" : ""} onClick={() => clickSort("gpHr")}>Est/hr</th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((p) => (
-                  <tr key={p.id} className={p.id === selId ? "sel" : ""} onClick={() => setSelId(p.id === selId ? null : p.id)}>
-                    <td>
-                      {p.name}
-                      {p.high < 50 && <span className="fd-taxfree">0% tax</span>}
-                      {p.members ? <span className="fd-mem">P2P</span> : <span className="fd-f2p">F2P</span>}
-                    </td>
-                    <td>{fmtGp(p.low)}</td>
-                    <td className="hide-sm">{fmtGp(p.high)}</td>
-                    <td className="hide-sm mut">{p.tax ? fmtGp(p.tax) : "—"}</td>
-                    <td className={p.margin > 0 ? "up" : "dn"}>{fmtGp(p.margin)}</td>
-                    <td className={p.roi > 0 ? "up" : "dn"}>{p.roi.toFixed(1)}%</td>
-                    <td className="hide-sm mut">{fmtQty(p.limit)}</td>
-                    <td className="hide-sm mut">{fmtQty(p.dv)}</td>
-                    <td><RiskBadge risk={p.risk} /></td>
-                    <td>{fmtGp(p.perCycle)}</td>
-                    <td style={{ color: "#F0B437" }}>{fmtGp(p.gpHr)}</td>
-                  </tr>
+                  <React.Fragment key={p.id}>
+                    <tr className={p.id === selId ? "sel" : ""} onClick={() => setSelId(p.id === selId ? null : p.id)}>
+                      <td>
+                        <span className="fd-caret">{p.id === selId ? "▾" : "▸"}</span>
+                        {p.name}
+                        {p.tax === 0 && <span className="fd-taxfree">0% tax</span>}
+                        {p.members ? <span className="fd-mem">P2P</span> : <span className="fd-f2p">F2P</span>}
+                      </td>
+                      <td>{fmtGp(p.buyP)}</td>
+                      <td className="hide-sm">{fmtGp(p.sellP)}</td>
+                      <td className={p.margin > 0 ? "up" : "dn"}>{fmtGp(p.margin)}</td>
+                      <td className={p.roi > 0 ? "up" : "dn"}>{p.roi.toFixed(1)}%</td>
+                      <td className={durClass(p.tBuyH)}>{fmtDur(p.tBuyH)}</td>
+                      <td className={"hide-sm " + durClass(p.tSellH)}>{fmtDur(p.tSellH)}</td>
+                      <td className="hide-sm mut">{fmtQty(p.limit)}</td>
+                      <td className="hide-sm mut">{fmtQty(p.dv)}</td>
+                      <td><RiskBadge risk={p.risk} /></td>
+                      <td className="hide-sm">{fmtGp(p.perCycle)}</td>
+                      <td style={{ color: "#F0B437" }}>{fmtGp(p.gpHr)}</td>
+                    </tr>
+                    {p.id === selId && (
+                      <ExpandedRow sel={p} status={status} data={series[p.id]}
+                        budget={ctl.budget} onClose={() => setSelId(null)} />
+                    )}
+                  </React.Fragment>
                 ))}
                 {!sorted.length && (
-                  <tr><td colSpan={11} style={{ textAlign: "center", padding: 24, color: "#A5937A" }}>
-                    Nothing passes these rules. Loosen the risk cap or minimum ROI, raise the bankroll, or clear the tax-free filter.
+                  <tr><td colSpan={12} style={{ textAlign: "center", padding: 24, color: "#A5937A" }}>
+                    Nothing passes these rules. Loosen the risk cap or minimum ROI, ease the offer-pricing dial back toward the touch, raise the bankroll, or clear the tax-free filter.
                   </td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </section>
-
-        {/* offer slip */}
-        {sel && <OfferSlip sel={sel} status={status} data={series[sel.id]} onClose={() => setSelId(null)} />}
 
         {/* ledger notes */}
         <section className="fd-panel">
@@ -701,9 +786,11 @@ export default function FlipDesk() {
             <p><b>The tax.</b> The Exchange takes 2% of the sale price of every item, rounded down, capped at 5m per item. Anything that sells under 50 gp is exempt — which is why a 1 gp margin on iron arrows or iron nails is a clean 25–33% ROI while a 1% margin on a whip is roughly break-even after tax.</p>
             <p><b>Buy limits.</b> Every item caps how many you can buy per rolling 4 hours. Limits are the real ceiling on gp/hr: a 7,000-limit penny item can out-earn a big-ticket flip you can only buy 8 of. The est/hr column is always capped by limit ÷ 4h.</p>
             <p><b>Risk score.</b> Blended from three observable pressures: how thin the hourly flow is (will your offer fill?), how far the 5-minute price has drifted from the 1-hour average relative to your margin (will the move eat your edge?), and how stale the last trade is. Low ≤ 30, high ≥ 60. It measures fill-and-drift risk, not manipulation.</p>
-            <p><b>Playstyle.</b> Patient mode assumes ~4-hour round trips gated by buy limits — set offers, log off, collect. Scalper mode assumes ~15-minute round trips and only makes sense on books deep enough to fill you fast; that's the "actionable for 5 minutes" end of the dial.</p>
+            <p><b>The fill clock.</b> Your buy order fills from people insta-selling into the book; your sell order fills from insta-buyers. The desk reads each side's hourly flow separately and estimates how long an order of your size waits: quantity ÷ (that side's flow × your share of it). A fat margin on a book where the sell side moves 40 units an hour is a parked bankroll, and the clock says so before you learn it the hard way.</p>
+            <p><b>Offer pricing.</b> The GE queue is price-time priority. Quoting at the touch (buy at insta-sell, sell at insta-buy) takes the full spread but stands you behind everyone already there — figure ~25% of counter-flow finds you. Stepping even 1 gp inside jumps the entire queue at that price, so fills come far faster at 2 gp of margin given up. The pricing dial and each item's strategy table price this trade-off both ways.</p>
+            <p><b>Playstyle.</b> The dial sets how long a round trip you'll tolerate: patient mode sizes stacks for ~4-hour cycles — set offers, log off, collect; scalper mode sizes them to turn in ~15 minutes and only makes sense on books deep enough to fill you fast.</p>
             <p><b>Two worked personas.</b> The <i>penny bulk</i> preset is the &lt;50 gp, tax-exempt, high-ROI grind — iron arrows, nails, feathers, essence. The <i>5-minute scalps</i> preset hunts deep-volume items where the spread refills constantly and your money is never parked.</p>
-            <p><b>What the numbers aren't.</b> Instant-buy and instant-sell prices are the last trades crossed, not guaranteed fills. Estimates assume you capture ~30% of hourly flow at best, which is generous on contested items. This is a lens for reading the market, not an order robot.</p>
+            <p><b>What the numbers aren't.</b> Instant-buy and instant-sell prices are the last trades crossed, not guaranteed fills. Fill clocks assume the last hour's flow keeps its pace and that you capture ~25% of it at the touch (more when you price inside) — generous on contested items, and blind to the queue already ahead of you. This is a lens for reading the market, not an order robot.</p>
           </div>
           <p className="fd-foot">
             prices &amp; volumes · OSRS Wiki real-time prices API (RuneLite) · snapshot baked {SNAP_DATE.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })} · not affiliated with Jagex
@@ -714,85 +801,174 @@ export default function FlipDesk() {
   );
 }
 
-/* ================= offer slip ================= */
-function OfferSlip({ sel, status, data, onClose }) {
-  const taxLine = sel.high < 50
-    ? "exempt — sells under 50 gp"
-    : `2% of ${sel.high.toLocaleString()} = ${sel.tax.toLocaleString()} gp, rounded down`;
-  const cycleStr = sel.cycleH < 1 ? Math.round(sel.cycleH * 60) + " min" : sel.cycleH.toFixed(1) + " h";
+/* ================= expanded row ================= */
+const timeTick = (t) => {
+  const d = new Date(t * 1000);
+  return d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0");
+};
+
+function ExpandedRow({ sel, status, data, budget, onClose }) {
+  const rowRef = useRef(null);
+  useEffect(() => { rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, []);
+
+  /* same bankroll & attention window, three ways to price the offers */
+  const strats = useMemo(() => {
+    const defs = [
+      { label: "At the touch", step: 0 },
+      { label: "+1 gp inside", step: 1 },
+      { label: "Mid-spread cut", step: Math.round(sel.maxStep / 2) },
+      { label: "Your dial", step: sel.step },
+    ];
+    const seen = new Set();
+    return defs
+      .filter((d) => d.step <= sel.maxStep && !seen.has(d.step) && seen.add(d.step))
+      .sort((a, b) => a.step - b.step)
+      .map((d) => ({ ...d, ...priceOut(sel, budget, sel.tolH, d.step, sel.qty) }));
+  }, [sel, budget]);
+
+  const taxLine = sel.tax === 0
+    ? (sel.sellP < 50 ? "tax exempt — sells under 50 gp" : "tax exempt item")
+    : `tax is 2% of ${sel.sellP.toLocaleString()} = ${sel.tax.toLocaleString()} gp, rounded down`;
   const bars = [
     { k: "Fill risk", v: sel.fillR, note: fmtQty(sel.hv) + " traded last hour" },
     { k: "Drift risk", v: sel.driftR, note: (sel.vol == null ? "~" : sel.vol.toFixed(1) + "%") + " 5m-vs-1h drift" },
     { k: "Staleness", v: sel.staleR, note: "last trade " + agoStr(sel.stale) + (status === "snapshot" ? " at snapshot" : "") },
   ];
+  const boundNote =
+    sel.qty >= sel.limit ? "Buy-limit bound — your bankroll could take more, the Exchange won't sell it to you. Consider a second line."
+      : sel.qty >= sel.afford ? "Bankroll bound — every coin is working. A bigger stack would buy up to the " + sel.limit.toLocaleString() + " limit."
+      : "Cycle-bound — a bigger stack wouldn't round-trip inside your playstyle window. Give it more patience or price more aggressively.";
+
   return (
-    <section className="fd-slip">
-      <div className="fd-sliphead">
-        <h3>{sel.name}</h3>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <RiskBadge risk={sel.risk} />
-          <a className="fd-link" href={`https://prices.runescape.wiki/osrs/item/${sel.id}`} target="_blank" rel="noreferrer">wiki page ↗</a>
-          <button className="fd-btn" onClick={onClose}>✕ close</button>
-        </div>
-      </div>
-      <div className="fd-slipbody">
-        <div className="fd-box">
-          <h4>The Flip</h4>
-          <div className="fd-kv"><span>Buy at (insta-sell)</span><b>{fmtFull(sel.low)}</b></div>
-          <div className="fd-kv"><span>Sell at (insta-buy)</span><b>{fmtFull(sel.high)}</b></div>
-          <div className="fd-kv"><span>GE tax</span><b className={sel.tax ? "r" : "g"}>{sel.tax ? "-" + fmtFull(sel.tax) : "0 gp"}</b></div>
-          <div className="fd-kv" style={{ borderTop: "1px solid #3A2E1B", marginTop: 4, paddingTop: 7 }}>
-            <span>Net per unit</span><b className={sel.margin > 0 ? "g" : "r"}>{fmtFull(sel.margin)} · {sel.roi.toFixed(1)}%</b>
+    <tr className="fd-exprow" ref={rowRef}>
+      <td colSpan={12}>
+        <div className="fd-expand">
+          <div className="fd-exphead">
+            <h3>{sel.name}</h3>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <RiskBadge risk={sel.risk} />
+              <a className="fd-link" href={`https://prices.runescape.wiki/osrs/item/${sel.id}`} target="_blank" rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}>wiki page ↗</a>
+              <button className="fd-btn" onClick={onClose}>✕ close</button>
+            </div>
           </div>
-          <p className="fd-note">{taxLine}. Buy limit {sel.limit.toLocaleString()} / 4h · {fmtQty(sel.dv)} traded in 24h.</p>
-        </div>
-        <div className="fd-box">
-          <h4>Your Play</h4>
-          <div className="fd-kv"><span>Quantity</span><b className="au">{sel.qty.toLocaleString()}</b></div>
-          <div className="fd-kv"><span>Capital out</span><b>{fmtGp(sel.capital)} gp</b></div>
-          <div className="fd-kv"><span>Profit / cycle</span><b className={sel.perCycle > 0 ? "g" : "r"}>{fmtGp(sel.perCycle)} gp</b></div>
-          <div className="fd-kv"><span>Cycle time</span><b>~{cycleStr}</b></div>
-          <div className="fd-kv"><span>Est. rate</span><b className="au">{fmtGp(sel.gpHr)}/hr</b></div>
-          <p className="fd-note">
-            {sel.qty === sel.limit ? "Buy-limit bound — your bankroll could take more, the Exchange won't sell it to you. Consider a second line."
-              : sel.qty === sel.afford ? "Bankroll bound — every coin is working. A bigger stack would buy up to the " + sel.limit.toLocaleString() + " limit."
-              : "Flow bound — the book is too thin to fill more than this per cycle at your pace."}
-          </p>
-        </div>
-        <div className="fd-box">
-          <h4>Risk Read &amp; Tape</h4>
-          {bars.map((b) => (
-            <div key={b.k}>
-              <div className="fd-kv" style={{ padding: "1px 0" }}><span>{b.k}</span><b style={{ fontSize: 11.5, color: "#A5937A" }}>{b.note}</b></div>
-              <div className="fd-riskbar"><i style={{ width: clamp(b.v, 2, 100) + "%", background: RISK_COLOR[riskBucket(b.v)] }} /></div>
+
+          <div className="fd-expgrid">
+            <div className="fd-box">
+              <h4>The Flip</h4>
+              <div className="fd-kv"><span>Buy offer @</span><b>{fmtFull(sel.buyP)}{sel.step > 0 && <i className="fd-stepnote"> touch {fmtGp(sel.low)}</i>}</b></div>
+              <div className="fd-kv"><span>Sell offer @</span><b>{fmtFull(sel.sellP)}{sel.step > 0 && <i className="fd-stepnote"> touch {fmtGp(sel.high)}</i>}</b></div>
+              <div className="fd-kv"><span>GE tax</span><b className={sel.tax ? "r" : "g"}>{sel.tax ? "-" + fmtFull(sel.tax) : "0 gp"}</b></div>
+              <div className="fd-kv" style={{ borderTop: "1px solid #3A2E1B", marginTop: 4, paddingTop: 7 }}>
+                <span>Net per unit</span><b className={sel.margin > 0 ? "g" : "r"}>{fmtFull(sel.margin)} · {sel.roi.toFixed(1)}%</b>
+              </div>
+              <p className="fd-note">
+                {sel.step > 0
+                  ? `Priced ${sel.step} gp inside the spread on each side — queue-jumping the touch. ${taxLine}.`
+                  : `Quoting at the touch for the full ${fmtGp(sel.high - sel.low)} spread. ${taxLine}.`}
+                {" "}Buy limit {sel.limit.toLocaleString()} / 4h · {fmtQty(sel.dv)} traded in 24h.
+              </p>
             </div>
-          ))}
-          {data?.pts?.length > 1 ? (
-            <div style={{ width: "100%", height: 90, marginTop: 4 }}>
-              <ResponsiveContainer>
-                <LineChart data={data.pts} margin={{ top: 4, right: 2, bottom: 0, left: 2 }}>
-                  <YAxis domain={["auto", "auto"]} hide />
-                  <XAxis dataKey="t" hide />
-                  <RTooltip content={({ active, payload }) => active && payload?.length ? (
-                    <div className="fd-tip">{payload.map((p) => (
-                      <div key={p.dataKey}>{p.dataKey === "hi" ? "sell" : "buy"} {fmtGp(p.value)}</div>
-                    ))}</div>
-                  ) : null} />
-                  <Line type="monotone" dataKey="hi" stroke="#F0B437" dot={false} strokeWidth={1.5} connectNulls />
-                  <Line type="monotone" dataKey="lo" stroke="#83CE70" dot={false} strokeWidth={1.5} connectNulls />
-                </LineChart>
-              </ResponsiveContainer>
+
+            <div className="fd-box">
+              <h4>Your Play</h4>
+              <div className="fd-kv"><span>Quantity</span><b className="au">{sel.qty.toLocaleString()}</b></div>
+              <div className="fd-kv"><span>Capital out</span><b>{fmtGp(sel.capital)} gp</b></div>
+              <div className="fd-kv"><span>Buy order fills in</span><b className={durClass(sel.tBuyH)}>~{fmtDur(sel.tBuyH)}</b></div>
+              <div className="fd-kv"><span>Sell order fills in</span><b className={durClass(sel.tSellH)}>~{fmtDur(sel.tSellH)}</b></div>
+              <div className="fd-kv"><span>Round trip</span><b>~{fmtDur(sel.cycleH)}</b></div>
+              <div className="fd-kv"><span>Profit / cycle</span><b className={sel.perCycle > 0 ? "g" : "r"}>{fmtGp(sel.perCycle)} gp</b></div>
+              <div className="fd-kv"><span>Est. rate</span><b className="au">{fmtGp(sel.gpHr)}/hr</b></div>
+              <p className="fd-note">{boundNote}</p>
             </div>
-          ) : (
-            <p className="fd-note" style={{ marginTop: 6 }}>
-              {data?.err || status === "snapshot"
-                ? "Price history needs the live feed — offline right now."
-                : "Pulling 6-hour tape…"}
+
+            <div className="fd-box">
+              <h4>Risk Read</h4>
+              {bars.map((b) => (
+                <div key={b.k}>
+                  <div className="fd-kv" style={{ padding: "1px 0" }}><span>{b.k}</span><b style={{ fontSize: 11.5, color: "#A5937A" }}>{b.note}</b></div>
+                  <div className="fd-riskbar"><i style={{ width: clamp(b.v, 2, 100) + "%", background: RISK_COLOR[riskBucket(b.v)] }} /></div>
+                </div>
+              ))}
+              <p className="fd-note">
+                Counter-flow last hour: ~{fmtQty(sel.hvLo)}/hr hit the buy side, ~{fmtQty(sel.hvHi)}/hr the sell side
+                {sel.hvSplit ? "" : " (even split assumed — live feed refines this)"}.
+                Your offers are modelled to capture ~{Math.round(sel.share * 100)}% of that flow at this pricing.
+              </p>
+            </div>
+          </div>
+
+          <div className="fd-box">
+            <h4>Pricing the offers — margin vs. waiting time</h4>
+            <div style={{ overflowX: "auto" }}>
+              <table className="fd-strat">
+                <thead>
+                  <tr>
+                    <th>Strategy</th><th>Buy @</th><th>Sell @</th><th>Net/unit</th><th>ROI</th>
+                    <th>Buy fill</th><th>Sell fill</th><th>Est/hr</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {strats.map((s) => (
+                    <tr key={s.step} className={s.step === sel.step ? "cur" : ""}>
+                      <td>{s.label}{s.step === sel.step ? " ◂" : ""}</td>
+                      <td>{fmtGp(s.buyP)}</td>
+                      <td>{fmtGp(s.sellP)}</td>
+                      <td className={s.margin > 0 ? "up" : "dn"}>{fmtGp(s.margin)}</td>
+                      <td className={s.roi > 0 ? "up" : "dn"}>{s.roi.toFixed(1)}%</td>
+                      <td className={durClass(s.tBuyH)}>{fmtDur(s.tBuyH)}</td>
+                      <td className={durClass(s.tSellH)}>{fmtDur(s.tSellH)}</td>
+                      <td style={{ color: "#F0B437" }}>{fmtGp(s.gpHr)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="fd-note">
+              {sel.maxStep === 0
+                ? "The book is only " + fmtGp(sel.high - sel.low) + " wide — there is no room to price inside it. Penny books are patient by nature."
+                : "Same bankroll, same attention window — only the offer prices move. Stepping 1 gp inside jumps every offer waiting at the touch; deeper cuts only outbid other queue-jumpers."}
             </p>
-          )}
-          {data?.pts?.length > 1 && <p className="fd-note" style={{ marginTop: 2 }}>Last ~6h · gold = sell side, green = buy side.</p>}
+          </div>
+
+          <div className="fd-box">
+            <h4>The Tape — last 24h · gold = sell side, green = buy side, bars = volume</h4>
+            {data?.pts?.length > 1 ? (
+              <div style={{ width: "100%", height: 200 }}>
+                <ResponsiveContainer>
+                  <ComposedChart data={data.pts} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid stroke="#33291A" strokeDasharray="2 4" />
+                    <XAxis dataKey="t" tickFormatter={timeTick} stroke="#7A6B54" fontSize={10}
+                      fontFamily="monospace" minTickGap={48} />
+                    <YAxis yAxisId="p" domain={["auto", "auto"]} tickFormatter={fmtGp} stroke="#7A6B54"
+                      fontSize={10} fontFamily="monospace" width={54} />
+                    <YAxis yAxisId="v" orientation="right" hide domain={[0, (max) => max * 4]} />
+                    <RTooltip content={({ active, payload, label }) => active && payload?.length ? (
+                      <div className="fd-tip">
+                        <b>{timeTick(label)}</b>
+                        {payload.map((p) => (
+                          <div key={p.dataKey}>
+                            {p.dataKey === "hi" ? "sell " + fmtGp(p.value) : p.dataKey === "lo" ? "buy " + fmtGp(p.value) : "vol " + fmtQty(p.value)}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null} />
+                    <Bar yAxisId="v" dataKey="v" fill="#57452A" fillOpacity={0.55} isAnimationActive={false} />
+                    <Line yAxisId="p" type="monotone" dataKey="hi" stroke="#F0B437" dot={false} strokeWidth={1.5} connectNulls isAnimationActive={false} />
+                    <Line yAxisId="p" type="monotone" dataKey="lo" stroke="#83CE70" dot={false} strokeWidth={1.5} connectNulls isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="fd-note" style={{ marginTop: 6 }}>
+                {data?.err || status === "snapshot"
+                  ? "Price history needs the live feed — offline right now."
+                  : "Pulling the 24-hour tape…"}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
-    </section>
+      </td>
+    </tr>
   );
 }
