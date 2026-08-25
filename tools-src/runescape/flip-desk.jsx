@@ -67,6 +67,9 @@ const fmtSecs = (s) => {
   return (s < 36000 ? (s / 3600).toFixed(1) : Math.round(s / 3600)) + " hr";
 };
 const paceClass = (s) => (!isFinite(s) ? "bad" : s <= 10 ? "good" : s <= 120 ? "" : s <= 900 ? "warn" : "bad");
+// signed % gap between real trades and the official guide index
+const fmtDev = (d) => (d > 0 ? "+" : "") + d.toFixed(Math.abs(d) >= 10 ? 0 : 1) + "%";
+const devClass = (d) => (Math.abs(d) < 2 ? "mut" : Math.abs(d) < 10 ? "" : "warn");
 
 /* ================= data shaping ================= */
 /* v2 rows (capture-snapshot.mjs): [id,name,limit,members,low,high,hvLo,hvHi,
@@ -137,7 +140,7 @@ function assess(it) {
   // book pace: how long the WHOLE market takes to trade one unit each way at
   // the last hour's pace. Pure observation — no guess about your share of it.
   const pace = it.hvLo > 0 && it.hvHi > 0 ? 3600 / it.hvLo + 3600 / it.hvHi : Infinity;
-  return { ...it, tax, margin, roi, turnover, pace };
+  return { ...it, tax, margin, roi, turnover, pace, dev: it.dev ?? 0 };
 }
 
 /* ================= api citizenship =================
@@ -150,7 +153,7 @@ function assess(it) {
    - a hidden tab never polls; the refresh button can't bust the cache      */
 const TTL = {
   latest: 85_000, "5m": 300_000, "1h": 900_000,
-  volumes: 3_600_000, mapping: 7 * 86_400_000,
+  volumes: 3_600_000, mapping: 7 * 86_400_000, official: 6 * 3_600_000,
 };
 const memCache = new Map();   // path -> {ts, data}
 const inflight = new Map();   // path -> Promise
@@ -244,6 +247,10 @@ async function pullLive() {
   ]);
   let m5 = null;
   try { m5 = await apiGet("5m", "/5m"); } catch (e) { /* 1h pricing covers */ }
+  // the official in-game guide index — Jagex's own lagged daily average of
+  // EVERY trade, an independent sample the board tracks but never prices from
+  let official = null;
+  try { official = await apiGet("official", "/official"); } catch (e) { /* index optional */ }
   const meta = uni || BASE_ITEMS;      // no mapping? fall back to the baked classics
   const now = Math.floor(Date.now() / 1000);
   const items = [];
@@ -281,6 +288,9 @@ async function pullLive() {
     const moving = Math.abs(movePct) > 7.5;
     let tier = crossed || stale > 60 ? "C" : ok5 && stale <= 15 ? "A" : "B";
     if (moving && tier === "A") tier = "B";
+    // deviance from the official index: real traded mid vs the guide price
+    const guide = official?.[base.name];
+    const dev = guide > 0 ? (((low + high) / 2 - guide) / guide) * 100 : 0;
     items.push({
       id: base.id, name: base.name, limit: base.limit, members: base.members,
       low, high, hv: hvHi + hvLo, hvHi, hvLo,
@@ -288,6 +298,7 @@ async function pullLive() {
       high1h: ok1 ? Math.round(h.avgHighPrice) : null,
       lastLow: p?.low ?? null, lastHigh: p?.high ?? null, crossed,
       dv, staleHi, staleLo, tier, src: ok5 ? "5m" : "1h", moving, movePct,
+      official: guide > 0 ? guide : null, dev,
     });
   }
   if (items.length < 20) throw new Error("thin response");
@@ -382,7 +393,7 @@ const CSS = `
 .ge-tablewrap::-webkit-scrollbar { width:12px; height:12px; }
 .ge-tablewrap::-webkit-scrollbar-track { background:var(--inset2); }
 .ge-tablewrap::-webkit-scrollbar-thumb { background:var(--stone); border:1px solid var(--edge); }
-table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:760px; }
+table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820px; }
 .ge-t thead th { position:sticky; top:0; z-index:2; background:var(--stone); color:var(--orange);
   font-weight:600; font-size:11px; letter-spacing:.12em; text-transform:uppercase; text-align:right;
   padding:8px 10px; border-bottom:2px solid var(--edge); cursor:pointer; white-space:nowrap;
@@ -573,6 +584,7 @@ function ItemPopup({ it, status, onClose }) {
             <span>{it.members ? "Members" : "Free-to-play"}</span>
             <span>Buy limit <b>{it.limit.toLocaleString()}</b> / 4h</span>
             <span>Traded <b>{fmtQty(it.dv)}</b> / day ≈ <b>{fmtGp(it.turnover)}</b> gp</span>
+            {it.official != null && <span>Guide index <b>{fmtGp(it.official)}</b> · real trades {fmtDev(it.dev)}</span>}
             {o.tax === 0 && <span style={{ color: "var(--good)" }}>No GE tax</span>}
             <span>{{ "5m": "priced from the 5-min tape", "1h": "priced from the 1-hour tape",
               snap5m: "priced from the baked 5-min tape (offline)", snap1h: "priced from the baked 1-hour tape (offline)" }[it.src] || "priced from raw prints (offline)"}</span>
@@ -658,6 +670,17 @@ function ItemPopup({ it, status, onClose }) {
               ⚠ The 5-minute tape sits {Math.abs(it.movePct).toFixed(0)}% {it.movePct > 0 ? "above" : "below"} the
               hour's average — the price is on the move. A margin read off a moving price is provisional; probe
               with 1 and recheck before committing size.
+            </p>
+          )}
+          {it.official != null && Math.abs(it.dev) >= 10 && (
+            <p className="ge-note caution">
+              ⚠ Real trades sit {Math.abs(it.dev).toFixed(0)}% {it.dev > 0 ? "above" : "below"} the official
+              guide index — a lagged daily average of every trade in the game. Either the market genuinely moved
+              and the index hasn't caught up, or someone is painting one of the two.{" "}
+              {it.dev > 0
+                ? "While the gap holds, sellers still anchored to the guide keep feeding the book below the market — standing buy offers eat well."
+                : "While the gap holds, buyers still anchored to the guide keep paying over the market — standing sell offers eat well."}{" "}
+              On thin volume, assume the worst.
             </p>
           )}
           {it.tier === "C" && !it.crossed && (
@@ -1143,8 +1166,10 @@ function Econ101() {
         <h3>Where prices come from</h3>
         <ul>
           <li>The in-game <b>guide price</b> is Jagex's own average, updated roughly once a day by an opaque
-            formula. It lags the real market by hours to days, and manipulators lean on that lag. Nothing on
-            this board uses it.</li>
+            formula. It lags the real market by hours to days, and manipulators lean on that lag. This board
+            never <i>prices</i> from it — but it does <b>track it as an index</b>: it's computed from every
+            trade in the game (not just the plugin's sample), so the gap between real trades and the index is
+            a signal in its own right.</li>
           <li>This board runs on the{" "}
             <a className="ge-link" href="https://prices.runescape.wiki" target="_blank" rel="noreferrer">
               OSRS Wiki's real-time feed ↗</a>: RuneLite clients report actual trades as they happen. A
@@ -1237,6 +1262,11 @@ function Econ101() {
             average wears ↕ (price in motion), and Job Board chains that pay over 50% on cost or lean on a
             weak leg wear a ⚠ — unusual numbers are either opportunities or bad data, and a 1-unit probe is
             how you find out which.</li>
+          <li><b>Vs index</b> compares real trades to the official guide price — two independent samples of
+            the same market (the plugin's tape vs Jagex's lagged census of every trade). Near zero means the
+            feed is telling the truth. A wide gap is momentum the index hasn't caught up with — and while it
+            holds, casual players still anchored to the guide keep handing the informed side cheap fills — or
+            it's one of the two prices being painted. Thin volume plus a wide gap: assume painted.</li>
           <li>The <b>Job Board</b> prices whole production chains from the same tape — buy the inputs, work
             them, sell the output, tax and buy limits included.</li>
         </ul>
@@ -1422,6 +1452,7 @@ export default function FlipDesk() {
                 <Th k="high" cls="hide-sm">Sell</Th>
                 <Th k="margin">Margin</Th>
                 <Th k="roi">ROI</Th>
+                <Th k="dev" cls="hide-sm">Vs index</Th>
                 <Th k="turnover">Gp moved/day</Th>
                 <Th k="dv" cls="hide-sm">Traded/day</Th>
                 <Th k="limit" cls="hide-sm">Limit/4h</Th>
@@ -1444,6 +1475,7 @@ export default function FlipDesk() {
                   <td className="gold hide-sm">{fmtGp(it.high)}</td>
                   <td className={it.margin > 0 ? "good" : it.margin < 0 ? "bad" : "mut"}>{fmtGp(it.margin)}</td>
                   <td className={it.margin > 0 ? "good" : it.margin < 0 ? "bad" : "mut"}>{it.roi.toFixed(1)}%</td>
+                  <td className={"hide-sm " + (it.official == null ? "mut" : devClass(it.dev))}>{it.official == null ? "–" : fmtDev(it.dev)}</td>
                   <td className="gold">{fmtGp(it.turnover)}</td>
                   <td className="mut hide-sm">{fmtQty(it.dv)}</td>
                   <td className="mut hide-sm">{fmtQty(it.limit)}</td>
@@ -1462,7 +1494,9 @@ export default function FlipDesk() {
           GE tax (2% of sale, capped at 5m; under 50 gp and bonds exempt). Gp moved/day = daily volume ×
           mid price — the depth of the river, not your share of it.<br />
           Book pace = how long the whole book takes to trade one unit each way at the last hour's pace — the
-          market's own metabolism, no guess about your queue position or competition; your fills stack on top of it.<br />
+          market's own metabolism, no guess about your queue position or competition; your fills stack on top of it.
+          Vs index = real traded mid vs the official in-game guide price (Jagex's lagged daily average of every
+          trade) — a wide gap means the market moved and the index hasn't caught up, or someone is painting one of them.<br />
           A / B / C flags grade data confidence; ↕ marks a 5-minute tape that disagrees with the hour (price in
           motion); unpriceable books (one-sided, crossed, dislocated) are set aside.<br />
           Live prices courtesy of the <a className="ge-link" href="https://prices.runescape.wiki" target="_blank" rel="noreferrer">OSRS Wiki price API</a> — estimates, not promises.

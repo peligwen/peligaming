@@ -5,6 +5,9 @@
 // for (browsers can't send one).
 
 const UPSTREAM = "https://prices.runescape.wiki/api/v1/osrs";
+// The official in-game guide prices, mirrored daily by the wiki as one bulk
+// JSON module — a different upstream and cadence than the real-time API.
+const OFFICIAL = "https://oldschool.runescape.wiki/w/Module:GEPrices/data.json?action=raw";
 const UA = "flip-desk edge proxy @ gaming.peliglot.com (shared cache for all site visitors)";
 
 // per-endpoint edge-cache TTLs (seconds), matched to how often the data moves
@@ -15,6 +18,7 @@ const ENDPOINTS = new Map([
   ["volumes", 3600],
   ["mapping", 86400],
   ["timeseries", 600],
+  ["official", 21600], // the guide price updates roughly daily
 ]);
 
 export default {
@@ -37,7 +41,7 @@ async function osrs(req, url, ctx) {
     const v = url.searchParams.get(k);
     if (v != null && /^[\w-]{1,32}$/.test(v)) qs.set(k, v);
   }
-  const upstream = `${UPSTREAM}/${ep}${qs.toString() ? "?" + qs : ""}`;
+  const upstream = ep === "official" ? OFFICIAL : `${UPSTREAM}/${ep}${qs.toString() ? "?" + qs : ""}`;
 
   const cache = caches.default;
   const cacheKey = new Request(upstream); // one shared entry per endpoint+params
