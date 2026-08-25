@@ -71,6 +71,14 @@ const BASE_ITEMS = SNAPSHOT.items.map(rowToItem);
    - fill risk: thin hourly flow → your offers sit unfilled
    - drift risk: recent 5-min vs 1-hour price drift vs. your margin
    - staleness: minutes since either side of the book last traded    */
+/* drift pressure vs the margin that cushions it.
+   penny items tick in whole gp, so % drift is noise — damp it */
+function driftOf(it, roi) {
+  let v = it.vol == null ? 0.6 : it.vol;
+  if (it.high < 50) v = Math.min(v, 8);
+  return clamp((v / Math.max(Math.abs(roi), 0.15)) * 35, 0, 100);
+}
+
 function assess(it) {
   const tax = geTax(it.high, it.id);
   const margin = it.high - it.low - tax;
@@ -80,10 +88,7 @@ function assess(it) {
   // the thinner side of the book gates your round trip — a one-sided tape still strands you
   const gateFlow = it.hvSplit ? Math.min(it.hvLo, it.hvHi) * 2 : (it.hv || 0);
   const fillR = clamp(100 - Math.log10(gateFlow + 1) * 20, 0, 100);
-  // penny items tick in whole gp, so % drift is noise — damp it
-  let v = it.vol == null ? 0.6 : it.vol;
-  if (it.high < 50) v = Math.min(v, 8);
-  const driftR = clamp((v / Math.max(Math.abs(roi), 0.15)) * 35, 0, 100);
+  const driftR = driftOf(it, roi);
   const staleR = clamp((it.stale || 0) * 1.5, 0, 100);
   const risk = Math.round(0.45 * fillR + 0.35 * driftR + 0.2 * staleR);
 
@@ -97,8 +102,10 @@ function assess(it) {
    queue at that price, so capture leaps; deeper steps only outbid other steppers.
    Your buy order fills from insta-sellers (hvLo), your sell from insta-buyers (hvHi). */
 const SHARE_TOUCH = 0.25;
+// stepping 1 gp inside jumps the touch queue (price priority is real mechanics),
+// but rivals reprice too — capture caps near 2.4x touch, not at "most of the flow"
 const shareOf = (step, maxStep) =>
-  step <= 0 ? SHARE_TOUCH : 0.7 + 0.2 * (maxStep > 0 ? step / maxStep : 1);
+  step <= 0 ? SHARE_TOUCH : 0.5 + 0.1 * (maxStep > 0 ? step / maxStep : 1);
 
 /* one pricing scenario for an item: step gp inside the spread on each side.
    fixedQty pins the stack size (strategy comparison); otherwise the stack is
@@ -112,9 +119,11 @@ function priceOut(a, budget, tolH, step, fixedQty, shareMul = 1) {
   const tax = geTax(sellP, a.id);
   const quotedMargin = sellP - buyP - tax;
   // confirmed margin: don't assume you sell above the hour's average high or
-  // buy below its average low — the conservative figure is what gets ranked
+  // buy below its average low — the conservative figure is what gets ranked.
+  // crossed hourly averages (a trending tape) clamp the margin to nothing,
+  // which is the honest read: the hour's book paid no spread at all.
   let margin = quotedMargin;
-  if (a.avgHi && a.avgLo && a.avgHi > a.avgLo) {
+  if (a.avgHi && a.avgLo) {
     const cSell = Math.min(sellP, a.avgHi);
     const cBuy = Math.max(buyP, a.avgLo);
     margin = Math.min(quotedMargin, cSell - cBuy - geTax(cSell, a.id));
@@ -131,7 +140,7 @@ function priceOut(a, budget, tolH, step, fixedQty, shareMul = 1) {
   const hPerUnit = (buyRate > 0 ? 1 / buyRate : Infinity) + (sellRate > 0 ? 1 / sellRate : Infinity);
   const qtyTol = isFinite(hPerUnit) ? Math.floor(tolH / hPerUnit) : 0;
   const qty = fixedQty != null
-    ? Math.max(0, Math.min(fixedQty, a.limit))
+    ? Math.max(0, Math.min(fixedQty, a.limit, afford))
     : Math.max(0, Math.min(a.limit, afford, qtyTol));
 
   const tBuyH = buyRate > 0 ? Math.max(qty / buyRate, 1 / 60) : Infinity;
@@ -151,29 +160,52 @@ function priceOut(a, budget, tolH, step, fixedQty, shareMul = 1) {
 }
 
 /* play = 0 patient 4-hour limits … 1 five-minute scalper
-   price = 0 quote at the touch … 1 meet mid-spread for near-instant fills */
+   price = tiebreak lean: 0 favour full margin … 1 favour fast fills.
+   The desk prices each item itself — it evaluates the discrete quotes worth
+   considering (touch, +1 gp inside, mid-spread) and ranks the item on the best
+   earner; the dial only breaks near-ties (within 10% of the best gp/hr). */
 function playOut(a, budget, play, price) {
   const tolH = lerp(4, 0.25, play); // round-trip you'll tolerate
   const maxStep = Math.max(0, Math.floor((a.high - a.low - 1) / 2));
-  const step = Math.round(price * maxStep);
-  const p = priceOut(a, budget, tolH, step);
-  // drift hurts in proportion to how long the round trip actually runs
-  const driftH = clamp(a.driftR * Math.sqrt(clamp(isFinite(p.cycleH) ? p.cycleH : 8, 0.1, 8)), 0, 100);
+  const cands = [...new Set([0, Math.min(1, maxStep), Math.round(maxStep / 2)])];
+  let p = null;
+  for (const s of cands) {
+    const r = priceOut(a, budget, tolH, s);
+    if (!p) { p = r; continue; }
+    const best = Math.max(p.gpHr, r.gpHr);
+    if (best > 0 && Math.min(p.gpHr, r.gpHr) >= best * 0.9) {
+      p = price < 0.5 ? (r.step < p.step ? r : p) : (r.step > p.step ? r : p);
+    } else if (r.gpHr > p.gpHr) {
+      p = r;
+    }
+  }
+  // honest ranges: bracket the capture guess around the chosen quote
+  const pess = priceOut(a, budget, tolH, p.step, p.qty, 0.5);
+  const opt = priceOut(a, budget, tolH, p.step, p.qty, 1.5);
+  // drift is scored against the margin actually ranked (stepped, confirmed),
+  // and hurts in proportion to how long the round trip actually runs
+  const driftH = clamp(driftOf(a, p.roi) * Math.sqrt(clamp(isFinite(p.cycleH) ? p.cycleH : 8, 0.1, 8)), 0, 100);
   const risk = Math.round(0.45 * a.fillR + 0.35 * driftH + 0.2 * a.staleR);
   const rocHr = p.capital > 0 ? (p.gpHr / p.capital) * 100 : 0;
   // a spread already ground down to the tax is being fought over by flippers
-  const contested = a.hv > 0 && a.high - a.low <= geTax(a.high, a.id) + 2;
-  return { ...a, ...p, tolH, driftR: driftH, risk, rocHr, contested, bookMargin: a.margin, bookRoi: a.roi };
+  // (meaningless for tax-exempt books, whose 1-2 gp spreads are their nature)
+  const contested = a.hv > 0 && geTax(a.high, a.id) > 0 && a.high - a.low <= geTax(a.high, a.id) + 2;
+  return {
+    ...a, ...p, tolH, driftR: driftH, risk, rocHr, contested,
+    gpHrLo: pess.gpHr, gpHrHi: opt.gpHr,
+    bookMargin: a.margin, bookRoi: a.roi,
+  };
 }
 
 const riskBucket = (r) => (r < 30 ? "low" : r < 60 ? "medium" : "high");
 const RISK_COLOR = { low: "#83CE70", medium: "#E0A43A", high: "#E26A5A" };
 
-/* signed tape read for a row: mean of per-leg momentum, damped for pennies */
+/* signed tape read for a row: mean of the legs that actually traded, damped for pennies */
 const momOf = (it) => {
-  if (it.momLo == null && it.momHi == null) return null;
   if (it.high < 50) return null; // penny ticks make % moves pure noise
-  const m = ((it.momLo ?? 0) + (it.momHi ?? 0)) / 2;
+  const legs = [it.momLo, it.momHi].filter((x) => x != null);
+  if (!legs.length) return null;
+  const m = legs.reduce((s, x) => s + x, 0) / legs.length;
   return { m, dir: m <= -0.75 ? "dn" : m >= 0.75 ? "up" : "flat" };
 };
 
@@ -187,7 +219,7 @@ const PRESETS = [
   {
     key: "scalp", label: "5-minute scalps",
     blurb: "Deep books that fill in minutes. You're paid for attention, not patience — reprice constantly, exit fast.",
-    c: { budget: 5_000_000, play: 1, price: 0.35, riskTol: 75, minRoi: 0.8, taxFree: false, f2p: false },
+    c: { budget: 5_000_000, play: 1, price: 0.8, riskTol: 75, minRoi: 0.8, taxFree: false, f2p: false },
   },
   {
     key: "limits", label: "Steady 4-hour limits",
@@ -197,7 +229,7 @@ const PRESETS = [
   {
     key: "whale", label: "High roller",
     blurb: "Big-ticket gear where one flip pays like a boss drop — and one drift wipes a day. Thin books, wide nerves.",
-    c: { budget: 600_000_000, play: 0.35, price: 0.15, riskTol: 90, minRoi: 0.4, taxFree: false, f2p: false },
+    c: { budget: 600_000_000, play: 0.35, price: 0.3, riskTol: 90, minRoi: 0.4, taxFree: false, f2p: false },
   },
 ];
 
@@ -395,9 +427,10 @@ table.fd-lt { width:100%; border-collapse:collapse; font-family:var(--mono); fon
    The wiki's price API is a free community service run for RuneLite users.
    This desk is deliberately polite with it:
    - every endpoint is cached at its natural update cadence (latest ~1min,
-     5m blocks every 5min, 1h hourly, volumes daily, mapping ~weekly)
+     5m blocks every 5min, 1h refreshed 15min, volumes hourly, mapping ~weekly)
    - concurrent callers share a single in-flight request
-   - errors back off exponentially, serving stale data meanwhile
+   - errors back off exponentially PER ENDPOINT, serving stale data meanwhile
+     (a dead /mapping escalates its own backoff without pausing /latest)
    - a hidden tab never polls; the refresh button can't bust the cache      */
 const TTL = {
   latest: 85_000, "5m": 300_000, "1h": 900_000,
@@ -405,13 +438,14 @@ const TTL = {
 };
 const memCache = new Map();   // url -> {ts, data}
 const inflight = new Map();   // url -> Promise
-let failStreak = 0, backoffUntil = 0;
+const cooloff = new Map();    // kind -> {streak, until}
 
 async function apiGet(kind, url) {
   const ttl = TTL[kind] ?? 300_000;
   const hit = memCache.get(url);
   if (hit && Date.now() - hit.ts < ttl) return hit.data;
-  if (Date.now() < backoffUntil) {
+  const cool = cooloff.get(kind);
+  if (cool && Date.now() < cool.until) {
     if (hit) return hit.data;               // stale beats hammering a hurting API
     throw new Error("cooling off");
   }
@@ -423,12 +457,12 @@ async function apiGet(kind, url) {
       const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
-      failStreak = 0;
+      cooloff.delete(kind);
       memCache.set(url, { ts: Date.now(), data });
       return data;
     } catch (e) {
-      failStreak++;
-      backoffUntil = Date.now() + Math.min(45_000 * 2 ** (failStreak - 1), 900_000);
+      const streak = (cooloff.get(kind)?.streak || 0) + 1;
+      cooloff.set(kind, { streak, until: Date.now() + Math.min(45_000 * 2 ** (streak - 1), 900_000) });
       if (hit) return hit.data;
       throw e;
     } finally { clearTimeout(t); inflight.delete(url); }
@@ -488,9 +522,11 @@ async function pullLive() {
     const momHi = h.avgHighPrice && f.avgHighPrice ? ((f.avgHighPrice - h.avgHighPrice) / h.avgHighPrice) * 100 : null;
     const stale = Math.max(now - (p.highTime || now), now - (p.lowTime || now)) / 60;
     // a latest spread far wider than the hour's average is usually one bait or
-    // outlier print, not a margin you can capture — badge it, don't chase it
+    // outlier print, not a margin you can capture — badge it, don't chase it.
+    // missing or crossed hourly averages (thin or trending tape) are just as
+    // unconfirmable, so they carry the badge too
     const avgSpread = h.avgHighPrice && h.avgLowPrice ? h.avgHighPrice - h.avgLowPrice : null;
-    const unconf = avgSpread != null && avgSpread >= 0 && high - low > Math.max(1.5 * avgSpread, avgSpread + 2);
+    const unconf = avgSpread == null || avgSpread <= 0 || high - low > Math.max(1.5 * avgSpread, avgSpread + 2);
     items.push({
       id: base.id, name: base.name, limit: base.limit, members: base.members,
       low, high, hv, hvHi, hvLo, hvSplit: true, unconf,
@@ -603,14 +639,16 @@ export default function FlipDesk() {
     [assessed, ctl.budget, ctl.play, ctl.price]
   );
 
-  /* personal calibration: how much of the predicted edge this player realizes */
+  /* personal calibration: gp-weighted realized ÷ predicted over closed flips.
+     Losses count in full — the one number that must never flatter. */
   const calibration = useMemo(() => {
     const closed = ledger.filter((l) => l.status === "closed" && l.predNet > 0 && l.realNet != null);
     if (closed.length < 2) return null;
-    const r = closed.map((l) => clamp(l.realNet / l.predNet, 0, 2));
-    return r.reduce((s, x) => s + x, 0) / r.length;
+    const pred = closed.reduce((s, l) => s + l.predNet, 0);
+    const real = closed.reduce((s, l) => s + l.realNet, 0);
+    return pred > 0 ? real / pred : null;
   }, [ledger]);
-  const calF = calOn && calibration != null ? clamp(calibration, 0.2, 1.5) : 1;
+  const calF = calOn && calibration != null ? clamp(calibration, 0.1, 1.5) : 1;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -622,7 +660,11 @@ export default function FlipDesk() {
       (!ctl.f2p || !p.members) &&
       (!q || p.name.toLowerCase().includes(q))
     );
-    return calF === 1 ? out : out.map((p) => ({ ...p, gpHr: p.gpHr * calF }));
+    // calibration scales every rate-derived column together so they stay in agreement
+    return calF === 1 ? out : out.map((p) => ({
+      ...p, gpHr: p.gpHr * calF, gpHrLo: p.gpHrLo * calF, gpHrHi: p.gpHrHi * calF,
+      perCycle: p.perCycle * calF, rocHr: p.rocHr * calF,
+    }));
   }, [played, ctl, search, calF]);
 
   const sorted = useMemo(() => {
@@ -653,23 +695,28 @@ export default function FlipDesk() {
 
   const sel = useMemo(() => played.find((p) => p.id === selId) || null, [played, selId]);
 
-  /* 24h tape for the selected item — one request per item per 10 minutes, tops */
+  /* 24h tape for the selected item — one request per item per 10 minutes, tops.
+     The 350ms debounce means surfing down the board coalesces to the row the
+     user actually lands on instead of firing a request per keystroke of clicks. */
   useEffect(() => {
     if (!sel) return;
     const e = series[sel.id];
     if (e && Date.now() - e.ts < TTL.timeseries) return;
     let dead = false;
-    apiGet("timeseries", `${API}/timeseries?timestep=5m&id=${sel.id}`)
-      .then((j) => {
-        if (dead) return;
-        const pts = (j.data || []).slice(-288).map((d) => ({
-          t: d.timestamp, hi: d.avgHighPrice, lo: d.avgLowPrice,
-          v: (d.highPriceVolume || 0) + (d.lowPriceVolume || 0),
-        })).filter((d) => d.hi || d.lo);
-        setSeries((s) => ({ ...s, [sel.id]: pts.length ? { ts: Date.now(), pts } : { ts: Date.now(), err: true } }));
-      })
-      .catch(() => { if (!dead) setSeries((s) => ({ ...s, [sel.id]: { ts: Date.now(), err: true } })); });
-    return () => { dead = true; };
+    const t = setTimeout(() => {
+      apiGet("timeseries", `${API}/timeseries?timestep=5m&id=${sel.id}`)
+        .then((j) => {
+          if (dead) return;
+          const raw = (j.data || []).slice(-288);
+          const pts = raw.map((d) => ({
+            t: d.timestamp, hi: d.avgHighPrice, lo: d.avgLowPrice,
+            v: (d.highPriceVolume || 0) + (d.lowPriceVolume || 0),
+          })).filter((d) => d.hi || d.lo);
+          setSeries((s) => ({ ...s, [sel.id]: pts.length ? { ts: Date.now(), pts, n: raw.length } : { ts: Date.now(), err: true } }));
+        })
+        .catch(() => { if (!dead) setSeries((s) => ({ ...s, [sel.id]: { ts: Date.now(), err: true } })); });
+    }, 350);
+    return () => { dead = true; clearTimeout(t); };
   }, [sel, series]);
 
   /* Desk Plan: greedy allocation of the bankroll across GE slots by est. gp/hr */
@@ -680,7 +727,10 @@ export default function FlipDesk() {
     for (const c of [...filtered].sort((a, b) => b.gpHr - a.gpHr)) {
       if (lines.length >= slots || bank <= 0) break;
       if (c.gpHr <= 0 || c.buyP > bank) continue;
-      const r = priceOut(c, bank, c.tolH, c.step); // re-sized to the bankroll left
+      // a plan is a portfolio: no single line hogs more than ~40% of the bankroll
+      // (unless one unit already costs more than that)
+      const lineBank = Math.min(bank, Math.max(ctl.budget * 0.4, c.buyP));
+      const r = priceOut(c, lineBank, c.tolH, c.step); // re-sized to the coin left
       if (r.qty < 1 || r.perCycle <= 0) continue;
       const pess = priceOut(c, bank, c.tolH, c.step, r.qty, 0.5);
       const opt = priceOut(c, bank, c.tolH, c.step, r.qty, 1.5);
@@ -701,13 +751,15 @@ export default function FlipDesk() {
   const byId = useMemo(() => new Map(played.map((p) => [p.id, p])), [played]);
 
   const logFlip = useCallback((p) => {
+    // store RAW predictions (never calibrated), or the loop would feed on itself
+    const raw = byId.get(p.id) || p;
     setLedger((L) => [...L, {
-      uid: Date.now() + ":" + p.id, id: p.id, name: p.name, qty: p.qty,
-      buyP: p.buyP, sellP: p.sellP, predNet: p.perCycle, predGpHr: Math.round(p.gpHr),
-      predCycleH: isFinite(p.cycleH) ? +p.cycleH.toFixed(2) : null,
+      uid: Date.now() + ":" + p.id, id: raw.id, name: raw.name, qty: raw.qty,
+      buyP: raw.buyP, sellP: raw.sellP, predNet: raw.perCycle, predGpHr: Math.round(raw.gpHr),
+      predCycleH: isFinite(raw.cycleH) ? +raw.cycleH.toFixed(2) : null,
       ts: Date.now(), status: "open", realNet: null,
     }]);
-  }, []);
+  }, [byId]);
 
   const clickSort = (k, dir = -1) => {
     if (sortKey === k) setSortDir((d) => -d);
@@ -719,9 +771,9 @@ export default function FlipDesk() {
     : ctl.play < 0.6 ? "mixed — check in hourly"
     : ctl.play < 0.85 ? "active — reprice often"
     : "scalping — 5-min churn";
-  const priceLabel = ctl.price < 0.05 ? "at the touch — full margin"
-    : ctl.price < 0.5 ? "step inside — jump the queue"
-    : "deep cut — speed over margin";
+  const priceLabel = ctl.price < 0.35 ? "lean margin on close calls"
+    : ctl.price < 0.65 ? "let the numbers decide"
+    : "lean speed on close calls";
   const riskLabel = ctl.riskTol < 40 ? "careful" : ctl.riskTol < 70 ? "balanced" : "degen";
   const activePreset = PRESETS.find((p) => p.key === preset);
 
@@ -749,7 +801,7 @@ export default function FlipDesk() {
             )}
             {status === "snapshot" && <span className="fd-chip snap">◈ SNAPSHOT · {SNAP_DATE.toLocaleDateString([], { day: "numeric", month: "short" })}</span>}
             {status === "loading" && <span className="fd-chip load">… polling exchange</span>}
-            <button className="fd-btn" onClick={refresh} disabled={status === "loading"}>↻ Refresh</button>
+            <button className="fd-btn" onClick={() => refresh(false)} disabled={status === "loading"}>↻ Refresh</button>
           </div>
         </header>
         <hr className="fd-rule" />
@@ -805,10 +857,10 @@ export default function FlipDesk() {
               <div className="fd-ends"><span>patient limits</span><span>5-min scalper</span></div>
             </div>
             <div className="fd-ctl">
-              <label>Offer pricing <b>{priceLabel}</b></label>
+              <label>Pricing tiebreak <b>{priceLabel}</b></label>
               <input className="fd-range" type="range" min={0} max={1} step={0.01}
-                value={ctl.price} onChange={(e) => setC({ price: +e.target.value })} aria-label="Offer pricing" />
-              <div className="fd-ends"><span>full margin, slow fill</span><span>thin margin, fast fill</span></div>
+                value={ctl.price} onChange={(e) => setC({ price: +e.target.value })} aria-label="Pricing tiebreak" />
+              <div className="fd-ends"><span>full margin</span><span>fast fills</span></div>
             </div>
             <div className="fd-ctl">
               <label>Risk appetite <b>{riskLabel} ≤ {ctl.riskTol}</b></label>
@@ -964,7 +1016,7 @@ export default function FlipDesk() {
                         <span className="fd-caret">{p.id === selId ? "▾" : "▸"}</span>
                         {p.name}
                         {mom && mom.dir !== "flat" && (
-                          <span className={"fd-mom " + mom.dir} title={`5m vs 1h: buy side ${p.momLo?.toFixed(1)}%, sell side ${p.momHi?.toFixed(1)}%`}>
+                          <span className={"fd-mom " + mom.dir} title={`5m vs 1h: buy side ${p.momLo != null ? p.momLo.toFixed(1) + "%" : "–"}, sell side ${p.momHi != null ? p.momHi.toFixed(1) + "%" : "–"}`}>
                             {mom.dir === "up" ? "▲" : "▼"}
                           </span>
                         )}
@@ -983,7 +1035,7 @@ export default function FlipDesk() {
                       <td className="hide-sm mut">{fmtQty(p.dv)}</td>
                       <td className={dim}><RiskBadge risk={p.risk} /></td>
                       <td className="hide-sm">{fmtGp(p.perCycle)}</td>
-                      <td className={"gold" + dim}>{fmtGp(p.gpHr)}</td>
+                      <td className={"gold" + dim} title={"midpoint " + fmtGp(p.gpHr) + "/hr — range brackets the capture guess"}>{fmtGp(p.gpHrLo)}–{fmtGp(p.gpHrHi)}</td>
                       <td className={"hide-sm mut" + dim}>{p.rocHr >= 10 ? Math.round(p.rocHr) : p.rocHr.toFixed(p.rocHr >= 1 ? 1 : 2)}%</td>
                     </tr>
                     {p.id === selId && (
@@ -1021,7 +1073,7 @@ export default function FlipDesk() {
             <p><b>Buy limits.</b> Every item caps how many you can buy per rolling 4 hours. Limits are the real ceiling on gp/hr: a 7,000-limit penny item can out-earn a big-ticket flip you can only buy 8 of. The est/hr column is always capped by limit ÷ 4h.</p>
             <p><b>Risk score.</b> Blended from three observable pressures: how thin the hourly flow is (will your offer fill?), how far the 5-minute price has drifted from the 1-hour average relative to your margin (will the move eat your edge?), and how stale the last trade is. Low ≤ 30, high ≥ 60. It measures fill-and-drift risk, not manipulation.</p>
             <p><b>The fill clock.</b> Your buy order fills from people insta-selling into the book; your sell order fills from insta-buyers. The desk reads each side's hourly flow separately and estimates how long an order of your size waits: quantity ÷ (that side's flow × your share of it). A fat margin on a book where the sell side moves 40 units an hour is a parked bankroll, and the clock says so before you learn it the hard way.</p>
-            <p><b>Offer pricing.</b> The GE queue is price-time priority. Quoting at the touch (buy at insta-sell, sell at insta-buy) takes the full spread but stands you behind everyone already there — figure ~25% of counter-flow finds you. Stepping even 1 gp inside jumps the entire queue at that price, so fills come far faster at 2 gp of margin given up. The pricing dial and each item's strategy table price this trade-off both ways.</p>
+            <p><b>Offer pricing.</b> The GE queue is price-time priority. Quoting at the touch (buy at insta-sell, sell at insta-buy) takes the full spread but stands you behind everyone already there — figure ~25% of counter-flow finds you. Stepping even 1 gp inside jumps the entire queue at that price, though rivals reprice too, so capture tops out around 2.4× the touch, not "most of the flow". The desk prices each item itself: it tries the touch, +1 gp inside, and a mid-spread cut, and ranks the item on whichever earns best — the tiebreak dial only decides near-ties between margin and speed. Each item's strategy table shows all three side by side.</p>
             <p><b>Playstyle.</b> The dial sets how long a round trip you'll tolerate: patient mode sizes stacks for ~4-hour cycles — set offers, log off, collect; scalper mode sizes them to turn in ~15 minutes and only makes sense on books deep enough to fill you fast.</p>
             <p><b>Confirmed vs. quoted.</b> The latest insta-buy/insta-sell are two individual trades — one bait or outlier print can fabricate a margin. The desk therefore ranks on the <i>confirmed</i> margin: it never assumes you sell above the last hour's average high or buy below its average low. When the quote is far richer than the hour's book, the row says <i>unconfirmed</i> — probe with 1 before committing.</p>
             <p><b>The tape's direction.</b> ▲/▼ beside an item is the signed 5-minute-vs-1-hour move. A falling tape is the classic knife: your buy fills instantly <i>because</i> everyone is selling, and the exit leg eats the move. The expanded ledger spells out which leg carries the risk.</p>
@@ -1051,13 +1103,13 @@ function ExpandedRow({ sel, status, data, budget, calF = 1, onLog, onClose }) {
   useEffect(() => { rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, []);
   const [logged, setLogged] = useState(false);
 
-  /* same bankroll & attention window, three ways to price the offers */
+  /* same bankroll & attention window, three ways to price the offers —
+     the desk has already picked the best earner (marked ◂) */
   const strats = useMemo(() => {
     const defs = [
       { label: "At the touch", step: 0 },
       { label: "+1 gp inside", step: 1 },
       { label: "Mid-spread cut", step: Math.round(sel.maxStep / 2) },
-      { label: "Your dial", step: sel.step },
     ];
     const seen = new Set();
     return defs
@@ -1072,19 +1124,23 @@ function ExpandedRow({ sel, status, data, budget, calF = 1, onLog, onClose }) {
     priceOut(sel, budget, sel.tolH, sel.step, sel.qty, 1.5),
   ], [sel, budget]);
 
-  /* what the 24h tape says about this margin — computed from the one fetch */
+  /* what the 24h tape says about this margin — computed from the one fetch.
+     The denominator is EVERY 5-minute window: one where nothing traded on both
+     sides is a window the margin did not exist as a fillable round trip. */
   const tape = useMemo(() => {
-    if (!data?.pts) return null;
+    if (!data?.pts || sel.margin <= 0) return null;
+    const windows = Math.max(data.n || 0, data.pts.length);
     const pts = data.pts.filter((p) => p.hi && p.lo);
-    if (pts.length < 24) return null;
+    if (pts.length < 24 || windows < 48) return null;
     const margins = pts.map((p) => p.hi - p.lo - geTax(p.hi, sel.id));
-    const persist = margins.filter((m) => m >= sel.margin).length / margins.length;
+    const persist = margins.filter((m) => m >= sel.margin).length / windows;
+    const twoSided = pts.length / windows;
     const mids = pts.map((p) => (p.hi + p.lo) / 2);
     const moves = mids.slice(1).map((m, i) => Math.abs(m - mids[i])).sort((a, b) => a - b);
     const typ = moves[Math.floor(moves.length / 2)] || 0;
     const lo = Math.min(...mids), hi = Math.max(...mids);
     const pos = hi > lo ? ((mids[mids.length - 1] - lo) / (hi - lo)) * 100 : 50;
-    return { persist, cushion: typ > 0 ? sel.margin / typ : null, pos };
+    return { persist, twoSided, cushion: typ > 0 ? sel.margin / typ : null, pos };
   }, [data, sel]);
 
   const taxLine = sel.tax === 0
@@ -1205,7 +1261,7 @@ function ExpandedRow({ sel, status, data, budget, calF = 1, onLog, onClose }) {
             <p className="fd-note">
               {sel.maxStep === 0
                 ? "The book is only " + fmtGp(sel.high - sel.low) + " wide — there is no room to price inside it. Penny books are patient by nature."
-                : "Same bankroll, same attention window — only the offer prices move. Stepping 1 gp inside jumps every offer waiting at the touch; deeper cuts only outbid other queue-jumpers."}
+                : "Same bankroll, same attention window — only the offer prices move. The desk quotes the best earner (◂) and your tiebreak dial settles near-ties. Stepping 1 gp inside jumps every offer waiting at the touch; deeper cuts only outbid other queue-jumpers."}
             </p>
           </div>
 
@@ -1214,6 +1270,7 @@ function ExpandedRow({ sel, status, data, budget, calF = 1, onLog, onClose }) {
             {tape && (
               <div className="fd-tapestats">
                 <div className="fd-kv"><span>This margin existed</span><b>{Math.round(tape.persist * 100)}% of the last 24h</b></div>
+                <div className="fd-kv"><span>Both sides traded</span><b className={tape.twoSided < 0.5 ? "r" : ""}>{Math.round(tape.twoSided * 100)}% of windows</b></div>
                 <div className="fd-kv"><span>Margin vs typical 5m move</span><b className={tape.cushion != null && tape.cushion < 1 ? "r" : "g"}>{tape.cushion != null ? tape.cushion.toFixed(1) + "× cover" : "–"}</b></div>
                 <div className="fd-kv"><span>Price in the day's range</span><b>{Math.round(tape.pos)}%{tape.pos <= 25 ? " — near the low" : tape.pos >= 75 ? " — near the high" : ""}</b></div>
               </div>
@@ -1262,17 +1319,30 @@ function ExpandedRow({ sel, status, data, budget, calF = 1, onLog, onClose }) {
 function LedgerPanel({ ledger, setLedger, byId, calibration, calOn, setCalOn, onSelect }) {
   const [closing, setClosing] = useState(null); // uid mid-close
   const [realIn, setRealIn] = useState("");
+  const [minIn, setMinIn] = useState("");
 
   const open = ledger.filter((l) => l.status === "open");
   const closed = ledger.filter((l) => l.status === "closed");
   const realized = closed.reduce((s, l) => s + (l.realNet || 0), 0);
   const openCap = open.reduce((s, l) => s + l.qty * l.buyP, 0);
+  // how long flips really take vs the clock's guess, from close-outs that gave a time
+  const cycleCal = (() => {
+    const timed = closed.filter((l) => l.realMin > 0 && l.predCycleH > 0);
+    if (timed.length < 2) return null;
+    const pred = timed.reduce((s, l) => s + l.predCycleH, 0);
+    const real = timed.reduce((s, l) => s + l.realMin / 60, 0);
+    return real / pred;
+  })();
 
   const close = (uid) => {
+    if (realIn.trim() === "") return; // an empty close would record 0 gp and poison calibration
     const n = Math.round(Number(realIn));
     if (!isFinite(n)) return;
-    setLedger((L) => L.map((l) => (l.uid === uid ? { ...l, status: "closed", realNet: n, closedTs: Date.now() } : l)));
-    setClosing(null); setRealIn("");
+    const mins = Math.round(Number(minIn));
+    setLedger((L) => L.map((l) => (l.uid === uid
+      ? { ...l, status: "closed", realNet: n, realMin: isFinite(mins) && mins > 0 ? mins : null, closedTs: Date.now() }
+      : l)));
+    setClosing(null); setRealIn(""); setMinIn("");
   };
   const del = (uid) => setLedger((L) => L.filter((l) => l.uid !== uid));
 
@@ -1293,7 +1363,10 @@ function LedgerPanel({ ledger, setLedger, byId, calibration, calOn, setCalOn, on
             <tbody>
               {[...ledger].sort((a, b) => b.ts - a.ts).slice(0, 30).map((l) => {
                 const cur = byId.get(l.id);
-                const mark = l.status === "open" && cur ? cur.margin * l.qty : null;
+                // mark the position you HOLD: today's realistic exit against YOUR entry price
+                const exitP = cur ? (cur.avgHi ? Math.min(cur.high, cur.avgHi) : cur.high) : null;
+                const mark = l.status === "open" && exitP != null
+                  ? (exitP - geTax(exitP, l.id) - l.buyP) * l.qty : null;
                 return (
                   <tr key={l.uid} className={l.status === "closed" ? "closedRow" : ""}>
                     <td>
@@ -1308,10 +1381,13 @@ function LedgerPanel({ ledger, setLedger, byId, calibration, calOn, setCalOn, on
                       {l.status === "closed" ? (
                         <b className={l.realNet >= 0 ? "up" : "dn"}>{fmtGp(l.realNet)}</b>
                       ) : closing === l.uid ? (
-                        <span style={{ display: "inline-flex", gap: 6 }}>
+                        <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
                           <input className="fd-in" type="number" placeholder="realized gp"
                             value={realIn} onChange={(e) => setRealIn(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && close(l.uid)} autoFocus />
+                          <input className="fd-in" type="number" placeholder="mins (opt.)" style={{ width: 76 }}
+                            value={minIn} onChange={(e) => setMinIn(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && close(l.uid)} />
                           <button className="fd-btn" onClick={() => close(l.uid)}>save</button>
                         </span>
                       ) : (
@@ -1338,10 +1414,15 @@ function LedgerPanel({ ledger, setLedger, byId, calibration, calOn, setCalOn, on
         <div className="fd-calrow">
           {calibration != null ? (
             <>
-              <span>Across {closed.length} closed flips you realized ~{Math.round(calibration * 100)}% of predicted profit.</span>
+              <span>
+                Across {closed.length} closed flips you realized {calibration <= 0
+                  ? "a net loss against predicted profit — the estimates say nothing until the leaks stop"
+                  : `~${Math.round(calibration * 100)}% of predicted profit (gp-weighted, losses included)`}.
+                {cycleCal != null && <> Cycles ran ~{cycleCal < 1 ? Math.round((1 / cycleCal) * 10) / 10 + "× faster" : Math.round(cycleCal * 10) / 10 + "× slower"} than the clocks guessed.</>}
+              </span>
               <label className="fd-tog">
                 <input type="checkbox" checked={calOn} onChange={(e) => setCalOn(e.target.checked)} />
-                calibrate est. gp/hr to my results
+                calibrate estimates to my results
               </label>
             </>
           ) : (
