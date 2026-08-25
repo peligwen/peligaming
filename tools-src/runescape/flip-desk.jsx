@@ -58,6 +58,15 @@ const fmtDurShort = (h) => {
 };
 // colour a fill-time: fast fills green, slow fills red
 const durClass = (h) => (!isFinite(h) ? "bad" : h <= 0.25 ? "good" : h <= 2 ? "" : h <= 8 ? "warn" : "bad");
+// seconds, at second/minute/hour resolution — for the book-pace column
+const fmtSecs = (s) => {
+  if (s == null || !isFinite(s)) return "—";
+  if (s < 1) return "<1 s";
+  if (s < 90) return Math.round(s) + " s";
+  if (s < 5400) return Math.round(s / 60) + " min";
+  return (s < 36000 ? (s / 3600).toFixed(1) : Math.round(s / 3600)) + " hr";
+};
+const paceClass = (s) => (!isFinite(s) ? "bad" : s <= 10 ? "good" : s <= 120 ? "" : s <= 900 ? "warn" : "bad");
 
 /* ================= data shaping ================= */
 /* v2 rows (capture-snapshot.mjs): [id,name,limit,members,low,high,hvLo,hvHi,
@@ -122,12 +131,13 @@ function assess(it) {
   const tax = geTax(it.high, it.id);
   const margin = it.high - it.low - tax;
   const roi = it.low > 0 ? (margin / it.low) * 100 : 0;
-  const bR = it.hvLo * SHARE_TOUCH, sR = it.hvHi * SHARE_TOUCH;
-  const flipH = (bR > 0 ? it.limit / bR : Infinity) + (sR > 0 ? it.limit / sR : Infinity);
   // gp through the book per day: units traded × mid price. Scales with both
   // price and volume, so it ranks bonds next to feathers honestly.
   const turnover = it.dv * ((it.low + it.high) / 2);
-  return { ...it, tax, margin, roi, flipH, turnover };
+  // book pace: how long the WHOLE market takes to trade one unit each way at
+  // the last hour's pace. Pure observation — no guess about your share of it.
+  const pace = it.hvLo > 0 && it.hvHi > 0 ? 3600 / it.hvLo + 3600 / it.hvHi : Infinity;
+  return { ...it, tax, margin, roi, turnover, pace };
 }
 
 /* ================= api citizenship =================
@@ -261,12 +271,23 @@ async function pullLive() {
     const staleLo = p?.lowTime ? Math.round((now - p.lowTime) / 60) : 999;
     const crossed = !!(p && p.high && p.low && p.high < p.low);
     const stale = Math.max(staleHi, staleLo);
-    const tier = crossed || stale > 60 ? "C" : ok5 && stale <= 15 ? "A" : "B";
+    // cross-check the two windows: when the 5-min tape has walked away from the
+    // hour's average, the price is in motion and margins here are provisional
+    let movePct = 0;
+    if (ok5 && ok1) {
+      const mid5 = (f.avgLowPrice + f.avgHighPrice) / 2, mid1 = (h.avgLowPrice + h.avgHighPrice) / 2;
+      movePct = mid1 > 0 ? ((mid5 - mid1) / mid1) * 100 : 0;
+    }
+    const moving = Math.abs(movePct) > 7.5;
+    let tier = crossed || stale > 60 ? "C" : ok5 && stale <= 15 ? "A" : "B";
+    if (moving && tier === "A") tier = "B";
     items.push({
       id: base.id, name: base.name, limit: base.limit, members: base.members,
       low, high, hv: hvHi + hvLo, hvHi, hvLo,
+      low1h: ok1 ? Math.round(h.avgLowPrice) : null,
+      high1h: ok1 ? Math.round(h.avgHighPrice) : null,
       lastLow: p?.low ?? null, lastHigh: p?.high ?? null, crossed,
-      dv, staleHi, staleLo, tier, src: ok5 ? "5m" : "1h",
+      dv, staleHi, staleLo, tier, src: ok5 ? "5m" : "1h", moving, movePct,
     });
   }
   if (items.length < 20) throw new Error("thin response");
@@ -483,6 +504,7 @@ input.ge-range:disabled { opacity:.4; cursor:default; }
   padding:0 13px 8px; text-shadow:1px 1px 0 #000; }
 .ge-req { font-family:var(--mono); font-size:11px; border:1px solid var(--edge); border-radius:2px; padding:0 5px; }
 .ge-req.ok { color:var(--good); } .ge-req.no { color:var(--bad); } .ge-req.unk { color:var(--tan); }
+.ge-req.warn { color:var(--warn); border-color:#6e5426; cursor:help; }
 .ge-joblines { margin:0 13px 10px; padding:8px 11px; font-family:var(--mono); font-size:12.5px; line-height:1.75; }
 .ge-joblines .op { display:inline-block; width:52px; font-weight:700; letter-spacing:.06em; font-size:11px; }
 .ge-joblines .op.buy { color:var(--good); } .ge-joblines .op.work { color:var(--orange); } .ge-joblines .op.sell { color:var(--bad); }
@@ -631,6 +653,13 @@ function ItemPopup({ it, status, onClose }) {
               and the averages will lag it. Probe with 1 before committing the stack.
             </p>
           )}
+          {it.moving && !it.crossed && (
+            <p className="ge-note caution">
+              ⚠ The 5-minute tape sits {Math.abs(it.movePct).toFixed(0)}% {it.movePct > 0 ? "above" : "below"} the
+              hour's average — the price is on the move. A margin read off a moving price is provisional; probe
+              with 1 and recheck before committing size.
+            </p>
+          )}
           {it.tier === "C" && !it.crossed && (
             <p className="ge-note caution">
               ⚠ Low-confidence book: the last trade is old or the data is sparse. Treat the margin as a rumour
@@ -693,6 +722,21 @@ const niceRound = (n) => {
   return Math.round((m < 1.5 ? 1 : m < 2.5 ? 2 : m < 3.5 ? 3 : m < 4.5 ? 4 : m < 7.5 ? 5 : 10) * pow);
 };
 
+/* Express work crosses the spread NOW, so it prices off the freshest tape.
+   Patient work plays out over hours, so its quotes anchor to the 1-hour
+   averages — slower actions should lean on slower, steadier data. */
+const jobBuyPx = (it, mode) => (mode === "express" ? it.high : (it.low1h ?? it.low));
+const jobSellPx = (it, mode) => (mode === "express" ? it.low : (it.high1h ?? it.high));
+
+/* Semi-precious gems crush on a failed cut — the level requirement is real but
+   the yield isn't 100%. r.x = [b, a]: success/256 = min(256, b + (lvl−1)·a/98). */
+const succOf = (r, skills) => {
+  if (!r.x) return 1;
+  const have = skills?.[r.s];
+  const lvl = clamp(have === "" || have == null ? 1 : +have || 1, r.l, 99);
+  return Math.min(256, r.x[0] + ((lvl - 1) * r.x[1]) / 98) / 256;
+};
+
 // group recipe variants by output name index once
 const RECIPES_BY_OUT = (() => {
   const m = new Map();
@@ -705,7 +749,7 @@ const RECIPES_BY_OUT = (() => {
 
 /* the cheapest way to get one unit of `nameIdx`: buy it off the exchange, or
    craft it from parts (recursively, when crafting beats buying by >3%). */
-function sourceUnit(nameIdx, mode, byName, memo, visiting) {
+function sourceUnit(nameIdx, mode, byName, memo, visiting, skills) {
   if (memo.has(nameIdx)) return memo.get(nameIdx);
   const name = RECIPES.names[nameIdx];
   if (name === "Coins") {
@@ -714,7 +758,7 @@ function sourceUnit(nameIdx, mode, byName, memo, visiting) {
     return plan;
   }
   const it = byName.get(name);
-  const buyCost = it ? (mode === "express" ? it.high : it.low) : null;
+  const buyCost = it ? jobBuyPx(it, mode) : null;
   let best = buyCost != null
     ? { cost: buyCost, secs: 0, buys: [[nameIdx, 1]], steps: [], coins: 0 }
     : null;
@@ -725,7 +769,7 @@ function sourceUnit(nameIdx, mode, byName, memo, visiting) {
       let cost = 0, secs = (RATE[r.f] ?? 3.0) / r.q, coins = 0, ok = true;
       const buys = new Map(), steps = new Map([[JSON.stringify(r), 1 / r.q]]);
       for (const [mi, mq] of r.m) {
-        const sub = sourceUnit(mi, mode, byName, memo, visiting);
+        const sub = sourceUnit(mi, mode, byName, memo, visiting, skills);
         if (!sub) { ok = false; break; }
         const per = mq / r.q;
         cost += sub.cost * per; secs += sub.secs * per; coins += sub.coins * per;
@@ -733,6 +777,13 @@ function sourceUnit(nameIdx, mode, byName, memo, visiting) {
         for (const [sk, sc] of sub.steps) steps.set(sk, (steps.get(sk) || 0) + sc * per);
       }
       if (!ok) continue;
+      // a crushable step means 1/p attempts (and material sets) per success
+      const p = succOf(r, skills);
+      if (p < 1) {
+        cost /= p; secs /= p; coins /= p;
+        for (const [bi, bq] of buys) buys.set(bi, bq / p);
+        for (const [sk, sc] of steps) steps.set(sk, sc / p);
+      }
       // craft only when it genuinely beats the exchange (or the exchange has no price)
       if (best == null || cost < best.cost * 0.97) {
         best = { cost, secs, buys: [...buys], steps: [...steps], coins };
@@ -746,14 +797,14 @@ function sourceUnit(nameIdx, mode, byName, memo, visiting) {
 
 /* every job worth posting for the current mode: one card per craftable,
    tradeable output whose sale beats the cost of its parts */
-function buildJobs(items, mode) {
+function buildJobs(items, mode, skills) {
   const byName = new Map(items.map((it) => [it.name, it]));
   const memo = new Map();
   const jobs = [];
   for (const [outIdx, variants] of RECIPES_BY_OUT) {
     const out = byName.get(RECIPES.names[outIdx]);
     if (!out) continue;
-    const sellRaw = mode === "express" ? out.low : out.high;
+    const sellRaw = jobSellPx(out, mode);
     const sellUnit = sellRaw - geTax(sellRaw, out.id);
     let best = null;
     for (const r of variants) {
@@ -762,7 +813,7 @@ function buildJobs(items, mode) {
       const buys = new Map(), steps = new Map([[JSON.stringify(r), 1 / r.q]]);
       const visiting = new Set([outIdx]);
       for (const [mi, mq] of r.m) {
-        const sub = sourceUnit(mi, mode, byName, memo, visiting);
+        const sub = sourceUnit(mi, mode, byName, memo, visiting, skills);
         if (!sub) { ok = false; break; }
         const per = mq / r.q;
         cost += sub.cost * per; secs += sub.secs * per; coins += sub.coins * per;
@@ -770,6 +821,13 @@ function buildJobs(items, mode) {
         for (const [sk, sc] of sub.steps) steps.set(sk, (steps.get(sk) || 0) + sc * per);
       }
       if (!ok) continue;
+      // a crushable final step means 1/p attempts (and material sets) per success
+      const p = succOf(r, skills);
+      if (p < 1) {
+        cost /= p; secs /= p; coins /= p;
+        for (const [bi, bq] of buys) buys.set(bi, bq / p);
+        for (const [sk, sc] of steps) steps.set(sk, sc / p);
+      }
       const profitUnit = sellUnit - cost;
       if (best == null || profitUnit > best.profitUnit) {
         best = { r, cost, secs: secs * OVERHEAD, coins, buys, steps, profitUnit };
@@ -802,12 +860,22 @@ function buildJobs(items, mode) {
     const maxN = Math.max(0, Math.min(...caps));
     if (maxN < 1) continue;
 
+    // sanity-check the chain: a return this rich in a liquid market is more
+    // often thin or stale data than free money, and a C-grade or fast-moving
+    // leg poisons the whole sum — flag it, let the player judge
+    const legs = [out, ...buyList.map((b) => b.it)];
+    const rich = best.cost > 0 && best.profitUnit / best.cost > 0.5;
+    const staleLegs = legs.filter((x) => x.tier === "C").map((x) => x.name);
+    const movingLegs = legs.filter((x) => x.moving).map((x) => x.name);
+    const crushP = Math.min(1, ...stepList.map((s) => succOf(s.r, skills)));
+
     jobs.push({
       key: outIdx + ":" + mode, out, mode, ...best,
       sellUnit, stepList, buyList, maxN, members,
       levels: [...levels].map(([s, l]) => ({ s, l })),
       facilities: [...facilities],
       unlocks: [...unlocks],
+      rich, staleLegs, movingLegs, crush: crushP < 1 ? 1 - crushP : 0,
       defaultN: Math.min(niceRound(450 / best.secs), maxN),
     });
   }
@@ -855,13 +923,32 @@ function JobCard({ job, n, setN, sheet }) {
         {[...new Set(job.stepList.map((s) => s.r.g).filter(Boolean))].map((g) => (
           <span key={g} className="ge-req unk" title="Hand tool required — a few gp from a shop">{g}</span>
         ))}
+        {job.crush > 0 && (
+          <span className="ge-req warn" title={`Semi-precious gems crush on a failed cut — at your Crafting level ≈${Math.round(job.crush * 100)}% of attempts fail. The buy list below already includes the extra uncut gems.`}>
+            ≈{Math.round(job.crush * 100)}% crush
+          </span>
+        )}
+        {job.rich && (
+          <span className="ge-req warn" title="This chain pays over 50% on cost. In a liquid market someone would already be doing it — thin or stale data somewhere in the chain is the likelier story. Probe every leg with 1 before committing.">
+            unusually rich ⚠
+          </span>
+        )}
+        {(job.staleLegs.length > 0 || job.movingLegs.length > 0) && (
+          <span className="ge-req warn" title={[
+            job.staleLegs.length > 0 ? `Low-confidence pricing on: ${job.staleLegs.join(", ")}.` : "",
+            job.movingLegs.length > 0 ? `Price in motion on: ${job.movingLegs.join(", ")}.` : "",
+            "The pay is only as good as its weakest leg — check each on the Market Board first.",
+          ].filter(Boolean).join(" ")}>
+            check the tape ⚠
+          </span>
+        )}
         {job.members && <span className="ge-mem">P2P</span>}
         <span>margin {fmtFull(Math.round(job.profitUnit))} gp per item</span>
       </div>
       <div className="ge-joblines ge-inset">
         {job.buyList.map((b) => {
           const q = Math.ceil(b.perUnit * n);
-          const unit = mode === "express" ? b.it.high : b.it.low;
+          const unit = jobBuyPx(b.it, mode);
           return (
             <div key={b.it.id}>
               <span className="op buy">BUY</span>
@@ -885,8 +972,8 @@ function JobCard({ job, n, setN, sheet }) {
         })}
         <div>
           <span className="op sell">SELL</span>
-          {fmtFull(n)}× {out.name} @ {fmtFull(mode === "express" ? out.low : out.high)}
-          {geTax(mode === "express" ? out.low : out.high, out.id) > 0 ? " less tax" : ""} — {fmtGp(Math.round(n * job.sellUnit))} gp
+          {fmtFull(n)}× {out.name} @ {fmtFull(jobSellPx(out, mode))}
+          {geTax(jobSellPx(out, mode), out.id) > 0 ? " less tax" : ""} — {fmtGp(Math.round(n * job.sellUnit))} gp
           {mode === "patient" && <span className="clock"> · fills ≈ {fmtDurShort(sellClock)}</span>}
         </div>
       </div>
@@ -905,6 +992,14 @@ function JobCard({ job, n, setN, sheet }) {
         </div>
       </div>
       {capNote && <p className="ge-note caution" style={{ padding: "0 13px 10px", margin: 0 }}>⚠ {capNote}.</p>}
+      {(job.rich || job.staleLegs.length > 0) && (
+        <p className="ge-note caution" style={{ padding: "0 13px 10px", margin: 0 }}>
+          ⚠ {[
+            job.rich && "pays suspiciously well — verify each leg with a 1-unit probe before committing",
+            job.staleLegs.length > 0 && `weak data on ${job.staleLegs.slice(0, 2).join(", ")}${job.staleLegs.length > 2 ? ` +${job.staleLegs.length - 2} more` : ""}`,
+          ].filter(Boolean).join("; ")}.
+        </p>
+      )}
     </section>
   );
 }
@@ -920,7 +1015,7 @@ function JobBoard({ items, status }) {
   });
   useEffect(() => { try { localStorage.setItem("fd-sheet-v1", JSON.stringify(sheet)); } catch (e) {} }, [sheet]);
 
-  const jobs = useMemo(() => buildJobs(items, mode), [items, mode]);
+  const jobs = useMemo(() => buildJobs(items, mode, sheet.skills), [items, mode, sheet.skills]);
   // only the quests that actually gate a job on today's board make the sheet
   const questList = useMemo(() => [...new Set(jobs.flatMap((j) => j.unlocks))].sort(), [jobs]);
 
@@ -952,7 +1047,7 @@ function JobBoard({ items, status }) {
           <span className="ge-read" style={{ margin: 0 }}>
             {mode === "express"
               ? "Prices cross the spread on both ends: thinner pay, but every leg fills at once."
-              : "Prices quote at the touch on both ends: the full margin, with a wait on each leg."}
+              : "Quotes at the touch on both ends, anchored to the hour's averages: the full margin, with a wait on each leg."}
           </span>
         </div>
         <div className="ge-filters">
@@ -1012,7 +1107,9 @@ function JobBoard({ items, status }) {
       <p className="ge-foot">
         Default batches are sized to roughly 5–10 minutes of work and capped by 4-hour buy limits and what the
         books can absorb (≈10% of daily volume when taking the market; ≈4 hours of patient fills when quoting).<br />
-        Action speeds are desk assumptions per facility, +15% for banking. The market moves while you work — the
+        Action speeds are desk assumptions per facility, +15% for banking. Quote &amp; wait prices anchor to the
+        1-hour averages — patient work should lean on slower data. Chains that pay over 50% on cost, or lean on
+        weak or fast-moving legs, wear a ⚠ — verify before you trust them. The market moves while you work — the
         pay is an estimate, not a contract.
       </p>
     </>
@@ -1131,8 +1228,15 @@ function Econ101() {
           <li><b>Gp moved/day</b> is daily volume × mid price — the size of the river. A big number is a
             deep, honest market that can absorb real size; a small one means every other number on the row
             is fragile.</li>
-          <li><b>Fill clocks</b> come from each side's real hourly flow and an assumed ~25% share of it when
-            quoting at the touch. Estimates, not promises.</li>
+          <li><b>Book pace</b> is how long the whole book takes to trade one unit each way at the last hour's
+            pace — pure observation, the market's metabolism. Your own fills are slower: quantity, queue
+            position and competition all stack on top, and the board doesn't pretend to know your share.
+            The popup's fill clocks do assume a share (~25% at the touch), which is why they're labeled
+            estimates.</li>
+          <li>The board <b>cross-checks its own data</b>: a 5-minute tape that walks away from the hour's
+            average wears ↕ (price in motion), and Job Board chains that pay over 50% on cost or lean on a
+            weak leg wear a ⚠ — unusual numbers are either opportunities or bad data, and a 1-unit probe is
+            how you find out which.</li>
           <li>The <b>Job Board</b> prices whole production chains from the same tape — buy the inputs, work
             them, sell the output, tax and buy limits included.</li>
         </ul>
@@ -1321,7 +1425,7 @@ export default function FlipDesk() {
                 <Th k="turnover">Gp moved/day</Th>
                 <Th k="dv" cls="hide-sm">Traded/day</Th>
                 <Th k="limit" cls="hide-sm">Limit/4h</Th>
-                <Th k="flipH" dir={1} cls="hide-sm">Flip a limit</Th>
+                <Th k="pace" dir={1} cls="hide-sm">Book pace</Th>
               </tr>
             </thead>
             <tbody>
@@ -1334,6 +1438,7 @@ export default function FlipDesk() {
                     {it.members && <span className="ge-mem">P2P</span>}
                     {it.tier === "B" && <span className="ge-flag" title="Priced from the 1-hour average book (the 5-minute tape was too thin), or the last trade is over 15 minutes old.">B</span>}
                     {it.tier === "C" && <span className="ge-flag tC" title="Low-confidence pricing: stale, crossed prints, or raw offline data. Probe with 1 before trusting the margin.">C</span>}
+                    {it.moving && <span className="ge-flag" title={`The 5-minute tape sits ${Math.abs(it.movePct).toFixed(0)}% ${it.movePct > 0 ? "above" : "below"} the hour's average — the price is on the move and these margins are provisional.`}>↕</span>}
                   </td>
                   <td className="gold">{fmtGp(it.low)}</td>
                   <td className="gold hide-sm">{fmtGp(it.high)}</td>
@@ -1342,7 +1447,7 @@ export default function FlipDesk() {
                   <td className="gold">{fmtGp(it.turnover)}</td>
                   <td className="mut hide-sm">{fmtQty(it.dv)}</td>
                   <td className="mut hide-sm">{fmtQty(it.limit)}</td>
-                  <td className={"hide-sm " + durClass(it.flipH)}>{fmtDurShort(it.flipH)}</td>
+                  <td className={"hide-sm " + paceClass(it.pace)}>{fmtSecs(it.pace)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1356,7 +1461,10 @@ export default function FlipDesk() {
           fallback) — never a single print, so one bait trade can't paint the board. Margin is per item after
           GE tax (2% of sale, capped at 5m; under 50 gp and bonds exempt). Gp moved/day = daily volume ×
           mid price — the depth of the river, not your share of it.<br />
-          A / B / C flags grade data confidence; unpriceable books (one-sided, crossed, dislocated) are set aside.<br />
+          Book pace = how long the whole book takes to trade one unit each way at the last hour's pace — the
+          market's own metabolism, no guess about your queue position or competition; your fills stack on top of it.<br />
+          A / B / C flags grade data confidence; ↕ marks a 5-minute tape that disagrees with the hour (price in
+          motion); unpriceable books (one-sided, crossed, dislocated) are set aside.<br />
           Live prices courtesy of the <a className="ge-link" href="https://prices.runescape.wiki" target="_blank" rel="noreferrer">OSRS Wiki price API</a> — estimates, not promises.
         </p>
         </>}

@@ -49,8 +49,12 @@ function unlockOf(name, skill, facility) {
 }
 // Hand tools the recipe data doesn't list as materials but the job can't start
 // without. Rule-based so whole families get tagged consistently.
+const GEMS = new Set(['Opal', 'Jade', 'Red topaz', 'Sapphire', 'Emerald', 'Ruby',
+  'Diamond', 'Dragonstone', 'Onyx', 'Zenyte']);
 function gearOf(name, skill, facility) {
   const n = name.toLowerCase();
+  if (skill === 'Crafting' && GEMS.has(name)) return 'Chisel';
+  if (skill === 'Fletching' && n.includes('amethyst')) return 'Chisel';
   if (skill === 'Smithing' && facility === 'Furnace' && n.includes('cannonball')) return 'Ammo mould';
   if (skill === 'Crafting' && facility === 'Furnace') {
     if (/\bring\b/.test(n)) return 'Ring mould';
@@ -62,6 +66,12 @@ function gearOf(name, skill, facility) {
   }
   return null;
 }
+
+// Semi-precious gems crush on a failed cut — the level requirement is real but
+// the yield isn't 100%. success/256 = min(256, b + (level−1)·a/98). Opal's
+// constants are the wiki's own; jade and red topaz are fitted to the wiki's
+// published rates (jeweller's-chisel guarantee levels, measured crush rates).
+const CRUSH = { Opal: [129, 122], Jade: [91, 160], 'Red topaz': [99, 140] };
 
 const keepName = new Map(); // name -> new index
 const names = [];
@@ -95,6 +105,7 @@ for (const [nodeIdx, variantList] of Object.entries(recipes)) {
     if (g) rec.g = g;
     const u = unlockOf(outNode.n, v.s, v.f || '');
     if (u) rec.u = u;
+    if (v.s === 'Crafting' && !(v.f || '') && CRUSH[outNode.n]) rec.x = CRUSH[outNode.n];
     out.push(rec);
   }
 }
