@@ -28,6 +28,15 @@ const FACILITIES = new Set([
   '', 'Furnace', 'Anvil', 'Cooking range', 'Fire', 'Spinning wheel', 'Loom',
   'Pottery Oven', "Potter's Wheel", 'Dairy churn',
 ]);
+// Outputs whose visualizer data is wrong or disputed. Reported in testing:
+// cannonball smelting is NOT a walk-up furnace job (mould required at minimum;
+// the facility itself is disputed) — off the board until the data is verified.
+// The anvil chainshot/incendiary variants stay: they consume bought cannonballs.
+const EXCLUDE_OUTPUTS = new Set([
+  'Bronze cannonball', 'Iron cannonball', 'Steel cannonball',
+  'Mithril cannonball', 'Adamant cannonball', 'Rune cannonball',
+  'Cannon ball (Between a Rock...)', 'Granite cannonball',
+]);
 
 const keepName = new Map(); // name -> new index
 const names = [];
@@ -40,7 +49,7 @@ const out = [];
 let variants = 0, skippedSkill = 0;
 for (const [nodeIdx, variantList] of Object.entries(recipes)) {
   const outNode = nodes[+nodeIdx];
-  if (!outNode) continue;
+  if (!outNode || EXCLUDE_OUTPUTS.has(outNode.n)) continue;
   for (const v of variantList) {
     variants++;
     if (!SKILLS.has(v.s) || !FACILITIES.has(v.f || '')) { skippedSkill++; continue; }

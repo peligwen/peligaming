@@ -64,7 +64,9 @@ const rowToItem = (r) => ({
   low: r[4], high: r[5], hv: r[6], dv: r[7],
   // snapshot stores combined hourly flow; assume an even split until live data lands
   hvLo: r[6] / 2, hvHi: r[6] / 2,
-  unconf: false, staleHi: r[9], staleLo: r[9],
+  staleHi: r[9], staleLo: r[9],
+  // v1 snapshot rows are priced from raw prints — the lowest confidence there is
+  lastLow: r[4], lastHigh: r[5], crossed: false, tier: "C", src: "prints",
 });
 const BASE_ITEMS = SNAPSHOT.items.map(rowToItem);
 
@@ -117,12 +119,12 @@ function assess(it) {
    The wiki's price API is a free community service run for RuneLite users.
    This board is deliberately polite with it:
    - every endpoint is cached at its natural update cadence (latest ~1min,
-     1h refreshed 15min, volumes hourly, mapping ~weekly)
+     5m blocks every 5min, 1h refreshed 15min, volumes hourly, mapping ~weekly)
    - concurrent callers share a single in-flight request
    - errors back off exponentially PER ENDPOINT, serving stale data meanwhile
    - a hidden tab never polls; the refresh button can't bust the cache      */
 const TTL = {
-  latest: 85_000, "1h": 900_000,
+  latest: 85_000, "5m": 300_000, "1h": 900_000,
   volumes: 3_600_000, mapping: 7 * 86_400_000,
 };
 const memCache = new Map();   // url -> {ts, data}
@@ -178,6 +180,17 @@ async function loadUniverse() {
   } catch (e) { return null; }
 }
 
+/* ================= pricing =================
+   The two /latest prints are asynchronous last trades, not a fillable two-way
+   quote — one bot dump, bait print or impatient buyer skews them for everyone
+   reading the feed. So the board prices every row from windowed VOLUME-WEIGHTED
+   AVERAGES instead: the 5-minute window when both sides traded meaningfully,
+   falling back to the 1-hour window; raw prints only date the row. Books the
+   averages can't price honestly stay off the board and are counted:
+   - one-sided: a side with no traded average (an offer there just sits)
+   - crossed averages: buy avg above sell avg — the price is in motion
+   - dislocated: a wide spread on a busy book; real competition would have
+     closed it, so it's a data artifact or a knife, not an opportunity      */
 async function pullLive() {
   const [latest, h1, vols, uni] = await Promise.all([
     apiGet("latest", `${API}/latest`),
@@ -185,36 +198,45 @@ async function pullLive() {
     apiGet("volumes", `${API}/volumes`),
     loadUniverse(),
   ]);
+  let m5 = null;
+  try { m5 = await apiGet("5m", `${API}/5m`); } catch (e) { /* 1h pricing covers */ }
   const meta = uni || BASE_ITEMS;      // no mapping? fall back to the baked classics
   const now = Math.floor(Date.now() / 1000);
   const items = [];
+  const hidden = { oneSided: 0, crossedAvg: 0, dislocated: 0 };
   for (const base of meta) {
     const p = latest.data?.[base.id];
-    if (!p || !p.high || !p.low) continue;
-    const high = p.high, low = p.low;
-    // crossed tape (insta-buy below insta-sell) means one side is stale and the
-    // price is moving — swapping would fabricate a margin out of staleness
-    if (high < low) continue;
     const h = h1.data?.[base.id] || {};
+    const f = m5?.data?.[base.id] || {};
     // highPriceVolume = trades at insta-buy (fills YOUR sell offer); lowPriceVolume = insta-sells (fills YOUR buy offer)
     const hvHi = h.highPriceVolume || 0;
     const hvLo = h.lowPriceVolume || 0;
-    // highTime = last insta-buy (your SELL leg's evidence); lowTime = last insta-sell (your BUY leg's)
-    const staleHi = Math.round((now - (p.highTime || now)) / 60);
-    const staleLo = Math.round((now - (p.lowTime || now)) / 60);
-    // a latest spread far wider than the hour's average is usually one bait or
-    // outlier print, not a margin you can capture — flag it, don't chase it
-    const avgSpread = h.avgHighPrice && h.avgLowPrice ? h.avgHighPrice - h.avgLowPrice : null;
-    const unconf = avgSpread == null || avgSpread <= 0 || high - low > Math.max(1.5 * avgSpread, avgSpread + 2);
+    if (!p && !hvHi && !hvLo) continue; // nothing traded at all — not a market
+    const ok5 = f.avgLowPrice && f.avgHighPrice && (f.lowPriceVolume || 0) >= 5 && (f.highPriceVolume || 0) >= 5;
+    const ok1 = h.avgLowPrice && h.avgHighPrice && hvLo >= 1 && hvHi >= 1;
+    if (!ok5 && !ok1) { hidden.oneSided++; continue; }
+    // GE orders are whole gp — round the averages to enterable prices
+    const low = Math.round(ok5 ? f.avgLowPrice : h.avgLowPrice);
+    const high = Math.round(ok5 ? f.avgHighPrice : h.avgHighPrice);
+    if (high < low) { hidden.crossedAvg++; continue; }
+    const dv = vols.data?.[base.id] ?? 0;
+    const spreadPct = low > 0 ? ((high - low) / low) * 100 : 0;
+    if (high >= 50 && spreadPct > 10 && dv > 20_000) { hidden.dislocated++; continue; }
+    // raw prints date the row and flag disagreement — they never price it
+    const staleHi = p?.highTime ? Math.round((now - p.highTime) / 60) : 999;
+    const staleLo = p?.lowTime ? Math.round((now - p.lowTime) / 60) : 999;
+    const crossed = !!(p && p.high && p.low && p.high < p.low);
+    const stale = Math.max(staleHi, staleLo);
+    const tier = crossed || stale > 60 ? "C" : ok5 && stale <= 15 ? "A" : "B";
     items.push({
       id: base.id, name: base.name, limit: base.limit, members: base.members,
-      low, high, hv: hvHi + hvLo, hvHi, hvLo, unconf,
-      dv: vols.data?.[base.id] ?? 0,
-      staleHi, staleLo,
+      low, high, hv: hvHi + hvLo, hvHi, hvLo,
+      lastLow: p?.low ?? null, lastHigh: p?.high ?? null, crossed,
+      dv, staleHi, staleLo, tier, src: ok5 ? "5m" : "1h",
     });
   }
   if (items.length < 20) throw new Error("thin response");
-  return { items, universe: !!uni };
+  return { items, universe: !!uni, hidden };
 }
 
 /* ================= styles — old-school interface ================= */
@@ -324,6 +346,7 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:700
 .ge-t .mut { color:var(--tan); } .ge-t .gold { color:var(--orange); }
 .ge-mem { color:#d0a0e8; font-size:10px; margin-left:6px; border:1px solid #5a4470; border-radius:2px; padding:0 4px; font-family:var(--mono); }
 .ge-flag { color:var(--warn); font-size:10px; margin-left:6px; border:1px dashed #6e5426; border-radius:2px; padding:0 4px; font-family:var(--mono); cursor:help; }
+.ge-flag.tC { color:var(--bad); border-color:#6e2f26; }
 .ge-more { padding:9px 12px; font-size:12px; color:var(--tan); text-align:center; }
 @media (max-width:720px){ .hide-sm{display:none} table.ge-t{min-width:520px} }
 @media (max-width:480px){ .hide-xs{display:none} table.ge-t{min-width:0}
@@ -485,6 +508,7 @@ function ItemPopup({ it, status, onClose }) {
             <span>Buy limit <b>{it.limit.toLocaleString()}</b> / 4h</span>
             <span>Traded <b>{fmtQty(it.dv)}</b> / day</span>
             {o.tax === 0 && <span style={{ color: "var(--good)" }}>No GE tax</span>}
+            <span>{it.src === "5m" ? "priced from the 5-min tape" : it.src === "1h" ? "priced from the 1-hour tape" : "priced from raw prints (offline)"}</span>
           </div>
 
           {/* the recommended orders */}
@@ -550,10 +574,22 @@ function ItemPopup({ it, status, onClose }) {
             <div><span>Round trip</span><b className="gold">{fmtDurShort(o.cycleH)}</b></div>
           </div>
 
-          {it.unconf && (
+          {it.lastLow != null && it.lastHigh != null && (it.lastLow !== it.low || it.lastHigh !== it.high) && it.src !== "prints" && (
+            <p className="ge-note">
+              Last raw prints: {fmtFull(it.lastLow)} / {fmtFull(it.lastHigh)} ({agoStr(it.staleLo)} / {agoStr(it.staleHi)}) —
+              the offers above are anchored to what actually traded, not to single prints.
+            </p>
+          )}
+          {it.crossed && (
             <p className="ge-note caution">
-              ⚠ The current spread is much wider than this item traded over the last hour — likely one outlier
-              or bait print rather than a margin you can capture. Probe with 1 before committing the stack.
+              ⚠ The last two prints are crossed (insta-buy below insta-sell) — the price is moving right now
+              and the averages will lag it. Probe with 1 before committing the stack.
+            </p>
+          )}
+          {it.tier === "C" && !it.crossed && (
+            <p className="ge-note caution">
+              ⚠ Low-confidence book: the last trade is old or the data is sparse. Treat the margin as a rumour
+              until a 1-unit probe confirms it.
             </p>
           )}
           {status === "snapshot" && (
@@ -737,9 +773,11 @@ function JobCard({ job, n, setN, sheet }) {
   const cost = Math.round(n * job.cost);
   const profit = Math.round(n * job.profitUnit);
   const lvlChip = (q) => {
+    // a blank skill counts as level 1 — the board never assumes training you haven't claimed
     const have = sheet.skills[q.s];
-    const cls = have === "" || have == null ? "unk" : +have >= q.l ? "ok" : "no";
-    return <span key={q.s} className={"ge-req " + cls}>{q.s} {q.l}{cls === "ok" ? " ✓" : cls === "no" ? " ✗" : ""}</span>;
+    const lvl = have === "" || have == null ? 1 : +have;
+    const cls = lvl >= q.l ? "ok" : "no";
+    return <span key={q.s} className={"ge-req " + cls}>{q.s} {q.l}{cls === "ok" ? " ✓" : " ✗"}</span>;
   };
   const capNote = n >= job.maxN
     ? (mode === "express" ? "capped — a bigger batch would move these books" : "capped — the books can't fill more inside ~4h")
@@ -824,7 +862,8 @@ function JobBoard({ items, status }) {
     if (job.members && !sheet.members) return false;
     for (const q of job.levels) {
       const have = sheet.skills[q.s];
-      if (have !== "" && have != null && +have < q.l) return false;
+      const lvl = have === "" || have == null ? 1 : +have; // blank = level 1
+      if (lvl < q.l) return false;
     }
     return true;
   };
@@ -875,7 +914,7 @@ function JobBoard({ items, status }) {
       )}
       <p className="ge-read">
         <b>{jobs.length}</b> jobs pay on the exchange right now{shown.length < jobs.length ? <> · showing {shown.length}</> : null}.
-        Blank levels are not filtered — fill in your stats and the board tailors itself.
+        Blank skills count as level 1 — fill in your stats to unlock more of the board.
       </p>
 
       {shown.map((job) => (
@@ -994,6 +1033,7 @@ export default function FlipDesk() {
   );
 
   const sel = useMemo(() => assessed.find((p) => p.id === selId) || null, [assessed, selId]);
+  const hiddenN = live?.hidden ? live.hidden.oneSided + live.hidden.crossedAvg + live.hidden.dislocated : 0;
   const snapAgeH = Math.round((Date.now() / 1000 - SNAPSHOT.ts) / 3600);
   const snapAgeStr = snapAgeH > 48 ? `~${Math.round(snapAgeH / 24)} days old` : `~${snapAgeH}h old`;
   const SHOW = 400;
@@ -1042,6 +1082,7 @@ export default function FlipDesk() {
         <p className="ge-read">
           <b>{assessed.length.toLocaleString()}</b> items on the exchange
           {filtered.length !== assessed.length && <> · <b>{filtered.length.toLocaleString()}</b> match your filters</>}
+          {hiddenN > 0 && <> · {hiddenN.toLocaleString()} unpriceable books set aside (one-sided, crossed or dislocated)</>}
           {" "}· tap an item for its recommended flip.
         </p>
 
@@ -1086,7 +1127,8 @@ export default function FlipDesk() {
                   <td>
                     <span className="nm">{it.name}</span>
                     {it.members && <span className="ge-mem">P2P</span>}
-                    {it.unconf && <span className="ge-flag" title="Spread is far wider than the last hour's average — likely one outlier print.">?</span>}
+                    {it.tier === "B" && <span className="ge-flag" title="Priced from the 1-hour average book (the 5-minute tape was too thin), or the last trade is over 15 minutes old.">B</span>}
+                    {it.tier === "C" && <span className="ge-flag tC" title="Low-confidence pricing: stale, crossed prints, or raw offline data. Probe with 1 before trusting the margin.">C</span>}
                   </td>
                   <td className="gold">{fmtGp(it.low)}</td>
                   <td className="gold hide-sm">{fmtGp(it.high)}</td>
@@ -1104,8 +1146,10 @@ export default function FlipDesk() {
         </div>
 
         <p className="ge-foot">
-          Buy = highest insta-sell price · Sell = lowest insta-buy price · Margin is per item after GE tax
-          (2% of sale, capped at 5m; under 50 gp and bonds exempt).<br />
+          Buy / Sell = what each side actually traded at, volume-weighted over the last 5 minutes (1-hour
+          fallback) — never a single print, so one bait trade can't paint the board. Margin is per item after
+          GE tax (2% of sale, capped at 5m; under 50 gp and bonds exempt).<br />
+          A / B / C flags grade data confidence; unpriceable books (one-sided, crossed, dislocated) are set aside.<br />
           Live prices courtesy of the <a className="ge-link" href="https://prices.runescape.wiki" target="_blank" rel="noreferrer">OSRS Wiki price API</a> — estimates, not promises.
         </p>
         </>}
