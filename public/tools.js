@@ -30,7 +30,7 @@ window.PELIGAMING = {
       tools: [
         {
           name: "Flip Desk",
-          description: "Grand Exchange flipping desk — margins, GE tax, volume and risk, with live OSRS Wiki prices.",
+          description: "The Grand Exchange as it stands — a live market board; tap an item for its recommended flip orders and fill times.",
           path: "tools/runescape/flip-desk.html",
         },
         {
