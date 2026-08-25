@@ -651,6 +651,11 @@ function ItemPopup({ it, status, onClose }) {
    "Quote and wait" prices at the touch on both ends for the full margin,
    with fill clocks on each leg. */
 const SKILL_LIST = ["Smithing", "Crafting", "Fletching", "Cooking", "Herblore"];
+// almost every unlock is a quest; the exceptions get their own tooltip
+const UNLOCK_NOTE = {
+  "Broader Fletching": "Slayer reward unlock — 300 points at any Slayer master",
+};
+const unlockNote = (u) => UNLOCK_NOTE[u] || "Quest required — tick it off in your sheet once it's done";
 // seconds per action by facility — desk assumptions (banking overhead added on top)
 const RATE = {
   Furnace: 3.0, Anvil: 3.0, "Cooking range": 2.4, Fire: 2.4,
@@ -760,11 +765,13 @@ function buildJobs(items, mode) {
     if (!best || best.profitUnit <= 0) continue;
 
     // requirements across every step — listed in work order, raw materials first
-    const levels = new Map(); const facilities = new Set(); let members = out.members;
+    const levels = new Map(); const facilities = new Set(); const unlocks = new Set();
+    let members = out.members;
     const stepList = [...best.steps].reverse().map(([sk, perUnit]) => ({ r: JSON.parse(sk), perUnit }));
     for (const s of stepList) {
       levels.set(s.r.s, Math.max(levels.get(s.r.s) || 0, s.r.l));
       if (s.r.f) facilities.add(s.r.f);
+      if (s.r.u) unlocks.add(s.r.u);
     }
     const buyList = [...best.buys].map(([bi, perUnit]) => ({ it: byName.get(RECIPES.names[bi]), perUnit }));
     if (buyList.some((b) => !b.it)) continue;
@@ -787,6 +794,7 @@ function buildJobs(items, mode) {
       sellUnit, stepList, buyList, maxN, members,
       levels: [...levels].map(([s, l]) => ({ s, l })),
       facilities: [...facilities],
+      unlocks: [...unlocks],
       defaultN: Math.min(niceRound(450 / best.secs), maxN),
     });
   }
@@ -822,6 +830,14 @@ function JobCard({ job, n, setN, sheet }) {
       </div>
       <div className="ge-jobmeta">
         {job.levels.map(lvlChip)}
+        {job.unlocks.map((u) => {
+          const done = !!sheet.quests?.[u];
+          return (
+            <span key={u} className={"ge-req " + (done ? "ok" : "no")} title={unlockNote(u)}>
+              {u}{done ? " ✓" : " ✗"}
+            </span>
+          );
+        })}
         {job.facilities.map((f) => <span key={f} className="ge-req unk">{f}</span>)}
         {[...new Set(job.stepList.map((s) => s.r.g).filter(Boolean))].map((g) => (
           <span key={g} className="ge-req unk" title="Hand tool required — a few gp from a shop">{g}</span>
@@ -886,12 +902,14 @@ function JobBoard({ items, status }) {
   const [hideCant, setHideCant] = useState(true);
   const [batches, setBatches] = useState({}); // job key -> chosen n
   const [sheet, setSheet] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("fd-sheet-v1")) || { members: true, skills: {} }; }
-    catch (e) { return { members: true, skills: {} }; }
+    try { return JSON.parse(localStorage.getItem("fd-sheet-v1")) || { members: true, skills: {}, quests: {} }; }
+    catch (e) { return { members: true, skills: {}, quests: {} }; }
   });
   useEffect(() => { try { localStorage.setItem("fd-sheet-v1", JSON.stringify(sheet)); } catch (e) {} }, [sheet]);
 
   const jobs = useMemo(() => buildJobs(items, mode), [items, mode]);
+  // only the quests that actually gate a job on today's board make the sheet
+  const questList = useMemo(() => [...new Set(jobs.flatMap((j) => j.unlocks))].sort(), [jobs]);
 
   const canDo = (job) => {
     if (job.members && !sheet.members) return false;
@@ -900,6 +918,7 @@ function JobBoard({ items, status }) {
       const lvl = have === "" || have == null ? 1 : +have; // blank = level 1
       if (lvl < q.l) return false;
     }
+    for (const u of job.unlocks) if (!sheet.quests?.[u]) return false; // unticked = not done
     return true;
   };
   const q = search.trim().toLowerCase();
@@ -942,6 +961,18 @@ function JobBoard({ items, status }) {
           <label className="ge-tog"><input type="checkbox" checked={sheet.members}
             onChange={(e) => setSheet((sh) => ({ ...sh, members: e.target.checked }))} />members</label>
         </div>
+        {questList.length > 0 && (
+          <div className="ge-sheet" style={{ marginTop: 8 }}>
+            <span style={{ color: "var(--orange)", textShadow: "1px 1px 0 #000" }}>Quests done:</span>
+            {questList.map((u) => (
+              <label key={u} className="ge-tog" title={unlockNote(u)}>
+                <input type="checkbox" checked={!!sheet.quests?.[u]}
+                  onChange={(e) => setSheet((sh) => ({ ...sh, quests: { ...sh.quests, [u]: e.target.checked } }))} />
+                {u}
+              </label>
+            ))}
+          </div>
+        )}
       </section>
 
       {status === "snapshot" && (
@@ -949,7 +980,7 @@ function JobBoard({ items, status }) {
       )}
       <p className="ge-read">
         <b>{jobs.length}</b> jobs pay on the exchange right now{shown.length < jobs.length ? <> · showing {shown.length}</> : null}.
-        Blank skills count as level 1 — fill in your stats to unlock more of the board.
+        Blank skills count as level 1 and unticked quests as not done — fill in your sheet to unlock more of the board.
       </p>
 
       {shown.map((job) => (

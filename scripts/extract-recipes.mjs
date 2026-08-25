@@ -32,6 +32,21 @@ const FACILITIES = new Set([
 const EXCLUDE_OUTPUTS = new Set([
   'Cannon ball (Between a Rock...)', // golden cannonball, quest mould
 ]);
+// Quest and reward unlocks the recipe data doesn't carry but the game enforces.
+// Rule-based so whole families (every dart tip, every cannonball) get tagged
+// consistently; joins to the character sheet's quest checklist on the board.
+function unlockOf(name, skill, facility) {
+  const n = name.toLowerCase();
+  if (skill === 'Herblore') return 'Druidic Ritual'; // gates the whole skill
+  if (n.includes('dart') && !n.includes('atlatl') && !n.includes('prototype')) return 'The Tourist Trap';
+  if (n.includes('cannonball') && facility === 'Furnace') return 'Dwarf Cannon';
+  if (n.includes('blurite') && skill === 'Smithing') return "The Knight's Sword";
+  if (n === 'dragon sq shield') return "Legends' Quest";
+  if (n === 'gold helmet') return 'Between a Rock...';
+  if (n === 'silvthrill rod') return 'In Aid of the Myreque';
+  if (n.includes('broad') && skill === 'Fletching') return 'Broader Fletching'; // Slayer reward, not a quest
+  return null;
+}
 // Hand tools the recipe data doesn't list as materials but the job can't start
 // without. Rule-based so whole families get tagged consistently.
 function gearOf(name, skill, facility) {
@@ -78,6 +93,8 @@ for (const [nodeIdx, variantList] of Object.entries(recipes)) {
     };
     const g = gearOf(outNode.n, v.s, v.f || '');
     if (g) rec.g = g;
+    const u = unlockOf(outNode.n, v.s, v.f || '');
+    if (u) rec.u = u;
     out.push(rec);
   }
 }
@@ -88,6 +105,9 @@ console.log(`kept ${out.length} of ${variants} recipe variants (${skippedSkill} 
 const facil = {};
 for (const r of out) facil[r.f || '(none)'] = (facil[r.f || '(none)'] || 0) + 1;
 console.log('facilities:', JSON.stringify(facil));
+const unl = {};
+for (const r of out) if (r.u) unl[r.u] = (unl[r.u] || 0) + 1;
+console.log('unlocks:', JSON.stringify(unl));
 const show = (n) => {
   const i = keepName.get(n);
   const rs = out.filter((r) => r.o === i);
