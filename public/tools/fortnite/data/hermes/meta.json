@@ -1,0 +1,22 @@
+{
+ "name": "Hermes",
+ "season": "Chapter 6 (v34.20) \u00b7 datamined reference island",
+ "accuracy": "datamined",
+ "accuracyNote": "Real 16-bit landscape heightmap exported from the game files. Elevations and sightlines here are accurate (buildings and props excluded - this is the bare terrain).",
+ "worldBounds": {
+  "minX": -130048.0,
+  "maxX": 132096.0,
+  "minY": -130048.0,
+  "maxY": 132096.0
+ },
+ "pois": [],
+ "credits": [
+  "heightmap: SnakeyFlea/FortniteHeightmaps (datamined, v34.20)",
+  "Fortnite is \u00a9 Epic Games - fan-made, non-commercial tool"
+ ],
+ "zMin": -16.19,
+ "zMax": 198.48,
+ "waterLevel": 0.0,
+ "heightmapSize": 1024,
+ "textureSize": 2048
+}

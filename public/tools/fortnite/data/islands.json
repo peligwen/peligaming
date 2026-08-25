@@ -1,0 +1,15 @@
+[
+ {
+  "slug": "shattered-coast",
+  "name": "Shattered Coast",
+  "season": "Chapter 7 Season 4 \u00b7 Override (v42.00)",
+  "accuracy": "approx",
+  "default": true
+ },
+ {
+  "slug": "hermes",
+  "name": "Hermes",
+  "season": "Chapter 6 (v34.20) \u00b7 datamined reference island",
+  "accuracy": "datamined"
+ }
+]

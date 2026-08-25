@@ -41,6 +41,18 @@ window.PELIGAMING = {
       ],
     },
     {
+      name: "Fortnite",
+      icon: "🪂",
+      accent: "#4dd7ff",
+      tools: [
+        {
+          name: "Tactical Terrain",
+          description: "The live island in 3D — place an observer to map sightlines and dead ground, probe shots, and read cover before you rotate.",
+          path: "tools/fortnite/tactical-map.html",
+        },
+      ],
+    },
+    {
       name: "Skyrim",
       icon: "🐉",
       accent: "#8fb4cc",

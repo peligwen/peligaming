@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fortnite Tactical Terrain — sightlines, cover &amp; dead ground in 3D</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#111826ee; --line:#1f2b3d; --text:#dce8f5; --dim:#7d8fa5;
+    --cyan:#4dd7ff; --lime:#a4f24d; --red:#ff6a5e; --amber:#ffc24d;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;overscroll-behavior:none;}
+  canvas{display:block;touch-action:none;}
+  #hdr{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;gap:10px;align-items:center;
+    padding:8px 12px;background:linear-gradient(#101826f2,#0c1320f2);border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  #hdr h1{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:20px;letter-spacing:.5px;
+    color:var(--cyan);text-transform:uppercase;line-height:1;white-space:nowrap;}
+  #hdr h1 span{color:var(--amber);}
+  select{background:#0c1320;color:var(--text);border:1px solid var(--line);border-radius:6px;
+    padding:5px 8px;font-size:13px;outline:none;}
+  .badge{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid;white-space:nowrap;}
+  .badge.approx{color:var(--amber);border-color:#7a5c22;background:#2a210e;}
+  .badge.datamined{color:var(--lime);border-color:#4a7a22;background:#18260e;}
+  #panel{position:fixed;top:56px;right:10px;z-index:25;width:248px;max-height:calc(100% - 120px);
+    overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:12px;backdrop-filter:blur(6px);}
+  #panel h2{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim);margin:12px 0 6px;}
+  #panel h2:first-child{margin-top:0;}
+  .modes{display:flex;gap:6px;}
+  .modes button{flex:1;background:#0c1320;color:var(--dim);border:1px solid var(--line);border-radius:8px;
+    padding:7px 4px;font-size:12px;cursor:pointer;}
+  .modes button.on{color:#04121c;background:var(--cyan);border-color:var(--cyan);font-weight:600;}
+  label.row{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0;cursor:pointer;color:var(--text);}
+  label.row input[type=checkbox]{accent-color:var(--cyan);}
+  .slider{display:block;font-size:12px;color:var(--dim);padding:4px 0;}
+  .slider output{color:var(--text);float:right;}
+  input[type=range]{width:100%;accent-color:var(--cyan);}
+  .btnrow{display:flex;gap:6px;margin-top:6px;}
+  .btnrow button{flex:1;background:#0c1320;color:var(--text);border:1px solid var(--line);border-radius:8px;
+    padding:6px;font-size:12px;cursor:pointer;}
+  .btnrow button:hover{border-color:var(--cyan);}
+  .legend{font-size:11.5px;color:var(--dim);line-height:1.55;}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+  #note{font-size:11px;color:var(--dim);border-top:1px solid var(--line);margin-top:12px;padding-top:8px;line-height:1.5;}
+  #hint{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:25;background:var(--panel);
+    border:1px solid var(--line);border-radius:999px;padding:6px 16px;font-size:12.5px;color:var(--text);
+    white-space:nowrap;max-width:94vw;overflow:hidden;text-overflow:ellipsis;}
+  #hint b{color:var(--cyan);font-weight:600;}
+  #profileBox{position:fixed;left:10px;bottom:44px;z-index:24;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:8px;display:none;}
+  #profileBox .verdict{font-size:12px;margin-bottom:4px;}
+  #profile{display:block;border-radius:6px;}
+  #panelToggle{display:none;position:fixed;top:62px;right:10px;z-index:26;background:var(--panel);
+    color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;}
+  #loading{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);flex-direction:column;gap:12px;transition:opacity .4s;}
+  #loading .bar{width:220px;height:4px;background:#16202f;border-radius:2px;overflow:hidden;}
+  #loading .bar i{display:block;height:100%;width:30%;background:var(--cyan);border-radius:2px;animation:ld 1s infinite;}
+  @keyframes ld{0%{margin-left:-30%}100%{margin-left:100%}}
+  @media (max-width:760px){
+    #panel{display:none;}
+    #panel.open{display:block;top:auto;bottom:44px;right:10px;left:10px;width:auto;max-height:55vh;}
+    #panelToggle{display:block;}
+    #profileBox{left:10px;right:10px;} #profile{width:100%!important;}
+    #hdr h1{font-size:16px;}
+  }
+</style>
+</head>
+<body>
+<div id="hdr">
+  <h1>Tactical <span>Terrain</span></h1>
+  <select id="islandSel"></select>
+  <span class="badge approx" id="accBadge">approx terrain</span>
+</div>
+
+<button id="panelToggle">⚙ Controls</button>
+
+<div id="panel">
+  <h2>Mode</h2>
+  <div class="modes">
+    <button id="mObserver" class="on">👁 Observer</button>
+    <button id="mProbe">📏 Sightline</button>
+    <button id="mExplore">🖐 Explore</button>
+  </div>
+
+  <h2>Observer</h2>
+  <label class="slider">eye height <output id="eyeOut">1.6 m</output>
+    <input type="range" id="eyeH" min="0.4" max="12" step="0.2" value="1.6"></label>
+  <label class="slider">view radius <output id="radOut">500 m</output>
+    <input type="range" id="radius" min="150" max="1200" step="25" value="500"></label>
+  <div class="btnrow">
+    <button id="pinBtn" title="Freeze this viewshed as a cyan layer and place a second observer">📌 Pin viewshed</button>
+    <button id="clearBtn">✕ Clear</button>
+  </div>
+
+  <h2>Layers</h2>
+  <label class="row"><input type="checkbox" id="lyViewshed" checked> viewshed overlay</label>
+  <label class="row"><input type="checkbox" id="lyPois" checked> named locations</label>
+  <label class="row"><input type="checkbox" id="lyLandmarks"> landmarks</label>
+  <label class="row"><input type="checkbox" id="lyContours"> contour lines (10 m)</label>
+  <label class="row"><input type="checkbox" id="lySlope"> cliffs &amp; steep cover</label>
+  <label class="row"><input type="checkbox" id="lyHypso"> height tint</label>
+
+  <h2>Legend</h2>
+  <div class="legend">
+    <span class="sw" style="background:#a4f24d"></span>seen from observer (head of a standing target)<br>
+    <span class="sw" style="background:#ff6a5e"></span>dead ground — hidden from observer<br>
+    <span class="sw" style="background:#4dd7ff"></span>pinned observer's view<br>
+    <span class="sw" style="background:#ff9d3d"></span>cliff faces (&gt;35°) — hard cover / no climb
+  </div>
+
+  <div id="note"></div>
+</div>
+
+<div id="profileBox">
+  <div class="verdict" id="verdict"></div>
+  <canvas id="profile" width="420" height="110"></canvas>
+</div>
+
+<div id="hint">Click terrain to <b>place your observer</b> — drag to orbit, scroll/pinch to zoom</div>
+
+<div id="loading"><div style="font-family:Anton,Impact,sans-serif;font-size:22px;color:var(--cyan);letter-spacing:1px">LOADING ISLAND…</div><div class="bar"><i></i></div></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ------------------------------------------------------------------ state */
+const HM = 1024;                      // heightfield grid size
+let scene, camera, renderer, terrainMesh, terrainMat, waterPlane;
+let island = null;                    // {meta, height:Float32Array, water:Uint8Array, spanX, spanY, mpp}
+let overlay, overlayTex, pinned, pinnedTex;
+let observer = null, pinnedObserver = null;   // {gx, gy} grid coords
+let obMarker = null, pinMarker = null, probeLine = null;
+let poiSprites = [];
+let mode = 'observer';
+let needsRender = true;
+
+const $ = id => document.getElementById(id);
+const scratch = new THREE.Vector3();
+
+/* --------------------------------------------------------- data loading */
+function loadImageData(url, w, h) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', {willReadFrequently: true});
+      ctx.drawImage(img, 0, 0, w, h);
+      res(ctx.getImageData(0, 0, w, h).data);
+    };
+    img.onerror = rej;
+    img.src = url;
+  });
+}
+
+async function loadIsland(slug) {
+  $('loading').style.display = 'flex';
+  $('loading').style.opacity = 1;
+  const meta = await (await fetch(`data/${slug}/meta.json`)).json();
+  const [hmData, wmData] = await Promise.all([
+    loadImageData(`data/${slug}/heightmap.png`, HM, HM),
+    loadImageData(`data/${slug}/watermask.png`, HM, HM),
+  ]);
+  const height = new Float32Array(HM * HM);
+  const water = new Uint8Array(HM * HM);
+  const zSpan = meta.zMax - meta.zMin;
+  for (let i = 0; i < HM * HM; i++) {
+    height[i] = meta.zMin + (hmData[i * 4] * 256 + hmData[i * 4 + 1]) / 65535 * zSpan;
+    water[i] = wmData[i * 4] > 127 ? 1 : 0;
+  }
+  const spanX = (meta.worldBounds.maxX - meta.worldBounds.minX) / 100; // m
+  const spanY = (meta.worldBounds.maxY - meta.worldBounds.minY) / 100;
+  island = {meta, height, water, spanX, spanY, mpp: spanX / HM};
+  const texture = await new Promise((res, rej) =>
+    new THREE.TextureLoader().load(`data/${slug}/texture.jpg`, res, undefined, rej));
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  buildTerrain(texture);
+  buildPois();
+  clearTactical();
+  const acc = meta.accuracy === 'datamined';
+  $('accBadge').textContent = acc ? 'datamined terrain' : 'approx terrain';
+  $('accBadge').className = 'badge ' + meta.accuracy;
+  $('note').innerHTML = `<b>${meta.name}</b> — ${meta.season}.<br>${meta.accuracyNote}<br><br>` +
+    meta.credits.map(c => '· ' + c).join('<br>');
+  $('loading').style.opacity = 0;
+  setTimeout(() => $('loading').style.display = 'none', 450);
+  setMode('observer');
+  needsRender = true;
+}
+
+/* ------------------------------------------------------ height sampling */
+function hAt(gx, gy) {           // bilinear sample of the heightfield (grid px)
+  const x = Math.min(Math.max(gx, 0), HM - 1.001), y = Math.min(Math.max(gy, 0), HM - 1.001);
+  const x0 = x | 0, y0 = y | 0, fx = x - x0, fy = y - y0;
+  const h = island.height, i = y0 * HM + x0;
+  return (h[i] * (1 - fx) + h[i + 1] * fx) * (1 - fy) +
+         (h[i + HM] * (1 - fx) + h[i + HM + 1] * fx) * fy;
+}
+// world (three.js) <-> grid:  x = (gx/HM - .5)*spanX ; z = (gy/HM - .5)*spanY
+const g2wx = gx => (gx / HM - 0.5) * island.spanX;
+const g2wz = gy => (gy / HM - 0.5) * island.spanY;
+const w2gx = x => (x / island.spanX + 0.5) * HM;
+const w2gy = z => (z / island.spanY + 0.5) * HM;
+
+/* ------------------------------------------------------------- terrain */
+function buildTerrain(texture) {
+  if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); }
+  const SEG = 512;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array((SEG + 1) * (SEG + 1) * 3);
+  const uv = new Float32Array((SEG + 1) * (SEG + 1) * 2);
+  let p = 0, q = 0;
+  for (let j = 0; j <= SEG; j++) {
+    for (let i = 0; i <= SEG; i++) {
+      const gx = i / SEG * (HM - 1), gy = j / SEG * (HM - 1);
+      pos[p++] = g2wx(gx); pos[p++] = hAt(gx, gy); pos[p++] = g2wz(gy);
+      uv[q++] = i / SEG; uv[q++] = j / SEG;
+    }
+  }
+  const idx = new Uint32Array(SEG * SEG * 6);
+  let t = 0;
+  for (let j = 0; j < SEG; j++) {
+    for (let i = 0; i < SEG; i++) {
+      const a = j * (SEG + 1) + i, b = a + 1, c = a + SEG + 1, d = c + 1;
+      idx[t++] = a; idx[t++] = c; idx[t++] = b;
+      idx[t++] = b; idx[t++] = c; idx[t++] = d;
+    }
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.computeVertexNormals();
+
+  overlay = new Uint8Array(HM * HM);
+  overlayTex = makeMaskTex(overlay);
+  pinned = new Uint8Array(HM * HM);
+  pinnedTex = makeMaskTex(pinned);
+  const waterTex = makeMaskTex(island.water.map ? Uint8Array.from(island.water, v => v * 255) : island.water);
+
+  terrainMat = new THREE.ShaderMaterial({
+    uniforms: {
+      map: {value: texture},
+      overlayTex: {value: overlayTex},
+      pinnedTex: {value: pinnedTex},
+      waterTex: {value: waterTex},
+      sunDir: {value: new THREE.Vector3(-0.45, 0.75, -0.4).normalize()},
+      zRange: {value: new THREE.Vector2(island.meta.zMin, island.meta.zMax)},
+      showViewshed: {value: 1}, showContours: {value: 0},
+      showSlope: {value: 0}, showHypso: {value: 0},
+    },
+    extensions: {derivatives: true},
+    vertexShader: `
+      varying vec2 vUv; varying vec3 vN; varying float vH;
+      void main(){
+        vUv = uv; vN = normal; vH = position.y;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+      }`,
+    fragmentShader: `
+      uniform sampler2D map, overlayTex, pinnedTex, waterTex;
+      uniform vec3 sunDir; uniform vec2 zRange;
+      uniform float showViewshed, showContours, showSlope, showHypso;
+      varying vec2 vUv; varying vec3 vN; varying float vH;
+      void main(){
+        vec3 col = texture2D(map, vUv).rgb;
+        float water = texture2D(waterTex, vUv).r;
+        float diff = 0.55 + 0.5 * max(dot(normalize(vN), sunDir), 0.0);
+        col *= diff;
+        if (showHypso > 0.5 && water < 0.5) {
+          float t = clamp((vH - 0.0) / max(zRange.y, 1.0), 0.0, 1.0);
+          vec3 hyp = mix(vec3(0.15,0.45,0.2), vec3(0.85,0.75,0.3), smoothstep(0.0,0.5,t));
+          hyp = mix(hyp, vec3(0.95,0.97,1.0), smoothstep(0.55,1.0,t));
+          col = mix(col, hyp * diff, 0.55);
+        }
+        if (showSlope > 0.5 && water < 0.5) {
+          float steep = smoothstep(0.82, 0.62, normalize(vN).y); // >35 deg
+          col = mix(col, vec3(1.0,0.62,0.24), steep * 0.55);
+        }
+        if (showContours > 0.5 && water < 0.5) {
+          float f10 = abs(fract(vH / 10.0 + 0.5) - 0.5) / max(fwidth(vH / 10.0), 1e-4);
+          float f50 = abs(fract(vH / 50.0 + 0.5) - 0.5) / max(fwidth(vH / 50.0), 1e-4);
+          col = mix(col, vec3(0.1,0.08,0.05), (1.0 - min(f10, 1.0)) * 0.35);
+          col = mix(col, vec3(0.05,0.04,0.02), (1.0 - min(f50, 1.0)) * 0.45);
+        }
+        if (showViewshed > 0.5) {
+          float ov = texture2D(overlayTex, vUv).r;
+          if (ov > 0.66)      col = mix(col, vec3(0.64,0.95,0.30), 0.40);
+          else if (ov > 0.25) col = mix(col, vec3(0.95,0.20,0.30), 0.42);
+          float pv = texture2D(pinnedTex, vUv).r;
+          if (pv > 0.66)      col = mix(col, vec3(0.30,0.84,1.00), 0.30);
+        }
+        if (water > 0.5) col = mix(col, vec3(0.10,0.35,0.55), 0.25);
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  terrainMesh = new THREE.Mesh(geo, terrainMat);
+  scene.add(terrainMesh);
+
+  if (waterPlane) scene.remove(waterPlane);
+  waterPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(island.spanX * 1.02, island.spanY * 1.02),
+    new THREE.MeshBasicMaterial({color: 0x2a6a9e, transparent: true, opacity: 0.42, depthWrite: false}));
+  waterPlane.rotation.x = -Math.PI / 2;
+  waterPlane.position.y = 0.12;
+  scene.add(waterPlane);
+}
+
+function makeMaskTex(data) {
+  const tex = new THREE.DataTexture(data, HM, HM, THREE.LuminanceFormat, THREE.UnsignedByteType);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/* ---------------------------------------------------------------- POIs */
+function poiSprite(name, major) {
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  const fs = major ? 34 : 24;
+  ctx.font = `${major ? '' : ''}700 ${fs}px "Segoe UI", sans-serif`;
+  const w = Math.ceil(ctx.measureText(name).width) + 26;
+  c.width = w; c.height = fs + 22;
+  ctx.font = `700 ${fs}px "Segoe UI", sans-serif`;
+  ctx.fillStyle = 'rgba(6,12,20,0.62)';
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(0, 0, w, c.height, 8) : ctx.rect(0, 0, w, c.height);
+  ctx.fill();
+  ctx.fillStyle = major ? '#ffffff' : '#bcd2e8';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(name, w / 2, c.height / 2 + 1);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: tex, depthTest: false, transparent: true}));
+  const s = major ? 3.2 : 2.4;
+  sp.scale.set(w * s / fs * 9, c.height * s / fs * 9, 1);
+  return sp;
+}
+
+function buildPois() {
+  poiSprites.forEach(s => scene.remove(s.sprite));
+  poiSprites = [];
+  const wb = island.meta.worldBounds;
+  for (const p of island.meta.pois || []) {
+    const gx = (p.x - wb.minX) / (wb.maxX - wb.minX) * HM;
+    const gy = (p.y - wb.minY) / (wb.maxY - wb.minY) * HM;
+    if (gx < 0 || gx >= HM || gy < 0 || gy >= HM) continue;
+    const major = p.type === 'named';
+    const sp = poiSprite(p.name, major);
+    sp.position.set(g2wx(gx), hAt(gx, gy) + (major ? 42 : 30), g2wz(gy));
+    sp.renderOrder = 10;
+    scene.add(sp);
+    poiSprites.push({sprite: sp, major});
+  }
+  updatePoiVisibility();
+}
+function updatePoiVisibility() {
+  const showN = $('lyPois').checked, showL = $('lyLandmarks').checked;
+  poiSprites.forEach(p => p.sprite.visible = p.major ? showN : showL);
+  needsRender = true;
+}
+
+/* ------------------------------------------------------------ viewshed */
+function computeViewshed() {
+  if (!observer) return;
+  overlay.fill(0);
+  const eyeH = parseFloat($('eyeH').value);
+  const targetH = 1.7;                       // standing enemy head height
+  const radPx = parseFloat($('radius').value) / island.mpp;
+  const {gx: ox, gy: oy} = observer;
+  const eyeZ = hAt(ox, oy) + eyeH;
+  const H = island.height;
+  const NR = 2160;
+  for (let r = 0; r < NR; r++) {
+    const th = r / NR * Math.PI * 2;
+    const dx = Math.cos(th), dy = Math.sin(th);
+    let horizon = -Infinity;
+    for (let d = 1; d <= radPx; d += 1) {
+      const cx = ox + dx * d, cy = oy + dy * d;
+      if (cx < 0 || cx >= HM - 1 || cy < 0 || cy >= HM - 1) break;
+      const i = (cy | 0) * HM + (cx | 0);
+      const z = H[i];
+      const dist = d * island.mpp;
+      const tanTarget = (z + targetH - eyeZ) / dist;
+      overlay[i] = tanTarget >= horizon ? 255 : 96;
+      const tanTerrain = (z - eyeZ) / dist;
+      if (tanTerrain > horizon) horizon = tanTerrain;
+    }
+  }
+  overlay[(oy | 0) * HM + (ox | 0)] = 255;
+  overlayTex.needsUpdate = true;
+  needsRender = true;
+}
+
+function clearTactical() {
+  if (overlay) { overlay.fill(0); overlayTex.needsUpdate = true; }
+  if (pinned) { pinned.fill(0); pinnedTex.needsUpdate = true; }
+  observer = pinnedObserver = null;
+  if (obMarker) { scene.remove(obMarker); obMarker = null; }
+  if (pinMarker) { scene.remove(pinMarker); pinMarker = null; }
+  hideProbe();
+  needsRender = true;
+}
+
+function makeMarker(color) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({color});
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 26, 6), mat);
+  pole.position.y = 13;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 10), mat);
+  head.position.y = 30;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(11, 1.4, 6, 28),
+    new THREE.MeshBasicMaterial({color, transparent: true, opacity: 0.8}));
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.8;
+  g.add(pole, head, ring);
+  return g;
+}
+
+function placeObserver(gx, gy) {
+  observer = {gx, gy};
+  if (!obMarker) { obMarker = makeMarker(0xa4f24d); scene.add(obMarker); }
+  obMarker.position.set(g2wx(gx), hAt(gx, gy), g2wz(gy));
+  computeViewshed();
+  setHint(`Observer at <b>${Math.round(hAt(gx, gy))} m</b> elevation — lime = you see them, red = dead ground. Switch to <b>Sightline</b> to probe a specific line.`);
+}
+
+function pinViewshed() {
+  if (!observer) return;
+  pinned.set(overlay);
+  pinnedTex.needsUpdate = true;
+  pinnedObserver = {...observer};
+  if (!pinMarker) { pinMarker = makeMarker(0x4dd7ff); scene.add(pinMarker); }
+  pinMarker.position.copy(obMarker.position);
+  overlay.fill(0); overlayTex.needsUpdate = true;
+  observer = null;
+  scene.remove(obMarker); obMarker = null;
+  setHint('Viewshed pinned in <b>cyan</b> — place a second observer to compare positions.');
+  needsRender = true;
+}
+
+/* ------------------------------------------------------- sightline probe */
+function probeSightline(gx, gy) {
+  if (!observer) { setHint('Place an <b>Observer</b> first, then probe sightlines from it.'); return; }
+  const {gx: ox, gy: oy} = observer;
+  const eyeH = parseFloat($('eyeH').value);
+  const eyeZ = hAt(ox, oy) + eyeH;
+  const tgtZ = hAt(gx, gy) + 1.7;
+  const distM = Math.hypot((gx - ox) * island.mpp, (gy - oy) * island.spanY / HM);
+  const NSAMP = 320;
+  let blocked = false, blockAt = -1;
+  const prof = new Float32Array(NSAMP + 1);
+  for (let i = 0; i <= NSAMP; i++) {
+    const t = i / NSAMP;
+    prof[i] = hAt(ox + (gx - ox) * t, oy + (gy - oy) * t);
+    if (i > 0 && i < NSAMP) {
+      const losZ = eyeZ + (tgtZ - eyeZ) * t;
+      if (prof[i] > losZ) { if (!blocked) blockAt = t; blocked = true; }
+    }
+  }
+  drawProfile(prof, eyeZ, tgtZ, distM, blocked, blockAt);
+  // 3d line
+  if (probeLine) scene.remove(probeLine);
+  const pts = [];
+  for (let i = 0; i <= 32; i++) {
+    const t = i / 32;
+    pts.push(new THREE.Vector3(
+      g2wx(ox + (gx - ox) * t), eyeZ + (tgtZ - eyeZ) * t, g2wz(oy + (gy - oy) * t)));
+  }
+  probeLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color: blocked ? 0xff6a5e : 0xa4f24d}));
+  probeLine.renderOrder = 9;
+  scene.add(probeLine);
+  needsRender = true;
+}
+
+function drawProfile(prof, eyeZ, tgtZ, distM, blocked, blockAt) {
+  const box = $('profileBox'); box.style.display = 'block';
+  const cv = $('profile'), ctx = cv.getContext('2d');
+  const W = cv.width, Hc = cv.height, pad = 6;
+  ctx.clearRect(0, 0, W, Hc);
+  let lo = Math.min(eyeZ, tgtZ), hi = Math.max(eyeZ, tgtZ);
+  for (const v of prof) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  lo -= 4; hi += 6;
+  const X = t => pad + t * (W - 2 * pad);
+  const Y = z => Hc - pad - (z - lo) / (hi - lo) * (Hc - 2 * pad);
+  // terrain fill
+  ctx.beginPath();
+  ctx.moveTo(X(0), Y(prof[0]));
+  for (let i = 1; i < prof.length; i++) ctx.lineTo(X(i / (prof.length - 1)), Y(prof[i]));
+  ctx.lineTo(X(1), Hc - pad); ctx.lineTo(X(0), Hc - pad); ctx.closePath();
+  ctx.fillStyle = '#22303f'; ctx.fill();
+  ctx.strokeStyle = '#3d566e'; ctx.stroke();
+  // LOS
+  ctx.beginPath(); ctx.moveTo(X(0), Y(eyeZ)); ctx.lineTo(X(1), Y(tgtZ));
+  ctx.strokeStyle = blocked ? '#ff6a5e' : '#a4f24d'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
+  if (blocked) {
+    ctx.fillStyle = '#ff6a5e';
+    ctx.beginPath(); ctx.arc(X(blockAt), Y(eyeZ + (tgtZ - eyeZ) * blockAt), 3.5, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = '#a4f24d'; ctx.beginPath(); ctx.arc(X(0), Y(eyeZ), 3.5, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffc24d'; ctx.beginPath(); ctx.arc(X(1), Y(tgtZ), 3.5, 0, 7); ctx.fill();
+  const dz = Math.round(tgtZ - eyeZ);
+  $('verdict').innerHTML = blocked
+    ? `<span style="color:#ff6a5e">✕ BLOCKED</span> — ${Math.round(distM)} m, target ${dz >= 0 ? '+' : ''}${dz} m ${dz >= 0 ? 'above' : 'below'} you`
+    : `<span style="color:#a4f24d">✓ CLEAR SHOT</span> — ${Math.round(distM)} m, target ${dz >= 0 ? '+' : ''}${dz} m ${dz >= 0 ? 'above' : 'below'} you`;
+}
+function hideProbe() {
+  $('profileBox').style.display = 'none';
+  if (probeLine) { scene.remove(probeLine); probeLine = null; }
+}
+
+/* --------------------------------------------------------- ray picking */
+function pickTerrain(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    (clientX - rect.left) / rect.width * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1);
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(ndc, camera);
+  const o = ray.ray.origin, d = ray.ray.direction;
+  // march the analytic heightfield
+  let t = 0, last = o.y - sampleWorldH(o.x, o.z);
+  for (let i = 0; i < 3000; i++) {
+    t += Math.max(2, t * 0.004);
+    scratch.copy(d).multiplyScalar(t).add(o);
+    if (t > 15000) break;
+    const dh = scratch.y - sampleWorldH(scratch.x, scratch.z);
+    if (dh <= 0) {
+      // refine by bisection
+      let t0 = t - Math.max(2, (t - Math.max(2, t * 0.004)) * 0.004), t1 = t;
+      for (let k = 0; k < 18; k++) {
+        const tm = (t0 + t1) / 2;
+        scratch.copy(d).multiplyScalar(tm).add(o);
+        (scratch.y - sampleWorldH(scratch.x, scratch.z) <= 0) ? t1 = tm : t0 = tm;
+      }
+      scratch.copy(d).multiplyScalar(t1).add(o);
+      const gx = w2gx(scratch.x), gy = w2gy(scratch.z);
+      if (gx < 1 || gx > HM - 2 || gy < 1 || gy > HM - 2) return null;
+      return {gx, gy};
+    }
+    last = dh;
+  }
+  return null;
+}
+function sampleWorldH(x, z) {
+  const gx = w2gx(x), gy = w2gy(z);
+  if (gx < 0 || gx >= HM || gy < 0 || gy >= HM) return -100;
+  return hAt(gx, gy);
+}
+
+/* ------------------------------------------------------ camera controls */
+const cam = {theta: -Math.PI / 2, phi: 0.86, dist: 2500, target: new THREE.Vector3(0, 0, 0)};
+function applyCamera() {
+  const sp = Math.sin(cam.phi), cp = Math.cos(cam.phi);
+  camera.position.set(
+    cam.target.x + cam.dist * sp * Math.cos(cam.theta),
+    cam.target.y + cam.dist * cp,
+    cam.target.z + cam.dist * sp * Math.sin(cam.theta));
+  camera.lookAt(cam.target);
+  needsRender = true;
+}
+
+function initControls(el) {
+  let px = 0, py = 0, mode2 = null, moved = 0;
+  let pinchD = 0, pinchMid = null;
+  const clampTarget = () => {
+    const L = Math.max(island ? island.spanX : 3000, 1500) * 0.75;
+    cam.target.x = Math.min(Math.max(cam.target.x, -L), L);
+    cam.target.z = Math.min(Math.max(cam.target.z, -L), L);
+  };
+  el.addEventListener('pointerdown', e => {
+    el.setPointerCapture(e.pointerId);
+    px = e.clientX; py = e.clientY; moved = 0;
+    mode2 = (e.button === 2 || e.shiftKey) ? 'pan' : 'rot';
+  });
+  el.addEventListener('pointermove', e => {
+    if (mode2 === null) return;
+    const dx = e.clientX - px, dy = e.clientY - py;
+    moved += Math.abs(dx) + Math.abs(dy);
+    px = e.clientX; py = e.clientY;
+    if (mode2 === 'rot') {
+      cam.theta += dx * 0.005;
+      cam.phi = Math.min(Math.max(cam.phi - dy * 0.005, 0.08), 1.5);
+    } else {
+      const s = cam.dist / 700;
+      const fx = Math.cos(cam.theta), fz = Math.sin(cam.theta);
+      cam.target.x += (-dx * -fz + dy * fx) * s;
+      cam.target.z += (-dx * fx + dy * fz) * s;
+      clampTarget();
+    }
+    applyCamera();
+  });
+  el.addEventListener('pointerup', e => {
+    if (moved < 6 && e.button === 0) handleClick(e.clientX, e.clientY);
+    mode2 = null;
+  });
+  el.addEventListener('contextmenu', e => e.preventDefault());
+  el.addEventListener('wheel', e => {
+    e.preventDefault();
+    cam.dist = Math.min(Math.max(cam.dist * (1 + Math.sign(e.deltaY) * 0.1), 60), 9000);
+    applyCamera();
+  }, {passive: false});
+  // touch pinch
+  el.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      pinchD = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+                          e.touches[0].clientY - e.touches[1].clientY);
+      mode2 = 'pinch';
+    }
+  }, {passive: true});
+  el.addEventListener('touchmove', e => {
+    if (mode2 === 'pinch' && e.touches.length === 2) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+                           e.touches[0].clientY - e.touches[1].clientY);
+      cam.dist = Math.min(Math.max(cam.dist * pinchD / d, 60), 9000);
+      pinchD = d;
+      applyCamera();
+    }
+  }, {passive: true});
+  el.addEventListener('touchend', () => { if (mode2 === 'pinch') mode2 = null; });
+}
+
+function handleClick(x, y) {
+  const hit = pickTerrain(x, y);
+  if (!hit) return;
+  if (mode === 'observer') placeObserver(hit.gx, hit.gy);
+  else if (mode === 'probe') probeSightline(hit.gx, hit.gy);
+  else {
+    const h = Math.round(hAt(hit.gx, hit.gy));
+    setHint(`Elevation <b>${h} m</b> — switch mode to place an observer or probe a sightline.`);
+  }
+}
+
+/* ------------------------------------------------------------------ UI */
+function setHint(html) { $('hint').innerHTML = html; }
+
+function setMode(m) {
+  mode = m;
+  $('mObserver').className = m === 'observer' ? 'on' : '';
+  $('mProbe').className = m === 'probe' ? 'on' : '';
+  $('mExplore').className = m === 'explore' ? 'on' : '';
+  if (m === 'observer') setHint('Click terrain to <b>place your observer</b>');
+  if (m === 'probe') setHint('Click terrain to <b>probe a sightline</b> from your observer');
+  if (m === 'explore') setHint('Drag to orbit · scroll to zoom · right-drag / shift-drag to pan');
+}
+
+function bindUI() {
+  $('mObserver').onclick = () => setMode('observer');
+  $('mProbe').onclick = () => setMode('probe');
+  $('mExplore').onclick = () => setMode('explore');
+  $('pinBtn').onclick = pinViewshed;
+  $('clearBtn').onclick = () => { clearTactical(); setMode('observer'); };
+  $('eyeH').oninput = () => { $('eyeOut').textContent = (+$('eyeH').value).toFixed(1) + ' m'; };
+  $('eyeH').onchange = () => { if (observer) computeViewshed(); };
+  $('radius').oninput = () => { $('radOut').textContent = $('radius').value + ' m'; };
+  $('radius').onchange = () => { if (observer) computeViewshed(); };
+  $('lyViewshed').onchange = e => { terrainMat.uniforms.showViewshed.value = e.target.checked ? 1 : 0; needsRender = true; };
+  $('lyContours').onchange = e => { terrainMat.uniforms.showContours.value = e.target.checked ? 1 : 0; needsRender = true; };
+  $('lySlope').onchange = e => { terrainMat.uniforms.showSlope.value = e.target.checked ? 1 : 0; needsRender = true; };
+  $('lyHypso').onchange = e => { terrainMat.uniforms.showHypso.value = e.target.checked ? 1 : 0; needsRender = true; };
+  $('lyPois').onchange = updatePoiVisibility;
+  $('lyLandmarks').onchange = updatePoiVisibility;
+  $('islandSel').onchange = e => loadIsland(e.target.value);
+  $('panelToggle').onclick = () => $('panel').classList.toggle('open');
+}
+
+/* ---------------------------------------------------------------- boot */
+async function boot() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0e14);
+  scene.fog = new THREE.Fog(0x0a0e14, 5200, 10500);
+  camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 2, 20000);
+  renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  document.body.appendChild(renderer.domElement);
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    needsRender = true;
+  });
+  initControls(renderer.domElement);
+  bindUI();
+  applyCamera();
+
+  const manifest = await (await fetch('data/islands.json')).json();
+  $('islandSel').innerHTML = manifest.map(i =>
+    `<option value="${i.slug}">${i.name} — ${i.season.split('·')[0].trim()}</option>`).join('');
+  const def = manifest.find(i => i.default) || manifest[0];
+  $('islandSel').value = def.slug;
+  await loadIsland(def.slug);
+
+  (function loop() {
+    requestAnimationFrame(loop);
+    if (needsRender) { renderer.render(scene, camera); needsRender = false; }
+  })();
+}
+boot().catch(e => {
+  $('loading').innerHTML = `<div style="color:#ff6a5e;max-width:420px;text-align:center;font-size:14px">
+    Failed to load island data (${e && e.message || e}).<br>This tool needs to be served over HTTP — see the repo README.</div>`;
+});
+})();
+</script>
+</body>
+</html>
