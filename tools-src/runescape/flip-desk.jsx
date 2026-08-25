@@ -124,7 +124,10 @@ function assess(it) {
   const roi = it.low > 0 ? (margin / it.low) * 100 : 0;
   const bR = it.hvLo * SHARE_TOUCH, sR = it.hvHi * SHARE_TOUCH;
   const flipH = (bR > 0 ? it.limit / bR : Infinity) + (sR > 0 ? it.limit / sR : Infinity);
-  return { ...it, tax, margin, roi, flipH };
+  // gp through the book per day: units traded × mid price. Scales with both
+  // price and volume, so it ranks bonds next to feathers honestly.
+  const turnover = it.dv * ((it.low + it.high) / 2);
+  return { ...it, tax, margin, roi, flipH, turnover };
 }
 
 /* ================= api citizenship =================
@@ -358,7 +361,7 @@ const CSS = `
 .ge-tablewrap::-webkit-scrollbar { width:12px; height:12px; }
 .ge-tablewrap::-webkit-scrollbar-track { background:var(--inset2); }
 .ge-tablewrap::-webkit-scrollbar-thumb { background:var(--stone); border:1px solid var(--edge); }
-table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:700px; }
+table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:760px; }
 .ge-t thead th { position:sticky; top:0; z-index:2; background:var(--stone); color:var(--orange);
   font-weight:600; font-size:11px; letter-spacing:.12em; text-transform:uppercase; text-align:right;
   padding:8px 10px; border-bottom:2px solid var(--edge); cursor:pointer; white-space:nowrap;
@@ -449,7 +452,7 @@ input.ge-range:disabled { opacity:.4; cursor:default; }
 .ge-foot { text-align:center; color:var(--dark-tan); font-size:11px; margin-top:18px; line-height:1.6; }
 
 /* tabs */
-.ge-tabs { display:flex; gap:6px; margin-bottom:12px; }
+.ge-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
 .ge-tab {
   font-family:var(--disp); font-weight:600; font-size:13px; letter-spacing:.08em; text-transform:uppercase;
   color:var(--tan); text-shadow:1px 1px 0 #000; background:var(--inset2);
@@ -494,6 +497,16 @@ input.ge-range:disabled { opacity:.4; cursor:default; }
 .ge-batch { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:12.5px; }
 .ge-batch .ge-btn { padding:3px 9px; font-family:var(--mono); }
 .ge-batch b { min-width:52px; text-align:center; color:var(--yellow); }
+
+/* econ 101 */
+.ge-econ h3 { margin:0 0 7px; font-family:var(--disp); font-weight:700; font-size:16.5px; color:var(--orange);
+  letter-spacing:.02em; text-shadow:2px 2px 0 #000; }
+.ge-econ p { margin:0 0 9px; font-size:13.5px; line-height:1.6; color:var(--white); text-shadow:1px 1px 0 #000; }
+.ge-econ ul { margin:0 0 9px; padding-left:20px; font-size:13.5px; line-height:1.6; text-shadow:1px 1px 0 #000; }
+.ge-econ li { margin:0 0 6px; }
+.ge-econ li::marker { color:var(--orange); }
+.ge-econ b { color:var(--yellow); font-weight:600; }
+.ge-econ p:last-child, .ge-econ ul:last-child { margin-bottom:0; }
 `;
 
 /* ================= item popup ================= */
@@ -537,7 +550,7 @@ function ItemPopup({ it, status, onClose }) {
           <div className="ge-meta">
             <span>{it.members ? "Members" : "Free-to-play"}</span>
             <span>Buy limit <b>{it.limit.toLocaleString()}</b> / 4h</span>
-            <span>Traded <b>{fmtQty(it.dv)}</b> / day</span>
+            <span>Traded <b>{fmtQty(it.dv)}</b> / day ≈ <b>{fmtGp(it.turnover)}</b> gp</span>
             {o.tax === 0 && <span style={{ color: "var(--good)" }}>No GE tax</span>}
             <span>{{ "5m": "priced from the 5-min tape", "1h": "priced from the 1-hour tape",
               snap5m: "priced from the baked 5-min tape (offline)", snap1h: "priced from the baked 1-hour tape (offline)" }[it.src] || "priced from raw prints (offline)"}</span>
@@ -1006,6 +1019,128 @@ function JobBoard({ items, status }) {
   );
 }
 
+/* ================= econ 101 =================
+   The primer. Static text, no data, no API — just the things about this
+   economy a flipper wishes someone had told them on day one. */
+function Econ101() {
+  return (
+    <div className="ge-econ">
+      <section className="ge-panel">
+        <h3>The machine itself</h3>
+        <ul>
+          <li>The Grand Exchange is one big anonymous <b>order book</b> per item. Buy offers queue against
+            sell offers, matched by <b>price-time priority</b>: the best price trades first, and at the same
+            price, whoever quoted first.</li>
+          <li>When your offer crosses a standing one, the trade happens at the <b>standing offer's price</b>.
+            Offer 120 gp for something someone is selling at 100 and you pay 100 — the extra 20 comes back in
+            your collection box. The "insta-buy" price is simply the cheapest standing sell offer; "insta-sell"
+            is the best standing buy.</li>
+          <li>You get <b>8 offer slots</b> on members worlds (3 on free worlds) and they all run at once.
+            That's why this desk doesn't talk in gp/hr — your time isn't the input. Capital and buy limits are.</li>
+          <li>Every sale pays a <b>2% tax</b> (rounded down, capped at 5m per item; items under 50 gp and
+            bonds exempt). It comes out of the seller's proceeds and is baked into every margin on this board.</li>
+        </ul>
+      </section>
+
+      <section className="ge-panel">
+        <h3>Where prices come from</h3>
+        <ul>
+          <li>The in-game <b>guide price</b> is Jagex's own average, updated roughly once a day by an opaque
+            formula. It lags the real market by hours to days, and manipulators lean on that lag. Nothing on
+            this board uses it.</li>
+          <li>This board runs on the{" "}
+            <a className="ge-link" href="https://prices.runescape.wiki" target="_blank" rel="noreferrer">
+              OSRS Wiki's real-time feed ↗</a>: RuneLite clients report actual trades as they happen. A
+            "high" print is an insta-buy — someone paid the standing sell offer. A "low" print is an
+            insta-sell.</li>
+          <li>One print is one player's trade, and possibly a bait. Rows here are priced from{" "}
+            <b>volume-weighted averages</b> of the last 5 minutes (1-hour fallback), and books the averages
+            can't price honestly are set aside rather than shown.</li>
+          <li>The feed only sees trades from players running the plugin — a large sample of the tape, not all
+            of it. Every number is an estimate with error bars, and honest tools say so.</li>
+        </ul>
+      </section>
+
+      <section className="ge-panel">
+        <h3>The clocks — what resets when</h3>
+        <ul>
+          <li><b>Buy limits</b> — every item has a 4-hour buy limit (13,000 iron ore, 70 twisted bows — each
+            item has its own line). The window is per-item and <b>rolling</b>: it starts at your first
+            purchase and the whole allowance frees 4 hours later. There is no server-wide reset tick.</li>
+          <li><b>00:00 UTC</b> — the game's day boundary. Daily-limited content flips here and the daily
+            player cycle starts over.</li>
+          <li><b>Wednesday morning (UK time)</b> — the weekly game update, the biggest scheduled market event
+            there is. Balance changes and new content move whole markets, and speculation starts moving them
+            the moment the newspost drops — sometimes before.</li>
+          <li><b>The trading day</b> — books are deepest through the EU evening and NA afternoon, thinnest in
+            the small hours UTC. Thin hours mean wider spreads, slower fills, and easier manipulation.</li>
+        </ul>
+      </section>
+
+      <section className="ge-panel">
+        <h3>Faucets and sinks — why prices sit where they do</h3>
+        <ul>
+          <li>Every price is a balance of flows. Items pour in from drops, skilling and shops (the{" "}
+            <b>faucets</b>) and drain out through use — food eaten, potions drunk, runes cast, charges burned
+            (the <b>sinks</b>). When an update touches either flow, the price moves until they balance again.</li>
+          <li>Gold has its own plumbing: alchemy and coin drops print gp into the game; the GE tax destroys
+            it. The tax is the biggest gold sink in the game — every flip quietly deletes a little gold.</li>
+          <li><b>High alchemy</b> puts a hard floor under much of the catalogue: once an item falls near its
+            alch value minus the cost of a nature rune, alchemists buy everything at that line and the price
+            stops falling.</li>
+          <li>Where a shop sells the same item, the shop price acts as a soft <b>ceiling</b> the same way —
+            climb past it and players simply buy from the shop instead.</li>
+        </ul>
+      </section>
+
+      <section className="ge-panel">
+        <h3>Bots</h3>
+        <ul>
+          <li>Large parts of the commodity market are <b>bot-supplied</b> — common logs, ores, hides, essence
+            and other gatherables. That's why those prices sit low and eerily still: a bot farm never gets
+            bored and never asks for a raise.</li>
+          <li><b>Ban waves are supply shocks.</b> When a big one lands, botted commodities spike, then drift
+            back down over weeks as the farms rebuild. Trade the drift, not the headline.</li>
+          <li>Bots flip too: scripted traders camp the high-volume books and keep those spreads razor thin.
+            It's why the honest, fat margins tend to hide in awkward mid-volume items the scripts don't
+            bother with.</li>
+        </ul>
+      </section>
+
+      <section className="ge-panel">
+        <h3>Manipulation — how not to be the mark</h3>
+        <ul>
+          <li>The classic pump: a group picks a dead, low-volume item, quietly buys it out, posts hype, and
+            sells into the crowd that shows up. If an item you've never heard of is up 300% on no update,
+            you're not early — you're the <b>exit liquidity</b>.</li>
+          <li><b>Bait prints</b>: single trades placed to paint a fat margin onto the feed. One print costs a
+            manipulator almost nothing; moving an hour of volume-weighted average costs real money. That is
+            exactly why this board prices from the averages.</li>
+          <li>Thin books lie by default. A juicy margin on an item that trades 30 a day is a rumour, not a
+            price. <b>Probe with 1 unit first</b> — the cheapest information you will ever buy.</li>
+          <li>The board's own defenses work the same list: one-sided, crossed and dislocated books are set
+            aside, stale or contradictory data wears a C flag, and no row is ever priced off a single print.</li>
+        </ul>
+      </section>
+
+      <section className="ge-panel">
+        <h3>Reading this board</h3>
+        <ul>
+          <li><b>Buy / Sell</b> are what each side actually traded at, volume-weighted. Margin is per item
+            after tax. A / B / C grades how much to trust the row.</li>
+          <li><b>Gp moved/day</b> is daily volume × mid price — the size of the river. A big number is a
+            deep, honest market that can absorb real size; a small one means every other number on the row
+            is fragile.</li>
+          <li><b>Fill clocks</b> come from each side's real hourly flow and an assumed ~25% share of it when
+            quoting at the touch. Estimates, not promises.</li>
+          <li>The <b>Job Board</b> prices whole production chains from the same tape — buy the inputs, work
+            them, sell the output, tax and buy limits included.</li>
+        </ul>
+      </section>
+    </div>
+  );
+}
+
 /* ================= filters ================= */
 const BANDS = [
   { k: "any", label: "Any price", lo: 0, hi: Infinity },
@@ -1033,10 +1168,10 @@ export default function FlipDesk() {
   const [minVol, setMinVol] = useState("any");
   const [f2pOnly, setF2pOnly] = useState(false);
   const [profOnly, setProfOnly] = useState(false);
-  const [sortKey, setSortKey] = useState("dv");
+  const [sortKey, setSortKey] = useState("turnover");
   const [sortDir, setSortDir] = useState(-1);
   const [selId, setSelId] = useState(null);
-  const [view, setView] = useState("market"); // market | jobs
+  const [view, setView] = useState("market"); // market | jobs | econ
 
   const refresh = useCallback(async (auto = false) => {
     if (!auto) setStatus("loading");
@@ -1132,6 +1267,8 @@ export default function FlipDesk() {
             aria-selected={view === "market"} onClick={() => setView("market")}>Market Board</button>
           <button className={"ge-tab" + (view === "jobs" ? " on" : "")} role="tab"
             aria-selected={view === "jobs"} onClick={() => setView("jobs")}>Job Board</button>
+          <button className={"ge-tab" + (view === "econ" ? " on" : "")} role="tab"
+            aria-selected={view === "econ"} onClick={() => setView("econ")}>Econ 101</button>
         </div>
 
         {status === "snapshot" && (
@@ -1143,6 +1280,7 @@ export default function FlipDesk() {
         )}
 
         {view === "jobs" && <JobBoard items={assessed} status={status} />}
+        {view === "econ" && <Econ101 />}
 
         {view === "market" && <>
         <p className="ge-read">
@@ -1180,7 +1318,8 @@ export default function FlipDesk() {
                 <Th k="high" cls="hide-sm">Sell</Th>
                 <Th k="margin">Margin</Th>
                 <Th k="roi">ROI</Th>
-                <Th k="dv" cls="hide-xs">Traded/day</Th>
+                <Th k="turnover">Gp moved/day</Th>
+                <Th k="dv" cls="hide-sm">Traded/day</Th>
                 <Th k="limit" cls="hide-sm">Limit/4h</Th>
                 <Th k="flipH" dir={1} cls="hide-sm">Flip a limit</Th>
               </tr>
@@ -1200,7 +1339,8 @@ export default function FlipDesk() {
                   <td className="gold hide-sm">{fmtGp(it.high)}</td>
                   <td className={it.margin > 0 ? "good" : it.margin < 0 ? "bad" : "mut"}>{fmtGp(it.margin)}</td>
                   <td className={it.margin > 0 ? "good" : it.margin < 0 ? "bad" : "mut"}>{it.roi.toFixed(1)}%</td>
-                  <td className="mut hide-xs">{fmtQty(it.dv)}</td>
+                  <td className="gold">{fmtGp(it.turnover)}</td>
+                  <td className="mut hide-sm">{fmtQty(it.dv)}</td>
                   <td className="mut hide-sm">{fmtQty(it.limit)}</td>
                   <td className={"hide-sm " + durClass(it.flipH)}>{fmtDurShort(it.flipH)}</td>
                 </tr>
@@ -1214,7 +1354,8 @@ export default function FlipDesk() {
         <p className="ge-foot">
           Buy / Sell = what each side actually traded at, volume-weighted over the last 5 minutes (1-hour
           fallback) — never a single print, so one bait trade can't paint the board. Margin is per item after
-          GE tax (2% of sale, capped at 5m; under 50 gp and bonds exempt).<br />
+          GE tax (2% of sale, capped at 5m; under 50 gp and bonds exempt). Gp moved/day = daily volume ×
+          mid price — the depth of the river, not your share of it.<br />
           A / B / C flags grade data confidence; unpriceable books (one-sided, crossed, dislocated) are set aside.<br />
           Live prices courtesy of the <a className="ge-link" href="https://prices.runescape.wiki" target="_blank" rel="noreferrer">OSRS Wiki price API</a> — estimates, not promises.
         </p>
