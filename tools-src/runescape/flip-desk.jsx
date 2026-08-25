@@ -387,6 +387,12 @@ const CSS = `
 .ge-tog { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--white); cursor:pointer;
   user-select:none; white-space:nowrap; text-shadow:1px 1px 0 #000; }
 .ge-tog input { accent-color:var(--orange); width:15px; height:15px; }
+.ge-fslider { flex:1 1 150px; min-width:130px; max-width:210px; }
+.ge-fslider .fl { display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  font-size:10.5px; color:var(--tan); letter-spacing:.1em; text-transform:uppercase;
+  text-shadow:1px 1px 0 #000; margin-bottom:1px; cursor:help; }
+.ge-fslider .fl b { font-family:var(--mono); font-size:11.5px; color:var(--yellow); font-weight:600;
+  text-transform:none; letter-spacing:0; }
 
 /* the board */
 .ge-tablewrap { overflow:auto; max-height:calc(100vh - 130px); }
@@ -728,6 +734,15 @@ const RATE = {
   "Dairy churn": 3.0, "": 1.8,
 };
 const OVERHEAD = 1.15; // bank trips, misclicks, being human
+/* A chain's margin is the market paying a wage for the labor in it, so "too
+   good to be true" is judged against the WORK, not the outlay: a labor-heavy
+   chain (a keel, a full smelting run) earning a fat margin is just a real
+   need priced by a real market — nobody else wants to do the work. What a
+   liquid market never leaves lying around is near-free money: big pay on
+   almost no labor. Honest skilling work tops out around a few hundred k
+   gp/hr, so a chain implying several times that per hour of hands-on work
+   is more likely thin or stale data than a genuine wage. */
+const RICH_GP_PER_WORK_HOUR = 2_000_000;
 const verbOf = (r) => {
   if (r.f === "Furnace") return "Smelt";
   if (r.f === "Anvil") return "Smith";
@@ -883,11 +898,13 @@ function buildJobs(items, mode, skills) {
     const maxN = Math.max(0, Math.min(...caps));
     if (maxN < 1) continue;
 
-    // sanity-check the chain: a return this rich in a liquid market is more
-    // often thin or stale data than free money, and a C-grade or fast-moving
+    // sanity-check the chain: the implied wage — pay per hour of hands-on
+    // work — is the tell. Beyond any honest skilling wage it's more often
+    // thin or stale data than free money, and a C-grade or fast-moving
     // leg poisons the whole sum — flag it, let the player judge
     const legs = [out, ...buyList.map((b) => b.it)];
-    const rich = best.cost > 0 && best.profitUnit / best.cost > 0.5;
+    const wage = (best.profitUnit * 3600) / best.secs;
+    const rich = wage > RICH_GP_PER_WORK_HOUR;
     const staleLegs = legs.filter((x) => x.tier === "C").map((x) => x.name);
     const movingLegs = legs.filter((x) => x.moving).map((x) => x.name);
     const crushP = Math.min(1, ...stepList.map((s) => succOf(s.r, skills)));
@@ -898,7 +915,7 @@ function buildJobs(items, mode, skills) {
       levels: [...levels].map(([s, l]) => ({ s, l })),
       facilities: [...facilities],
       unlocks: [...unlocks],
-      rich, staleLegs, movingLegs, crush: crushP < 1 ? 1 - crushP : 0,
+      wage, rich, staleLegs, movingLegs, crush: crushP < 1 ? 1 - crushP : 0,
       defaultN: Math.min(niceRound(450 / best.secs), maxN),
     });
   }
@@ -952,7 +969,7 @@ function JobCard({ job, n, setN, sheet }) {
           </span>
         )}
         {job.rich && (
-          <span className="ge-req warn" title="This chain pays over 50% on cost. In a liquid market someone would already be doing it — thin or stale data somewhere in the chain is the likelier story. Probe every leg with 1 before committing.">
+          <span className="ge-req warn" title={`This chain pays ≈${fmtGp(job.wage)} gp per hour of hands-on work — beyond what honest skilling labor earns anywhere. A big margin on labor-heavy work is just a wage, but pay the labor can't explain usually means thin or stale data somewhere in the chain. Probe every leg with 1 before committing.`}>
             unusually rich ⚠
           </span>
         )}
@@ -1018,7 +1035,7 @@ function JobCard({ job, n, setN, sheet }) {
       {(job.rich || job.staleLegs.length > 0) && (
         <p className="ge-note caution" style={{ padding: "0 13px 10px", margin: 0 }}>
           ⚠ {[
-            job.rich && "pays suspiciously well — verify each leg with a 1-unit probe before committing",
+            job.rich && "pays suspiciously well for the work involved — verify each leg with a 1-unit probe before committing",
             job.staleLegs.length > 0 && `weak data on ${job.staleLegs.slice(0, 2).join(", ")}${job.staleLegs.length > 2 ? ` +${job.staleLegs.length - 2} more` : ""}`,
           ].filter(Boolean).join("; ")}.
         </p>
@@ -1131,9 +1148,10 @@ function JobBoard({ items, status }) {
         Default batches are sized to roughly 5–10 minutes of work and capped by 4-hour buy limits and what the
         books can absorb (≈10% of daily volume when taking the market; ≈4 hours of patient fills when quoting).<br />
         Action speeds are desk assumptions per facility, +15% for banking. Quote &amp; wait prices anchor to the
-        1-hour averages — patient work should lean on slower data. Chains that pay over 50% on cost, or lean on
-        weak or fast-moving legs, wear a ⚠ — verify before you trust them. The market moves while you work — the
-        pay is an estimate, not a contract.
+        1-hour averages — patient work should lean on slower data. A fat margin on labor-heavy work is just a
+        wage; chains whose pay outruns any honest wage for the hands-on work in them (≈2m gp/hr), or that lean
+        on weak or fast-moving legs, wear a ⚠ — verify before you trust them. The market moves while you work —
+        the pay is an estimate, not a contract.
       </p>
     </>
   );
@@ -1259,8 +1277,9 @@ function Econ101() {
             The popup's fill clocks do assume a share (~25% at the touch), which is why they're labeled
             estimates.</li>
           <li>The board <b>cross-checks its own data</b>: a 5-minute tape that walks away from the hour's
-            average wears ↕ (price in motion), and Job Board chains that pay over 50% on cost or lean on a
-            weak leg wear a ⚠ — unusual numbers are either opportunities or bad data, and a 1-unit probe is
+            average wears ↕ (price in motion), and Job Board chains whose pay outruns any honest wage for
+            the work in them, or that lean on a weak leg, wear a ⚠ — a fat margin on real labor is a wage,
+            but pay that labor can't explain is either an opportunity or bad data, and a 1-unit probe is
             how you find out which.</li>
           <li><b>Vs index</b> compares real trades to the official guide price — two independent samples of
             the same market (the plugin's tape vs Jagex's lagged census of every trade). Near zero means the
@@ -1276,6 +1295,23 @@ function Econ101() {
 }
 
 /* ================= filters ================= */
+// slider screens — each parks at one end meaning "any" so the board stays
+// unfiltered until the player reaches for the dial
+const ROI_ANY = 0;    // min ROI %: 0 = any
+const MOVE_ANY = 15;  // max |5-min vs 1-hour| drift %: 15 = any
+const DEV_ANY = 25;   // max |vs official index| %: 25 = any
+
+function FilterSlider({ label, value, min, max, step, onChange, display, title }) {
+  return (
+    <div className="ge-fslider">
+      <span className="fl" title={title}>{label} <b>{display}</b></span>
+      <input className="ge-range" type="range" min={min} max={max} step={step}
+        value={value} onChange={(e) => onChange(+e.target.value)}
+        aria-label={label + " filter"} title={title} />
+    </div>
+  );
+}
+
 const BANDS = [
   { k: "any", label: "Any price", lo: 0, hi: Infinity },
   { k: "p1", label: "Under 100 gp", lo: 0, hi: 100 },
@@ -1302,6 +1338,9 @@ export default function FlipDesk() {
   const [minVol, setMinVol] = useState("any");
   const [f2pOnly, setF2pOnly] = useState(false);
   const [profOnly, setProfOnly] = useState(false);
+  const [minRoi, setMinRoi] = useState(ROI_ANY);
+  const [maxMove, setMaxMove] = useState(MOVE_ANY);
+  const [maxDev, setMaxDev] = useState(DEV_ANY);
   const [sortKey, setSortKey] = useState("turnover");
   const [sortDir, setSortDir] = useState(-1);
   const [selId, setSelId] = useState(null);
@@ -1343,9 +1382,16 @@ export default function FlipDesk() {
       it.dv >= v.min &&
       (!f2pOnly || !it.members) &&
       (!profOnly || it.margin > 0) &&
+      (minRoi <= ROI_ANY || it.roi >= minRoi) &&
+      // drift: how far the 5-min tape sits from the hour's average (rows the
+      // cross-check couldn't run on carry 0 and pass — the tier flag covers them)
+      (maxMove >= MOVE_ANY || Math.abs(it.movePct ?? 0) <= maxMove) &&
+      // tightening the index screen also drops rows the guide doesn't cover —
+      // they can't demonstrate closeness to an index they don't have
+      (maxDev >= DEV_ANY || (it.official != null && Math.abs(it.dev) <= maxDev)) &&
       (!q || it.name.toLowerCase().includes(q))
     );
-  }, [assessed, search, band, minVol, f2pOnly, profOnly]);
+  }, [assessed, search, band, minVol, f2pOnly, profOnly, minRoi, maxMove, maxDev]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -1439,6 +1485,17 @@ export default function FlipDesk() {
             </select>
             <label className="ge-tog"><input type="checkbox" checked={f2pOnly} onChange={(e) => setF2pOnly(e.target.checked)} />F2P only</label>
             <label className="ge-tog"><input type="checkbox" checked={profOnly} onChange={(e) => setProfOnly(e.target.checked)} />in profit</label>
+          </div>
+          <div className="ge-filters" style={{ marginTop: 10 }}>
+            <FilterSlider label="Min ROI" value={minRoi} min={0} max={20} step={0.5} onChange={setMinRoi}
+              display={minRoi <= ROI_ANY ? "any" : `≥ ${minRoi}%`}
+              title="Hide rows whose after-tax margin returns less than this on the buy price." />
+            <FilterSlider label="Price drift" value={maxMove} min={0} max={MOVE_ANY} step={0.5} onChange={setMaxMove}
+              display={maxMove >= MOVE_ANY ? "any" : `≤ ${maxMove}%`}
+              title="Stability screen: how far the 5-minute tape may sit from the hour's average. Tighten it to keep only steady prices and hide books in motion (↕)." />
+            <FilterSlider label="Vs index" value={maxDev} min={0} max={DEV_ANY} step={1} onChange={setMaxDev}
+              display={maxDev >= DEV_ANY ? "any" : `≤ ±${maxDev}%`}
+              title="How far real trades may sit from the official guide index. Tightening this also hides items the index doesn't cover." />
           </div>
         </section>
 
