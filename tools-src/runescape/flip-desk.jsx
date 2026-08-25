@@ -61,6 +61,7 @@ const rowToItem = (r) => ({
   low: r[4], high: r[5], hv: r[6], dv: r[7],
   // snapshot stores combined hourly flow; assume an even split until live data lands
   hvLo: r[6] / 2, hvHi: r[6] / 2, hvSplit: false,
+  avgLo: null, avgHi: null, momLo: null, momHi: null, unconf: false,
   vol: r[8] < 0 ? null : r[8], stale: r[9],
 });
 const BASE_ITEMS = SNAPSHOT.items.map(rowToItem);
@@ -101,24 +102,34 @@ const shareOf = (step, maxStep) =>
 
 /* one pricing scenario for an item: step gp inside the spread on each side.
    fixedQty pins the stack size (strategy comparison); otherwise the stack is
-   sized to round-trip inside the attention window tolH. */
-function priceOut(a, budget, tolH, step, fixedQty) {
+   sized to round-trip inside the attention window tolH. shareMul brackets the
+   capture guess (0.5 pessimistic … 1.5 optimistic) for range displays. */
+function priceOut(a, budget, tolH, step, fixedQty, shareMul = 1) {
   const maxStep = Math.max(0, Math.floor((a.high - a.low - 1) / 2));
   step = clamp(step, 0, maxStep);
   const buyP = a.low + step;
   const sellP = a.high - step;
   const tax = geTax(sellP, a.id);
-  const margin = sellP - buyP - tax;
+  const quotedMargin = sellP - buyP - tax;
+  // confirmed margin: don't assume you sell above the hour's average high or
+  // buy below its average low — the conservative figure is what gets ranked
+  let margin = quotedMargin;
+  if (a.avgHi && a.avgLo && a.avgHi > a.avgLo) {
+    const cSell = Math.min(sellP, a.avgHi);
+    const cBuy = Math.max(buyP, a.avgLo);
+    margin = Math.min(quotedMargin, cSell - cBuy - geTax(cSell, a.id));
+  }
   const roi = buyP > 0 ? (margin / buyP) * 100 : 0;
 
-  const share = shareOf(step, maxStep);
+  const share = clamp(shareOf(step, maxStep) * shareMul, 0.05, 0.95);
   const buyRate = a.hvLo * share;   // units/hour your buy offer absorbs
   const sellRate = a.hvHi * share;
   const afford = buyP > 0 ? Math.floor(budget / buyP) : 0;
 
-  // biggest stack that still round-trips inside your attention window
+  // biggest stack that still round-trips inside your attention window —
+  // no floor: if even 1 unit can't cycle in time, the trade fails the window
   const hPerUnit = (buyRate > 0 ? 1 / buyRate : Infinity) + (sellRate > 0 ? 1 / sellRate : Infinity);
-  const qtyTol = isFinite(hPerUnit) ? Math.max(1, Math.floor(tolH / hPerUnit)) : 1;
+  const qtyTol = isFinite(hPerUnit) ? Math.floor(tolH / hPerUnit) : 0;
   const qty = fixedQty != null
     ? Math.max(0, Math.min(fixedQty, a.limit))
     : Math.max(0, Math.min(a.limit, afford, qtyTol));
@@ -133,7 +144,7 @@ function priceOut(a, budget, tolH, step, fixedQty) {
     : 0;
   const capital = qty * buyP;
   return {
-    step, maxStep, buyP, sellP, tax, margin, roi, share,
+    step, maxStep, buyP, sellP, tax, margin, quotedMargin, roi, share,
     tBuyH, tSellH, cycleH, qty, perCycle, gpHr, capital, afford,
     limitBound: qty === a.limit && qty < Math.min(afford, qtyTol),
   };
@@ -146,11 +157,25 @@ function playOut(a, budget, play, price) {
   const maxStep = Math.max(0, Math.floor((a.high - a.low - 1) / 2));
   const step = Math.round(price * maxStep);
   const p = priceOut(a, budget, tolH, step);
-  return { ...a, ...p, tolH, bookMargin: a.margin, bookRoi: a.roi };
+  // drift hurts in proportion to how long the round trip actually runs
+  const driftH = clamp(a.driftR * Math.sqrt(clamp(isFinite(p.cycleH) ? p.cycleH : 8, 0.1, 8)), 0, 100);
+  const risk = Math.round(0.45 * a.fillR + 0.35 * driftH + 0.2 * a.staleR);
+  const rocHr = p.capital > 0 ? (p.gpHr / p.capital) * 100 : 0;
+  // a spread already ground down to the tax is being fought over by flippers
+  const contested = a.hv > 0 && a.high - a.low <= geTax(a.high, a.id) + 2;
+  return { ...a, ...p, tolH, driftR: driftH, risk, rocHr, contested, bookMargin: a.margin, bookRoi: a.roi };
 }
 
 const riskBucket = (r) => (r < 30 ? "low" : r < 60 ? "medium" : "high");
 const RISK_COLOR = { low: "#83CE70", medium: "#E0A43A", high: "#E26A5A" };
+
+/* signed tape read for a row: mean of per-leg momentum, damped for pennies */
+const momOf = (it) => {
+  if (it.momLo == null && it.momHi == null) return null;
+  if (it.high < 50) return null; // penny ticks make % moves pure noise
+  const m = ((it.momLo ?? 0) + (it.momHi ?? 0)) / 2;
+  return { m, dir: m <= -0.75 ? "dn" : m >= 0.75 ? "up" : "flat" };
+};
 
 /* ================= presets ================= */
 const PRESETS = [
@@ -288,7 +313,11 @@ table.fd-t { border-collapse:collapse; width:100%; font-size:12.5px; min-width:7
 .fd-t tbody tr:hover { background:#241C0E; }
 .fd-t tbody tr.sel { background:#2E2410; box-shadow:inset 3px 0 0 var(--gold); }
 .fd-t .up { color:var(--green); } .fd-t .dn { color:var(--red); } .fd-t .mut { color:var(--mut); } .fd-t .wn { color:var(--amber); }
+.fd-t .gold { color:var(--gold); }
+.fd-t .dim { opacity:.45; }
 .fd-caret { display:inline-block; width:14px; color:var(--gold-dim); font-size:10px; }
+.fd-mom { margin-left:6px; font-size:10px; }
+.fd-mom.up { color:var(--green); } .fd-mom.dn { color:var(--red); }
 .fd-badge { display:inline-block; font-size:10px; letter-spacing:.08em; padding:2px 7px; border-radius:2px; border:1px solid; font-family:var(--mono); }
 .fd-mem { color:#C9A0E8; font-size:10px; margin-left:6px; border:1px solid #5A4470; border-radius:2px; padding:0 4px; }
 .fd-f2p { color:#8FBCE0; font-size:10px; margin-left:6px; border:1px solid #3E5A70; border-radius:2px; padding:0 4px; }
@@ -323,7 +352,36 @@ table.fd-strat { width:100%; border-collapse:collapse; font-family:var(--mono); 
 .fd-riskbar { height:7px; background:#151006; border:1px solid #3A2E1B; border-radius:3px; overflow:hidden; margin:3px 0 8px; }
 .fd-riskbar i { display:block; height:100%; }
 .fd-note { font-size:11.5px; color:var(--mut); margin-top:8px; line-height:1.5; }
+.fd-note.fd-knife { color:#E8A79B; }
+.fd-note.fd-rise { color:#B9DFA9; }
 .fd-link { color:var(--gold); text-decoration:none; border-bottom:1px dotted var(--gold-dim); font-size:12px; }
+.fd-tapestats { display:grid; grid-template-columns:repeat(3,1fr); gap:0 18px; margin-bottom:6px; }
+@media (max-width:860px){ .fd-tapestats{grid-template-columns:1fr} }
+
+/* desk plan */
+.fd-planrows { display:flex; flex-direction:column; gap:6px; }
+.fd-planrow { display:grid; grid-template-columns:26px 1.5fr 1.5fr 1fr .9fr 1.1fr; gap:10px; align-items:center;
+  background:var(--inset); border:1px solid var(--trim); border-radius:4px; padding:8px 12px;
+  color:var(--parch); font-family:var(--mono); font-size:12.5px; cursor:pointer; text-align:left; width:100%; }
+.fd-planrow:hover { border-color:var(--trim-hi); background:#241C0E; }
+.fd-planrow .slot { font-family:var(--disp); font-weight:700; color:var(--gold-dim); font-size:14px; }
+.fd-planrow .nm { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fd-planrow .qty, .fd-planrow .cap, .fd-planrow .cyc { color:var(--mut); }
+.fd-planrow .cap, .fd-planrow .cyc, .fd-planrow .est { text-align:right; }
+.fd-planrow .est { color:var(--gold); white-space:nowrap; }
+@media (max-width:760px){ .fd-planrow{grid-template-columns:22px 1.2fr 1fr} .fd-planrow .cap,.fd-planrow .cyc,.fd-planrow .qty{display:none} }
+
+/* flip ledger */
+table.fd-lt { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px; min-width:680px; }
+.fd-lt th { text-align:right; color:var(--gold-dim); font-family:var(--disp); font-weight:600; font-size:9.5px;
+  letter-spacing:.14em; text-transform:uppercase; padding:4px 8px; border-bottom:1px solid var(--trim); white-space:nowrap; }
+.fd-lt th:first-child, .fd-lt td:first-child { text-align:left; }
+.fd-lt td { text-align:right; padding:5px 8px; border-bottom:1px solid #2A2113; white-space:nowrap; }
+.fd-lt .up { color:var(--green); } .fd-lt .dn { color:var(--red); } .fd-lt .mut { color:var(--mut); }
+.fd-lt tr.closedRow td { opacity:.55; }
+.fd-linkbtn { background:none; border:none; color:var(--gold); cursor:pointer; font:inherit; padding:0; border-bottom:1px dotted var(--gold-dim); }
+.fd-in { background:var(--inset); border:1px solid var(--trim); color:var(--parch); border-radius:3px; padding:3px 6px; width:110px; font-family:var(--mono); font-size:12px; }
+.fd-calrow { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:12.5px; color:var(--mut); }
 
 /* ledger notes */
 .fd-notes { columns:2; column-gap:28px; font-size:12.5px; color:#C4B594; }
@@ -333,24 +391,83 @@ table.fd-strat { width:100%; border-collapse:collapse; font-family:var(--mono); 
 .fd-foot { text-align:center; color:#7A6B54; font-size:11px; margin-top:20px; font-family:var(--mono); letter-spacing:.06em; }
 `;
 
-/* ================= live fetch ================= */
-async function fetchJson(url, signal) {
-  const res = await fetch(url, { signal, headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  return res.json();
+/* ================= api citizenship =================
+   The wiki's price API is a free community service run for RuneLite users.
+   This desk is deliberately polite with it:
+   - every endpoint is cached at its natural update cadence (latest ~1min,
+     5m blocks every 5min, 1h hourly, volumes daily, mapping ~weekly)
+   - concurrent callers share a single in-flight request
+   - errors back off exponentially, serving stale data meanwhile
+   - a hidden tab never polls; the refresh button can't bust the cache      */
+const TTL = {
+  latest: 85_000, "5m": 300_000, "1h": 900_000,
+  volumes: 3_600_000, timeseries: 600_000, mapping: 7 * 86_400_000,
+};
+const memCache = new Map();   // url -> {ts, data}
+const inflight = new Map();   // url -> Promise
+let failStreak = 0, backoffUntil = 0;
+
+async function apiGet(kind, url) {
+  const ttl = TTL[kind] ?? 300_000;
+  const hit = memCache.get(url);
+  if (hit && Date.now() - hit.ts < ttl) return hit.data;
+  if (Date.now() < backoffUntil) {
+    if (hit) return hit.data;               // stale beats hammering a hurting API
+    throw new Error("cooling off");
+  }
+  if (inflight.has(url)) return inflight.get(url);
+  const p = (async () => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10_000);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      failStreak = 0;
+      memCache.set(url, { ts: Date.now(), data });
+      return data;
+    } catch (e) {
+      failStreak++;
+      backoffUntil = Date.now() + Math.min(45_000 * 2 ** (failStreak - 1), 900_000);
+      if (hit) return hit.data;
+      throw e;
+    } finally { clearTimeout(t); inflight.delete(url); }
+  })();
+  inflight.set(url, p);
+  return p;
 }
 
-async function pullLive(signal) {
-  const [latest, h1, vols] = await Promise.all([
-    fetchJson(`${API}/latest`, signal),
-    fetchJson(`${API}/1h`, signal),
-    fetchJson(`${API}/volumes`, signal),
+/* the full tradeable universe from /mapping, slimmed and cached ~weekly */
+async function loadUniverse() {
+  const LS = "fd:universe-v1";
+  try {
+    const j = JSON.parse(localStorage.getItem(LS));
+    if (j && Date.now() - j.ts < TTL.mapping && j.items?.length > 500) return j.items;
+  } catch (e) { /* no storage / stale — refetch */ }
+  try {
+    const map = await apiGet("mapping", `${API}/mapping`);
+    if (!Array.isArray(map) || map.length < 500) return null;
+    const items = map
+      .filter((m) => m.id != null && m.name && m.limit > 0)
+      .map((m) => ({ id: m.id, name: m.name, limit: m.limit, members: !!m.members }));
+    try { localStorage.setItem(LS, JSON.stringify({ ts: Date.now(), items })); } catch (e) {}
+    return items;
+  } catch (e) { return null; }
+}
+
+async function pullLive() {
+  const [latest, h1, vols, uni] = await Promise.all([
+    apiGet("latest", `${API}/latest`),
+    apiGet("1h", `${API}/1h`),
+    apiGet("volumes", `${API}/volumes`),
+    loadUniverse(),
   ]);
   let m5 = null;
-  try { m5 = await fetchJson(`${API}/5m`, signal); } catch (e) { /* drift falls back */ }
+  try { m5 = await apiGet("5m", `${API}/5m`); } catch (e) { /* drift & momentum fall back */ }
+  const meta = uni || BASE_ITEMS;      // no mapping? fall back to the desk classics
   const now = Math.floor(Date.now() / 1000);
-  const out = {};
-  for (const base of BASE_ITEMS) {
+  const items = [];
+  for (const base of meta) {
     const p = latest.data?.[base.id];
     if (!p || !p.high || !p.low) continue;
     const high = p.high, low = p.low;
@@ -366,19 +483,25 @@ async function pullLive(signal) {
     const mid = (d) => (d.avgHighPrice && d.avgLowPrice ? (d.avgHighPrice + d.avgLowPrice) / 2 : d.avgHighPrice || d.avgLowPrice || null);
     const m1 = mid(h), mf = mid(f);
     const vol = m1 && mf ? Math.abs(mf - m1) / m1 * 100 : null;
+    // signed per-leg momentum: 5m average vs the hour's, % — the sign is the story
+    const momLo = h.avgLowPrice && f.avgLowPrice ? ((f.avgLowPrice - h.avgLowPrice) / h.avgLowPrice) * 100 : null;
+    const momHi = h.avgHighPrice && f.avgHighPrice ? ((f.avgHighPrice - h.avgHighPrice) / h.avgHighPrice) * 100 : null;
     const stale = Math.max(now - (p.highTime || now), now - (p.lowTime || now)) / 60;
     // a latest spread far wider than the hour's average is usually one bait or
     // outlier print, not a margin you can capture — badge it, don't chase it
     const avgSpread = h.avgHighPrice && h.avgLowPrice ? h.avgHighPrice - h.avgLowPrice : null;
     const unconf = avgSpread != null && avgSpread >= 0 && high - low > Math.max(1.5 * avgSpread, avgSpread + 2);
-    out[base.id] = {
+    items.push({
+      id: base.id, name: base.name, limit: base.limit, members: base.members,
       low, high, hv, hvHi, hvLo, hvSplit: true, unconf,
-      dv: vols.data?.[base.id] ?? base.dv,
+      avgLo: h.avgLowPrice || null, avgHi: h.avgHighPrice || null,
+      momLo, momHi,
+      dv: vols.data?.[base.id] ?? 0,
       vol, stale: Math.round(stale),
-    };
+    });
   }
-  if (Object.keys(out).length < 20) throw new Error("thin response");
-  return out;
+  if (items.length < 20) throw new Error("thin response");
+  return { items, universe: !!uni };
 }
 
 /* ================= small pieces ================= */
@@ -419,7 +542,7 @@ const BarTip = ({ active, payload }) => {
 /* ================= app ================= */
 export default function FlipDesk() {
   const [status, setStatus] = useState("loading"); // loading | live | snapshot
-  const [liveMap, setLiveMap] = useState(null);
+  const [live, setLive] = useState(null);          // {items, universe} | null
   const [updatedAt, setUpdatedAt] = useState(null);
   const [preset, setPreset] = useState("penny");
   const [ctl, setCtl] = useState({ ...PRESETS[0].c });
@@ -427,28 +550,42 @@ export default function FlipDesk() {
   const [sortKey, setSortKey] = useState("gpHr");
   const [sortDir, setSortDir] = useState(-1);
   const [selId, setSelId] = useState(null);
-  const [series, setSeries] = useState({}); // id -> {pts}|{err}
-  const abortRef = useRef(null);
+  const [series, setSeries] = useState({}); // id -> {ts, pts}|{ts, err}
+  const [ledger, setLedger] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("fd-ledger-v1")) || []; } catch (e) { return []; }
+  });
+  const [calOn, setCalOn] = useState(() => {
+    try { return localStorage.getItem("fd-cal") === "1"; } catch (e) { return false; }
+  });
+  const [, setTick] = useState(0); // periodic re-render so the data-age chip ticks
 
-  const refresh = useCallback(async () => {
-    setStatus("loading");
-    abortRef.current?.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-    const timer = setTimeout(() => ctrl.abort(), 9000);
+  const refresh = useCallback(async (auto = false) => {
+    if (!auto) setStatus("loading");
     try {
-      const map = await pullLive(ctrl.signal);
-      setLiveMap(map);
+      const r = await pullLive();
+      setLive(r);
       setUpdatedAt(new Date());
       setStatus("live");
     } catch (e) {
-      setStatus("snapshot");
-    } finally {
-      clearTimeout(timer);
+      // an auto tick that fails keeps showing the last good tape; the age chip tells the story
+      setStatus((s) => (auto && s === "live" ? s : "snapshot"));
     }
   }, []);
 
-  useEffect(() => { refresh(); return () => abortRef.current?.abort(); }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  /* polite auto-poll: 90s cadence, only while the tab is visible; apiGet's
+     per-endpoint caches mean each tick costs at most one /latest request */
+  useEffect(() => {
+    const iv = setInterval(() => { if (!document.hidden) refresh(true); }, 90_000);
+    const onVis = () => { if (!document.hidden) refresh(true); };
+    document.addEventListener("visibilitychange", onVis);
+    const age = setInterval(() => setTick((x) => x + 1), 30_000);
+    return () => { clearInterval(iv); clearInterval(age); document.removeEventListener("visibilitychange", onVis); };
+  }, [refresh]);
+
+  useEffect(() => { try { localStorage.setItem("fd-ledger-v1", JSON.stringify(ledger)); } catch (e) {} }, [ledger]);
+  useEffect(() => { try { localStorage.setItem("fd-cal", calOn ? "1" : "0"); } catch (e) {} }, [calOn]);
 
   const setC = (patch) => { setCtl((c) => ({ ...c, ...patch })); setPreset(null); };
   const applyPreset = (p) => {
@@ -458,22 +595,26 @@ export default function FlipDesk() {
     setSortDir(-1);
   };
 
-  /* merge snapshot + live, run the model */
-  const assessed = useMemo(() => {
-    return BASE_ITEMS.map((b) => {
-      const l = liveMap?.[b.id];
-      return assess(l ? { ...b, ...l, vol: l.vol == null ? b.vol : l.vol } : b);
-    });
-  }, [liveMap]);
+  /* the working set: the full live universe, or the baked classics offline */
+  const assessed = useMemo(() => (live?.items ?? BASE_ITEMS).map(assess), [live]);
 
   const played = useMemo(
     () => assessed.map((a) => playOut(a, ctl.budget, ctl.play, ctl.price)),
     [assessed, ctl.budget, ctl.play, ctl.price]
   );
 
+  /* personal calibration: how much of the predicted edge this player realizes */
+  const calibration = useMemo(() => {
+    const closed = ledger.filter((l) => l.status === "closed" && l.predNet > 0 && l.realNet != null);
+    if (closed.length < 2) return null;
+    const r = closed.map((l) => clamp(l.realNet / l.predNet, 0, 2));
+    return r.reduce((s, x) => s + x, 0) / r.length;
+  }, [ledger]);
+  const calF = calOn && calibration != null ? clamp(calibration, 0.2, 1.5) : 1;
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return played.filter((p) =>
+    const out = played.filter((p) =>
       p.qty > 0 &&
       p.roi >= ctl.minRoi &&
       p.risk <= ctl.riskTol &&
@@ -481,7 +622,8 @@ export default function FlipDesk() {
       (!ctl.f2p || !p.members) &&
       (!q || p.name.toLowerCase().includes(q))
     );
-  }, [played, ctl, search]);
+    return calF === 1 ? out : out.map((p) => ({ ...p, gpHr: p.gpHr * calF }));
+  }, [played, ctl, search, calF]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -511,25 +653,61 @@ export default function FlipDesk() {
 
   const sel = useMemo(() => played.find((p) => p.id === selId) || null, [played, selId]);
 
-  /* sparkline for the selected item (live only) */
+  /* 24h tape for the selected item — one request per item per 10 minutes, tops */
   useEffect(() => {
-    if (!sel || series[sel.id]) return;
+    if (!sel) return;
+    const e = series[sel.id];
+    if (e && Date.now() - e.ts < TTL.timeseries) return;
     let dead = false;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 8000);
-    fetchJson(`${API}/timeseries?timestep=5m&id=${sel.id}`, ctrl.signal)
+    apiGet("timeseries", `${API}/timeseries?timestep=5m&id=${sel.id}`)
       .then((j) => {
         if (dead) return;
         const pts = (j.data || []).slice(-288).map((d) => ({
           t: d.timestamp, hi: d.avgHighPrice, lo: d.avgLowPrice,
           v: (d.highPriceVolume || 0) + (d.lowPriceVolume || 0),
         })).filter((d) => d.hi || d.lo);
-        setSeries((s) => ({ ...s, [sel.id]: pts.length ? { pts } : { err: true } }));
+        setSeries((s) => ({ ...s, [sel.id]: pts.length ? { ts: Date.now(), pts } : { ts: Date.now(), err: true } }));
       })
-      .catch(() => { if (!dead) setSeries((s) => ({ ...s, [sel.id]: { err: true } })); })
-      .finally(() => clearTimeout(t));
-    return () => { dead = true; ctrl.abort(); };
+      .catch(() => { if (!dead) setSeries((s) => ({ ...s, [sel.id]: { ts: Date.now(), err: true } })); });
+    return () => { dead = true; };
   }, [sel, series]);
+
+  /* Desk Plan: greedy allocation of the bankroll across GE slots by est. gp/hr */
+  const plan = useMemo(() => {
+    const slots = ctl.f2p ? 3 : 8; // a free-to-play account has 3 GE slots
+    let bank = ctl.budget;
+    const lines = [];
+    for (const c of [...filtered].sort((a, b) => b.gpHr - a.gpHr)) {
+      if (lines.length >= slots || bank <= 0) break;
+      if (c.gpHr <= 0 || c.buyP > bank) continue;
+      const r = priceOut(c, bank, c.tolH, c.step); // re-sized to the bankroll left
+      if (r.qty < 1 || r.perCycle <= 0) continue;
+      const pess = priceOut(c, bank, c.tolH, c.step, r.qty, 0.5);
+      const opt = priceOut(c, bank, c.tolH, c.step, r.qty, 1.5);
+      lines.push({
+        id: c.id, name: c.name, risk: c.risk, qty: r.qty, buyP: r.buyP, sellP: r.sellP,
+        capital: r.capital, cycleH: r.cycleH,
+        gpHr: r.gpHr * calF, gpHrLo: pess.gpHr * calF, gpHrHi: opt.gpHr * calF,
+      });
+      bank -= r.capital;
+    }
+    return {
+      lines, slots, deployed: ctl.budget - bank,
+      estLo: lines.reduce((s, l) => s + l.gpHrLo, 0),
+      estHi: lines.reduce((s, l) => s + l.gpHrHi, 0),
+    };
+  }, [filtered, ctl.budget, ctl.f2p, calF]);
+
+  const byId = useMemo(() => new Map(played.map((p) => [p.id, p])), [played]);
+
+  const logFlip = useCallback((p) => {
+    setLedger((L) => [...L, {
+      uid: Date.now() + ":" + p.id, id: p.id, name: p.name, qty: p.qty,
+      buyP: p.buyP, sellP: p.sellP, predNet: p.perCycle, predGpHr: Math.round(p.gpHr),
+      predCycleH: isFinite(p.cycleH) ? +p.cycleH.toFixed(2) : null,
+      ts: Date.now(), status: "open", realNet: null,
+    }]);
+  }, []);
 
   const clickSort = (k, dir = -1) => {
     if (sortKey === k) setSortDir((d) => -d);
@@ -547,7 +725,8 @@ export default function FlipDesk() {
   const riskLabel = ctl.riskTol < 40 ? "careful" : ctl.riskTol < 70 ? "balanced" : "degen";
   const activePreset = PRESETS.find((p) => p.key === preset);
 
-  const scatterData = filtered.map((f) => ({ ...f, dvLog: Math.max(f.dv, 1), roiCap: Math.min(f.roi, 80) }));
+  const scatterData = [...filtered].sort((a, b) => b.gpHr - a.gpHr).slice(0, 400)
+    .map((f) => ({ ...f, dvLog: Math.max(f.dv, 1), roiCap: Math.min(f.roi, 80) }));
   const topBars = [...filtered].sort((a, b) => b.gpHr - a.gpHr).slice(0, 8)
     .map((x) => ({ ...x, shortName: x.name.length > 18 ? x.name.slice(0, 17) + "…" : x.name }));
 
@@ -566,7 +745,7 @@ export default function FlipDesk() {
           </div>
           <div className="fd-status">
             {status === "live" && (
-              <span className="fd-chip live"><i className="fd-live-dot" />LIVE FEED · {updatedAt?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              <span className="fd-chip live"><i className="fd-live-dot" />LIVE · {assessed.length.toLocaleString()} ITEMS · {updatedAt ? agoStr((Date.now() - updatedAt.getTime()) / 60000).replace(" ago", "").toUpperCase() : ""}</span>
             )}
             {status === "snapshot" && <span className="fd-chip snap">◈ SNAPSHOT · {SNAP_DATE.toLocaleDateString([], { day: "numeric", month: "short" })}</span>}
             {status === "loading" && <span className="fd-chip load">… polling exchange</span>}
@@ -591,9 +770,10 @@ export default function FlipDesk() {
         {/* market read */}
         {read && (
           <p className="fd-read">
-            {read.n} of {read.total} tracked items pass your desk rules.
+            {read.n} of {read.total.toLocaleString()} {status === "live" && live?.universe ? "scanned tradeables" : "tracked items"} pass your desk rules.
             {read.top && <> Best tape right now: <b>{read.top.name}</b> at ~<b>{fmtGp(read.top.gpHr)}/hr</b> on your settings.</>}
             {read.penny > 0 && <> {read.penny} tax-exempt penny items are moving ~{fmtQty(read.pennyFlow)} units a day between them.</>}
+            {calF !== 1 && <> Estimates calibrated to your ledger (×{calF.toFixed(2)}).</>}
           </p>
         )}
 
@@ -655,6 +835,30 @@ export default function FlipDesk() {
             </div>
           </div>
         </section>
+
+        {/* desk plan */}
+        {plan.lines.length > 0 && (
+          <section className="fd-panel">
+            <h2 className="fd-lab">Desk Plan — {plan.lines.length} of {plan.slots} slots · {fmtGp(plan.deployed)} deployed · est {fmtGp(plan.estLo)}–{fmtGp(plan.estHi)}/hr</h2>
+            <div className="fd-planrows">
+              {plan.lines.map((l, i) => (
+                <button key={l.id} className="fd-planrow" onClick={() => setSelId(l.id)}>
+                  <span className="slot">{i + 1}</span>
+                  <span className="nm">{l.name}</span>
+                  <span className="qty">{fmtQty(l.qty)} @ {fmtGp(l.buyP)} → {fmtGp(l.sellP)}</span>
+                  <span className="cap">{fmtGp(l.capital)} out</span>
+                  <span className="cyc">~{fmtDur(l.cycleH)}/cycle</span>
+                  <span className="est">{fmtGp(l.gpHrLo)}–{fmtGp(l.gpHrHi)}/hr</span>
+                </button>
+              ))}
+            </div>
+            <p className="fd-note">
+              Greedy allocation of your bankroll across {plan.slots} Grand Exchange slots{ctl.f2p ? " (F2P accounts get 3)" : ""}, best est. gp/hr first,
+              each line re-sized to the coin left after the slots above it. Ranges bracket the capture guess (half to 1.5× the modelled share of flow).
+              Tap a line to open its ledger below.
+            </p>
+          </section>
+        )}
 
         {/* scoreboard */}
         {best && (
@@ -746,39 +950,56 @@ export default function FlipDesk() {
                   <th className={sortKey === "risk" ? "on" : ""} onClick={() => clickSort("risk")}>Risk</th>
                   <th className={(sortKey === "perCycle" ? "on " : "") + "hide-sm"} onClick={() => clickSort("perCycle")}>Gp/cycle</th>
                   <th className={sortKey === "gpHr" ? "on" : ""} onClick={() => clickSort("gpHr")}>Est/hr</th>
+                  <th className={(sortKey === "rocHr" ? "on " : "") + "hide-sm"} onClick={() => clickSort("rocHr")} title="Return on the capital deployed, per hour">%/hr</th>
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((p) => (
+                {sorted.slice(0, 250).map((p) => {
+                  const mom = momOf(p);
+                  const dim = status === "snapshot" ? " dim" : "";
+                  return (
                   <React.Fragment key={p.id}>
                     <tr className={p.id === selId ? "sel" : ""} onClick={() => setSelId(p.id === selId ? null : p.id)}>
                       <td>
                         <span className="fd-caret">{p.id === selId ? "▾" : "▸"}</span>
                         {p.name}
+                        {mom && mom.dir !== "flat" && (
+                          <span className={"fd-mom " + mom.dir} title={`5m vs 1h: buy side ${p.momLo?.toFixed(1)}%, sell side ${p.momHi?.toFixed(1)}%`}>
+                            {mom.dir === "up" ? "▲" : "▼"}
+                          </span>
+                        )}
                         {p.tax === 0 && <span className="fd-taxfree">0% tax</span>}
                         {p.members ? <span className="fd-mem">P2P</span> : <span className="fd-f2p">F2P</span>}
                         {p.unconf && <span className="fd-unconf" title="Latest spread is far wider than the hour's average — probably one outlier print. Probe with 1 before committing.">unconfirmed</span>}
+                        {p.contested && <span className="fd-unconf" title="The spread is already ground down to the tax — flippers are fighting over this book.">contested</span>}
                       </td>
                       <td>{fmtGp(p.buyP)}</td>
                       <td className="hide-sm">{fmtGp(p.sellP)}</td>
                       <td className={p.margin > 0 ? "up" : "dn"}>{fmtGp(p.margin)}</td>
                       <td className={p.roi > 0 ? "up" : "dn"}>{p.roi.toFixed(1)}%</td>
-                      <td className={durClass(p.tBuyH)}>{fmtDur(p.tBuyH)}</td>
-                      <td className={"hide-sm " + durClass(p.tSellH)}>{fmtDur(p.tSellH)}</td>
+                      <td className={durClass(p.tBuyH) + dim}>{fmtDur(p.tBuyH)}</td>
+                      <td className={"hide-sm " + durClass(p.tSellH) + dim}>{fmtDur(p.tSellH)}</td>
                       <td className="hide-sm mut">{fmtQty(p.limit)}</td>
                       <td className="hide-sm mut">{fmtQty(p.dv)}</td>
-                      <td><RiskBadge risk={p.risk} /></td>
+                      <td className={dim}><RiskBadge risk={p.risk} /></td>
                       <td className="hide-sm">{fmtGp(p.perCycle)}</td>
-                      <td style={{ color: "#F0B437" }}>{fmtGp(p.gpHr)}</td>
+                      <td className={"gold" + dim}>{fmtGp(p.gpHr)}</td>
+                      <td className={"hide-sm mut" + dim}>{p.rocHr >= 10 ? Math.round(p.rocHr) : p.rocHr.toFixed(p.rocHr >= 1 ? 1 : 2)}%</td>
                     </tr>
                     {p.id === selId && (
                       <ExpandedRow sel={p} status={status} data={series[p.id]}
-                        budget={ctl.budget} onClose={() => setSelId(null)} />
+                        budget={ctl.budget} calF={calF} onLog={logFlip} onClose={() => setSelId(null)} />
                     )}
                   </React.Fragment>
-                ))}
+                  );
+                })}
+                {sorted.length > 250 && (
+                  <tr><td colSpan={13} style={{ textAlign: "center", padding: 10, color: "#7A6B54", cursor: "default" }}>
+                    top 250 of {sorted.length.toLocaleString()} shown — sort, search, or tighten the rules to surface the rest
+                  </td></tr>
+                )}
                 {!sorted.length && (
-                  <tr><td colSpan={12} style={{ textAlign: "center", padding: 24, color: "#A5937A" }}>
+                  <tr><td colSpan={13} style={{ textAlign: "center", padding: 24, color: "#A5937A" }}>
                     Nothing passes these rules. Loosen the risk cap or minimum ROI, ease the offer-pricing dial back toward the touch, raise the bankroll, or clear the tax-free filter.
                   </td></tr>
                 )}
@@ -786,6 +1007,11 @@ export default function FlipDesk() {
             </table>
           </div>
         </section>
+
+        {/* flip ledger */}
+        <LedgerPanel ledger={ledger} setLedger={setLedger} byId={byId}
+          calibration={calibration} calOn={calOn} setCalOn={setCalOn}
+          onSelect={(id) => setSelId(id)} />
 
         {/* ledger notes */}
         <section className="fd-panel">
@@ -797,7 +1023,12 @@ export default function FlipDesk() {
             <p><b>The fill clock.</b> Your buy order fills from people insta-selling into the book; your sell order fills from insta-buyers. The desk reads each side's hourly flow separately and estimates how long an order of your size waits: quantity ÷ (that side's flow × your share of it). A fat margin on a book where the sell side moves 40 units an hour is a parked bankroll, and the clock says so before you learn it the hard way.</p>
             <p><b>Offer pricing.</b> The GE queue is price-time priority. Quoting at the touch (buy at insta-sell, sell at insta-buy) takes the full spread but stands you behind everyone already there — figure ~25% of counter-flow finds you. Stepping even 1 gp inside jumps the entire queue at that price, so fills come far faster at 2 gp of margin given up. The pricing dial and each item's strategy table price this trade-off both ways.</p>
             <p><b>Playstyle.</b> The dial sets how long a round trip you'll tolerate: patient mode sizes stacks for ~4-hour cycles — set offers, log off, collect; scalper mode sizes them to turn in ~15 minutes and only makes sense on books deep enough to fill you fast.</p>
+            <p><b>Confirmed vs. quoted.</b> The latest insta-buy/insta-sell are two individual trades — one bait or outlier print can fabricate a margin. The desk therefore ranks on the <i>confirmed</i> margin: it never assumes you sell above the last hour's average high or buy below its average low. When the quote is far richer than the hour's book, the row says <i>unconfirmed</i> — probe with 1 before committing.</p>
+            <p><b>The tape's direction.</b> ▲/▼ beside an item is the signed 5-minute-vs-1-hour move. A falling tape is the classic knife: your buy fills instantly <i>because</i> everyone is selling, and the exit leg eats the move. The expanded ledger spells out which leg carries the risk.</p>
+            <p><b>The Desk Plan.</b> You don't flip one item — you run up to 8 Grand Exchange slots against one bankroll. The plan greedily fills slots best est. gp/hr first, re-sizing each line to the coin left after the lines above it, and totals what the whole desk should earn as a range, not a point.</p>
+            <p><b>Your Ledger.</b> Log a flip when you place it, close it with what you actually made. After two closes the desk knows your realized-vs-predicted ratio and can calibrate every estimate to it — the honest answer to "these numbers look too good". It lives in your browser; nothing leaves the page.</p>
             <p><b>Two worked personas.</b> The <i>penny bulk</i> preset is the &lt;50 gp, tax-exempt, high-ROI grind — iron arrows, nails, feathers, essence. The <i>5-minute scalps</i> preset hunts deep-volume items where the spread refills constantly and your money is never parked.</p>
+            <p><b>On the wiki's API.</b> Prices come from the OSRS Wiki's free real-time API, and the desk is deliberately gentle with it: every endpoint is cached at its natural update cadence (the item map ~weekly, volumes hourly, the 1h book 15 min, the tape ~90 s), a hidden tab never polls, errors back off exponentially, and the refresh button can't bust the cache. Leaving the desk open costs the wiki roughly one small request a minute.</p>
             <p><b>What the numbers aren't.</b> Instant-buy and instant-sell prices are the last trades crossed, not guaranteed fills — a margin tagged <i>unconfirmed</i> means the latest spread is far wider than the hour's average, which usually smells like one outlier print: probe it with a single unit first. Fill clocks assume the last hour's flow keeps its pace and that you capture ~25% of it at the touch (more when you price inside) — generous on contested items, and blind to the queue already ahead of you. This is a lens for reading the market, not an order robot.</p>
           </div>
           <p className="fd-foot">
@@ -815,9 +1046,10 @@ const timeTick = (t) => {
   return d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0");
 };
 
-function ExpandedRow({ sel, status, data, budget, onClose }) {
+function ExpandedRow({ sel, status, data, budget, calF = 1, onLog, onClose }) {
   const rowRef = useRef(null);
   useEffect(() => { rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, []);
+  const [logged, setLogged] = useState(false);
 
   /* same bankroll & attention window, three ways to price the offers */
   const strats = useMemo(() => {
@@ -834,6 +1066,27 @@ function ExpandedRow({ sel, status, data, budget, onClose }) {
       .map((d) => ({ ...d, ...priceOut(sel, budget, sel.tolH, d.step, sel.qty) }));
   }, [sel, budget]);
 
+  /* bracket the capture guess for honest ranges */
+  const [pess, opt] = useMemo(() => [
+    priceOut(sel, budget, sel.tolH, sel.step, sel.qty, 0.5),
+    priceOut(sel, budget, sel.tolH, sel.step, sel.qty, 1.5),
+  ], [sel, budget]);
+
+  /* what the 24h tape says about this margin — computed from the one fetch */
+  const tape = useMemo(() => {
+    if (!data?.pts) return null;
+    const pts = data.pts.filter((p) => p.hi && p.lo);
+    if (pts.length < 24) return null;
+    const margins = pts.map((p) => p.hi - p.lo - geTax(p.hi, sel.id));
+    const persist = margins.filter((m) => m >= sel.margin).length / margins.length;
+    const mids = pts.map((p) => (p.hi + p.lo) / 2);
+    const moves = mids.slice(1).map((m, i) => Math.abs(m - mids[i])).sort((a, b) => a - b);
+    const typ = moves[Math.floor(moves.length / 2)] || 0;
+    const lo = Math.min(...mids), hi = Math.max(...mids);
+    const pos = hi > lo ? ((mids[mids.length - 1] - lo) / (hi - lo)) * 100 : 50;
+    return { persist, cushion: typ > 0 ? sel.margin / typ : null, pos };
+  }, [data, sel]);
+
   const taxLine = sel.tax === 0
     ? (sel.sellP < 50 ? "tax exempt — sells under 50 gp" : "tax exempt item")
     : `tax is 2% of ${sel.sellP.toLocaleString()} = ${sel.tax.toLocaleString()} gp, rounded down`;
@@ -849,7 +1102,7 @@ function ExpandedRow({ sel, status, data, budget, onClose }) {
 
   return (
     <tr className="fd-exprow" ref={rowRef}>
-      <td colSpan={12}>
+      <td colSpan={13}>
         <div className="fd-expand">
           <div className="fd-exphead">
             <h3>{sel.name}</h3>
@@ -857,6 +1110,11 @@ function ExpandedRow({ sel, status, data, budget, onClose }) {
               <RiskBadge risk={sel.risk} />
               <a className="fd-link" href={`https://prices.runescape.wiki/osrs/item/${sel.id}`} target="_blank" rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}>wiki page ↗</a>
+              {onLog && (
+                <button className="fd-btn" disabled={logged} onClick={() => { onLog(sel); setLogged(true); }}>
+                  {logged ? "✓ logged" : "✎ log this flip"}
+                </button>
+              )}
               <button className="fd-btn" onClick={onClose}>✕ close</button>
             </div>
           </div>
@@ -867,8 +1125,12 @@ function ExpandedRow({ sel, status, data, budget, onClose }) {
               <div className="fd-kv"><span>Buy offer @</span><b>{fmtFull(sel.buyP)}{sel.step > 0 && <i className="fd-stepnote"> touch {fmtGp(sel.low)}</i>}</b></div>
               <div className="fd-kv"><span>Sell offer @</span><b>{fmtFull(sel.sellP)}{sel.step > 0 && <i className="fd-stepnote"> touch {fmtGp(sel.high)}</i>}</b></div>
               <div className="fd-kv"><span>GE tax</span><b className={sel.tax ? "r" : "g"}>{sel.tax ? "-" + fmtFull(sel.tax) : "0 gp"}</b></div>
+              {sel.quotedMargin !== sel.margin && (
+                <div className="fd-kv"><span>Quoted by latest prints</span><b>{fmtFull(sel.quotedMargin)}</b></div>
+              )}
               <div className="fd-kv" style={{ borderTop: "1px solid #3A2E1B", marginTop: 4, paddingTop: 7 }}>
-                <span>Net per unit</span><b className={sel.margin > 0 ? "g" : "r"}>{fmtFull(sel.margin)} · {sel.roi.toFixed(1)}%</b>
+                <span>{sel.quotedMargin !== sel.margin ? "Net, confirmed by the 1h book" : "Net per unit"}</span>
+                <b className={sel.margin > 0 ? "g" : "r"}>{fmtFull(sel.margin)} · {sel.roi.toFixed(1)}%</b>
               </div>
               <p className="fd-note">
                 {sel.step > 0
@@ -882,11 +1144,11 @@ function ExpandedRow({ sel, status, data, budget, onClose }) {
               <h4>Your Play</h4>
               <div className="fd-kv"><span>Quantity</span><b className="au">{sel.qty.toLocaleString()}</b></div>
               <div className="fd-kv"><span>Capital out</span><b>{fmtGp(sel.capital)} gp</b></div>
-              <div className="fd-kv"><span>Buy order fills in</span><b className={durClass(sel.tBuyH)}>~{fmtDur(sel.tBuyH)}</b></div>
-              <div className="fd-kv"><span>Sell order fills in</span><b className={durClass(sel.tSellH)}>~{fmtDur(sel.tSellH)}</b></div>
-              <div className="fd-kv"><span>Round trip</span><b>~{fmtDur(sel.cycleH)}</b></div>
+              <div className="fd-kv"><span>Buy order fills in</span><b className={durClass(sel.tBuyH)}>~{fmtDur(opt.tBuyH)}–{fmtDur(pess.tBuyH)}</b></div>
+              <div className="fd-kv"><span>Sell order fills in</span><b className={durClass(sel.tSellH)}>~{fmtDur(opt.tSellH)}–{fmtDur(pess.tSellH)}</b></div>
+              <div className="fd-kv"><span>Round trip</span><b>~{fmtDur(opt.cycleH)}–{fmtDur(pess.cycleH)}</b></div>
               <div className="fd-kv"><span>Profit / cycle</span><b className={sel.perCycle > 0 ? "g" : "r"}>{fmtGp(sel.perCycle)} gp</b></div>
-              <div className="fd-kv"><span>Est. rate</span><b className="au">{fmtGp(sel.gpHr)}/hr</b></div>
+              <div className="fd-kv"><span>Est. rate</span><b className="au">{fmtGp(pess.gpHr * calF)}–{fmtGp(opt.gpHr * calF)}/hr</b></div>
               <p className="fd-note">{boundNote}</p>
             </div>
 
@@ -903,6 +1165,14 @@ function ExpandedRow({ sel, status, data, budget, onClose }) {
                 {sel.hvSplit ? "" : " (even split assumed — live feed refines this)"}.
                 Your offers are modelled to capture ~{Math.round(sel.share * 100)}% of that flow at this pricing.
               </p>
+              {sel.momHi != null && sel.momHi <= -0.75 && (
+                <p className="fd-note fd-knife">▼ Falling tape — the sell side sits {sel.momHi.toFixed(1)}% under its hourly average.
+                  Your buy fills because everyone is selling; the exit leg carries the risk. Wait it out, or price the sell aggressively and take the thinner net.</p>
+              )}
+              {sel.momLo != null && sel.momLo >= 0.75 && (sel.momHi == null || sel.momHi >= 0) && (
+                <p className="fd-note fd-rise">▲ Rising tape — the buy side runs {sel.momLo.toFixed(1)}% above its hourly average.
+                  Expect the buy leg to fill slowly at the touch; a step inside earns its keep here.</p>
+              )}
             </div>
           </div>
 
@@ -926,7 +1196,7 @@ function ExpandedRow({ sel, status, data, budget, onClose }) {
                       <td className={s.roi > 0 ? "up" : "dn"}>{s.roi.toFixed(1)}%</td>
                       <td className={durClass(s.tBuyH)}>{fmtDur(s.tBuyH)}</td>
                       <td className={durClass(s.tSellH)}>{fmtDur(s.tSellH)}</td>
-                      <td style={{ color: "#F0B437" }}>{fmtGp(s.gpHr)}</td>
+                      <td style={{ color: "#F0B437" }}>{fmtGp(s.gpHr * calF)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -941,6 +1211,13 @@ function ExpandedRow({ sel, status, data, budget, onClose }) {
 
           <div className="fd-box">
             <h4>The Tape — last 24h · gold = sell side, green = buy side, bars = volume</h4>
+            {tape && (
+              <div className="fd-tapestats">
+                <div className="fd-kv"><span>This margin existed</span><b>{Math.round(tape.persist * 100)}% of the last 24h</b></div>
+                <div className="fd-kv"><span>Margin vs typical 5m move</span><b className={tape.cushion != null && tape.cushion < 1 ? "r" : "g"}>{tape.cushion != null ? tape.cushion.toFixed(1) + "× cover" : "–"}</b></div>
+                <div className="fd-kv"><span>Price in the day's range</span><b>{Math.round(tape.pos)}%{tape.pos <= 25 ? " — near the low" : tape.pos >= 75 ? " — near the high" : ""}</b></div>
+              </div>
+            )}
             {data?.pts?.length > 1 ? (
               <div style={{ width: "100%", height: 200 }}>
                 <ResponsiveContainer>
@@ -978,5 +1255,100 @@ function ExpandedRow({ sel, status, data, budget, onClose }) {
         </div>
       </td>
     </tr>
+  );
+}
+
+/* ================= flip ledger ================= */
+function LedgerPanel({ ledger, setLedger, byId, calibration, calOn, setCalOn, onSelect }) {
+  const [closing, setClosing] = useState(null); // uid mid-close
+  const [realIn, setRealIn] = useState("");
+
+  const open = ledger.filter((l) => l.status === "open");
+  const closed = ledger.filter((l) => l.status === "closed");
+  const realized = closed.reduce((s, l) => s + (l.realNet || 0), 0);
+  const openCap = open.reduce((s, l) => s + l.qty * l.buyP, 0);
+
+  const close = (uid) => {
+    const n = Math.round(Number(realIn));
+    if (!isFinite(n)) return;
+    setLedger((L) => L.map((l) => (l.uid === uid ? { ...l, status: "closed", realNet: n, closedTs: Date.now() } : l)));
+    setClosing(null); setRealIn("");
+  };
+  const del = (uid) => setLedger((L) => L.filter((l) => l.uid !== uid));
+
+  return (
+    <section className="fd-panel">
+      <h2 className="fd-lab">Your Ledger — {open.length} open · {fmtGp(openCap)} deployed · {fmtGp(realized)} realized</h2>
+      {!ledger.length && (
+        <p className="fd-note">
+          Nothing logged yet. Open an item and hit “✎ log this flip” when you place the offers, then close it out
+          with what you actually made. Once two flips are closed, the desk starts calibrating its estimates to your
+          results — the one thing no spreadsheet of quoted margins can do. Stored in this browser only.
+        </p>
+      )}
+      {!!ledger.length && (
+        <div style={{ overflowX: "auto" }}>
+          <table className="fd-lt">
+            <thead><tr><th>Flip</th><th>Qty</th><th>Buy @</th><th>Sell @</th><th>Predicted</th><th>Mark / realized</th><th>Age</th><th></th></tr></thead>
+            <tbody>
+              {[...ledger].sort((a, b) => b.ts - a.ts).slice(0, 30).map((l) => {
+                const cur = byId.get(l.id);
+                const mark = l.status === "open" && cur ? cur.margin * l.qty : null;
+                return (
+                  <tr key={l.uid} className={l.status === "closed" ? "closedRow" : ""}>
+                    <td>
+                      <button className="fd-linkbtn" onClick={() => onSelect(l.id)}>{l.name}</button>
+                      {l.status === "closed" && <span className="fd-taxfree">closed</span>}
+                    </td>
+                    <td>{fmtQty(l.qty)}</td>
+                    <td>{fmtGp(l.buyP)}</td>
+                    <td>{fmtGp(l.sellP)}</td>
+                    <td>{fmtGp(l.predNet)}</td>
+                    <td>
+                      {l.status === "closed" ? (
+                        <b className={l.realNet >= 0 ? "up" : "dn"}>{fmtGp(l.realNet)}</b>
+                      ) : closing === l.uid ? (
+                        <span style={{ display: "inline-flex", gap: 6 }}>
+                          <input className="fd-in" type="number" placeholder="realized gp"
+                            value={realIn} onChange={(e) => setRealIn(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && close(l.uid)} autoFocus />
+                          <button className="fd-btn" onClick={() => close(l.uid)}>save</button>
+                        </span>
+                      ) : (
+                        <span className={mark != null && mark < l.predNet ? "dn" : "mut"}>
+                          {mark != null ? "mark " + fmtGp(mark) : "–"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="mut">{agoStr((Date.now() - l.ts) / 60000)}</td>
+                    <td>
+                      {l.status === "open" && closing !== l.uid && (
+                        <button className="fd-btn" onClick={() => { setClosing(l.uid); setRealIn(""); }}>close</button>
+                      )}{" "}
+                      <button className="fd-btn" onClick={() => del(l.uid)} title="remove entry">✕</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {(calibration != null || closed.length === 1) && (
+        <div className="fd-calrow">
+          {calibration != null ? (
+            <>
+              <span>Across {closed.length} closed flips you realized ~{Math.round(calibration * 100)}% of predicted profit.</span>
+              <label className="fd-tog">
+                <input type="checkbox" checked={calOn} onChange={(e) => setCalOn(e.target.checked)} />
+                calibrate est. gp/hr to my results
+              </label>
+            </>
+          ) : (
+            <span>Close one more flip and the desk can start calibrating estimates to your results.</span>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
