@@ -28,15 +28,25 @@ const FACILITIES = new Set([
   '', 'Furnace', 'Anvil', 'Cooking range', 'Fire', 'Spinning wheel', 'Loom',
   'Pottery Oven', "Potter's Wheel", 'Dairy churn',
 ]);
-// Outputs whose visualizer data is wrong or disputed. Reported in testing:
-// cannonball smelting is NOT a walk-up furnace job (mould required at minimum;
-// the facility itself is disputed) — off the board until the data is verified.
-// The anvil chainshot/incendiary variants stay: they consume bought cannonballs.
+// Outputs whose data can't be trusted on the board (quest-specific one-offs).
 const EXCLUDE_OUTPUTS = new Set([
-  'Bronze cannonball', 'Iron cannonball', 'Steel cannonball',
-  'Mithril cannonball', 'Adamant cannonball', 'Rune cannonball',
-  'Cannon ball (Between a Rock...)', 'Granite cannonball',
+  'Cannon ball (Between a Rock...)', // golden cannonball, quest mould
 ]);
+// Hand tools the recipe data doesn't list as materials but the job can't start
+// without. Rule-based so whole families get tagged consistently.
+function gearOf(name, skill, facility) {
+  const n = name.toLowerCase();
+  if (skill === 'Smithing' && facility === 'Furnace' && n.includes('cannonball')) return 'Ammo mould';
+  if (skill === 'Crafting' && facility === 'Furnace') {
+    if (/\bring\b/.test(n)) return 'Ring mould';
+    if (n.includes('necklace')) return 'Necklace mould';
+    if (n.includes('amulet')) return 'Amulet mould';
+    if (n.includes('bracelet')) return 'Bracelet mould';
+    if (n.includes('tiara')) return 'Tiara mould';
+    if (n.includes('symbol')) return 'Holy mould';
+  }
+  return null;
+}
 
 const keepName = new Map(); // name -> new index
 const names = [];
@@ -58,14 +68,17 @@ for (const [nodeIdx, variantList] of Object.entries(recipes)) {
       return n ? [idx(n.n), +q || 1] : null;
     });
     if (!mats.length || mats.some((x) => !x)) continue;
-    out.push({
+    const rec = {
       o: idx(outNode.n),
       q: +v.q || 1,
       s: v.s,
       l: +v.l || 1,
       f: v.f || '',
       m: mats,
-    });
+    };
+    const g = gearOf(outNode.n, v.s, v.f || '');
+    if (g) rec.g = g;
+    out.push(rec);
   }
 }
 

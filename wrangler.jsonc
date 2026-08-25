@@ -1,11 +1,13 @@
 {
   "name": "peligaming",
+  "main": "src/worker.mjs",
   "compatibility_date": "2026-08-23",
   "observability": {
     "enabled": true
   },
   "assets": {
     "directory": "public",
+    "binding": "ASSETS",
     "not_found_handling": "404-page"
   },
   "routes": [{ "pattern": "gaming.peliglot.com", "custom_domain": true }]
