@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Naval Pathfinder — OSRS sailing routes between ports, wrecks &amp; shoals</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#0d0a07; --gold:#ffb83f; --yellow:#ffe95c; --parch:#f0e6d2; --dim:#a99a7e;
+    --bevel-hi:#6f5b39; --bevel-lo:#1c150c; --red:#ff6a4d; --teal:#6fd7c8;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{background:var(--bg);color:var(--parch);font-family:"Segoe UI",system-ui,sans-serif;overscroll-behavior:none;}
+  canvas{display:block;touch-action:none;}
+  .panel{background:linear-gradient(#39301fee,#291f13ee);border:2px solid;
+    border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);
+    box-shadow:0 4px 16px rgba(0,0,0,.6);}
+  #hdr{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;gap:10px;align-items:center;
+    padding:7px 10px;background:linear-gradient(#3a3024f2,#2a2217f2);border-bottom:2px solid var(--bevel-lo);
+    box-shadow:inset 0 1px 0 var(--bevel-hi);flex-wrap:wrap;}
+  #hdr h1{font-family:"VT323",monospace;font-weight:400;font-size:24px;color:var(--gold);
+    text-shadow:2px 2px 0 #000;line-height:1;white-space:nowrap;}
+  #hdr .sub{font-family:"VT323",monospace;font-size:13px;color:var(--dim);line-height:1.1;}
+  #stats{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{font-family:"VT323",monospace;font-size:16px;color:var(--yellow);background:#1c150c;
+    border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+    padding:2px 9px;white-space:nowrap;}
+  .chip b{color:var(--gold);font-weight:400;}
+  #panel{position:fixed;top:56px;right:10px;z-index:25;width:274px;max-height:calc(100% - 130px);
+    overflow-y:auto;padding:10px;scrollbar-width:thin;}
+  #panel h2{font-family:"VT323",monospace;font-weight:400;font-size:19px;color:var(--gold);
+    text-shadow:1px 1px 0 #000;margin:10px 0 5px;border-bottom:1px solid var(--bevel-hi);padding-bottom:2px;}
+  #panel h2:first-child{margin-top:0;}
+  .frow{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+  .frow label{font-family:"VT323",monospace;font-size:16px;color:var(--dim);width:44px;}
+  .pick{position:relative;flex:1;}
+  .pick input{width:100%;font-family:"VT323",monospace;font-size:16px;color:var(--yellow);
+    background:#1c150c;border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+    padding:4px 7px;outline:none;}
+  .pick input::placeholder{color:#7a6c52;}
+  .drop{position:absolute;top:100%;left:0;right:0;z-index:40;max-height:230px;overflow-y:auto;display:none;
+    background:#1c150cfa;border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);}
+  .drop div{font-family:"VT323",monospace;font-size:15px;padding:3px 8px;cursor:pointer;color:var(--parch);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .drop div:hover{background:#39301f;color:var(--yellow);}
+  .drop div small{color:var(--dim);font-size:12px;}
+  .drop .grp{color:var(--gold);background:#241c10;cursor:default;font-size:13px;letter-spacing:1px;}
+  #swapBtn{background:#1c150c;color:var(--gold);border:2px solid;cursor:pointer;font-size:13px;
+    border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:3px 7px;font-family:"VT323",monospace;}
+  .ck{display:flex;gap:7px;align-items:flex-start;margin:4px 0;font-size:12.5px;line-height:1.3;cursor:pointer;color:var(--parch);}
+  .ck input{accent-color:var(--gold);margin-top:2px;}
+  .ck small{color:var(--dim);display:block;font-size:11px;}
+  .ck .lvl{font-family:"VT323",monospace;color:var(--teal);font-size:13px;}
+  select{font-family:"VT323",monospace;font-size:15px;color:var(--yellow);background:#1c150c;width:100%;
+    border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);padding:4px;}
+  .sliderbox{margin:6px 0 2px;}
+  .sliderbox .ends{display:flex;justify-content:space-between;font-family:"VT323",monospace;font-size:14px;color:var(--dim);}
+  input[type=range]{width:100%;accent-color:var(--gold);}
+  .lgd{font-size:11.5px;line-height:1.7;color:var(--dim);}
+  .sw{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border:1px solid #0008;}
+  #log{position:fixed;left:10px;bottom:34px;z-index:24;width:300px;max-height:44vh;overflow-y:auto;
+    padding:10px;display:none;scrollbar-width:thin;}
+  #log h2{font-family:"VT323",monospace;font-weight:400;font-size:20px;color:var(--gold);text-shadow:1px 1px 0 #000;
+    margin-bottom:2px;}
+  #log .sub2{font-family:"VT323",monospace;font-size:14px;color:var(--dim);margin-bottom:7px;}
+  #log ol{list-style:none;}
+  #log li{font-family:"VT323",monospace;font-size:16px;color:var(--parch);padding:2px 0 2px 26px;position:relative;line-height:1.25;}
+  #log li b{color:var(--yellow);font-weight:400;}
+  #log li em{color:var(--dim);font-style:normal;font-size:14px;}
+  #log li .n{position:absolute;left:0;top:2px;color:var(--gold);}
+  #log .tot{border-top:1px solid var(--bevel-hi);margin-top:7px;padding-top:6px;font-family:"VT323",monospace;
+    font-size:16px;color:var(--gold);}
+  #log .warnbox{font-family:"VT323",monospace;font-size:15px;color:var(--red);line-height:1.3;margin-top:5px;}
+  #log .btns{display:flex;gap:6px;margin-top:7px;}
+  #log .btns button{flex:1;font-family:"VT323",monospace;font-size:14px;background:#1c150c;color:var(--parch);
+    border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:4px;cursor:pointer;}
+  #log .btns button:hover{color:var(--yellow);}
+  #hint{position:fixed;left:50%;transform:translateX(-50%);bottom:6px;z-index:22;font-family:"VT323",monospace;
+    font-size:14px;color:var(--dim);background:#0d0a07cc;padding:2px 12px;border-radius:10px;white-space:nowrap;
+    max-width:96vw;overflow:hidden;text-overflow:ellipsis;}
+  #hint b{color:var(--gold);font-weight:400;}
+  #compass{position:fixed;right:300px;bottom:34px;z-index:21;width:92px;height:92px;pointer-events:none;
+    filter:drop-shadow(2px 2px 2px #000);}
+  #tooltip{position:fixed;z-index:50;display:none;pointer-events:none;background:#1c150cf2;
+    border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);
+    padding:6px 9px;max-width:250px;font-family:"VT323",monospace;font-size:15px;color:var(--parch);line-height:1.25;}
+  #tooltip .t{color:var(--gold);font-size:17px;}
+  #tooltip .d{color:var(--dim);font-size:13px;}
+  #loading{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;
+    gap:14px;align-items:center;justify-content:center;transition:opacity .5s;}
+  #loading .t{font-family:"VT323",monospace;font-size:30px;color:var(--gold);text-shadow:2px 2px 0 #000;}
+  #loading .s{font-family:"VT323",monospace;font-size:16px;color:var(--dim);}
+  #loading .bar{width:230px;height:6px;background:#1c150c;border:1px solid var(--bevel-hi);}
+  #loading .bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .3s;}
+  #panelToggle,#logToggle{display:none;position:fixed;z-index:26;font-family:"VT323",monospace;font-size:16px;
+    background:#291f13ee;color:var(--gold);border:2px solid;padding:5px 10px;
+    border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);}
+  #panelToggle{top:58px;right:10px;}
+  #logToggle{bottom:34px;left:10px;}
+  #attrib{position:fixed;left:0;right:0;bottom:0;z-index:20;text-align:center;font-size:10px;color:#7a6c52;
+    background:#0d0a07d9;padding:2px 8px;}
+  #attrib a{color:#a99a7e;}
+  @media (max-width:820px){
+    #panel{display:none;}
+    #panel.open{display:block;left:10px;right:10px;width:auto;top:auto;bottom:74px;max-height:56vh;}
+    #panelToggle{display:block;}
+    #log{display:none!important;}
+    #log.open{display:block!important;left:10px;right:10px;width:auto;bottom:74px;max-height:56vh;z-index:27;}
+    #logToggle{display:block;}
+    #hdr h1{font-size:19px;} #hdr .sub{display:none;}
+    #compass{width:64px;height:64px;bottom:70px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="t">Naval Pathfinder</div><div class="bar"><i id="ldbar"></i></div>
+  <div class="s" id="ldmsg">Unrolling sea charts…</div></div>
+
+<div id="hdr">
+  <h1>⚓ Naval Pathfinder</h1>
+  <div class="sub">Gielinor sea routes — ports, wrecks &amp; shoals<br>around krakens and worse</div>
+  <div id="stats"></div>
+</div>
+
+<button id="panelToggle">⚙ Voyage</button>
+<button id="logToggle">📜 Directions</button>
+
+<div id="panel" class="panel">
+  <h2>Voyage</h2>
+  <div class="frow"><label>From</label><div class="pick"><input id="fromIn" placeholder="port, wreck, sea…" autocomplete="off"><div class="drop" id="fromDrop"></div></div></div>
+  <div class="frow"><label>To</label><div class="pick"><input id="toIn" placeholder="destination…" autocomplete="off"><div class="drop" id="toDrop"></div></div>
+    <button id="swapBtn" title="Swap">⇅</button></div>
+
+  <h2>Your ship</h2>
+  <div class="frow"><label style="width:auto">Hull</label><select id="hullSel"></select></div>
+  <div id="facilities"></div>
+
+  <h2>Course plotting</h2>
+  <div class="sliderbox">
+    <div class="ends"><span>fewest turns</span><span>fastest</span></div>
+    <input type="range" id="lambda" min="0" max="100" value="55">
+  </div>
+  <label class="ck"><input type="checkbox" id="avoidMon" checked>Steer clear of sea monsters<small>krakens, sharks &amp; friends get a wide berth</small></label>
+  <label class="ck"><input type="checkbox" id="avoidReef" checked>Avoid jagged reefs<small>uncheck to brave hull damage at Crandor &amp; Aehecatl</small></label>
+
+  <h2>Chart layers</h2>
+  <div id="layers"></div>
+  <label class="ck"><input type="checkbox" id="hazOverlay" checked>Tint hazardous waters</label>
+  <div class="lgd" id="legend"></div>
+</div>
+
+<div id="log" class="panel">
+  <h2>📜 Sailing Directions</h2>
+  <div class="sub2" id="logRoute"></div>
+  <ol id="legList"></ol>
+  <div class="tot" id="logTotals"></div>
+  <div class="warnbox" id="logWarn"></div>
+  <div class="btns"><button id="copyLink">⚓ Copy route link</button><button id="clearRoute">✕ Clear</button></div>
+</div>
+
+<canvas id="compass" width="184" height="184"></canvas>
+<div id="tooltip"></div>
+<div id="hint"><b>drag</b> orbit · <b>wheel</b> zoom · <b>right-drag</b> pan · <b>click</b> set destination · <b>shift-click</b> set start</div>
+<div id="attrib">Fan-made planner. Map imagery &amp; data from the <a href="https://oldschool.runescape.wiki" target="_blank" rel="noopener">OSRS Wiki</a> (CC BY-NC-SA). RuneScape © Jagex. Times are estimates.</div>
+
+<script>
+'use strict';
+// ============================================================ data loading
+const ld = (p, m) => { document.getElementById('ldbar').style.width = p + '%'; document.getElementById('ldmsg').textContent = m; };
+
+const NAV = {};           // naval.json content
+let CLS = null;           // Uint8Array cell classes, [cy*CW+cx], cy 0 = south
+let CW = 0, CH = 0, CELL = 4, WLD = null;
+
+async function loadData() {
+  ld(5, 'Unrolling sea charts…');
+  const nav = await (await fetch('data/naval/naval.json')).json();
+  Object.assign(NAV, nav);
+  WLD = nav.world; CELL = nav.cell; CW = nav.grid.w; CH = nav.grid.h;
+  ld(20, 'Reading the naval grid…');
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = 'data/naval/navcells.png'; });
+  const c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const d = ctx.getImageData(0, 0, CW, CH).data;
+  CLS = new Uint8Array(CW * CH);
+  for (let py = 0; py < CH; py++)
+    for (let px = 0; px < CW; px++)
+      CLS[(CH - 1 - py) * CW + px] = d[(py * CW + px) * 4];
+  ld(35, 'Stretching the canvas…');
+}
+
+// ============================================================ world helpers
+const cellIx = (cx, cy) => cy * CW + cx;
+const tileToCell = (x, y) => [Math.floor((x - WLD.x0) / CELL), Math.floor((y - WLD.y0) / CELL)];
+const cellCenterTile = i => [WLD.x0 + (i % CW) * CELL + CELL / 2, WLD.y0 + ((i / CW) | 0) * CELL + CELL / 2];
+// scene: 1 unit = 1 game tile, x east, z south (north = -z), centred on world centre
+const WCX = () => (WLD.x0 + WLD.x1) / 2, WCY = () => (WLD.y0 + WLD.y1) / 2;
+const tileToScene = (x, y) => [x - WCX(), -(y - WCY())];
+const sceneToTile = (sx, sz) => [sx + WCX(), WCY() - sz];
+
+// class indices from naval.json legend
+let CI = {};
+const gearHazKeys = () => Object.entries(NAV.hazards).filter(([k, h]) => h.mode === 'gear').map(([k]) => k);
+
+// ============================================================ ship state
+const ship = {
+  hull: 1,                 // index into NAV.hulls
+  fac: {},                 // hazard key -> bool (has the protective fitting)
+  lambda: 0.55,
+  avoidMon: true,
+  avoidReef: true,
+};
+
+// ============================================================ pathfinder
+// 16 grid-aligned winds: 8 unit steps + 8 knight-move half-winds.
+const DIRS = [
+  [0, 1], [1, 2], [1, 1], [2, 1], [1, 0], [2, -1], [1, -1], [1, -2],
+  [0, -1], [-1, -2], [-1, -1], [-2, -1], [-1, 0], [-2, 1], [-1, 1], [-1, 2],
+]; // clockwise from N (dy = +north)
+const DIRNAME = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+const DIRLEN = DIRS.map(([dx, dy]) => Math.hypot(dx, dy));
+const DIRANG = DIRS.map(([dx, dy]) => Math.atan2(dx, dy)); // radians clockwise from north
+// cells swept by a knight step (both must be passable so we can't clip land)
+const SWEPT = DIRS.map(([dx, dy]) => {
+  if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return [];
+  return Math.abs(dx) === 2
+    ? [[Math.sign(dx), 0], [Math.sign(dx), Math.sign(dy)]]
+    : [[0, Math.sign(dy)], [Math.sign(dx), Math.sign(dy)]];
+});
+
+let monsterPenalty = null; // Float32Array per cell, ticks of soft penalty
+function buildMonsterPenalty() {
+  monsterPenalty = new Float32Array(CW * CH);
+  for (const m of NAV.monsters || [])
+    for (const p of m.points) {
+      const R = Math.ceil((m.radius || 28) / CELL);
+      const [mcx, mcy] = tileToCell(p.x, p.y);
+      for (let dy = -R; dy <= R; dy++)
+        for (let dx = -R; dx <= R; dx++) {
+          const cx = mcx + dx, cy = mcy + dy;
+          if (cx < 0 || cx >= CW || cy < 0 || cy >= CH) continue;
+          const d = Math.hypot(dx, dy);
+          if (d > R) continue;
+          const i = cellIx(cx, cy);
+          monsterPenalty[i] = Math.max(monsterPenalty[i], 6 * (1 - d / R)); // up to +6 ticks per step
+        }
+    }
+}
+
+// passability under current loadout; returns 0 blocked, else 1
+function passable(cls) {
+  if (cls === 0) return 0;
+  const key = NAV.classes[cls];
+  if (key === 'open') return 1;
+  const h = NAV.hazards[key];
+  if (!h) return 1;
+  if (h.mode === 'wall') return 0;
+  if (h.mode === 'penalty') return 1;             // jagged reefs: soft
+  return ship.fac[key] ? 1 : 0;                    // gear-gated
+}
+
+function findRoute(fromTile, toTile) {
+  const speed = NAV.hulls[ship.hull].speed;        // tiles per tick
+  // turn penalty in ticks; the small floor breaks ties between the countless
+  // equal-time staircase paths, keeping "fastest" routes sane
+  const lambda = 0.6 + ship.lambda * 60;
+  const reefPen = ship.avoidReef ? 9 : 0.5;        // ticks per step through reefs
+  const start = snapCell(fromTile), goal = snapCell(toTile);
+  if (start < 0 || goal < 0) return { fail: null }; // caller diagnoses missing fittings
+
+  const gx = goal % CW, gy = (goal / CW) | 0;
+
+  const N = CW * CH * 16;
+  const g = new Float32Array(N).fill(Infinity);
+  const parent = new Int32Array(N).fill(-1);
+  // binary heap of [f, state]
+  const hf = [], hs = [];
+  const push = (f, s) => {
+    let i = hf.length; hf.push(f); hs.push(s);
+    while (i > 0) { const p = (i - 1) >> 1; if (hf[p] <= hf[i]) break;
+      [hf[p], hf[i]] = [hf[i], hf[p]]; [hs[p], hs[i]] = [hs[i], hs[p]]; i = p; }
+  };
+  const pop = () => {
+    const f = hf[0], s = hs[0], lf = hf.pop(), ls = hs.pop();
+    if (hf.length) { hf[0] = lf; hs[0] = ls;
+      let i = 0; for (;;) { const a = 2 * i + 1, b = a + 1; let m = i;
+        if (a < hf.length && hf[a] < hf[m]) m = a;
+        if (b < hf.length && hf[b] < hf[m]) m = b;
+        if (m === i) break; [hf[m], hf[i]] = [hf[i], hf[m]]; [hs[m], hs[i]] = [hs[i], hs[m]]; i = m; } }
+    return [f, s];
+  };
+  const heur = (cx, cy) => Math.hypot(cx - gx, cy - gy) * CELL / speed;
+
+  const scx = start % CW, scy = (start / CW) | 0;
+  for (let d = 0; d < 16; d++) { const s = start * 16 + d; g[s] = 0; push(heur(scx, scy), s); }
+
+  let found = -1, iter = 0;
+  while (hf.length) {
+    const [f, s] = pop();
+    const cell = (s / 16) | 0, dir = s % 16;
+    if (f > g[s] + heur(cell % CW, (cell / CW) | 0) + 1e-6) continue; // stale heap entry
+    if (cell === goal) { found = s; break; }
+    if (++iter > 8e6) return { fail: 'The route is too tangled to chart.' };
+    const cx = cell % CW, cy = (cell / CW) | 0;
+    const g0 = g[s];
+    for (let nd = 0; nd < 16; nd++) {
+      const nx = cx + DIRS[nd][0], ny = cy + DIRS[nd][1];
+      if (nx < 0 || nx >= CW || ny < 0 || ny >= CH) continue;
+      const ncell = cellIx(nx, ny);
+      const ncls = CLS[ncell];
+      if (!passable(ncls)) continue;
+      let blockedSweep = false;
+      for (const [ox, oy] of SWEPT[nd]) {
+        const sx = cx + ox, sy = cy + oy;
+        if (sx < 0 || sx >= CW || sy < 0 || sy >= CH || !passable(CLS[cellIx(sx, sy)])) { blockedSweep = true; break; }
+      }
+      if (blockedSweep) continue;
+      let cost = DIRLEN[nd] * CELL / speed;
+      // turning cost: part fixed per heading change (each one is a click and a
+      // moment of attention), part scaled by how sharp the turn is
+      let dd = Math.abs(nd - dir); if (dd > 8) dd = 16 - dd;
+      if (dd) cost += lambda * (0.55 + 0.45 * (dd * 22.5) / 45);
+      if (NAV.classes[ncls] === 'reefs') cost += reefPen * DIRLEN[nd];
+      if (ship.avoidMon && monsterPenalty) cost += monsterPenalty[ncell] * DIRLEN[nd];
+      const ns = ncell * 16 + nd;
+      if (g0 + cost < g[ns] - 1e-9) {
+        g[ns] = g0 + cost; parent[ns] = s;
+        push(g[ns] + heur(nx, ny), ns);
+      }
+    }
+  }
+  if (found < 0) return { fail: null }; // caller diagnoses which fitting is missing
+
+  // reconstruct
+  const cells = [];
+  for (let s = found; s >= 0; s = parent[s]) cells.push((s / 16) | 0);
+  cells.reverse();
+  // legs: merge consecutive identical direction steps
+  const legs = [];
+  for (let i = 1; i < cells.length; i++) {
+    const dx = cells[i] % CW - cells[i - 1] % CW, dy = ((cells[i] / CW) | 0) - ((cells[i - 1] / CW) | 0);
+    const nd = DIRS.findIndex(v => v[0] === dx && v[1] === dy);
+    const tiles = Math.hypot(dx, dy) * CELL;
+    if (legs.length && legs[legs.length - 1].dir === nd) {
+      legs[legs.length - 1].tiles += tiles; legs[legs.length - 1].end = cells[i];
+    } else legs.push({ dir: nd, tiles, start: cells[i - 1], end: cells[i] });
+  }
+  let dist = 0; for (const l of legs) dist += l.tiles;
+  const TURN_TICKS = 2; // rough cost of clicking a new heading and settling on it
+  const ticks = dist / speed + Math.max(0, legs.length - 1) * TURN_TICKS;
+  return { cells, legs, dist: Math.round(dist), turns: Math.max(0, legs.length - 1), secs: ticks * 0.6 };
+}
+
+function snapCell(tile, R = 16) {
+  const [cx, cy] = tileToCell(tile[0], tile[1]);
+  let best = -1, bd = Infinity;
+  for (let dy = -R; dy <= R; dy++)
+    for (let dx = -R; dx <= R; dx++) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || nx >= CW || ny < 0 || ny >= CH) continue;
+      if (!passable(CLS[cellIx(nx, ny)])) continue;
+      const d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = cellIx(nx, ny); }
+    }
+  return best;
+}
+
+// which fittings would open a route? Start from everything unlocked, then
+// greedily drop fittings the route can do without, so the answer is the
+// minimal set (Weiss needs the brazier, not every hazard near the ideal line)
+function diagnoseRoute(fromTile, toTile) {
+  const saved = { ...ship.fac };
+  const keys = gearHazKeys();
+  const withSet = set => {
+    for (const k of keys) ship.fac[k] = set.has(k);
+    const r = findRoute(fromTile, toTile);
+    return r.cells ? r : null;
+  };
+  let r = withSet(new Set(keys));
+  let needed = null;
+  if (r) {
+    needed = new Set();
+    for (const c of r.cells) {
+      const key = NAV.classes[CLS[c]];
+      if (NAV.hazards[key]?.mode === 'gear' && !saved[key]) needed.add(key);
+    }
+    for (const k of [...needed]) {
+      const trial = new Set(needed); trial.delete(k);
+      if (withSet(new Set([...trial, ...keys.filter(x => saved[x])]))) needed = trial;
+    }
+  }
+  ship.fac = saved;
+  return needed ? [...needed] : null;
+}
+
+function nearestSeaName(x, y, maxD = 110) {
+  let best = null, bd = maxD * maxD;
+  for (const s of NAV.seas) {
+    const d = (s.x - x) ** 2 + (s.y - y) ** 2;
+    if (d < bd) { bd = d; best = s.name; }
+  }
+  return best;
+}
+
+// ============================================================ three.js scene
+let renderer, scene, camera, seaMesh, overlayMesh, routeGroup, markerGroup, labelGroup, raycaster;
+const cam = { theta: Math.PI * 1.5, phi: 0.72, dist: 1500, target: new THREE.Vector3(0, 0, 0) };
+const CAM_MIN = 60, CAM_MAX = 3400;
+
+function applyCam() {
+  const sp = Math.sin(cam.phi), cp = Math.cos(cam.phi);
+  camera.position.set(
+    cam.target.x + cam.dist * sp * Math.cos(cam.theta),
+    cam.target.y + cam.dist * cp,
+    cam.target.z + cam.dist * sp * Math.sin(cam.theta));
+  camera.lookAt(cam.target);
+  drawCompass();
+  updateLabelVisibility();
+}
+
+async function buildScene() {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  document.body.appendChild(renderer.domElement);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d0a07);
+  scene.fog = new THREE.Fog(0x0d0a07, 2600, 5200);
+  camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 2, 12000);
+  raycaster = new THREE.Raycaster();
+
+  ld(45, 'Painting Gielinor’s seas…');
+  const texImg = new Image();
+  await new Promise((res, rej) => { texImg.onload = res; texImg.onerror = rej; texImg.src = 'data/naval/map.jpg'; });
+  const maxTex = renderer.capabilities.maxTextureSize;
+  let source = texImg;
+  if (texImg.width > maxTex) {
+    const sc = maxTex / texImg.width;
+    const c = document.createElement('canvas');
+    c.width = Math.floor(texImg.width * sc); c.height = Math.floor(texImg.height * sc);
+    c.getContext('2d').drawImage(texImg, 0, 0, c.width, c.height);
+    source = c;
+  }
+  const tex = new THREE.CanvasTexture(source instanceof HTMLCanvasElement ? source : (() => {
+    const c = document.createElement('canvas'); c.width = texImg.width; c.height = texImg.height;
+    c.getContext('2d').drawImage(texImg, 0, 0); return c;
+  })());
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+
+  const WW = WLD.x1 - WLD.x0, WH = WLD.y1 - WLD.y0;
+  seaMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(WW, WH),
+    new THREE.MeshBasicMaterial({ map: tex }));
+  seaMesh.rotation.x = -Math.PI / 2;
+  scene.add(seaMesh);
+
+  // table edge — a dark bevel around the chart, so it reads as an object
+  const edge = new THREE.Mesh(
+    new THREE.BoxGeometry(WW + 60, 26, WH + 60),
+    new THREE.MeshBasicMaterial({ color: 0x1c150c }));
+  edge.position.y = -14;
+  scene.add(edge);
+
+  overlayMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(WW, WH),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 1, depthWrite: false }));
+  overlayMesh.rotation.x = -Math.PI / 2;
+  overlayMesh.position.y = 1.5;
+  scene.add(overlayMesh);
+  rebuildOverlay();
+
+  routeGroup = new THREE.Group(); scene.add(routeGroup);
+  markerGroup = new THREE.Group(); scene.add(markerGroup);
+  labelGroup = new THREE.Group(); scene.add(labelGroup);
+
+  ld(70, 'Placing ports and wrecks…');
+  buildMarkers();
+  buildSeaLabels();
+
+  const ps = NAV.ports.find(p => p.name === 'Port Sarim') || NAV.ports[0];
+  const [sx, sz] = tileToScene(ps.x, ps.y);
+  cam.target.set(sx, 0, sz);
+  applyCam();
+  animate();
+}
+
+// hazard overlay canvas: static hazard tints + red for waters your ship can't take
+const HAZTINT = {
+  stormy: [140, 150, 255], reefs: [255, 140, 40], fetid: [150, 255, 90], crystal: [80, 230, 255],
+  kelp: [40, 200, 90], icy: [230, 245, 255], cold: [160, 200, 255], sunbaked: [255, 210, 60],
+  profane: [230, 90, 230], scalding: [255, 90, 30], cursed: [200, 40, 110],
+};
+function rebuildOverlay() {
+  const on = document.getElementById('hazOverlay').checked;
+  const c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const ctx = c.getContext('2d');
+  const im = ctx.createImageData(CW, CH);
+  for (let cy = 0; cy < CH; cy++)
+    for (let cx = 0; cx < CW; cx++) {
+      const cls = CLS[cellIx(cx, cy)];
+      const o = ((CH - 1 - cy) * CW + cx) * 4;
+      if (!cls) continue;
+      const key = NAV.classes[cls];
+      if (key === 'open') continue;
+      const t = HAZTINT[key]; if (!t) continue;
+      // red veil only for waters a fitting would open but this ship lacks;
+      // the forever-impassable oceans keep their own lore tint
+      const h = NAV.hazards[key];
+      const locked = h && h.mode === 'gear' && !ship.fac[key];
+      if (!on && !locked) continue;
+      im.data[o] = locked ? 210 : t[0];
+      im.data[o + 1] = locked ? 40 : t[1];
+      im.data[o + 2] = locked ? 30 : t[2];
+      im.data[o + 3] = locked ? 62 : 42;
+    }
+  ctx.putImageData(im, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.LinearFilter;
+  overlayMesh.material.map = tex;
+  overlayMesh.material.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------- markers
+function spriteTexture(draw, w = 64, h = 64) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.minFilter = THREE.LinearFilter;
+  return t;
+}
+function glyphTex(glyph, color, ring) {
+  return spriteTexture((ctx, w, h) => {
+    ctx.translate(w / 2, h / 2);
+    if (ring) {
+      ctx.beginPath(); ctx.arc(0, 0, 26, 0, 7);
+      ctx.fillStyle = '#1c150cd9'; ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = color; ctx.stroke();
+    }
+    ctx.font = '34px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = color; ctx.fillText(glyph, 0, 2);
+  });
+}
+const LAYERS = [
+  { key: 'ports', name: 'Ports & moorings', glyph: '⚓', color: '#ffb83f', on: true },
+  { key: 'wrecks', name: 'Shipwrecks', glyph: '🏴', color: '#d9d9d9', on: true },
+  { key: 'charting', name: 'Charting tasks', glyph: '✦', color: '#6fd7c8', on: false },
+  { key: 'shoals', name: 'Trawling shoals', glyph: '🐟', color: '#7fb2ff', on: false },
+  { key: 'monsters', name: 'Sea monsters', glyph: '🐙', color: '#ff6a4d', on: true },
+];
+const markerSets = {};   // key -> {group, items:[{x,y,label,desc,sprite}]}
+let pickables = [];
+
+function buildMarkers() {
+  const mk = (key, items, scale) => {
+    const tex = glyphTex(LAYERS.find(l => l.key === key).glyph, LAYERS.find(l => l.key === key).color, true);
+    const grp = new THREE.Group();
+    const list = [];
+    for (const it of items) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: true }));
+      const [sx, sz] = tileToScene(it.x, it.y);
+      sp.position.set(sx, 9, sz);
+      sp.scale.set(scale, scale, 1);
+      sp.userData = { ...it, layer: key };
+      grp.add(sp); list.push(sp);
+    }
+    grp.visible = LAYERS.find(l => l.key === key).on;
+    markerGroup.add(grp);
+    markerSets[key] = { group: grp, sprites: list };
+  };
+  mk('ports', NAV.ports.map(p => ({
+    x: p.x, y: p.y, label: p.name,
+    desc: `Sailing ${p.level}${p.req ? ' · ' + p.req : ''}${p.facilities ? '\n' + ['shipwright', 'notice board', 'salvaging', 'ledger', 'crew registrar', 'bank'].filter((f, i) => Object.values(p.facilities)[i]).join(' · ') : ''}`,
+    poi: { kind: 'port', name: p.name },
+  })), 26);
+  mk('wrecks', NAV.wrecks.flatMap(g => g.points.map(pt => ({
+    x: pt.x, y: pt.y, label: `${g.type[0].toUpperCase() + g.type.slice(1)} shipwreck`,
+    desc: g.level ? `Sailing ${g.level} to salvage` : 'Salvage site',
+    poi: { kind: 'wreck', name: `${g.type} wreck (${pt.x},${pt.y})` },
+  }))), 17);
+  mk('charting', NAV.charting.map(t => ({
+    x: t.x, y: t.y, label: `Charting · ${t.sea || t.ocean || ''}`,
+    desc: `${t.task}${t.level ? `\nSailing ${t.level}` : ''}${t.hazard ? ' · ' + t.hazard : ''}`,
+    poi: { kind: 'chart', name: `Charting (${t.x},${t.y})` },
+  })), 13);
+  mk('shoals', NAV.shoals.flatMap(s => s.points.map(pt => ({
+    x: pt.x, y: pt.y, label: s.name[0].toUpperCase() + s.name.slice(1),
+    desc: `${s.level ? 'Fishing ' + s.level : 'Trawling'}${pt.approx ? ' · roams this sea' : ''}`,
+    poi: { kind: 'shoal', name: `${s.name} (${pt.x},${pt.y})` },
+  }))), 17);
+  mk('monsters', NAV.monsters.flatMap(m => m.points.map(pt => ({
+    x: pt.x, y: pt.y, label: m.name,
+    desc: `${m.combat ? 'Combat ' + m.combat + ' · ' : ''}bounty target — hunted from this sea`,
+    poi: { kind: 'monster', name: `${m.name} (${pt.x},${pt.y})` },
+  }))), 22);
+  refreshPickables();
+}
+function refreshPickables() {
+  pickables = [];
+  for (const k in markerSets) if (markerSets[k].group.visible) pickables.push(...markerSets[k].sprites);
+}
+
+// sea name labels, VT323, visible when zoomed in
+function textSprite(text, px, color) {
+  const pad = 8;
+  const c = document.createElement('canvas');
+  const m = c.getContext('2d');
+  m.font = `${px}px VT323, monospace`;
+  c.width = Math.ceil(m.measureText(text).width) + pad * 2; c.height = px + pad * 2;
+  const ctx = c.getContext('2d');
+  ctx.font = `${px}px VT323, monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+  ctx.fillStyle = color;
+  ctx.fillText(text, c.width / 2, c.height / 2);
+  const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+  sp.scale.set(c.width / 2.4, c.height / 2.4, 1);
+  return sp;
+}
+function buildSeaLabels() {
+  for (const s of NAV.seas) {
+    const sp = textSprite(s.name, 26, '#f0e6d2cc');
+    const [sx, sz] = tileToScene(s.x, s.y);
+    sp.position.set(sx, 14, sz);
+    labelGroup.add(sp);
+  }
+}
+function updateLabelVisibility() {
+  if (labelGroup) labelGroup.visible = cam.dist < 1250;
+}
+
+// ---------------------------------------------------------------- route drawing
+let endpointMarkers = [];
+function drawRoute(route) {
+  routeGroup.clear();
+  for (const m of endpointMarkers) routeGroup.remove(m);
+  endpointMarkers = [];
+  if (!route || !route.cells) return;
+  const pts = route.cells.map(c => {
+    const [x, y] = cellCenterTile(c);
+    const [sx, sz] = tileToScene(x, y);
+    return new THREE.Vector3(sx, 3.5, sz);
+  });
+  // ribbon along the path
+  const wHalf = 3.2;
+  const verts = [], idx = [];
+  for (let i = 0; i < pts.length; i++) {
+    const dir = new THREE.Vector3();
+    if (i === 0) dir.subVectors(pts[1], pts[0]);
+    else if (i === pts.length - 1) dir.subVectors(pts[i], pts[i - 1]);
+    else dir.subVectors(pts[i + 1], pts[i - 1]);
+    dir.y = 0; dir.normalize();
+    const n = new THREE.Vector3(-dir.z, 0, dir.x);
+    verts.push(pts[i].x + n.x * wHalf, 3.5, pts[i].z + n.z * wHalf,
+               pts[i].x - n.x * wHalf, 3.5, pts[i].z - n.z * wHalf);
+    if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  const ribbon = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color: 0xffd24d, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
+  routeGroup.add(ribbon);
+  // waypoint flags at each turn
+  const flagGeo = new THREE.ConeGeometry(6, 16, 4);
+  const flagMat = new THREE.MeshBasicMaterial({ color: 0xffb83f });
+  const poleMat = new THREE.MeshBasicMaterial({ color: 0x6f5b39 });
+  let acc = 0;
+  for (let li = 0; li < route.legs.length - 1; li++) {
+    acc += route.legs[li].tiles;
+    const [x, y] = cellCenterTile(route.legs[li].end);
+    const [sx, sz] = tileToScene(x, y);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 26), poleMat);
+    pole.position.set(sx, 13, sz);
+    const flag = new THREE.Mesh(flagGeo, flagMat);
+    flag.position.set(sx, 30, sz);
+    routeGroup.add(pole, flag);
+  }
+  // start / end beacons
+  const mkBeacon = (cell, color) => {
+    const [x, y] = cellCenterTile(cell);
+    const [sx, sz] = tileToScene(x, y);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(11, 2.2, 8, 28),
+      new THREE.MeshBasicMaterial({ color }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(sx, 3.5, sz);
+    routeGroup.add(ring);
+  };
+  mkBeacon(route.cells[0], 0x6fd7c8);
+  mkBeacon(route.cells[route.cells.length - 1], 0xff6a4d);
+}
+
+// ============================================================ compass rose
+function drawCompass() {
+  const c = document.getElementById('compass');
+  const ctx = c.getContext('2d');
+  const S = c.width, R = S / 2 - 8;
+  ctx.clearRect(0, 0, S, S);
+  ctx.save(); ctx.translate(S / 2, S / 2);
+  // scene: camera theta rotates the world; north on screen = direction of -z projected.
+  const rot = -(cam.theta + Math.PI / 2);
+  ctx.rotate(rot);
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, 7);
+  ctx.fillStyle = '#1c150cd0'; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = '#6f5b39'; ctx.stroke();
+  for (let i = 0; i < 16; i++) {
+    const a = i * Math.PI / 8;
+    const len = i % 4 === 0 ? R - 10 : i % 2 === 0 ? R - 22 : R - 30;
+    ctx.beginPath();
+    ctx.moveTo(Math.sin(a) * (R - 40) * (i % 4 === 0 ? 0 : 0.75), -Math.cos(a) * (R - 40) * (i % 4 === 0 ? 0 : 0.75));
+    ctx.lineTo(Math.sin(a) * len, -Math.cos(a) * len);
+    ctx.lineWidth = i % 4 === 0 ? 3 : 1.4;
+    ctx.strokeStyle = i === 0 ? '#ff6a4d' : i % 4 === 0 ? '#ffb83f' : '#a99a7e';
+    ctx.stroke();
+  }
+  ctx.font = '26px VT323, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const [i, n] of [[0, 'N'], [4, 'E'], [8, 'S'], [12, 'W']]) {
+    const a = i * Math.PI / 8;
+    ctx.save();
+    ctx.translate(Math.sin(a) * (R + 0) * 0.72, -Math.cos(a) * (R + 0) * 0.72);
+    ctx.rotate(-rot);
+    ctx.fillStyle = i === 0 ? '#ff6a4d' : '#f0e6d2';
+    ctx.fillText(n, 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// ============================================================ interaction
+let dragging = false, panning = false, moved = 0, lastX = 0, lastY = 0, downAt = 0;
+function setupInput() {
+  const el = renderer.domElement;
+  el.addEventListener('pointerdown', e => {
+    dragging = true; panning = e.button === 2 || e.ctrlKey; moved = 0;
+    lastX = e.clientX; lastY = e.clientY; downAt = Date.now();
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', e => {
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    if (dragging) {
+      moved += Math.abs(dx) + Math.abs(dy);
+      if (panning) {
+        const k = cam.dist / innerHeight * 1.35;
+        const fx = Math.cos(cam.theta), fz = Math.sin(cam.theta);
+        cam.target.x += (-dy * fx + dx * fz) * -k * Math.cos(cam.phi) - (dx * fx + dy * fz) * 0; // radial
+        // pan in the ground plane relative to view
+        const rightX = -Math.sin(cam.theta), rightZ = Math.cos(cam.theta);
+        cam.target.x -= (dx * rightX) * k - 0; cam.target.z -= (dx * rightZ) * k;
+        cam.target.x += 0; // forward component
+        const fwdX = -Math.cos(cam.theta), fwdZ = -Math.sin(cam.theta);
+        cam.target.x -= dy * fwdX * k; cam.target.z -= dy * fwdZ * k;
+        clampTarget();
+      } else {
+        cam.theta += dx * 0.0052;
+        cam.phi = Math.min(Math.max(cam.phi - dy * 0.0052, 0.18), 1.32);
+      }
+      applyCam();
+    } else hover(e);
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  el.addEventListener('pointerup', e => {
+    dragging = false;
+    if (moved < 6 && Date.now() - downAt < 450 && e.button !== 2) pick(e);
+  });
+  el.addEventListener('contextmenu', e => e.preventDefault());
+  el.addEventListener('wheel', e => {
+    e.preventDefault();
+    cam.dist = Math.min(CAM_MAX, Math.max(CAM_MIN, cam.dist * (e.deltaY > 0 ? 1.13 : 0.885)));
+    applyCam();
+  }, { passive: false });
+  // touch pinch
+  let pinch = 0;
+  el.addEventListener('touchstart', e => { if (e.touches.length === 2) pinch = tdist(e); }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (e.touches.length === 2) {
+      const d = tdist(e);
+      if (pinch) { cam.dist = Math.min(CAM_MAX, Math.max(CAM_MIN, cam.dist * pinch / d)); applyCam(); }
+      pinch = d;
+    }
+  }, { passive: true });
+  const tdist = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+}
+function clampTarget() {
+  const WW = (WLD.x1 - WLD.x0) / 2 + 150, WH = (WLD.y1 - WLD.y0) / 2 + 150;
+  cam.target.x = Math.min(WW, Math.max(-WW, cam.target.x));
+  cam.target.z = Math.min(WH, Math.max(-WH, cam.target.z));
+}
+
+function screenRay(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  const v = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(v, camera);
+  return raycaster;
+}
+const tooltip = document.getElementById('tooltip');
+function hover(e) {
+  const rc = screenRay(e);
+  const hits = rc.intersectObjects(pickables, false);
+  if (hits.length) {
+    const u = hits[0].object.userData;
+    tooltip.innerHTML = `<div class="t">${u.label}</div><div class="d">${(u.desc || '').replace(/\n/g, '<br>')}</div>`;
+    tooltip.style.display = 'block';
+    tooltip.style.left = Math.min(innerWidth - 260, e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY + 12) + 'px';
+    document.body.style.cursor = 'pointer';
+  } else { tooltip.style.display = 'none'; document.body.style.cursor = ''; }
+}
+function pick(e) {
+  const rc = screenRay(e);
+  const hits = rc.intersectObjects(pickables, false);
+  if (hits.length) {
+    const u = hits[0].object.userData;
+    setEndpoint(e.shiftKey ? 'from' : 'to', { name: u.label, x: u.x, y: u.y });
+    return;
+  }
+  const ground = rc.intersectObject(seaMesh, false);
+  if (ground.length) {
+    const [gx, gy] = sceneToTile(ground[0].point.x, ground[0].point.z);
+    const x = Math.round(gx), y = Math.round(gy);
+    setEndpoint(e.shiftKey ? 'from' : 'to', { name: `Open water (${x}, ${y})`, x, y });
+  }
+}
+
+// ============================================================ UI state
+const voyage = { from: null, to: null, route: null };
+
+function poiCatalog() {
+  const cat = [];
+  cat.push({ grp: '⚓ Ports & moorings', items: NAV.ports.map(p => ({ name: p.name, x: p.x, y: p.y, sub: `Sailing ${p.level}` })) });
+  cat.push({ grp: '🏴 Shipwrecks', items: NAV.wrecks.flatMap(g => g.points.map((pt, i) => ({
+    name: `${g.type[0].toUpperCase() + g.type.slice(1)} wreck ${i + 1}`, x: pt.x, y: pt.y,
+    sub: nearestSeaName(pt.x, pt.y, 200) || `${pt.x},${pt.y}` }))) });
+  cat.push({ grp: '🐟 Trawling shoals', items: NAV.shoals.flatMap(s => s.points.map((pt, i) => ({
+    name: `${s.name[0].toUpperCase() + s.name.slice(1)}${s.points.length > 1 ? ' ' + (i + 1) : ''}`, x: pt.x, y: pt.y,
+    sub: nearestSeaName(pt.x, pt.y, 200) || '' }))) });
+  cat.push({ grp: '🐙 Sea monsters', items: NAV.monsters.flatMap(m => m.points.map((pt, i) => ({
+    name: `${m.name}${m.points.length > 1 ? ' ' + (i + 1) : ''}`, x: pt.x, y: pt.y,
+    sub: nearestSeaName(pt.x, pt.y, 200) || '' }))) });
+  cat.push({ grp: '🗺 Charting tasks', items: NAV.charting.map(t => ({
+    name: `${t.sea || t.ocean || 'Sea'} · ${t.type || 'task'} (${t.level ?? '?'})`, x: t.x, y: t.y, sub: t.task.slice(0, 60) })) });
+  cat.push({ grp: '🌊 Seas', items: NAV.seas.map(s => ({ name: s.name, x: s.x, y: s.y, sub: 'sea region' })) });
+  return cat;
+}
+
+function setupPickers() {
+  const catalog = poiCatalog();
+  for (const which of ['from', 'to']) {
+    const input = document.getElementById(which + 'In');
+    const drop = document.getElementById(which + 'Drop');
+    const render = q => {
+      drop.innerHTML = '';
+      const ql = q.trim().toLowerCase();
+      let shown = 0;
+      for (const c of catalog) {
+        const matches = c.items.filter(it => !ql || it.name.toLowerCase().includes(ql) || (it.sub || '').toLowerCase().includes(ql));
+        if (!matches.length) continue;
+        const g = document.createElement('div'); g.className = 'grp'; g.textContent = c.grp; drop.appendChild(g);
+        for (const it of matches.slice(0, ql ? 25 : 8)) {
+          const d = document.createElement('div');
+          d.innerHTML = `${it.name} <small>${it.sub || ''}</small>`;
+          d.addEventListener('pointerdown', ev => { ev.preventDefault(); setEndpoint(which, it); drop.style.display = 'none'; });
+          drop.appendChild(d); shown++;
+        }
+        if (shown > 90) break;
+      }
+      drop.style.display = shown ? 'block' : 'none';
+    };
+    input.addEventListener('focus', () => render(input.value));
+    input.addEventListener('input', () => render(input.value));
+    input.addEventListener('blur', () => setTimeout(() => drop.style.display = 'none', 180));
+  }
+  document.getElementById('swapBtn').addEventListener('click', () => {
+    [voyage.from, voyage.to] = [voyage.to, voyage.from];
+    document.getElementById('fromIn').value = voyage.from?.name || '';
+    document.getElementById('toIn').value = voyage.to?.name || '';
+    reroute();
+  });
+}
+
+function setEndpoint(which, poi) {
+  voyage[which] = { name: poi.name, x: poi.x, y: poi.y };
+  document.getElementById(which + 'In').value = poi.name;
+  reroute();
+}
+
+function setupShipPanel() {
+  const hullSel = document.getElementById('hullSel');
+  NAV.hulls.forEach((h, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = `${h.name} — ${h.speed} tiles/tick`;
+    hullSel.appendChild(o);
+  });
+  hullSel.value = ship.hull;
+  hullSel.addEventListener('change', () => { ship.hull = +hullSel.value; reroute(); });
+
+  const facBox = document.getElementById('facilities');
+  for (const key of gearHazKeys()) {
+    const h = NAV.hazards[key];
+    ship.fac[key] = false;
+    const l = document.createElement('label');
+    l.className = 'ck';
+    l.innerHTML = `<input type="checkbox" data-k="${key}"><span>${h.gate}
+      <span class="lvl">${h.sailing ? ` ⛵${h.sailing}` : ''}${h.construction ? ` 🔨${h.construction}` : ''}</span>
+      <small>opens ${h.name.toLowerCase()}</small></span>`;
+    l.querySelector('input').addEventListener('change', e => {
+      ship.fac[key] = e.target.checked; rebuildOverlay(); reroute();
+    });
+    facBox.appendChild(l);
+  }
+
+  document.getElementById('lambda').addEventListener('input', e => {
+    ship.lambda = 1 - e.target.value / 100; reroute();
+  });
+  ship.lambda = 1 - 55 / 100;
+  document.getElementById('avoidMon').addEventListener('change', e => { ship.avoidMon = e.target.checked; reroute(); });
+  document.getElementById('avoidReef').addEventListener('change', e => { ship.avoidReef = e.target.checked; reroute(); });
+  document.getElementById('hazOverlay').addEventListener('change', rebuildOverlay);
+
+  const layersBox = document.getElementById('layers');
+  for (const l of LAYERS) {
+    const lab = document.createElement('label');
+    lab.className = 'ck';
+    lab.innerHTML = `<input type="checkbox" ${l.on ? 'checked' : ''}><span>${l.glyph} ${l.name}</span>`;
+    lab.querySelector('input').addEventListener('change', e => {
+      markerSets[l.key].group.visible = e.target.checked; refreshPickables();
+    });
+    layersBox.appendChild(lab);
+  }
+
+  const legend = document.getElementById('legend');
+  const rows = Object.entries(NAV.hazards).map(([k, h]) => {
+    const t = HAZTINT[k] || [128, 128, 128];
+    const what = h.mode === 'wall' ? 'impassable' : h.mode === 'penalty' ? 'hull damage' : (h.gate || '');
+    return `<span class="sw" style="background:rgb(${t[0]},${t[1]},${t[2]})"></span>${h.name} — ${what}<br>`;
+  });
+  legend.innerHTML = rows.join('') + `<span class="sw" style="background:rgb(255,40,40)"></span>red tint — closed to your current ship`;
+
+  document.getElementById('copyLink').addEventListener('click', () => {
+    const u = new URL(location.href);
+    u.hash = routeHash();
+    navigator.clipboard?.writeText(u.href);
+    document.getElementById('copyLink').textContent = '✓ Copied';
+    setTimeout(() => document.getElementById('copyLink').textContent = '⚓ Copy route link', 1400);
+  });
+  document.getElementById('clearRoute').addEventListener('click', () => {
+    voyage.from = voyage.to = voyage.route = null;
+    document.getElementById('fromIn').value = document.getElementById('toIn').value = '';
+    drawRoute(null); renderLog(); updateStats(); history.replaceState(null, '', location.pathname);
+  });
+  document.getElementById('panelToggle').addEventListener('click', () => {
+    document.getElementById('panel').classList.toggle('open');
+    document.getElementById('log').classList.remove('open');
+  });
+  document.getElementById('logToggle').addEventListener('click', () => {
+    document.getElementById('log').classList.toggle('open');
+    document.getElementById('panel').classList.remove('open');
+  });
+}
+
+// ============================================================ routing + log
+let rerouteTimer = 0;
+function reroute() {
+  clearTimeout(rerouteTimer);
+  rerouteTimer = setTimeout(doRoute, 60);
+}
+function doRoute() {
+  if (!voyage.from || !voyage.to) { updateStats(); return; }
+  const t0 = performance.now();
+  const r = findRoute([voyage.from.x, voyage.from.y], [voyage.to.x, voyage.to.y]);
+  voyage.route = r;
+  if (r.fail === null) {
+    // blocked by loadout — find out what would open the way
+    r.needed = diagnoseRoute([voyage.from.x, voyage.from.y], [voyage.to.x, voyage.to.y]);
+  }
+  drawRoute(r);
+  renderLog();
+  updateStats();
+  history.replaceState(null, '', '#' + routeHash());
+}
+
+function fmtTime(secs) {
+  const m = Math.floor(secs / 60), s = Math.round(secs % 60);
+  return m ? `${m}:${String(s).padStart(2, '0')} min` : `${s}s`;
+}
+function updateStats() {
+  const el = document.getElementById('stats');
+  const r = voyage.route;
+  if (!r || !r.cells) { el.innerHTML = ''; return; }
+  el.innerHTML = `<span class="chip"><b>${r.dist}</b> tiles</span>
+    <span class="chip"><b>${r.turns}</b> turn${r.turns === 1 ? '' : 's'}</span>
+    <span class="chip">~<b>${fmtTime(r.secs)}</b></span>`;
+}
+
+function renderLog() {
+  const log = document.getElementById('log');
+  const r = voyage.route;
+  if (!voyage.from || !voyage.to || !r) { log.style.display = 'none'; return; }
+  log.style.display = 'block';
+  document.getElementById('logRoute').textContent = `${voyage.from.name} → ${voyage.to.name}`;
+  const list = document.getElementById('legList');
+  const warn = document.getElementById('logWarn');
+  const tots = document.getElementById('logTotals');
+  list.innerHTML = ''; warn.textContent = ''; tots.textContent = '';
+  if (!r.cells) {
+    if (r.fail) warn.textContent = r.fail;
+    else if (r.needed && r.needed.length)
+      warn.innerHTML = 'No route for this ship. You need:<br>' +
+        r.needed.map(k => `• ${NAV.hazards[k].gate} (Sailing ${NAV.hazards[k].sailing})`).join('<br>');
+    else warn.textContent = 'No sailable route — even with every fitting. The far shore may be beyond today’s seas.';
+    return;
+  }
+  let li = document.createElement('li');
+  li.innerHTML = `<span class="n">☸</span>Weigh anchor at <b>${voyage.from.name}</b>`;
+  list.appendChild(li);
+  r.legs.forEach((leg, i) => {
+    const [ex, ey] = cellCenterTile(leg.end);
+    const sea = i < r.legs.length - 1 ? nearestSeaName(ex, ey) : null;
+    li = document.createElement('li');
+    li.innerHTML = `<span class="n">${i + 1}.</span>Sail <b>${DIRNAME[leg.dir]}</b> for ${Math.round(leg.tiles)} tiles` +
+      (i < r.legs.length - 1 ? `<br><em>then turn ${sea ? 'near ' + sea : `at ${Math.round(ex)}, ${Math.round(ey)}`}</em>` : '');
+    list.appendChild(li);
+  });
+  li = document.createElement('li');
+  li.innerHTML = `<span class="n">⚓</span>Make berth at <b>${voyage.to.name}</b>`;
+  list.appendChild(li);
+  tots.textContent = `${r.dist} tiles · ${r.turns} turns · ~${fmtTime(r.secs)} under way`;
+  // hazards en route worth mentioning
+  const crossed = new Set();
+  for (const c of r.cells) {
+    const key = NAV.classes[CLS[c]];
+    if (NAV.hazards[key]) crossed.add(key);
+  }
+  if (crossed.size)
+    warn.innerHTML = [...crossed].map(k => `⚠ crosses ${NAV.hazards[k].name.toLowerCase()}` +
+      (NAV.hazards[k].mode === 'penalty' ? ' — expect hull damage' : '')).join('<br>');
+}
+
+// ============================================================ share links
+function routeHash() {
+  const p = new URLSearchParams();
+  if (voyage.from) p.set('from', `${voyage.from.x},${voyage.from.y},${voyage.from.name}`);
+  if (voyage.to) p.set('to', `${voyage.to.x},${voyage.to.y},${voyage.to.name}`);
+  p.set('opt', Math.round((1 - ship.lambda) * 100));
+  p.set('hull', ship.hull);
+  p.set('fac', gearHazKeys().map(k => ship.fac[k] ? 1 : 0).join(''));
+  if (!ship.avoidMon) p.set('mon', 0);
+  if (!ship.avoidReef) p.set('reef', 0);
+  return p.toString();
+}
+function loadHash() {
+  if (!location.hash || location.hash.length < 2) return;
+  try {
+    const p = new URLSearchParams(location.hash.slice(1));
+    const parse = v => { const m = v.split(','); return { x: +m[0], y: +m[1], name: m.slice(2).join(',') || 'Open water' }; };
+    if (p.get('hull') !== null) { ship.hull = Math.min(NAV.hulls.length - 1, +p.get('hull') || 0); document.getElementById('hullSel').value = ship.hull; }
+    const fac = p.get('fac') || '';
+    gearHazKeys().forEach((k, i) => {
+      ship.fac[k] = fac[i] === '1';
+      const box = document.querySelector(`#facilities input[data-k="${k}"]`);
+      if (box) box.checked = ship.fac[k];
+    });
+    if (p.get('opt') !== null) { document.getElementById('lambda').value = +p.get('opt'); ship.lambda = 1 - (+p.get('opt')) / 100; }
+    if (p.get('mon') === '0') { ship.avoidMon = false; document.getElementById('avoidMon').checked = false; }
+    if (p.get('reef') === '0') { ship.avoidReef = false; document.getElementById('avoidReef').checked = false; }
+    rebuildOverlay();
+    if (p.get('from')) setEndpoint('from', parse(p.get('from')));
+    if (p.get('to')) setEndpoint('to', parse(p.get('to')));
+  } catch (e) { console.warn('bad route link', e); }
+}
+
+// ============================================================ boot
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+(async () => {
+  try {
+    await loadData();
+    CI = Object.fromEntries(NAV.classes.map((k, i) => [k, i]));
+    buildMonsterPenalty();
+    await buildScene();
+    setupInput();
+    setupPickers();
+    setupShipPanel();
+    loadHash();
+    ld(100, 'Fair winds!');
+    setTimeout(() => {
+      const l = document.getElementById('loading');
+      l.style.opacity = 0; setTimeout(() => l.remove(), 550);
+    }, 250);
+  } catch (e) {
+    document.getElementById('ldmsg').textContent = 'The charts would not load: ' + e.message;
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>

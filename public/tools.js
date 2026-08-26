@@ -38,6 +38,11 @@ window.PELIGAMING = {
           description: "Every craftable item in OSRS as an explorable 3D web of recipes.",
           path: "tools/runescape/osrs-crafting-web-3d.html",
         },
+        {
+          name: "Naval Pathfinder",
+          description: "Chart sailing routes between ports, wrecks and shoals — around krakens, fetid waters and icy seas — tuned from fewest turns to fastest passage.",
+          path: "tools/runescape/naval-pathfinder.html",
+        },
       ],
     },
     {

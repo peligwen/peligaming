@@ -20,6 +20,8 @@ peligaming/
       skyrim/
   tools-src/              React (.jsx) tool sources, bundled by build:tools
   scripts/build-tools.mjs Bundles each tools-src entry into public/tools/
+  scripts/fetch-naval-data.mjs  Refreshes the Naval Pathfinder's committed
+                          data (map texture, nav grid, POIs) from the OSRS Wiki
 ```
 
 Deploys are still zero-build: `public/` is served verbatim, and built tool
