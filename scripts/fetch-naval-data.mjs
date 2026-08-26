@@ -542,32 +542,38 @@ const shoals = [];
   console.log(`shoals: ${shoals.length}`);
 }
 
-// sea monsters (bounty creatures) — threat zones + hunting destinations
+// sea monsters (bounty creatures) — every creature the notice boards offer
+// bounties on, with its hunting fields: each {{LocLine}} on the creature's
+// page is a cluster of exact spawn points (a "field of krakens"), which the
+// app renders as a danger area and the pathfinder steers around
 const monsters = [];
 {
-  const CANDIDATES = ['Armoured kraken', 'Vampyre kraken', 'Veiled kraken',
-    'Great white shark', 'Manta ray (monster)', 'Mogre (sea)', 'Osprey',
-    'Sea snake (Sailing)', 'Hydra (Sailing)'];
-  for (const title of CANDIDATES) {
+  const bounty = await pageWikitext('Bounty tasks');
+  const names = [...new Set([...bounty.matchAll(/monster=([^|}]+)/g)].map(m => m[1].trim()))];
+  for (const title of names) {
     const wt = await pageWikitext(title);
     if (!wt) { console.log(`  [skip] no page: ${title}`); continue; }
-    const locLine = wt.match(/\|\s*location\s*=\s*([^\n]*)/i)?.[1] ?? '';
-    const pts = [];
-    const names = [
-      ...[...locLine.matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)].map(m => m[1]),
-      ...[...wt.slice(0, 4000).matchAll(/found (?:in|at|around) [^.]*?\[\[([^\]|]+)/g)].map(m => m[1]),
-      ...stripWiki(locLine).split(/[,;]| and /).map(s => s.trim()), // plain-text sea names
-    ];
-    for (const n of names) {
-      if (!n) continue;
-      const c = seaByName.get(n.toLowerCase()) ?? (/\[\[/.test(locLine) ? await resolveCoords(n) : null);
-      if (c && !pts.some(p => p.x === c.x && p.y === c.y)) pts.push({ x: c.x, y: c.y });
+    const combat = +(wt.match(/\|\s*combat\s*=\s*(\d+)/)?.[1] ?? 0) || null;
+    const fields = [];
+    for (const m of wt.matchAll(/\{\{LocLine([\s\S]*?)\}\}/g)) {
+      const body = m[1];
+      const loc = stripWiki(body.match(/\|\s*location\s*=\s*([^\n|]*(?:\[\[[^\]]*\]\][^\n|]*)*)/)?.[1] ?? '');
+      const level = +(body.match(/\|\s*levels\s*=\s*(\d+)/)?.[1] ?? 0) || combat;
+      const pts = [];
+      for (const c of body.matchAll(/\|(?:x:)?(\d{3,4}),(?:y:)?(\d{3,4})/g)) {
+        const x = +c[1], y = +c[2];
+        if (x >= WX0 && x < WX1 && y >= WY0 && y < WY1) pts.push([x, y]);
+      }
+      if (pts.length) fields.push({ name: loc || 'At sea', level, points: pts });
     }
-    const level = +(wt.match(/\|\s*combat\s*=\s*(\d+)/)?.[1] ?? 0) || null;
-    if (pts.length) monsters.push({ name: title.replace(/ \((monster|sea|Sailing)\)/, ''), combat: level, points: pts.slice(0, 6), radius: 28 });
-    else console.log(`  [warn] no location resolved: ${title}`);
+    if (fields.length) monsters.push({
+      name: title.replace(/ \((monster|sea|Sailing)\)/i, ''), combat, fields,
+    });
+    else console.log(`  [warn] no spawn fields: ${title}`);
   }
-  console.log(`monsters: ${monsters.length}`);
+  const nf = monsters.reduce((n, m) => n + m.fields.length, 0);
+  const np = monsters.reduce((n, m) => n + m.fields.reduce((a, f) => a + f.points.length, 0), 0);
+  console.log(`monsters: ${monsters.length} (${nf} fields, ${np} spawn points)`);
 }
 
 // ---------------------------------------------------------------------------

@@ -234,23 +234,39 @@ const SWEPT = DIRS.map(([dx, dy]) => {
     : [[0, Math.sign(dy)], [Math.sign(dx), Math.sign(dy)]];
 });
 
-let monsterPenalty = null; // Float32Array per cell, ticks of soft penalty
-function buildMonsterPenalty() {
-  monsterPenalty = new Float32Array(CW * CH);
-  for (const m of NAV.monsters || [])
-    for (const p of m.points) {
-      const R = Math.ceil((m.radius || 28) / CELL);
-      const [mcx, mcy] = tileToCell(p.x, p.y);
-      for (let dy = -R; dy <= R; dy++)
-        for (let dx = -R; dx <= R; dx++) {
-          const cx = mcx + dx, cy = mcy + dy;
-          if (cx < 0 || cx >= CW || cy < 0 || cy >= CH) continue;
-          const d = Math.hypot(dx, dy);
-          if (d > R) continue;
-          const i = cellIx(cx, cy);
-          monsterPenalty[i] = Math.max(monsterPenalty[i], 6 * (1 - d / R)); // up to +6 ticks per step
-        }
+// Monster hunting grounds. Each field is a cluster of exact spawn points from
+// the wiki; we rasterise them into a per-cell danger grid, with the reach and
+// weight of each spawn scaled by the creature's combat level — a field of
+// level-211 vampyre krakens casts a far wider shadow than a flock of terns.
+let monsterDanger = null;  // Float32, 0..1 proximity to the nearest spawn
+let monsterLevel = null;   // Uint16, highest combat level threatening the cell
+let monsterMask = null;    // Int32 bitmask of monster indices covering the cell
+const monsterReach = lvl => 6 + lvl / 10; // tiles
+function buildMonsterDanger() {
+  monsterDanger = new Float32Array(CW * CH);
+  monsterLevel = new Uint16Array(CW * CH);
+  monsterMask = new Int32Array(CW * CH);
+  (NAV.monsters || []).forEach((m, mi) => {
+    for (const f of m.fields) {
+      const lvl = f.level || m.combat || 50;
+      const R = Math.ceil(monsterReach(lvl) / CELL);
+      for (const [px, py] of f.points) {
+        const [mcx, mcy] = tileToCell(px, py);
+        for (let dy = -R; dy <= R; dy++)
+          for (let dx = -R; dx <= R; dx++) {
+            const cx = mcx + dx, cy = mcy + dy;
+            if (cx < 0 || cx >= CW || cy < 0 || cy >= CH) continue;
+            const d = Math.hypot(dx, dy);
+            if (d > R) continue;
+            const i = cellIx(cx, cy);
+            const s = 1 - d / R;
+            if (s > monsterDanger[i]) monsterDanger[i] = s;
+            if (lvl > monsterLevel[i]) monsterLevel[i] = lvl;
+            monsterMask[i] |= 1 << (mi & 31);
+          }
+      }
     }
+  });
 }
 
 // passability under current loadout; returns 0 blocked, else 1
@@ -327,7 +343,8 @@ function findRoute(fromTile, toTile) {
       let dd = Math.abs(nd - dir); if (dd > 8) dd = 16 - dd;
       if (dd) cost += lambda * (0.55 + 0.45 * (dd * 22.5) / 45);
       if (NAV.classes[ncls] === 'reefs') cost += reefPen * DIRLEN[nd];
-      if (ship.avoidMon && monsterPenalty) cost += monsterPenalty[ncell] * DIRLEN[nd];
+      if (ship.avoidMon && monsterDanger && monsterDanger[ncell] > 0)
+        cost += monsterDanger[ncell] * (2 + monsterLevel[ncell] / 30) * DIRLEN[nd];
       const ns = ncell * 16 + nd;
       if (g0 + cost < g[ns] - 1e-9) {
         g[ns] = g0 + cost; parent[ns] = s;
@@ -409,8 +426,9 @@ function nearestSeaName(x, y, maxD = 110) {
 }
 
 // ============================================================ three.js scene
-let renderer, scene, camera, seaMesh, overlayMesh, routeGroup, markerGroup, labelGroup, raycaster;
-const cam = { theta: Math.PI * 1.5, phi: 0.72, dist: 1500, target: new THREE.Vector3(0, 0, 0) };
+let renderer, scene, camera, seaMesh, overlayMesh, monsterMesh, routeGroup, markerGroup, labelGroup, raycaster;
+// theta = PI/2 puts the camera south of the target looking north: north-up view
+const cam = { theta: Math.PI / 2, phi: 0.72, dist: 1500, target: new THREE.Vector3(0, 0, 0) };
 const CAM_MIN = 60, CAM_MAX = 3400;
 
 function applyCam() {
@@ -476,6 +494,14 @@ async function buildScene() {
   scene.add(overlayMesh);
   rebuildOverlay();
 
+  monsterMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(WW, WH),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 1, depthWrite: false }));
+  monsterMesh.rotation.x = -Math.PI / 2;
+  monsterMesh.position.y = 2.2;
+  scene.add(monsterMesh);
+  buildMonsterOverlay();
+
   routeGroup = new THREE.Group(); scene.add(routeGroup);
   markerGroup = new THREE.Group(); scene.add(markerGroup);
   labelGroup = new THREE.Group(); scene.add(labelGroup);
@@ -527,6 +553,30 @@ function rebuildOverlay() {
   overlayMesh.material.needsUpdate = true;
 }
 
+// monster hunting grounds as a blood-red haze; deeper red = higher level
+function buildMonsterOverlay() {
+  const c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const ctx = c.getContext('2d');
+  const im = ctx.createImageData(CW, CH);
+  for (let cy = 0; cy < CH; cy++)
+    for (let cx = 0; cx < CW; cx++) {
+      const i = cellIx(cx, cy);
+      const s = monsterDanger[i];
+      if (s <= 0.12 || !CLS[i]) continue;
+      const lvl = monsterLevel[i];
+      const o = ((CH - 1 - cy) * CW + cx) * 4;
+      im.data[o] = 190;
+      im.data[o + 1] = 25;
+      im.data[o + 2] = lvl > 150 ? 70 : 25; // the deadliest fields shade toward purple
+      im.data[o + 3] = Math.min(135, Math.pow(s, 1.3) * (12 + lvl * 0.4));
+    }
+  ctx.putImageData(im, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.LinearFilter;
+  monsterMesh.material.map = tex;
+  monsterMesh.material.needsUpdate = true;
+}
+
 // ---------------------------------------------------------------- markers
 function spriteTexture(draw, w = 64, h = 64) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -552,7 +602,7 @@ const LAYERS = [
   { key: 'wrecks', name: 'Shipwrecks', glyph: '🏴', color: '#d9d9d9', on: true },
   { key: 'charting', name: 'Charting tasks', glyph: '✦', color: '#6fd7c8', on: false },
   { key: 'shoals', name: 'Trawling shoals', glyph: '🐟', color: '#7fb2ff', on: false },
-  { key: 'monsters', name: 'Sea monsters', glyph: '🐙', color: '#ff6a4d', on: true },
+  { key: 'monsters', name: 'Monster grounds', glyph: '🐙', color: '#ff6a4d', on: true, mesh: true },
 ];
 const markerSets = {};   // key -> {group, items:[{x,y,label,desc,sprite}]}
 let pickables = [];
@@ -594,17 +644,17 @@ function buildMarkers() {
     desc: `${s.level ? 'Fishing ' + s.level : 'Trawling'}${pt.approx ? ' · roams this sea' : ''}`,
     poi: { kind: 'shoal', name: `${s.name} (${pt.x},${pt.y})` },
   }))), 17);
-  mk('monsters', NAV.monsters.flatMap(m => m.points.map(pt => ({
-    x: pt.x, y: pt.y, label: m.name,
-    desc: `${m.combat ? 'Combat ' + m.combat + ' · ' : ''}bounty target — hunted from this sea`,
-    poi: { kind: 'monster', name: `${m.name} (${pt.x},${pt.y})` },
-  }))), 22);
   refreshPickables();
 }
 function refreshPickables() {
   pickables = [];
   for (const k in markerSets) if (markerSets[k].group.visible) pickables.push(...markerSets[k].sprites);
 }
+const fieldCentroid = f => {
+  let x = 0, y = 0;
+  for (const [px, py] of f.points) { x += px; y += py; }
+  return [Math.round(x / f.points.length), Math.round(y / f.points.length)];
+};
 
 // sea name labels, VT323, visible when zoomed in
 function textSprite(text, px, color) {
@@ -704,8 +754,8 @@ function drawCompass() {
   const S = c.width, R = S / 2 - 8;
   ctx.clearRect(0, 0, S, S);
   ctx.save(); ctx.translate(S / 2, S / 2);
-  // scene: camera theta rotates the world; north on screen = direction of -z projected.
-  const rot = -(cam.theta + Math.PI / 2);
+  // world north (-z) projected to screen sits at angle (PI/2 - theta) from up
+  const rot = Math.PI / 2 - cam.theta;
   ctx.rotate(rot);
   ctx.beginPath(); ctx.arc(0, 0, R, 0, 7);
   ctx.fillStyle = '#1c150cd0'; ctx.fill();
@@ -747,15 +797,12 @@ function setupInput() {
     if (dragging) {
       moved += Math.abs(dx) + Math.abs(dy);
       if (panning) {
+        // grab-the-map: the sea moves with the cursor
         const k = cam.dist / innerHeight * 1.35;
-        const fx = Math.cos(cam.theta), fz = Math.sin(cam.theta);
-        cam.target.x += (-dy * fx + dx * fz) * -k * Math.cos(cam.phi) - (dx * fx + dy * fz) * 0; // radial
-        // pan in the ground plane relative to view
-        const rightX = -Math.sin(cam.theta), rightZ = Math.cos(cam.theta);
-        cam.target.x -= (dx * rightX) * k - 0; cam.target.z -= (dx * rightZ) * k;
-        cam.target.x += 0; // forward component
-        const fwdX = -Math.cos(cam.theta), fwdZ = -Math.sin(cam.theta);
-        cam.target.x -= dy * fwdX * k; cam.target.z -= dy * fwdZ * k;
+        const rX = Math.sin(cam.theta), rZ = -Math.cos(cam.theta);   // screen-right on the sea
+        const uX = -Math.cos(cam.theta), uZ = -Math.sin(cam.theta);  // screen-up on the sea
+        cam.target.x -= (dx * rX - dy * uX) * k;
+        cam.target.z -= (dx * rZ - dy * uZ) * k;
         clampTarget();
       } else {
         cam.theta += dx * 0.0052;
@@ -772,7 +819,16 @@ function setupInput() {
   el.addEventListener('contextmenu', e => e.preventDefault());
   el.addEventListener('wheel', e => {
     e.preventDefault();
-    cam.dist = Math.min(CAM_MAX, Math.max(CAM_MIN, cam.dist * (e.deltaY > 0 ? 1.13 : 0.885)));
+    const next = Math.min(CAM_MAX, Math.max(CAM_MIN, cam.dist * (e.deltaY > 0 ? 1.13 : 0.885)));
+    const s = next / cam.dist;
+    // zoom about the sea point under the cursor, so it stays put on screen
+    const hit = screenRay(e).intersectObject(seaMesh, false)[0];
+    if (hit) {
+      cam.target.x = hit.point.x + (cam.target.x - hit.point.x) * s;
+      cam.target.z = hit.point.z + (cam.target.z - hit.point.z) * s;
+      clampTarget();
+    }
+    cam.dist = next;
     applyCam();
   }, { passive: false });
   // touch pinch
@@ -807,14 +863,38 @@ const tooltip = document.getElementById('tooltip');
 function hover(e) {
   const rc = screenRay(e);
   const hits = rc.intersectObjects(pickables, false);
-  if (hits.length) {
-    const u = hits[0].object.userData;
-    tooltip.innerHTML = `<div class="t">${u.label}</div><div class="d">${(u.desc || '').replace(/\n/g, '<br>')}</div>`;
+  const show = (title, desc) => {
+    tooltip.innerHTML = `<div class="t">${title}</div><div class="d">${(desc || '').replace(/\n/g, '<br>')}</div>`;
     tooltip.style.display = 'block';
     tooltip.style.left = Math.min(innerWidth - 260, e.clientX + 14) + 'px';
     tooltip.style.top = (e.clientY + 12) + 'px';
+  };
+  if (hits.length) {
+    const u = hits[0].object.userData;
+    show(u.label, u.desc);
     document.body.style.cursor = 'pointer';
-  } else { tooltip.style.display = 'none'; document.body.style.cursor = ''; }
+    return;
+  }
+  // hovering a monster hunting ground?
+  if (monsterMesh && monsterMesh.visible) {
+    const g = rc.intersectObject(seaMesh, false)[0];
+    if (g) {
+      const [gx, gy] = sceneToTile(g.point.x, g.point.z);
+      const [cx, cy] = tileToCell(gx, gy);
+      if (cx >= 0 && cx < CW && cy >= 0 && cy < CH) {
+        const i = cellIx(cx, cy);
+        if (monsterDanger[i] > 0.03 && CLS[i]) {
+          const here = (NAV.monsters || []).filter((m, mi) => monsterMask[i] & (1 << (mi & 31)));
+          show('☠ Hunting grounds',
+            here.slice(0, 4).map(m => `${m.name} (level ${m.combat ?? '?'})`).join('\n') +
+            (ship.avoidMon ? '\nroutes give these waters a wide berth' : ''));
+          document.body.style.cursor = '';
+          return;
+        }
+      }
+    }
+  }
+  tooltip.style.display = 'none'; document.body.style.cursor = '';
 }
 function pick(e) {
   const rc = screenRay(e);
@@ -844,9 +924,10 @@ function poiCatalog() {
   cat.push({ grp: '🐟 Trawling shoals', items: NAV.shoals.flatMap(s => s.points.map((pt, i) => ({
     name: `${s.name[0].toUpperCase() + s.name.slice(1)}${s.points.length > 1 ? ' ' + (i + 1) : ''}`, x: pt.x, y: pt.y,
     sub: nearestSeaName(pt.x, pt.y, 200) || '' }))) });
-  cat.push({ grp: '🐙 Sea monsters', items: NAV.monsters.flatMap(m => m.points.map((pt, i) => ({
-    name: `${m.name}${m.points.length > 1 ? ' ' + (i + 1) : ''}`, x: pt.x, y: pt.y,
-    sub: nearestSeaName(pt.x, pt.y, 200) || '' }))) });
+  cat.push({ grp: '🐙 Monster grounds', items: NAV.monsters.flatMap(m => m.fields.map(f => {
+    const [x, y] = fieldCentroid(f);
+    return { name: `${m.name} — ${f.name}`, x, y, sub: `level ${f.level ?? m.combat ?? '?'}` };
+  })) });
   cat.push({ grp: '🗺 Charting tasks', items: NAV.charting.map(t => ({
     name: `${t.sea || t.ocean || 'Sea'} · ${t.type || 'task'} (${t.level ?? '?'})`, x: t.x, y: t.y, sub: t.task.slice(0, 60) })) });
   cat.push({ grp: '🌊 Seas', items: NAV.seas.map(s => ({ name: s.name, x: s.x, y: s.y, sub: 'sea region' })) });
@@ -933,6 +1014,7 @@ function setupShipPanel() {
     lab.className = 'ck';
     lab.innerHTML = `<input type="checkbox" ${l.on ? 'checked' : ''}><span>${l.glyph} ${l.name}</span>`;
     lab.querySelector('input').addEventListener('change', e => {
+      if (l.mesh) { monsterMesh.visible = e.target.checked; return; }
       markerSets[l.key].group.visible = e.target.checked; refreshPickables();
     });
     layersBox.appendChild(lab);
@@ -944,7 +1026,9 @@ function setupShipPanel() {
     const what = h.mode === 'wall' ? 'impassable' : h.mode === 'penalty' ? 'hull damage' : (h.gate || '');
     return `<span class="sw" style="background:rgb(${t[0]},${t[1]},${t[2]})"></span>${h.name} — ${what}<br>`;
   });
-  legend.innerHTML = rows.join('') + `<span class="sw" style="background:rgb(255,40,40)"></span>red tint — closed to your current ship`;
+  legend.innerHTML = rows.join('') +
+    `<span class="sw" style="background:rgb(255,40,40)"></span>red tint — closed to your current ship<br>` +
+    `<span class="sw" style="background:rgb(190,25,45)"></span>red haze — monster hunting grounds (deeper = deadlier)`;
 
   document.getElementById('copyLink').addEventListener('click', () => {
     const u = new URL(location.href);
@@ -1088,7 +1172,7 @@ function animate() {
   try {
     await loadData();
     CI = Object.fromEntries(NAV.classes.map((k, i) => [k, i]));
-    buildMonsterPenalty();
+    buildMonsterDanger();
     await buildScene();
     setupInput();
     setupPickers();
