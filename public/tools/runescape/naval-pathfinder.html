@@ -66,7 +66,9 @@
     margin-bottom:2px;}
   #log .sub2{font-family:"VT323",monospace;font-size:14px;color:var(--dim);margin-bottom:7px;}
   #log ol{list-style:none;}
-  #log li{font-family:"VT323",monospace;font-size:16px;color:var(--parch);padding:2px 0 2px 26px;position:relative;line-height:1.25;}
+  #log li{font-family:"VT323",monospace;font-size:16px;color:var(--parch);padding:2px 0 2px 26px;position:relative;line-height:1.25;overflow:hidden;}
+  #log li canvas.thumb{float:right;width:76px;height:76px;margin:2px 0 3px 8px;border:2px solid;
+    border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);cursor:pointer;display:block;}
   #log li b{color:var(--yellow);font-weight:400;}
   #log li em{color:var(--dim);font-style:normal;font-size:14px;}
   #log li .n{position:absolute;left:0;top:2px;color:var(--gold);}
@@ -143,7 +145,7 @@
     <div class="ends"><span>fewest turns</span><span>fastest</span></div>
     <input type="range" id="lambda" min="0" max="100" value="55">
   </div>
-  <label class="ck"><input type="checkbox" id="avoidMon" checked>Steer clear of sea monsters<small>krakens, sharks &amp; friends get a wide berth</small></label>
+  <label class="ck"><input type="checkbox" id="avoidMon" checked>Steer clear of sea monsters<small>ship-attackers get a wide berth; harmless quarry never bends the course</small></label>
   <label class="ck"><input type="checkbox" id="avoidReef" checked>Avoid jagged reefs<small>uncheck to brave hull damage at Crandor &amp; Aehecatl</small></label>
 
   <h2>Chart layers</h2>
@@ -233,15 +235,27 @@ const SWEPT = DIRS.map(([dx, dy]) => {
 // the wiki; we rasterise them into a per-cell danger grid, with the reach and
 // weight of each spawn scaled by the creature's combat level — a field of
 // level-211 vampyre krakens casts a far wider shadow than a flock of terns.
-let monsterDanger = null;  // Float32, 0..1 proximity to the nearest spawn
+// Ship-attackers (wiki aggressive = Yes: the big sharks and every kraken) get
+// the red haze and a routing penalty; harmless quarry (birds, rays, orcas…)
+// get a faint teal haze and never bend the course — they're bounty targets
+// you sail to on purpose.
+let monsterDanger = null;  // Float32, 0..1 proximity to the nearest attacker spawn
 let monsterLevel = null;   // Uint16, highest combat level threatening the cell
-let monsterMask = null;    // Int32 bitmask of monster indices covering the cell
+let monsterMask = null;    // Int32 bitmask of attacker indices covering the cell
+let calmDanger = null, calmLevel = null, calmMask = null;  // harmless quarry
 const monsterReach = lvl => 6 + lvl / 10; // tiles
+const isAggro = m => m.aggressive !== false;
 function buildMonsterDanger() {
   monsterDanger = new Float32Array(CW * CH);
   monsterLevel = new Uint16Array(CW * CH);
   monsterMask = new Int32Array(CW * CH);
+  calmDanger = new Float32Array(CW * CH);
+  calmLevel = new Uint16Array(CW * CH);
+  calmMask = new Int32Array(CW * CH);
   (NAV.monsters || []).forEach((m, mi) => {
+    const [dArr, lArr, mArr] = isAggro(m)
+      ? [monsterDanger, monsterLevel, monsterMask]
+      : [calmDanger, calmLevel, calmMask];
     for (const f of m.fields) {
       const lvl = f.level || m.combat || 50;
       const R = Math.ceil(monsterReach(lvl) / CELL);
@@ -255,9 +269,9 @@ function buildMonsterDanger() {
             if (d > R) continue;
             const i = cellIx(cx, cy);
             const s = 1 - d / R;
-            if (s > monsterDanger[i]) monsterDanger[i] = s;
-            if (lvl > monsterLevel[i]) monsterLevel[i] = lvl;
-            monsterMask[i] |= 1 << (mi & 31);
+            if (s > dArr[i]) dArr[i] = s;
+            if (lvl > lArr[i]) lArr[i] = lvl;
+            mArr[i] |= 1 << (mi & 31);
           }
       }
     }
@@ -556,7 +570,8 @@ function rebuildOverlay() {
   redraw();
 }
 
-// monster hunting grounds as a blood-red haze; deeper red = higher level
+// attacker hunting grounds as a blood-red haze (deeper red = higher level);
+// harmless quarry waters as a faint sea-glass teal
 function buildMonsterOverlay() {
   const c = document.createElement('canvas'); c.width = CW; c.height = CH;
   const ctx = c.getContext('2d');
@@ -564,14 +579,21 @@ function buildMonsterOverlay() {
   for (let cy = 0; cy < CH; cy++)
     for (let cx = 0; cx < CW; cx++) {
       const i = cellIx(cx, cy);
-      const s = monsterDanger[i];
-      if (s <= 0.12 || !CLS[i]) continue;
-      const lvl = monsterLevel[i];
+      if (!CLS[i]) continue;
+      const s = monsterDanger[i], q = calmDanger[i];
       const o = ((CH - 1 - cy) * CW + cx) * 4;
-      im.data[o] = 190;
-      im.data[o + 1] = 25;
-      im.data[o + 2] = lvl > 150 ? 70 : 25; // the deadliest fields shade toward purple
-      im.data[o + 3] = Math.min(135, Math.pow(s, 1.3) * (12 + lvl * 0.4));
+      if (s > 0.12) {
+        const lvl = monsterLevel[i];
+        im.data[o] = 190;
+        im.data[o + 1] = 25;
+        im.data[o + 2] = lvl > 150 ? 70 : 25; // the deadliest fields shade toward purple
+        im.data[o + 3] = Math.min(135, Math.pow(s, 1.3) * (12 + lvl * 0.4));
+      } else if (q > 0.12) {
+        im.data[o] = 70;
+        im.data[o + 1] = 205;
+        im.data[o + 2] = 185;
+        im.data[o + 3] = Math.min(80, Math.pow(q, 1.3) * (20 + calmLevel[i] * 0.12));
+      }
     }
   ctx.putImageData(im, 0, 0);
   monCanvas = c;
@@ -717,6 +739,70 @@ function drawRouteLayer() {
   ring(routePts[routePts.length - 1], '#ff6a4d');
 }
 
+// ---------------------------------------------------------------- turn thumbnails
+// a little chart crop around each turn — the water and coastline fingerprint
+// that tells you you're at the right spot. Fixed 80-tile window so thumbnails
+// share a scale; only a truly featureless frame (one water class, no land)
+// widens, and then says so with a ×2/×4 badge.
+function featurelessWindow(tx, ty, W) {
+  const [c0x, c0y] = tileToCell(tx - W / 2, ty - W / 2);
+  const [c1x, c1y] = tileToCell(tx + W / 2, ty + W / 2);
+  let first = -1;
+  for (let cy = Math.max(0, c0y); cy <= Math.min(CH - 1, c1y); cy++)
+    for (let cx = Math.max(0, c0x); cx <= Math.min(CW - 1, c1x); cx++) {
+      const cls = CLS[cellIx(cx, cy)];
+      if (!cls) return false;               // land in frame is a landmark
+      if (first < 0) first = cls;
+      else if (cls !== first) return false; // a water boundary is a landmark
+    }
+  return true;
+}
+function makeThumb(tx, ty, ringColor) {
+  let W = 80;
+  while (W < 400 && featurelessWindow(tx, ty, W)) W *= 2;
+  const px = 152;                           // 2x backing for a 76px thumb
+  const c = document.createElement('canvas');
+  c.width = c.height = px; c.className = 'thumb'; c.title = 'show on chart';
+  const g = c.getContext('2d');
+  const k = px / W;
+  const x0 = tx - W / 2, y1 = ty + W / 2;
+  g.fillStyle = '#0d0a07'; g.fillRect(0, 0, px, px);
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  const crop = (src, ppt) => {
+    const vx0 = Math.max(WLD.x0, x0), vx1 = Math.min(WLD.x1, x0 + W);
+    const vy0 = Math.max(WLD.y0, y1 - W), vy1 = Math.min(WLD.y1, y1);
+    if (vx1 <= vx0 || vy1 <= vy0) return;
+    g.drawImage(src,
+      (vx0 - WLD.x0) * ppt, (WLD.y1 - vy1) * ppt, (vx1 - vx0) * ppt, (vy1 - vy0) * ppt,
+      (vx0 - x0) * k, (y1 - vy1) * k, (vx1 - vx0) * k, (vy1 - vy0) * k);
+  };
+  crop(mapMips[0].src, mapMips[0].ppt);
+  if (hazCanvas) crop(hazCanvas, 1 / CELL);
+  if (monCanvas) crop(monCanvas, 1 / CELL);
+  // the route through the frame shows the shape of the turn
+  if (routePts) {
+    g.beginPath();
+    for (let i = 0; i < routePts.length; i++) {
+      const sx = (routePts[i][0] - x0) * k, sy = (y1 - routePts[i][1]) * k;
+      if (i) g.lineTo(sx, sy); else g.moveTo(sx, sy);
+    }
+    g.strokeStyle = 'rgba(255,210,77,0.95)'; g.lineWidth = 3;
+    g.lineJoin = 'round'; g.lineCap = 'round'; g.stroke();
+  }
+  g.beginPath(); g.arc(px / 2, px / 2, 11, 0, 7);
+  g.lineWidth = 3.5; g.strokeStyle = ringColor; g.stroke();
+  if (W > 80) {
+    g.font = '24px VT323, monospace'; g.textAlign = 'right'; g.textBaseline = 'bottom';
+    g.fillStyle = '#000c'; g.fillText('×' + W / 80, px - 4, px - 2);
+    g.fillStyle = '#ffe95c'; g.fillText('×' + W / 80, px - 5, px - 3);
+  }
+  c.addEventListener('click', () => {
+    view.x = tx; view.y = ty; view.scale = Math.max(view.scale, 2.2);
+    clampView(); redraw();
+  });
+  return c;
+}
+
 // ============================================================ compass rose
 // the chart is fixed north-up now, so the rose is decorative
 function drawCompass() {
@@ -821,17 +907,25 @@ function hover(e) {
     document.body.style.cursor = 'pointer';
     return;
   }
-  // hovering a monster hunting ground?
+  // hovering a monster field?
   if (layerOn('monsters') && monsterDanger) {
     const [gx, gy] = screenToWorld(e.clientX, e.clientY);
     const [cx, cy] = tileToCell(gx, gy);
     if (cx >= 0 && cx < CW && cy >= 0 && cy < CH) {
       const i = cellIx(cx, cy);
-      if (monsterDanger[i] > 0.03 && CLS[i]) {
-        const here = (NAV.monsters || []).filter((m, mi) => monsterMask[i] & (1 << (mi & 31)));
-        show('☠ Hunting grounds',
-          here.slice(0, 4).map(m => `${m.name} (level ${m.combat ?? '?'})`).join('\n') +
-          (ship.avoidMon ? '\nroutes give these waters a wide berth' : ''));
+      const hasA = monsterDanger[i] > 0.03, hasQ = calmDanger[i] > 0.03;
+      if ((hasA || hasQ) && CLS[i]) {
+        const lines = [];
+        (NAV.monsters || []).forEach((m, mi) => {
+          const bit = 1 << (mi & 31);
+          if (hasA && isAggro(m) && (monsterMask[i] & bit))
+            lines.push(`☠ ${m.name} (level ${m.combat ?? '?'})`);
+          else if (hasQ && !isAggro(m) && (calmMask[i] & bit))
+            lines.push(`○ ${m.name} (level ${m.combat ?? '?'}) — harmless`);
+        });
+        show(hasA ? '☠ Hunting grounds' : '○ Quarry waters',
+          lines.slice(0, 5).join('\n') +
+          (hasA && ship.avoidMon ? '\nroutes give these waters a wide berth' : ''));
         document.body.style.cursor = '';
         return;
       }
@@ -865,7 +959,8 @@ function poiCatalog() {
     sub: nearestSeaName(pt.x, pt.y, 200) || '' }))) });
   cat.push({ grp: '🐙 Monster grounds', items: NAV.monsters.flatMap(m => m.fields.map(f => {
     const [x, y] = fieldCentroid(f);
-    return { name: `${m.name} — ${f.name}`, x, y, sub: `level ${f.level ?? m.combat ?? '?'}` };
+    return { name: `${m.name} — ${f.name}`, x, y,
+      sub: `level ${f.level ?? m.combat ?? '?'}${isAggro(m) ? '' : ' · harmless'}` };
   })) });
   cat.push({ grp: '🗺 Charting tasks', items: NAV.charting.map(t => ({
     name: `${t.sea || t.ocean || 'Sea'} · ${t.type || 'task'} (${t.level ?? '?'})`, x: t.x, y: t.y, sub: t.task.slice(0, 60) })) });
@@ -945,7 +1040,7 @@ function setupShipPanel() {
   ship.lambda = 1 - 55 / 100;
   document.getElementById('avoidMon').addEventListener('change', e => { ship.avoidMon = e.target.checked; reroute(); });
   document.getElementById('avoidReef').addEventListener('change', e => { ship.avoidReef = e.target.checked; reroute(); });
-  document.getElementById('hazOverlay').addEventListener('change', rebuildOverlay);
+  document.getElementById('hazOverlay').addEventListener('change', () => { rebuildOverlay(); renderLog(); });
 
   const layersBox = document.getElementById('layers');
   for (const l of LAYERS) {
@@ -964,7 +1059,8 @@ function setupShipPanel() {
   });
   legend.innerHTML = rows.join('') +
     `<span class="sw" style="background:rgb(255,40,40)"></span>red tint — closed to your current ship<br>` +
-    `<span class="sw" style="background:rgb(190,25,45)"></span>red haze — monster hunting grounds (deeper = deadlier)`;
+    `<span class="sw" style="background:rgb(190,25,45)"></span>red haze — attackers hunt here (deeper = deadlier)<br>` +
+    `<span class="sw" style="background:rgb(70,205,185)"></span>teal haze — harmless quarry for bounties`;
 
   document.getElementById('copyLink').addEventListener('click', () => {
     const u = new URL(location.href);
@@ -1049,10 +1145,13 @@ function renderLog() {
     li = document.createElement('li');
     li.innerHTML = `<span class="n">${i + 1}.</span>Sail <b>${DIRNAME[leg.dir]}</b> for ${Math.round(leg.tiles)} tiles` +
       (i < r.legs.length - 1 ? `<br><em>then turn ${sea ? 'near ' + sea : `at ${Math.round(ex)}, ${Math.round(ey)}`}</em>` : '');
+    if (i < r.legs.length - 1) li.prepend(makeThumb(ex, ey, '#ffe95c'));
     list.appendChild(li);
   });
   li = document.createElement('li');
   li.innerHTML = `<span class="n">⚓</span>Make berth at <b>${voyage.to.name}</b>`;
+  const [bx, by] = cellCenterTile(r.cells[r.cells.length - 1]);
+  li.prepend(makeThumb(bx, by, '#ff6a4d'));
   list.appendChild(li);
   tots.textContent = `${r.dist} tiles · ${r.turns} turns · ~${fmtTime(r.secs)} under way`;
   // hazards en route worth mentioning

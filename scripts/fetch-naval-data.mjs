@@ -554,6 +554,9 @@ const monsters = [];
     const wt = await pageWikitext(title);
     if (!wt) { console.log(`  [skip] no page: ${title}`); continue; }
     const combat = +(wt.match(/\|\s*combat\s*=\s*(\d+)/)?.[1] ?? 0) || null;
+    // any variant with aggressive = Yes marks the creature as a ship-attacker;
+    // the rest are harmless quarry (the app routes around attackers only)
+    const aggressive = /\|\s*aggressive\d*\s*=\s*yes/i.test(wt);
     const fields = [];
     for (const m of wt.matchAll(/\{\{LocLine([\s\S]*?)\}\}/g)) {
       const body = m[1];
@@ -567,7 +570,7 @@ const monsters = [];
       if (pts.length) fields.push({ name: loc || 'At sea', level, points: pts });
     }
     if (fields.length) monsters.push({
-      name: title.replace(/ \((monster|sea|Sailing)\)/i, ''), combat, fields,
+      name: title.replace(/ \((monster|sea|Sailing)\)/i, ''), combat, aggressive, fields,
     });
     else console.log(`  [warn] no spawn fields: ${title}`);
   }
