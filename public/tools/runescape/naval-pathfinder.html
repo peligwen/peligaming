@@ -83,8 +83,6 @@
     font-size:14px;color:var(--dim);background:#0d0a07cc;padding:2px 12px;border-radius:10px;white-space:nowrap;
     max-width:96vw;overflow:hidden;text-overflow:ellipsis;}
   #hint b{color:var(--gold);font-weight:400;}
-  #compass{position:fixed;right:300px;bottom:34px;z-index:21;width:92px;height:92px;pointer-events:none;
-    filter:drop-shadow(2px 2px 2px #000);}
   #tooltip{position:fixed;z-index:50;display:none;pointer-events:none;background:#1c150cf2;
     border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);
     padding:6px 9px;max-width:250px;font-family:"VT323",monospace;font-size:15px;color:var(--parch);line-height:1.25;}
@@ -129,7 +127,6 @@
     #log.open{display:block!important;left:10px;right:10px;width:auto;bottom:74px;max-height:56vh;z-index:27;}
     #logToggle{display:block;}
     #hdr h1{font-size:19px;} #hdr .sub{display:none;}
-    #compass{width:64px;height:64px;bottom:70px;}
   }
 </style>
 </head>
@@ -180,7 +177,6 @@
   <div class="btns"><button id="copyLink">⚓ Copy route link</button><button id="clearRoute">✕ Clear</button></div>
 </div>
 
-<canvas id="compass" width="184" height="184"></canvas>
 <div id="tooltip"></div>
 <div id="ctx"></div>
 <div id="info" class="panel"><button id="infoX">✕</button><div class="t"></div><div class="b"></div></div>
@@ -509,8 +505,7 @@ async function buildView() {
   const ps = NAV.ports.find(p => p.name === 'Port Sarim') || NAV.ports[0];
   view.x = ps.x; view.y = ps.y;
   view.scale = Math.max(SC_MIN, Math.min(1.2, innerHeight / 1400));
-  drawCompass();
-  document.fonts?.ready.then(() => { drawCompass(); redraw(); });
+  document.fonts?.ready.then(redraw);
   animate();
 }
 
@@ -666,14 +661,16 @@ function glyphIcon(glyph, color) {
 const LAYERS = [
   { key: 'ports', name: 'Ports & moorings', glyph: '⚓', color: '#ffb83f', on: true },
   { key: 'wrecks', name: 'Shipwrecks', glyph: '🏴', color: '#d9d9d9', on: true },
+  { key: 'services', name: 'Bank boats', glyph: '$', color: '#9fe36f', on: true },
   { key: 'charting', name: 'Charting tasks', glyph: '✦', color: '#6fd7c8', on: false },
   { key: 'shoals', name: 'Trawling shoals', glyph: '🐟', color: '#7fb2ff', on: false },
   { key: 'monsters', name: 'Monster grounds', glyph: '🐙', color: '#ff6a4d', on: true, mesh: true },
 ];
 const markerItems = {};   // key -> [{x,y,label,desc,poi}]
 const markerIcons = {};   // key -> prerendered icon canvas
-const MARKER_SIZE = { ports: 26, wrecks: 17, charting: 13, shoals: 17 }; // world tiles
+const MARKER_SIZE = { ports: 26, wrecks: 17, services: 22, charting: 13, shoals: 17 }; // world tiles
 const markerPx = key => Math.max(9, Math.min(34, MARKER_SIZE[key] * view.scale));
+const cap = s => s[0].toUpperCase() + s.slice(1);
 
 function buildMarkers() {
   const mk = (key, items) => {
@@ -687,10 +684,16 @@ function buildMarkers() {
     poi: { kind: 'port', name: p.name },
   })));
   mk('wrecks', NAV.wrecks.flatMap(g => g.points.map(pt => ({
-    x: pt.x, y: pt.y, label: `${g.type[0].toUpperCase() + g.type.slice(1)} shipwreck`,
+    x: pt.x, y: pt.y, label: `${cap(g.type)} shipwreck`,
     desc: g.level ? `Sailing ${g.level} to salvage` : 'Salvage site',
+    wt: g.type, level: g.level,
     poi: { kind: 'wreck', name: `${g.type} wreck (${pt.x},${pt.y})` },
   }))));
+  mk('services', (NAV.services || []).map(s => ({
+    x: s.x, y: s.y, label: s.name,
+    desc: s.desc || '',
+    poi: { kind: 'service', name: s.name },
+  })));
   mk('charting', NAV.charting.map(t => ({
     x: t.x, y: t.y, label: `Charting · ${t.sea || t.ocean || ''}`,
     desc: `${t.task}${t.level ? `\nSailing ${t.level}` : ''}${t.hazard ? ' · ' + t.hazard : ''}`,
@@ -702,15 +705,74 @@ function buildMarkers() {
     poi: { kind: 'shoal', name: `${s.name} (${pt.x},${pt.y})` },
   }))));
 }
+// ---- wreck clustering: nearby wrecks of a kind fold into one big marker
+// as you zoom out, so a salvage field reads as a single thing to click on.
+// Merging is done in screen space, so clusters split naturally as you zoom in.
+function unionGroups(pts, near) {
+  const parent = pts.map((_, i) => i);
+  const find = i => parent[i] === i ? i : (parent[i] = find(parent[i]));
+  for (let a = 0; a < pts.length; a++)
+    for (let b = a + 1; b < pts.length; b++)
+      if (near(pts[a], pts[b])) parent[find(a)] = find(b);
+  const out = new Map();
+  pts.forEach((p, i) => {
+    const r = find(i);
+    if (!out.has(r)) out.set(r, []);
+    out.get(r).push(p);
+  });
+  return [...out.values()];
+}
+const centroid = pts => {
+  let x = 0, y = 0;
+  for (const p of pts) { x += p.x; y += p.y; }
+  return [Math.round(x / pts.length), Math.round(y / pts.length)];
+};
+const CLUSTER_PX = 40;                     // merge wrecks closer than this on screen
+const clusterPx = n => Math.max(26, Math.min(48, markerPx('wrecks') * (1.6 + 0.1 * n)));
+let wreckDisp = { scale: -1, items: null };
+function wreckDisplayItems() {
+  if (wreckDisp.scale === view.scale) return wreckDisp.items;
+  const items = [];
+  const byType = new Map();
+  for (const it of markerItems.wrecks) {
+    if (!byType.has(it.wt)) byType.set(it.wt, []);
+    byType.get(it.wt).push(it);
+  }
+  for (const [, arr] of byType)
+    for (const grp of unionGroups(arr, (a, b) => Math.hypot(a.x - b.x, a.y - b.y) * view.scale < CLUSTER_PX)) {
+      if (grp.length === 1) { items.push(grp[0]); continue; }
+      const [x, y] = centroid(grp);
+      const g0 = grp[0];
+      items.push({
+        cluster: true, count: grp.length, x, y, wt: g0.wt,
+        label: `${cap(g0.wt)} shipwrecks`,
+        desc: `${grp.length} salvage sites${g0.level ? ` · Sailing ${g0.level}` : ''}\nzoom in to single out a wreck`,
+        poi: { kind: 'wrecks', name: `${g0.wt} wrecks (${x},${y})` },
+      });
+    }
+  wreckDisp = { scale: view.scale, items };
+  return items;
+}
+const layerItems = key => key === 'wrecks' ? wreckDisplayItems() : markerItems[key];
+
 function drawMarkers() {
   for (const l of LAYERS) {
     if (l.mesh || !l.on) continue;
     const icon = markerIcons[l.key];
-    const px = markerPx(l.key);
-    for (const it of markerItems[l.key]) {
+    const base = markerPx(l.key);
+    for (const it of layerItems(l.key)) {
+      const px = it.cluster ? clusterPx(it.count) : base;
       const [sx, sy] = worldToScreen(it.x, it.y);
       if (sx < -px || sx > innerWidth + px || sy < -px || sy > innerHeight + px) continue;
       ctx2.drawImage(icon, sx - px / 2, sy - px / 2, px, px);
+      if (it.cluster) {
+        const fs = Math.max(14, px * 0.44);
+        ctx2.font = `${fs}px VT323, monospace`;
+        ctx2.textAlign = 'left'; ctx2.textBaseline = 'middle';
+        const bx = sx + px * 0.3, by = sy + px * 0.38;
+        ctx2.fillStyle = '#000d'; ctx2.fillText('×' + it.count, bx + 1.5, by + 1.5);
+        ctx2.fillStyle = '#ffe95c'; ctx2.fillText('×' + it.count, bx, by);
+      }
     }
   }
 }
@@ -720,8 +782,9 @@ function markersAt(px, py) {
   const hits = [];
   for (const l of LAYERS) {
     if (l.mesh || !l.on) continue;
-    const r = markerPx(l.key) * 0.55 + 5;
-    for (const it of markerItems[l.key]) {
+    const base = markerPx(l.key) * 0.55 + 5;
+    for (const it of layerItems(l.key)) {
+      const r = it.cluster ? clusterPx(it.count) * 0.55 + 5 : base;
       const [sx, sy] = worldToScreen(it.x, it.y);
       const d = (sx - px) ** 2 + (sy - py) ** 2;
       if (d < r * r) hits.push({ ...it, layer: l, d });
@@ -857,36 +920,6 @@ function makeThumb(tx, ty, ringColor) {
     clampView(); redraw();
   });
   return c;
-}
-
-// ============================================================ compass rose
-// the chart is fixed north-up now, so the rose is decorative
-function drawCompass() {
-  const c = document.getElementById('compass');
-  const ctx = c.getContext('2d');
-  const S = c.width, R = S / 2 - 8;
-  ctx.clearRect(0, 0, S, S);
-  ctx.save(); ctx.translate(S / 2, S / 2);
-  ctx.beginPath(); ctx.arc(0, 0, R, 0, 7);
-  ctx.fillStyle = '#1c150cd0'; ctx.fill();
-  ctx.lineWidth = 3; ctx.strokeStyle = '#6f5b39'; ctx.stroke();
-  for (let i = 0; i < 16; i++) {
-    const a = i * Math.PI / 8;
-    const len = i % 4 === 0 ? R - 10 : i % 2 === 0 ? R - 22 : R - 30;
-    ctx.beginPath();
-    ctx.moveTo(Math.sin(a) * (R - 40) * (i % 4 === 0 ? 0 : 0.75), -Math.cos(a) * (R - 40) * (i % 4 === 0 ? 0 : 0.75));
-    ctx.lineTo(Math.sin(a) * len, -Math.cos(a) * len);
-    ctx.lineWidth = i % 4 === 0 ? 3 : 1.4;
-    ctx.strokeStyle = i === 0 ? '#ff6a4d' : i % 4 === 0 ? '#ffb83f' : '#a99a7e';
-    ctx.stroke();
-  }
-  ctx.font = '26px VT323, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  for (const [i, n] of [[0, 'N'], [4, 'E'], [8, 'S'], [12, 'W']]) {
-    const a = i * Math.PI / 8;
-    ctx.fillStyle = i === 0 ? '#ff6a4d' : '#f0e6d2';
-    ctx.fillText(n, Math.sin(a) * R * 0.72, -Math.cos(a) * R * 0.72);
-  }
-  ctx.restore();
 }
 
 // ============================================================ interaction
@@ -1186,11 +1219,17 @@ function clearRoute() {
 function poiCatalog() {
   const cat = [];
   cat.push({ grp: '⚓ Ports & moorings', items: NAV.ports.map(p => ({ name: p.name, x: p.x, y: p.y, sub: `Sailing ${p.level}` })) });
-  cat.push({ grp: '🏴 Shipwrecks', items: NAV.wrecks.flatMap(g => g.points.map((pt, i) => ({
-    name: `${g.type[0].toUpperCase() + g.type.slice(1)} wreck ${i + 1}`, x: pt.x, y: pt.y,
-    sub: nearestSeaName(pt.x, pt.y, 200) || `${pt.x},${pt.y}` }))) });
+  cat.push({ grp: '💰 Bank boats', items: (NAV.services || []).map(s => ({
+    name: s.name, x: s.x, y: s.y, sub: nearestSeaName(s.x, s.y, 200) || '' })) });
+  // wrecks are listed as salvage fields, not one entry per hull on the seabed
+  cat.push({ grp: '🏴 Shipwrecks', items: NAV.wrecks.flatMap(g =>
+    unionGroups(g.points, (a, b) => Math.hypot(a.x - b.x, a.y - b.y) < 90).map(f => {
+      const [x, y] = centroid(f);
+      return { name: `${cap(g.type)} wreck${f.length > 1 ? `s ×${f.length}` : ''}`, x, y,
+        sub: nearestSeaName(x, y, 200) || `${x},${y}` };
+    })) });
   cat.push({ grp: '🐟 Trawling shoals', items: NAV.shoals.flatMap(s => s.points.map((pt, i) => ({
-    name: `${s.name[0].toUpperCase() + s.name.slice(1)}${s.points.length > 1 ? ' ' + (i + 1) : ''}`, x: pt.x, y: pt.y,
+    name: `${cap(s.name)}${s.points.length > 1 ? ' ' + (i + 1) : ''}`, x: pt.x, y: pt.y,
     sub: nearestSeaName(pt.x, pt.y, 200) || '' }))) });
   cat.push({ grp: '🐙 Monster grounds', items: NAV.monsters.flatMap(m => m.fields.map(f => {
     const [x, y] = fieldCentroid(f);

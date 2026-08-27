@@ -537,6 +537,15 @@ const wrecks = [];
   console.log(`shipwreck groups: ${wrecks.length} (${wrecks.reduce((n, w) => n + w.points.length, 0)} wrecks)`);
 }
 
+// sea services — hand-curated: these have no wiki table to scrape.
+// The bank boat sits in the Barracuda Belt south of the Isle of Souls;
+// position triangulated from the charting tasks and monster fields that
+// name it ("near the bank boat", "north of the bank boat").
+const services = [
+  { name: 'Bank boat', kind: 'bank', x: 2280, y: 2535,
+    desc: 'Deposit salvage and stow supplies without setting foot ashore.' },
+];
+
 // sea charting tasks — every page that transcludes {{SeaChartRow}}
 const charting = [];
 {
@@ -859,7 +868,7 @@ const naval = {
     { name: 'Rosewood hull', speed: 3.0, level: 90 },
   ],
   seas: seaLabels,
-  ports, wrecks, charting, shoals, monsters,
+  ports, wrecks, services, charting, shoals, monsters,
 };
 writeFileSync(join(OUT, 'naval.json'), JSON.stringify(naval));
 console.log(`naval.json: ${(JSON.stringify(naval).length / 1024).toFixed(0)} KB`);
