@@ -341,17 +341,44 @@ const refs = []; // {cls, r, g, b, cx, cy}
     const cs = dominantColors(s.x, s.y);
     if (cs.length) refs.push({ cls: classIndex.open, r: cs[0][0], g: cs[0][1], b: cs[0][2], cx: s.x, cy: s.y });
   }
-  for (const [key, h] of Object.entries(HAZARDS))
-    for (const s of h.seeds)
-      for (const c of dominantColors(s.x, s.y))
-        refs.push({ cls: classIndex[key], r: c[0], g: c[1], b: c[2], cx: s.x, cy: s.y });
+  // A hazard sea's own label can float in plain water too: the wiki lists
+  // the Piscatoris Sea under crystal-flecked waters, but only its southern
+  // reaches are crystal — the label sits in the open middle of the sea, and
+  // seeding there teaches the classifier that plain blue means crystal (the
+  // phantom that reached Drumstick Isle). Drop a sea's colour refs when they
+  // all read as open water while its sibling seas wear a genuine hazard
+  // palette. The sea keeps its name, flood seed and open-seed exclusion; its
+  // hazardous parts still classify from the sibling refs.
+  const near = (c, rs) => rs.reduce((d, r) => Math.min(d, Math.hypot(c[0] - r.r, c[1] - r.g, c[2] - r.b)), Infinity);
+  const opens = refs.filter(r => r.cls === classIndex.open);
+  for (const [key, h] of Object.entries(HAZARDS)) {
+    const cols = h.seeds.map(s => dominantColors(s.x, s.y));
+    const asRefs = cs => cs.map(c => ({ r: c[0], g: c[1], b: c[2] }));
+    const dead = cols.map((cs, i) => {
+      const sib = asRefs(cols.flatMap((c2, k) => k === i ? [] : c2));
+      return sib.length > 0 && cs.length > 0 && cs.every(c => near(c, opens) + 6 < near(c, sib));
+    });
+    for (let i = 0; i < h.seeds.length; i++) {
+      if (dead[i]) {
+        // The label verifiably sits in open water, so let it anchor open
+        // there: without a close open ref, a sibling sea's identical plain
+        // tone (Zul-Egil's murk-boundary bucket) would claim the safe water
+        // around this label from hundreds of tiles away.
+        console.log(`  seed ${h.seeds[i].title} (${key}): open-water label, seeding open instead`);
+        for (const c of cols[i])
+          refs.push({ cls: classIndex.open, r: c[0], g: c[1], b: c[2], cx: h.seeds[i].x, cy: h.seeds[i].y });
+        continue;
+      }
+      for (const c of cols[i])
+        refs.push({ cls: classIndex[key], r: c[0], g: c[1], b: c[2], cx: h.seeds[i].x, cy: h.seeds[i].y });
+    }
+  }
   // Container oceans become extra seeds only when the water at their label
   // actually wears the hazard's palette. The Northern and Forgotten Ocean
   // labels sit in genuine icy/cold water that the listed seas don't spatially
   // cover; the Western, Ardent, Shrouded, Sunset and Eastern Ocean labels all
   // float over plain safe water, where a seed would mislabel open sea as
   // hazard (the "crystal waters east of Port Roberts" bug).
-  const near = (c, rs) => rs.reduce((d, r) => Math.min(d, Math.hypot(c[0] - r.r, c[1] - r.g, c[2] - r.b)), Infinity);
   for (const [key, h] of Object.entries(HAZARDS)) {
     h.keptContainers = [];
     const own = refs.filter(r => r.cls === classIndex[key]);
