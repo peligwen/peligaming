@@ -543,7 +543,7 @@ const wrecks = [];
 // name it ("near the bank boat", "north of the bank boat").
 const services = [
   { name: 'Bank boat', kind: 'bank', x: 2280, y: 2535,
-    desc: 'Deposit salvage and stow supplies without setting foot ashore.' },
+    desc: 'A full bank at sea — deposit salvage, draw supplies, and collect Grand Exchange purchases without ever disembarking.' },
 ];
 
 // sea charting tasks — every page that transcludes {{SeaChartRow}}
