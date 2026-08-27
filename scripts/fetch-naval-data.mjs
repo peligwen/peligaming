@@ -240,9 +240,19 @@ async function resolveCoords(title) {
     if (!nameM) continue;
     const key = byName[nameM[1].trim().toLowerCase()];
     if (!key) continue;
-    const links = [...row.matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)].map(m => m[1])
-      .filter(t => !/^(File|Category):/i.test(t) && !/station|helm|keel|mast|brazier|sails|Ironman|disease|Sanfew|burn|Waterskin|prayer/i.test(t));
-    HAZARDS[key].locations = [...new Set(links)];
+    // The locations cell is a nested list: '*' is the container ocean, '**'
+    // the hazard seas within it. The seas are the trusted seeds; ocean labels
+    // sit wherever the overlay centres the whole ocean — often plain safe
+    // water (the Western Ocean label floats east of Port Roberts), and a
+    // hazard seed there teaches the classifier that open-water blue means
+    // hazard. Containers are kept aside and vetted by colour in stage 3.
+    // An ocean listed bare (no '**' seas) is wholly the hazard.
+    const items = [...row.matchAll(/^(\*+)[^[\]*\n]*\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/gm)]
+      .filter(m => !/^(File|Category):/i.test(m[2]));
+    const deepest = items.reduce((d, m) => Math.max(d, m[1].length), 0);
+    HAZARDS[key].locations = [...new Set(items.filter(m => m[1].length === deepest).map(m => m[2]))];
+    HAZARDS[key].containers = deepest > 1
+      ? [...new Set(items.filter(m => m[1].length === 1).map(m => m[2]))] : [];
   }
   // Jagged reefs' "around Crandor" is prose, not a link on every revision
   HAZARDS.reefs.locations = [...new Set([...(HAZARDS.reefs.locations || []), 'Crandor', 'Aehecatl'])];
@@ -252,6 +262,11 @@ async function resolveCoords(title) {
       const c = await resolveCoords(t);
       if (c) h.seeds.push({ ...c, title: t });
       else console.log(`  [warn] ${key}: could not resolve "${t}"`);
+    }
+    h.containerSeeds = [];
+    for (const t of h.containers || []) {
+      const c = await resolveCoords(t);
+      if (c) h.containerSeeds.push({ ...c, title: t });
     }
     console.log(`hazard ${key}: ${h.seeds.length} seeds (${(h.locations || []).length} listed)`);
   }
@@ -316,7 +331,7 @@ const refs = []; // {cls, r, g, b, cx, cy}
 {
   const hazardSeas = new Set();
   for (const h of Object.values(HAZARDS))
-    for (const s of h.seeds) hazardSeas.add(`${s.x},${s.y}`);
+    for (const s of [...h.seeds, ...h.containerSeeds]) hazardSeas.add(`${s.x},${s.y}`);
   for (const s of openSeeds)
     for (const c of dominantColors(s.x, s.y))
       refs.push({ cls: classIndex.open, r: c[0], g: c[1], b: c[2], cx: s.x, cy: s.y });
@@ -330,6 +345,26 @@ const refs = []; // {cls, r, g, b, cx, cy}
     for (const s of h.seeds)
       for (const c of dominantColors(s.x, s.y))
         refs.push({ cls: classIndex[key], r: c[0], g: c[1], b: c[2], cx: s.x, cy: s.y });
+  // Container oceans become extra seeds only when the water at their label
+  // actually wears the hazard's palette. The Northern and Forgotten Ocean
+  // labels sit in genuine icy/cold water that the listed seas don't spatially
+  // cover; the Western, Ardent, Shrouded, Sunset and Eastern Ocean labels all
+  // float over plain safe water, where a seed would mislabel open sea as
+  // hazard (the "crystal waters east of Port Roberts" bug).
+  const near = (c, rs) => rs.reduce((d, r) => Math.min(d, Math.hypot(c[0] - r.r, c[1] - r.g, c[2] - r.b)), Infinity);
+  for (const [key, h] of Object.entries(HAZARDS)) {
+    h.keptContainers = [];
+    const own = refs.filter(r => r.cls === classIndex[key]);
+    const open = refs.filter(r => r.cls === classIndex.open);
+    for (const s of h.containerSeeds) {
+      const cs = dominantColors(s.x, s.y);
+      const ok = cs.length && own.length && cs.every(c => near(c, own) + 6 < near(c, open));
+      console.log(`  container ${s.title} (${key}): ${ok ? 'kept' : 'dropped'}`);
+      if (!ok) continue;
+      h.keptContainers.push(s);
+      for (const c of cs) refs.push({ cls: classIndex[key], r: c[0], g: c[1], b: c[2], cx: s.x, cy: s.y });
+    }
+  }
 }
 console.log(`colour refs: ${refs.length}`);
 for (const key of CLASS_KEYS.slice(1)) {
@@ -408,7 +443,7 @@ const preDilate = classGrid.slice(); // undilated water, for harbour dredging be
     }
   const reach = new Uint8Array(W * H);
   const stack = [];
-  for (const s of [...openSeeds, ...Object.values(HAZARDS).flatMap(h => h.seeds)]) {
+  for (const s of [...openSeeds, ...Object.values(HAZARDS).flatMap(h => [...h.seeds, ...h.keptContainers])]) {
     const i = tileAt(s.x, s.y);
     if (i >= 0 && !dilated[i]) stack.push(i);
   }
@@ -788,7 +823,7 @@ const naval = {
   hazards: Object.fromEntries(Object.entries(HAZARDS).map(([k, h]) => [k, {
     name: h.name, mode: h.mode, gate: h.gate ?? null,
     sailing: h.sailing ?? null, construction: h.construction ?? null,
-    seas: (h.seeds ?? []).map(s => s.title),
+    seas: [...(h.keptContainers ?? []), ...(h.seeds ?? [])].map(s => s.title),
   }])),
   hulls: [
     { name: 'Wooden / Oak hull', speed: 1.5, level: 1 },
