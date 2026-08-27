@@ -13,7 +13,7 @@
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{height:100%;overflow:hidden;}
   body{background:var(--bg);color:var(--parch);font-family:"Segoe UI",system-ui,sans-serif;overscroll-behavior:none;}
-  canvas{display:block;touch-action:none;}
+  canvas{display:block;touch-action:none;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;}
   .panel{background:linear-gradient(#39301fee,#291f13ee);border:2px solid;
     border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);
     box-shadow:0 4px 16px rgba(0,0,0,.6);}
@@ -90,6 +90,23 @@
     padding:6px 9px;max-width:250px;font-family:"VT323",monospace;font-size:15px;color:var(--parch);line-height:1.25;}
   #tooltip .t{color:var(--gold);font-size:17px;}
   #tooltip .d{color:var(--dim);font-size:13px;}
+  #ctx{position:fixed;z-index:55;display:none;min-width:150px;font-family:"VT323",monospace;
+    user-select:none;-webkit-user-select:none;border:1px solid #0e0b07;background:#231d13fa;
+    box-shadow:2px 3px 10px rgba(0,0,0,.7);}
+  #ctx .ttl{background:#493f2b;color:#c6b895;font-size:15px;letter-spacing:1px;padding:2px 8px 1px;
+    border-bottom:1px solid #0e0b07;}
+  #ctx .op{font-size:17px;color:#fff;padding:3px 9px 2px;white-space:nowrap;cursor:pointer;line-height:1.2;}
+  #ctx .op:hover{background:#493f2b;}
+  #ctx .op .lvl{color:#9f6;font-size:15px;}
+  #info{position:fixed;z-index:45;display:none;width:258px;padding:9px 11px;
+    font-family:"VT323",monospace;font-size:16px;line-height:1.3;color:var(--parch);}
+  #info .t{color:var(--gold);font-size:19px;text-shadow:1px 1px 0 #000;margin-bottom:3px;padding-right:18px;}
+  #info .b .dim{color:var(--dim);font-size:14px;}
+  #info .b .bad{color:var(--red);}
+  #info .b .good{color:var(--teal);}
+  #info #infoX{position:absolute;top:4px;right:5px;background:none;border:0;color:var(--dim);
+    font-family:inherit;font-size:16px;cursor:pointer;padding:2px 4px;}
+  #info #infoX:hover{color:var(--yellow);}
   #loading{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;
     gap:14px;align-items:center;justify-content:center;transition:opacity .5s;}
   #loading .t{font-family:"VT323",monospace;font-size:30px;color:var(--gold);text-shadow:2px 2px 0 #000;}
@@ -165,7 +182,9 @@
 
 <canvas id="compass" width="184" height="184"></canvas>
 <div id="tooltip"></div>
-<div id="hint"><b>drag</b> pan · <b>wheel</b> zoom · <b>click</b> set destination · <b>shift-click</b> set start</div>
+<div id="ctx"></div>
+<div id="info" class="panel"><button id="infoX">✕</button><div class="t"></div><div class="b"></div></div>
+<div id="hint"><b>drag</b> pan · <b>wheel</b> zoom · <b>tap</b> examine · <b>right-click / hold</b> sail menu</div>
 <div id="attrib">Fan-made planner. Map imagery &amp; data from the <a href="https://oldschool.runescape.wiki" target="_blank" rel="noopener">OSRS Wiki</a> (CC BY-NC-SA). RuneScape © Jagex. Times are estimates.</div>
 
 <script>
@@ -695,20 +714,22 @@ function drawMarkers() {
     }
   }
 }
-// nearest visible marker within its icon's screen radius
-function markerAt(px, py) {
-  let best = null, bd = Infinity;
+// all visible markers under the cursor, nearest first — the right-click menu
+// lists every one, like stacked options at a crowded dock
+function markersAt(px, py) {
+  const hits = [];
   for (const l of LAYERS) {
     if (l.mesh || !l.on) continue;
     const r = markerPx(l.key) * 0.55 + 5;
     for (const it of markerItems[l.key]) {
       const [sx, sy] = worldToScreen(it.x, it.y);
       const d = (sx - px) ** 2 + (sy - py) ** 2;
-      if (d < r * r && d < bd) { bd = d; best = it; }
+      if (d < r * r) hits.push({ ...it, layer: l, d });
     }
   }
-  return best;
+  return hits.sort((a, b) => a.d - b.d);
 }
+const markerAt = (px, py) => markersAt(px, py)[0] || null;
 const fieldCentroid = f => {
   let x = 0, y = 0;
   for (const [px, py] of f.points) { x += px; y += py; }
@@ -869,7 +890,12 @@ function drawCompass() {
 }
 
 // ============================================================ interaction
+// RuneScape rules: a left click (or tap) only examines what's under it;
+// committing to anything — set sail to / from — takes a right click or a
+// long-press, which opens a Choose Option menu. Shift stays unbound,
+// reserved for multi-point routes later.
 let dragging = false, moved = 0, lastX = 0, lastY = 0, downAt = 0;
+let downX = 0, downY = 0, lpTimer = 0, suppressTap = false, suppressTapOnce = false;
 function zoomAt(px, py, f) {
   const [wx, wy] = screenToWorld(px, py);
   view.scale = Math.min(SC_MAX, Math.max(SC_MIN, view.scale * f));
@@ -880,15 +906,32 @@ function zoomAt(px, py, f) {
 }
 function setupInput() {
   const el = cnv;
+  // a press anywhere off the open menu dismisses it; the dismissing tap
+  // itself does nothing else, so note it before the canvas handler runs
+  document.addEventListener('pointerdown', e => {
+    if (ctxOpen && !ctxEl.contains(e.target)) { closeMenu(); suppressTapOnce = e.target === el; }
+  }, true);
   el.addEventListener('pointerdown', e => {
+    hideTooltip();
+    const dismissedMenu = suppressTapOnce; suppressTapOnce = false;
+    if (e.button === 2) { openMenu(e.clientX, e.clientY, false); return; }
+    if (e.button > 1) return;
+    suppressTap = dismissedMenu;
     dragging = true; moved = 0;
-    lastX = e.clientX; lastY = e.clientY; downAt = Date.now();
+    downX = lastX = e.clientX; downY = lastY = e.clientY; downAt = Date.now();
     el.setPointerCapture(e.pointerId);
+    if (e.pointerType !== 'mouse') {
+      clearTimeout(lpTimer);
+      lpTimer = setTimeout(() => {                       // long-press = right click
+        if (dragging && moved < 9) { dragging = false; suppressTap = true; openMenu(downX, downY, true); }
+      }, 450);
+    }
   });
   el.addEventListener('pointermove', e => {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     if (dragging) {
       moved += Math.abs(dx) + Math.abs(dy);
+      if (moved >= 9) clearTimeout(lpTimer);
       // grab-the-map: the sea moves with the cursor
       view.x -= dx / view.scale;
       view.y += dy / view.scale;
@@ -897,18 +940,31 @@ function setupInput() {
     lastX = e.clientX; lastY = e.clientY;
   });
   el.addEventListener('pointerup', e => {
-    dragging = false;
-    if (moved < 6 && Date.now() - downAt < 450 && e.button !== 2) pick(e);
+    clearTimeout(lpTimer);
+    const wasDrag = dragging; dragging = false;
+    if (wasDrag && !suppressTap && moved < 6 && Date.now() - downAt < 450 && e.button === 0)
+      examineAt(e.clientX, e.clientY);
+    suppressTap = false;
   });
+  el.addEventListener('pointercancel', () => { clearTimeout(lpTimer); dragging = false; });
   el.addEventListener('contextmenu', e => e.preventDefault());
   el.addEventListener('wheel', e => {
     e.preventDefault();
+    closeMenu();
     zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1 / 1.13 : 1.13);
   }, { passive: false });
+  // the menu closes as soon as the mouse strays off it, RS-style
+  addEventListener('pointermove', e => {
+    if (!ctxOpen || ctxTouch) return;
+    const r = ctxEl.getBoundingClientRect(), m = 26;
+    if (e.clientX < r.left - m || e.clientX > r.right + m || e.clientY < r.top - m || e.clientY > r.bottom + m)
+      closeMenu();
+  });
+  addEventListener('keydown', e => { if (e.key === 'Escape') { closeMenu(); closeInfo(); } });
   // touch pinch: zoom about the midpoint between the two fingers
   let pinch = 0;
   el.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) { pinch = tdist(e); dragging = false; }
+    if (e.touches.length === 2) { pinch = tdist(e); dragging = false; clearTimeout(lpTimer); closeMenu(); }
   }, { passive: true });
   el.addEventListener('touchmove', e => {
     if (e.touches.length === 2) {
@@ -929,7 +985,9 @@ function clampView() {
 }
 
 const tooltip = document.getElementById('tooltip');
+const hideTooltip = () => { tooltip.style.display = 'none'; document.body.style.cursor = ''; };
 function hover(e) {
+  if (ctxOpen) { hideTooltip(); return; }
   const show = (title, desc) => {
     tooltip.innerHTML = `<div class="t">${title}</div><div class="d">${(desc || '').replace(/\n/g, '<br>')}</div>`;
     tooltip.style.display = 'block';
@@ -968,20 +1026,162 @@ function hover(e) {
   }
   tooltip.style.display = 'none'; document.body.style.cursor = '';
 }
-function pick(e) {
-  const hit = markerAt(e.clientX, e.clientY);
-  if (hit) {
-    setEndpoint(e.shiftKey ? 'from' : 'to', { name: hit.label, x: hit.x, y: hit.y });
-    return;
-  }
-  const [gx, gy] = screenToWorld(e.clientX, e.clientY);
-  if (gx < WLD.x0 || gx > WLD.x1 || gy < WLD.y0 || gy > WLD.y1) return;
+// ---------------------------------------------------------------- Choose Option menu
+const ctxEl = document.getElementById('ctx');
+let ctxOpen = false, ctxTouch = false;
+function closeMenu() { if (ctxOpen) { ctxEl.style.display = 'none'; ctxOpen = false; } }
+ctxEl.addEventListener('contextmenu', e => e.preventDefault());
+
+const cellAt = (gx, gy) => {
+  const [cx, cy] = tileToCell(gx, gy);
+  return (cx < 0 || cx >= CW || cy < 0 || cy >= CH) ? -1 : cellIx(cx, cy);
+};
+
+function menuEntries(px, py) {
+  const opts = [];
+  const [gx, gy] = screenToWorld(px, py);
+  const inWorld = gx >= WLD.x0 && gx <= WLD.x1 && gy >= WLD.y0 && gy <= WLD.y1;
   const x = Math.round(gx), y = Math.round(gy);
-  setEndpoint(e.shiftKey ? 'from' : 'to', { name: `Open water (${x}, ${y})`, x, y });
+  const hits = markersAt(px, py).slice(0, 3);
+  for (const h of hits) {
+    const c = h.layer.color;
+    const poi = { name: h.label, x: h.x, y: h.y };
+    opts.push({ a: 'Sail to', t: h.label, c, f: () => setEndpoint('to', poi) });
+    opts.push({ a: 'Sail from', t: h.label, c, f: () => setEndpoint('from', poi) });
+    opts.push({ a: 'Examine', t: h.label, c, f: () => showMarkerCard(h, px, py) });
+  }
+  const i = inWorld ? cellAt(gx, gy) : -1;
+  const water = i >= 0 && CLS[i] > 0;
+  if (water) {
+    opts.push({ a: 'Sail here', f: () => setEndpoint('to', { name: `Open water (${x}, ${y})`, x, y }) });
+    opts.push({ a: 'Sail from here', f: () => setEndpoint('from', { name: `Open water (${x}, ${y})`, x, y }) });
+  }
+  if (water && layerOn('monsters') && monsterDanger) {
+    (NAV.monsters || []).forEach((m, mi) => {
+      const bit = 1 << (mi & 31);
+      const near = isAggro(m) ? monsterDanger[i] > 0.03 && (monsterMask[i] & bit)
+                              : calmDanger[i] > 0.03 && (calmMask[i] & bit);
+      if (near) opts.push({ a: 'Examine', t: m.name, c: '#ffff00', lvl: m.combat, f: () => showWaterCard(px, py) });
+    });
+  }
+  if (!hits.length && i >= 0)
+    opts.push({ a: 'Examine', t: water ? (nearestSeaName(x, y) || 'the waters') : 'the shore',
+      c: '#6fd7c8', f: () => showWaterCard(px, py) });
+  if (voyage.from || voyage.to) opts.push({ a: 'Clear route', f: clearRoute });
+  opts.push({ a: 'Cancel', f: () => {} });
+  return opts;
+}
+
+function openMenu(px, py, touch) {
+  closeMenu(); hideTooltip();
+  ctxEl.innerHTML = '';
+  const ttl = document.createElement('div');
+  ttl.className = 'ttl'; ttl.textContent = 'Choose Option';
+  ctxEl.appendChild(ttl);
+  for (const o of menuEntries(px, py)) {
+    const d = document.createElement('div');
+    d.className = 'op';
+    d.innerHTML = o.a + (o.t ? ` <span style="color:${o.c || '#ff0'}">${o.t}</span>` : '') +
+      (o.lvl != null ? ` <span class="lvl">(level-${o.lvl})</span>` : '');
+    d.addEventListener('click', () => { closeMenu(); o.f(); });
+    ctxEl.appendChild(d);
+  }
+  // open centred under the cursor like the game's menu, clamped on-screen
+  ctxEl.style.visibility = 'hidden'; ctxEl.style.display = 'block';
+  const w = ctxEl.offsetWidth, h = ctxEl.offsetHeight;
+  ctxEl.style.left = Math.max(4, Math.min(innerWidth - w - 4, px - w / 2)) + 'px';
+  ctxEl.style.top = Math.max(4, Math.min(innerHeight - h - 4, py - 9)) + 'px';
+  ctxEl.style.visibility = 'visible';
+  ctxOpen = true; ctxTouch = !!touch;
+}
+
+// ---------------------------------------------------------------- examine cards
+const infoEl = document.getElementById('info');
+function closeInfo() { infoEl.style.display = 'none'; }
+document.getElementById('infoX').addEventListener('click', closeInfo);
+// a right click on the card falls through to the sail menu for the spot below
+infoEl.addEventListener('contextmenu', e => { e.preventDefault(); openMenu(e.clientX, e.clientY, false); });
+
+function showCard(title, html, px, py) {
+  infoEl.querySelector('.t').textContent = title;
+  infoEl.querySelector('.b').innerHTML = html;
+  infoEl.style.display = 'block';
+  const w = infoEl.offsetWidth, h = infoEl.offsetHeight;
+  infoEl.style.left = Math.max(6, Math.min(innerWidth - w - 6, px + 14)) + 'px';
+  infoEl.style.top = Math.max(60, Math.min(innerHeight - h - 40, py + 12)) + 'px';
+}
+
+function showMarkerCard(hit, px, py) {
+  const lines = (hit.desc || '').split('\n').filter(Boolean).map(t => `<div>${t}</div>`);
+  const sea = nearestSeaName(hit.x, hit.y, 200);
+  lines.push(`<div class="dim">${sea ? sea + ' · ' : ''}(${hit.x}, ${hit.y})</div>`);
+  showCard(hit.label, lines.join(''), px, py);
+}
+
+function monsterLines(i) {
+  const out = [];
+  if (!monsterDanger || i < 0) return out;
+  const hasA = monsterDanger[i] > 0.03, hasQ = calmDanger[i] > 0.03;
+  (NAV.monsters || []).forEach((m, mi) => {
+    const bit = 1 << (mi & 31);
+    if (hasA && isAggro(m) && (monsterMask[i] & bit))
+      out.push(`<div class="bad">☠ ${m.name} (level-${m.combat ?? '?'}) hunts these waters</div>`);
+    else if (hasQ && !isAggro(m) && (calmMask[i] & bit))
+      out.push(`<div class="dim">○ ${m.name} (level-${m.combat ?? '?'}) — harmless quarry</div>`);
+  });
+  return out.slice(0, 5);
+}
+
+function showWaterCard(px, py) {
+  const [gx, gy] = screenToWorld(px, py);
+  const x = Math.round(gx), y = Math.round(gy);
+  const i = cellAt(gx, gy);
+  const lines = [];
+  let title;
+  if (i < 0 || !CLS[i]) {
+    title = 'Dry land';
+    lines.push('<div>Solid ground. Ships want water under the keel.</div>');
+  } else {
+    const key = NAV.classes[CLS[i]];
+    const sea = nearestSeaName(x, y);
+    if (key === 'open') {
+      title = sea || 'Open water';
+      lines.push('<div>Open water — clear sailing.</div>');
+    } else {
+      const h = NAV.hazards[key];
+      title = sea || h.name;
+      if (h.mode === 'wall')
+        lines.push(`<div class="bad">${h.name} — no ship can cross.</div>`);
+      else if (h.mode === 'penalty')
+        lines.push(`<div class="bad">${h.name} — sailable, but they'll chew the hull.</div>`);
+      else if (ship.fac[key])
+        lines.push(`<div class="good">${h.name} — open to you (${h.gate.toLowerCase()} fitted).</div>`);
+      else
+        lines.push(`<div class="bad">${h.name} — needs ${h.gate.toLowerCase()} (Sailing ${h.sailing}, Construction ${h.construction}).</div>`);
+    }
+    lines.push(...monsterLines(i));
+  }
+  lines.push(`<div class="dim">(${x}, ${y})</div>`);
+  showCard(title, lines.join(''), px, py);
+}
+
+// left click / tap: examine whatever is under it, never commit to anything
+function examineAt(px, py) {
+  const hit = markerAt(px, py);
+  if (hit) { showMarkerCard(hit, px, py); return; }
+  const [gx, gy] = screenToWorld(px, py);
+  if (gx < WLD.x0 || gx > WLD.x1 || gy < WLD.y0 || gy > WLD.y1) { closeInfo(); return; }
+  showWaterCard(px, py);
 }
 
 // ============================================================ UI state
 const voyage = { from: null, to: null, route: null };
+
+function clearRoute() {
+  voyage.from = voyage.to = voyage.route = null;
+  document.getElementById('fromIn').value = document.getElementById('toIn').value = '';
+  drawRoute(null); renderLog(); updateStats(); history.replaceState(null, '', location.pathname);
+}
 
 function poiCatalog() {
   const cat = [];
@@ -1104,11 +1304,7 @@ function setupShipPanel() {
     document.getElementById('copyLink').textContent = '✓ Copied';
     setTimeout(() => document.getElementById('copyLink').textContent = '⚓ Copy route link', 1400);
   });
-  document.getElementById('clearRoute').addEventListener('click', () => {
-    voyage.from = voyage.to = voyage.route = null;
-    document.getElementById('fromIn').value = document.getElementById('toIn').value = '';
-    drawRoute(null); renderLog(); updateStats(); history.replaceState(null, '', location.pathname);
-  });
+  document.getElementById('clearRoute').addEventListener('click', clearRoute);
   document.getElementById('panelToggle').addEventListener('click', () => {
     document.getElementById('panel').classList.toggle('open');
     document.getElementById('log').classList.remove('open');
