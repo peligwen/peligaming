@@ -12,6 +12,11 @@
 // cache (or pass --fresh) to pull the current map version. The committed
 // outputs are what deploys — this script is local tooling only.
 //
+// After a refresh, run `python3 scripts/audit-naval-grid.py --repair` and
+// review its report: it applies photo-referenced repairs for seas whose map
+// colours the classifier here misses (the southern kelp sea, the Backwater),
+// and verifies every port, wreck, shoal and charting task can be routed to.
+//
 // Hazard waters (fetid, icy, ...) are not published as polygons anywhere, but
 // they are rendered with distinct water colours on the map tiles. We learn a
 // reference colour per hazard by sampling around each hazard's seas (the sea
@@ -567,6 +572,10 @@ const charting = [];
       const get = k => body.match(new RegExp(`\\|\\s*${k}\\s*=\\s*([^|}]+)`))?.[1]?.trim();
       const loc = get('location')?.match(/(\d{3,4}),\s*(\d{3,4})/);
       if (!loc) continue;
+      // tasks located inside caves carry the cave-plane offset (y + 6400 in
+      // OSRS map space); fold them back onto the overworld spot they sit above
+      let ty = +loc[2];
+      if (ty > WY1 && ty - 6400 >= WY0 && ty - 6400 <= WY1) ty -= 6400;
       charting.push({
         task: stripWiki(body.split('|')[0]),
         level: +(get('level') ?? 0) || null,
@@ -574,7 +583,7 @@ const charting = [];
         hazard: get('hazard') || null,
         sea: get('sea') || null,
         ocean: get('ocean') || null,
-        x: +loc[1], y: +loc[2],
+        x: +loc[1], y: ty,
       });
     }
   });
@@ -721,21 +730,30 @@ const cellClass = new Uint8Array(CW * CH);
       }
     }
 
+  // connectivity must mirror the app's movement model: 8-neighbour steps over
+  // SAILABLE water only. Wall seas (eternal cold, sunbaked, ...) render on the
+  // map but block routes, so water joined to the sea only through a wall is
+  // landlocked for the pathfinder even though it looks connected here.
+  const WALLS = new Set(Object.entries(HAZARDS)
+    .filter(([, h]) => h.mode === 'wall').map(([k]) => classIndex[k]));
+  const isSailable = i => cellClass[i] !== 0 && !WALLS.has(cellClass[i]);
   const mainComponent = () => {
-    // largest connected component of cellClass
+    // largest 8-connected component of sailable water (walls stay comp -1)
     const comp = new Int32Array(CW * CH).fill(-1);
     let bestId = -1, bestSize = 0, id = 0;
     for (let s = 0; s < CW * CH; s++) {
-      if (!cellClass[s] || comp[s] >= 0) continue;
+      if (!isSailable(s) || comp[s] >= 0) continue;
       let size = 0;
       const stack = [s]; comp[s] = id;
       while (stack.length) {
         const i = stack.pop(); size++;
         const x = i % CW, y = (i / CW) | 0;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
-          if (x + dx >= 0 && x + dx < CW && y + dy >= 0 && y + dy < CH) {
-            const j = (y + dy) * CW + x + dx;
-            if (cellClass[j] && comp[j] < 0) { comp[j] = id; stack.push(j); }
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= CW || ny < 0 || ny >= CH) continue;
+            const j = ny * CW + nx;
+            if (isSailable(j) && comp[j] < 0) { comp[j] = id; stack.push(j); }
           }
       }
       if (size > bestSize) { bestSize = size; bestId = id; }
@@ -755,7 +773,7 @@ const cellClass = new Uint8Array(CW * CH);
     for (let dy = -10; dy <= 10; dy++)
       for (let dx = -10; dx <= 10; dx++) {
         const nx = pcx + dx, ny = pcy + dy;
-        if (nx < 0 || nx >= CW || ny < 0 || ny >= CH || !cellClass[ny * CW + nx]) continue;
+        if (nx < 0 || nx >= CW || ny < 0 || ny >= CH || !isSailable(ny * CW + nx)) continue;
         const d = dx * dx + dy * dy;
         if (d < nd) { nd = d; nearest = ny * CW + nx; }
       }
@@ -785,7 +803,9 @@ const cellClass = new Uint8Array(CW * CH);
     if (hit < 0) { console.log(`  [warn] cannot dredge a channel to ${p.name}`); continue; }
     let n = 0;
     for (let i = hit; i >= 0; i = prev[i]) {
-      if (!cellClass[i]) { cellClass[i] = cellPre[i] || classIndex.open; n++; }
+      // a dredged channel must be sailable — never assign a wall class
+      const pre = cellPre[i];
+      if (!cellClass[i]) { cellClass[i] = pre && !WALLS.has(pre) ? pre : classIndex.open; n++; }
     }
     dredged++;
     console.log(`  dredged ${n} cells to ${p.name}`);
@@ -793,12 +813,36 @@ const cellClass = new Uint8Array(CW * CH);
   console.log(`harbour dredging: ${dredged} ports connected`);
 
   // prune isolated pockets: keep only the main sea, so any snap in the app
-  // lands on water a route can actually leave
+  // lands on water a route can actually leave. A landlocked pocket is absorbed
+  // whole into the wall sea that seals it off (it usually IS that sea, just
+  // rendered in a plain-water colour), or turned to land when no wall borders
+  // it. Wall cells themselves always stay — they are display-only.
   const { comp, bestId } = mainComponent();
+  const pocketCells = new Map(); // comp id -> cell list
+  for (let i = 0; i < CW * CH; i++) {
+    if (!isSailable(i) || comp[i] === bestId || comp[i] < 0) continue;
+    if (!pocketCells.has(comp[i])) pocketCells.set(comp[i], []);
+    pocketCells.get(comp[i]).push(i);
+  }
   let pruned = 0;
-  for (let i = 0; i < CW * CH; i++)
-    if (cellClass[i] && comp[i] !== bestId) { cellClass[i] = 0; pruned++; }
-  console.log(`pruned ${pruned} isolated water cells`);
+  for (const cells of pocketCells.values()) {
+    const walls = new Map();
+    for (const i of cells) {
+      const x = i % CW, y = (i / CW) | 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || nx >= CW || ny < 0 || ny >= CH) continue;
+          const c = cellClass[ny * CW + nx];
+          if (WALLS.has(c)) walls.set(c, (walls.get(c) || 0) + 1);
+        }
+    }
+    let into = 0, bn = 0;
+    for (const [c, n] of walls) if (n > bn) { bn = n; into = c; }
+    for (const i of cells) cellClass[i] = into;
+    pruned += cells.length;
+  }
+  console.log(`absorbed ${pruned} landlocked water cells across ${pocketCells.size} pockets`);
 
   // drop ports with no navigable water in reach (interior docks like
   // Wyrmscraig Cavern live on other map planes and cannot be routed to)

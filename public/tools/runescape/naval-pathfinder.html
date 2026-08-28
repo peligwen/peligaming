@@ -1774,8 +1774,9 @@ function loadHash() {
     const p = new URLSearchParams(location.hash.slice(1));
     const parse = v => { const m = v.split(','); return { x: +m[0], y: +m[1], name: m.slice(2).join(',') || 'Open water' }; };
     if (p.get('hull') !== null) { ship.hull = Math.min(NAV.hulls.length - 1, +p.get('hull') || 0); document.getElementById('hullSel').value = ship.hull; }
-    const fac = p.get('fac') || '';
-    gearHazKeys().forEach((k, i) => {
+    const fac = p.get('fac');
+    if (fac !== null) gearHazKeys().forEach((k, i) => {
+      // only a link that names a loadout overrides the default-fitted ship
       ship.fac[k] = fac[i] === '1';
       const box = document.querySelector(`#facilities input[data-k="${k}"]`);
       if (box) box.checked = ship.fac[k];
