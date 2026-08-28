@@ -70,6 +70,8 @@ for (const tool of TOOLS) {
 </head>
 <body>
 <div id="root"></div>
+<a class="peligaming-home" href="../../" title="peligaming — all tools">⌂ peligaming</a>
+<style>.peligaming-home{position:fixed;right:10px;bottom:8px;z-index:9999;font:12px/1 system-ui,sans-serif;color:#fff;opacity:.35;text-decoration:none;background:#00000073;padding:4px 9px;border-radius:12px;transition:opacity .15s}.peligaming-home:hover{opacity:1}</style>
 <script>${js}</script>
 </body>
 </html>
