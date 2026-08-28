@@ -578,12 +578,19 @@ const charting = [];
       });
     }
   });
-  // the same row template can be transcluded on both a sea page and its ocean page
-  const seen = new Set();
-  for (let i = charting.length - 1; i >= 0; i--) {
-    const k = `${charting[i].x},${charting[i].y},${charting[i].task}`;
-    if (seen.has(k)) charting.splice(i, 1); else seen.add(k);
+  // the same row template can be transcluded on both a sea page and its ocean
+  // page, sometimes with the task text trimmed differently — dedupe by spot,
+  // type and level, keeping the fuller wording. This also keeps x,y,level
+  // unique, which the pathfinder uses as the saved-progress key.
+  const byKey = new Map();
+  for (const t of charting) {
+    const k = `${t.x},${t.y},${t.type},${t.level}`;
+    const prev = byKey.get(k);
+    if (!prev) byKey.set(k, t);
+    else if ((t.task || '').length > (prev.task || '').length) prev.task = t.task;
   }
+  charting.length = 0;
+  charting.push(...byKey.values());
   console.log(`charting tasks: ${charting.length}`);
 }
 
