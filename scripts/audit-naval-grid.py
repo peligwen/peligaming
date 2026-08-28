@@ -81,6 +81,15 @@ if REPAIR:
     lab, sizes = components(pass_mask)
     main = int(np.argmax(sizes))
 
+    # Cells whose map colour is clearly terrain (green or brown dominating
+    # blue). Dark shadowed land can read as murky water, and the upstream
+    # classifier sometimes water-marks it; if such cells fed the grow's
+    # references the grow could bridge real land (the Feldip strip north of
+    # Corsair Cove was one such bridge). They are barred from references
+    # and from being painted.
+    _r, _g, _b = cellcol[..., 0], cellcol[..., 1], cellcol[..., 2]
+    landish = (_g > _b + 18) | ((_r > _b + 25) & (_g > _b + 10))
+
     # A. grow the main sea over colour-matching land. Each box names the seas
     # the classifier dropped; references are the box's own classified water.
     GROW_BOXES = [
@@ -96,7 +105,7 @@ if REPAIR:
         inbox = np.zeros((CH, CW), bool); inbox[cy0:cy1, cx0:cx1] = True
         refs = {}
         for ci in PASSABLE:
-            cc = cellcol[(cls == ci) & inbox]
+            cc = cellcol[(cls == ci) & inbox & ~landish]
             if len(cc) >= 30:
                 refs[ci] = cc[np.random.default_rng(7).choice(len(cc), min(len(cc), 500), replace=False)]
         if not refs:
@@ -122,7 +131,7 @@ if REPAIR:
                     xx = x + dx
                     if xx < cx0 or xx >= cx1 or seen[yy, xx]: continue
                     seen[yy, xx] = True
-                    if cls[yy, xx] != 0: continue
+                    if cls[yy, xx] != 0 or landish[yy, xx]: continue
                     ci, d = match(cellcol[yy, xx])
                     if d <= thr:
                         cls[yy, xx] = ci
@@ -132,25 +141,42 @@ if REPAIR:
             f'{n} {CLASSES[ci]}' for ci, n in painted.most_common()) or 'nothing'))
 
     # B. absorb landlocked pockets into the wall sea that seals them
-    pass_mask = np.isin(cls, PASSABLE)
-    lab, sizes = components(pass_mask)
-    main = int(np.argmax(sizes))
-    absorbed = Counter()
-    for pid, sz in enumerate(sizes):
-        if not pid or pid == main: continue
-        ys, xs = np.nonzero(lab == pid)
-        walls = Counter()
-        for x, y in zip(xs, ys):
-            for dy in (-1, 0, 1):
-                for dx in (-1, 0, 1):
-                    yy, xx = y + dy, x + dx
-                    if 0 <= yy < CH and 0 <= xx < CW and cls[yy, xx] in WALL:
-                        walls[cls[yy, xx]] += 1
-        into = walls.most_common(1)[0][0] if walls else 0
-        cls[ys, xs] = into
-        absorbed[into] += sz
-    print('absorb pockets: ' + (', '.join(
-        f'{n} cells -> {CLASSES[ci]}' for ci, n in absorbed.most_common()) or 'none found'))
+    def absorb_pockets():
+        lab, sizes = components(np.isin(cls, PASSABLE))
+        main = int(np.argmax(sizes))
+        absorbed = Counter()
+        for pid, sz in enumerate(sizes):
+            if not pid or pid == main: continue
+            ys, xs = np.nonzero(lab == pid)
+            walls = Counter()
+            for x, y in zip(xs, ys):
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        yy, xx = y + dy, x + dx
+                        if 0 <= yy < CH and 0 <= xx < CW and cls[yy, xx] in WALL:
+                            walls[cls[yy, xx]] += 1
+            into = walls.most_common(1)[0][0] if walls else 0
+            cls[ys, xs] = into
+            absorbed[into] += sz
+        print('absorb pockets: ' + (', '.join(
+            f'{n} cells -> {CLASSES[ci]}' for ci, n in absorbed.most_common()) or 'none found'))
+        return lab, main
+
+    absorb_pockets()
+
+    # B2. de-water: terrain the classifier water-marked. The upstream build
+    # reads dark shadowed land (the Gu'Tanoth scorch, shoreline cliff shadow)
+    # as murky open water, and where such a strip touches the coast it joins
+    # the sea and routes sail overland. Every passable cell whose map colour
+    # is terrain goes back to land, and whatever that strands is absorbed.
+    # (The port/target snap audit below is the guard on this heuristic: no
+    # port moved and only one charting snap grew, 1.0 -> 4.0 cells, when it
+    # was introduced.)
+    bad = landish & np.isin(cls, PASSABLE)
+    if bad.any():
+        print(f'de-water: {int(bad.sum())} land-coloured cells were marked sailable')
+        cls[bad] = 0
+        absorb_pockets()
 
     # C. cave-plane charting coordinates back to the overworld
     moved = 0
