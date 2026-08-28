@@ -58,16 +58,13 @@
   .sliderbox{margin:6px 0 2px;}
   .sliderbox .ends{display:flex;justify-content:space-between;font-family:"VT323",monospace;font-size:14px;color:var(--dim);}
   input[type=range]{width:100%;accent-color:var(--gold);}
-  .via{display:flex;gap:6px;align-items:center;font-family:"VT323",monospace;font-size:15px;
-    color:var(--parch);padding:1px 0 1px 6px;}
-  .via .n{color:var(--gold);}
-  .via .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .via button{background:none;border:0;color:var(--dim);cursor:pointer;font-family:inherit;font-size:14px;padding:0 4px;}
-  .via button:hover{color:var(--red);}
   .subhint{font-family:"VT323",monospace;font-size:12.5px;color:#7a6c52;padding-left:6px;margin-bottom:4px;}
   .lvlin{display:flex;align-items:center;gap:3px;font-size:14px;}
   .lvlin input{width:46px;font-family:"VT323",monospace;font-size:16px;color:var(--yellow);background:#1c150c;
     border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);padding:3px 5px;outline:none;}
+  .lvlrow label{width:92px;flex:none;white-space:nowrap;font-size:15px;}
+  .lvlrow input[type=range]{flex:1;width:auto;}
+  .lvlrow .lvlval{font-family:"VT323",monospace;font-size:17px;color:var(--yellow);width:22px;text-align:right;}
   #chartTypes{display:grid;grid-template-columns:1fr 1fr;gap:0 8px;}
   .drop div.lk{opacity:.55;}
   .altline{font-family:"VT323",monospace;font-size:15px;line-height:1.3;margin-top:5px;cursor:pointer;}
@@ -165,16 +162,14 @@
   <div class="frow"><label>From</label><div class="pick"><input id="fromIn" placeholder="port, wreck, sea…" autocomplete="off"><div class="drop" id="fromDrop"></div></div></div>
   <div class="frow"><label>To</label><div class="pick"><input id="toIn" placeholder="destination…" autocomplete="off"><div class="drop" id="toDrop"></div></div>
     <button id="swapBtn" title="Swap">⇅</button></div>
-  <div id="viaList"></div>
-  <div class="subhint">shift-click the chart to add ports of call</div>
 
   <h2>Your ship</h2>
   <div class="frow"><label style="width:auto">Hull</label><select id="hullSel"></select></div>
-  <div class="frow"><label style="width:auto">Levels</label>
-    <span class="lvlin" title="your Sailing level">⛵<input id="lvlSail" type="number" min="1" max="99" placeholder="—" inputmode="numeric"></span>
-    <span class="lvlin" title="your Construction level">🔨<input id="lvlCon" type="number" min="1" max="99" placeholder="—" inputmode="numeric"></span>
-  </div>
-  <div class="subhint">set them and the chart greys what you can't use yet</div>
+  <div class="frow lvlrow"><label title="your Sailing level">⛵ Sailing</label>
+    <input id="lvlSail" type="range" min="1" max="99" value="99"><span class="lvlval" id="lvlSailV">99</span></div>
+  <div class="frow lvlrow"><label title="your Construction level">🔨 Constr.</label>
+    <input id="lvlCon" type="range" min="1" max="99" value="99"><span class="lvlval" id="lvlConV">99</span></div>
+  <div class="subhint">fittings within your levels check themselves — untick any you'd rather sail without</div>
   <div id="facilities"></div>
 
   <h2>Course plotting</h2>
@@ -212,7 +207,7 @@
 <div id="tooltip"></div>
 <div id="ctx"></div>
 <div id="info" class="panel"><button id="infoX">✕</button><div class="t"></div><div class="b"></div></div>
-<div id="hint"><b>drag</b> pan · <b>wheel</b> zoom · <b>tap</b> examine · <b>right-click / hold</b> sail menu · <b>shift-click</b> add stop</div>
+<div id="hint"><b>drag</b> pan · <b>wheel</b> zoom · <b>tap</b> examine · <b>right-click / hold</b> sail menu</div>
 <div id="attrib">Fan-made planner. Map imagery &amp; data from the <a href="https://oldschool.runescape.wiki" target="_blank" rel="noopener">OSRS Wiki</a> (CC BY-NC-SA). RuneScape © Jagex. Times are estimates.</div>
 
 <script>
@@ -267,9 +262,14 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem('navpf.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem('navpf.' + k, JSON.stringify(v)); } catch {} },
 };
-const prof = Object.assign({ s: null, c: null }, store.get('profile', {}));  // Sailing / Construction
-const lockedItem = it => !!(prof.s && it.level && it.level > prof.s);
+const prof = Object.assign({ s: 99, c: 99 }, store.get('profile', {}));  // Sailing / Construction
+prof.s = prof.s ?? 99; prof.c = prof.c ?? 99;   // older saves used null for "unset"
+const lockedItem = it => !!(it.level && it.level > prof.s);
 const lockNote = it => lockedItem(it) ? `\n🔒 needs Sailing ${it.level} — beyond your ${prof.s}` : '';
+const fittingLocked = key => {
+  const h = NAV.hazards[key];
+  return (h.sailing || 0) > prof.s || (h.construction || 0) > prof.c;
+};
 
 // ============================================================ pathfinder
 // 16 grid-aligned winds: 8 unit steps + 8 knight-move half-winds.
@@ -881,13 +881,12 @@ function drawSeaLabels() {
 }
 
 // ---------------------------------------------------------------- route drawing
-let routePts = null, routeSegs = null, routeStops = null, altPts = null, altDaring = false;
+let routePts = null, routeLegs = null, altPts = null, altDaring = false;
 function drawRoute(route) {
   if (route && route.cells) {
-    routePts = route.cells.map(cellCenterTile);   // whole voyage, for turn thumbnails
-    routeSegs = route.segs.map(s => ({ pts: s.cells.map(cellCenterTile), legs: s.legs }));
-    routeStops = route.stops;
-  } else routePts = routeSegs = routeStops = null;
+    routePts = route.cells.map(cellCenterTile);
+    routeLegs = route.legs;
+  } else routePts = routeLegs = null;
   altPts = voyage.alt ? voyage.alt.cells.map(cellCenterTile) : null;
   altDaring = !!voyage.alt?.daring;
   redraw();
@@ -911,26 +910,23 @@ function drawRouteLayer() {
       Math.max(2, Math.min(6, 4.2 * view.scale)));
     ctx2.setLineDash([]);
   }
-  if (!routeSegs) return;
-  for (const seg of routeSegs) {
-    strokeWorldLine(seg.pts, 'rgba(255,210,77,0.9)', Math.max(2.5, Math.min(9, 6.4 * view.scale)));
-    // waypoint flags at each turn
-    for (let li = 0; li < seg.legs.length - 1; li++) {
-      const [x, y] = cellCenterTile(seg.legs[li].end);
-      const [sx, sy] = worldToScreen(x, y);
-      ctx2.strokeStyle = '#6f5b39'; ctx2.lineWidth = 2;
-      ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.lineTo(sx, sy - 15); ctx2.stroke();
-      ctx2.fillStyle = '#ffb83f';
-      ctx2.beginPath(); ctx2.moveTo(sx, sy - 15); ctx2.lineTo(sx + 10, sy - 11); ctx2.lineTo(sx, sy - 7);
-      ctx2.closePath(); ctx2.fill();
-    }
+  if (!routePts) return;
+  strokeWorldLine(routePts, 'rgba(255,210,77,0.9)', Math.max(2.5, Math.min(9, 6.4 * view.scale)));
+  // waypoint flags at each turn
+  for (let li = 0; li < routeLegs.length - 1; li++) {
+    const [x, y] = cellCenterTile(routeLegs[li].end);
+    const [sx, sy] = worldToScreen(x, y);
+    ctx2.strokeStyle = '#6f5b39'; ctx2.lineWidth = 2;
+    ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.lineTo(sx, sy - 15); ctx2.stroke();
+    ctx2.fillStyle = '#ffb83f';
+    ctx2.beginPath(); ctx2.moveTo(sx, sy - 15); ctx2.lineTo(sx + 10, sy - 11); ctx2.lineTo(sx, sy - 7);
+    ctx2.closePath(); ctx2.fill();
   }
-  // beacons: teal anchorage, gold ports of call, red landfall
-  const ringColor = { start: '#6fd7c8', via: '#ffb83f', end: '#ff6a4d' };
-  for (const st of routeStops) {
-    const [sx, sy] = worldToScreen(st.xy[0], st.xy[1]);
+  // beacons: teal anchorage, red landfall
+  for (const [pt, col] of [[routePts[0], '#6fd7c8'], [routePts[routePts.length - 1], '#ff6a4d']]) {
+    const [sx, sy] = worldToScreen(pt[0], pt[1]);
     ctx2.beginPath(); ctx2.arc(sx, sy, Math.max(7, Math.min(16, 11 * view.scale)), 0, 7);
-    ctx2.lineWidth = 3.5; ctx2.strokeStyle = ringColor[st.kind]; ctx2.stroke();
+    ctx2.lineWidth = 3.5; ctx2.strokeStyle = col; ctx2.stroke();
   }
 }
 
@@ -1027,8 +1023,7 @@ function makeThumb(tx, ty, ringColor) {
 // ============================================================ interaction
 // RuneScape rules: a left click (or tap) only examines what's under it;
 // committing to anything — set sail to / from — takes a right click or a
-// long-press, which opens a Choose Option menu. Shift-click grows the
-// voyage: anchorage first, then destination, then ports of call between.
+// long-press, which opens a Choose Option menu.
 let dragging = false, moved = 0, lastX = 0, lastY = 0, downAt = 0;
 let downX = 0, downY = 0, lpTimer = 0, suppressTap = false, suppressTapOnce = false;
 function zoomAt(px, py, f) {
@@ -1078,8 +1073,7 @@ function setupInput() {
     clearTimeout(lpTimer);
     const wasDrag = dragging; dragging = false;
     if (wasDrag && !suppressTap && moved < 6 && Date.now() - downAt < 450 && e.button === 0) {
-      if (e.shiftKey) addStopAt(e.clientX, e.clientY);
-      else if (measure) { measure = null; redraw(); }   // a tap puts the ruler away
+      if (measure) { measure = null; redraw(); }   // a tap puts the ruler away
       else examineAt(e.clientX, e.clientY);
     }
     suppressTap = false;
@@ -1089,7 +1083,7 @@ function setupInput() {
   el.addEventListener('wheel', e => {
     e.preventDefault();
     closeMenu();
-    zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1 / 1.13 : 1.13);
+    zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1 / 1.08 : 1.08);
   }, { passive: false });
   // the menu closes as soon as the mouse strays off it, RS-style
   addEventListener('pointermove', e => {
@@ -1203,9 +1197,6 @@ function menuEntries(px, py) {
   const top = hits[0] ? { name: hits[0].label, x: hits[0].x, y: hits[0].y, c: hits[0].layer.color }
             : water ? { name: `Open water (${x}, ${y})`, x, y } : null;
   if (top) {
-    if (voyage.from || voyage.to)
-      opts.push(hits[0] ? { a: 'Add stop', t: top.name, c: top.c, f: () => addStop(top) }
-                        : { a: 'Add stop here', f: () => addStop(top) });
     opts.push({ a: 'Find nearest bank', c: '#9fe36f', f: () => findNearestBank(top.x, top.y, top.name) });
     opts.push(measure
       ? { a: 'Stop measuring', f: () => { measure = null; redraw(); } }
@@ -1339,53 +1330,13 @@ function examineAt(px, py) {
 }
 
 // ============================================================ UI state
-const voyage = { from: null, to: null, via: [], route: null, alt: null, bankRun: false };
-const voyagePoints = () => [voyage.from, ...voyage.via, voyage.to].filter(Boolean);
+const voyage = { from: null, to: null, route: null, alt: null, bankRun: false };
 
 function clearRoute() {
   voyage.from = voyage.to = voyage.route = voyage.alt = null;
-  voyage.via = []; voyage.bankRun = false;
-  renderViaList();
+  voyage.bankRun = false;
   document.getElementById('fromIn').value = document.getElementById('toIn').value = '';
   drawRoute(null); renderLog(); updateStats(); history.replaceState(null, '', location.pathname);
-}
-
-function renderViaList() {
-  const box = document.getElementById('viaList');
-  box.innerHTML = '';
-  voyage.via.forEach((v, i) => {
-    const d = document.createElement('div');
-    d.className = 'via';
-    d.innerHTML = `<span class="n">⚓${i + 1}</span><span class="nm">${v.name}</span><button title="remove this stop">✕</button>`;
-    d.querySelector('button').addEventListener('click', () => {
-      voyage.via.splice(i, 1); renderViaList(); reroute();
-    });
-    box.appendChild(d);
-  });
-}
-
-// shift-click (or the menu's Add stop) grows the voyage at its end:
-// anchorage first, then destination, then ports of call slot in between
-function addStop(poi) {
-  const p = { name: poi.name, x: poi.x, y: poi.y };
-  voyage.bankRun = false;
-  if (!voyage.from) { voyage.from = p; document.getElementById('fromIn').value = p.name; }
-  else if (!voyage.to) { voyage.to = p; document.getElementById('toIn').value = p.name; }
-  else {
-    voyage.via.push(voyage.to);
-    voyage.to = p;
-    document.getElementById('toIn').value = p.name;
-    renderViaList();
-  }
-  reroute();
-}
-function addStopAt(px, py) {
-  const hit = markerAt(px, py);
-  if (hit) return addStop({ name: hit.label, x: hit.x, y: hit.y });
-  const [gx, gy] = screenToWorld(px, py);
-  const i = cellAt(gx, gy);
-  if (i < 0 || !CLS[i]) return;          // no ports of call on dry land
-  addStop({ name: `Open water (${Math.round(gx)}, ${Math.round(gy)})`, x: Math.round(gx), y: Math.round(gy) });
 }
 
 // every place a hold can be emptied: the bank boats plus each port with a bank
@@ -1409,7 +1360,6 @@ function findNearestBank(x, y, fromName) {
       innerWidth / 2 - 130, 80);
     return;
   }
-  voyage.via = []; renderViaList();
   setEndpoint('from', { name: fromName, x, y }, true);
   setEndpoint('to', best, true);
   voyage.bankRun = true;
@@ -1505,7 +1455,6 @@ function setupPickers() {
   }
   document.getElementById('swapBtn').addEventListener('click', () => {
     [voyage.from, voyage.to] = [voyage.to, voyage.from];
-    voyage.via.reverse(); renderViaList();
     document.getElementById('fromIn').value = voyage.from?.name || '';
     document.getElementById('toIn').value = voyage.to?.name || '';
     reroute();
@@ -1530,12 +1479,16 @@ function setupShipPanel() {
   hullSel.addEventListener('change', () => { ship.hull = +hullSel.value; reroute(); });
 
   const sIn = document.getElementById('lvlSail'), cIn = document.getElementById('lvlCon');
-  if (prof.s) sIn.value = prof.s;
-  if (prof.c) cIn.value = prof.c;
+  const sV = document.getElementById('lvlSailV'), cV = document.getElementById('lvlConV');
+  sIn.value = prof.s; cIn.value = prof.c;
+  const showLvls = () => { sV.textContent = sIn.value; cV.textContent = cIn.value; };
+  showLvls();
   const onProf = () => {
-    const p = el => { const v = parseInt(el.value, 10); return v >= 1 && v <= 99 ? v : null; };
-    prof.s = p(sIn); prof.c = p(cIn);
+    prof.s = +sIn.value; prof.c = +cIn.value;
+    showLvls();
     store.set('profile', prof);
+    // everything within reach comes fitted by default; untick to sail without
+    for (const key of gearHazKeys()) ship.fac[key] = !fittingLocked(key);
     applyProfile();
   };
   sIn.addEventListener('input', onProf);
@@ -1544,10 +1497,10 @@ function setupShipPanel() {
   const facBox = document.getElementById('facilities');
   for (const key of gearHazKeys()) {
     const h = NAV.hazards[key];
-    ship.fac[key] = false;
+    ship.fac[key] = !fittingLocked(key);
     const l = document.createElement('label');
     l.className = 'ck';
-    l.innerHTML = `<input type="checkbox" data-k="${key}"><span>${h.gate}
+    l.innerHTML = `<input type="checkbox" data-k="${key}"${ship.fac[key] ? ' checked' : ''}><span>${h.gate}
       <span class="lvl">${h.sailing ? ` ⛵${h.sailing}` : ''}${h.construction ? ` 🔨${h.construction}` : ''}</span>
       <small>opens ${h.name.toLowerCase()}</small></span>`;
     l.querySelector('input').addEventListener('change', e => {
@@ -1615,21 +1568,21 @@ function applyProfile() {
   const hullSel = document.getElementById('hullSel');
   NAV.hulls.forEach((h, i) => {
     const o = hullSel.options[i];
-    o.disabled = !!(prof.s && h.level > prof.s);
+    o.disabled = h.level > prof.s;
     o.textContent = `${h.name} — ${h.speed} tiles/tick${o.disabled ? ` (⛵${h.level})` : ''}`;
   });
-  if (prof.s && NAV.hulls[ship.hull].level > prof.s) {
+  if (NAV.hulls[ship.hull].level > prof.s) {
     let best = 0;
     NAV.hulls.forEach((h, i) => { if (h.level <= prof.s) best = i; });
     ship.hull = best; hullSel.value = best;
   }
   for (const key of gearHazKeys()) {
-    const h = NAV.hazards[key];
     const box = document.querySelector(`#facilities input[data-k="${key}"]`);
-    const locked = !!(prof.s && h.sailing > prof.s) || !!(prof.c && h.construction > prof.c);
+    const locked = fittingLocked(key);
+    if (locked) ship.fac[key] = false;
     box.disabled = locked;
     box.closest('label').style.opacity = locked ? 0.5 : '';
-    if (locked && ship.fac[key]) { ship.fac[key] = false; box.checked = false; }
+    box.checked = ship.fac[key];
   }
   rebuildOverlay(); redraw(); reroute();
 }
@@ -1680,51 +1633,28 @@ function reroute() {
   rerouteTimer = setTimeout(doRoute, 60);
 }
 function doRoute() {
-  const pts = voyagePoints();
   voyage.alt = null;
-  if (pts.length < 2) {
+  if (!voyage.from || !voyage.to) {
     voyage.route = null;
     drawRoute(null); renderLog(); updateStats();
     return;
   }
-  // chain the voyage stop by stop; every leg between calls is its own passage
-  const chain = () => {
-    const segs = [];
-    for (let i = 1; i < pts.length; i++) {
-      const r = findRoute([pts[i - 1].x, pts[i - 1].y], [pts[i].x, pts[i].y]);
-      if (!r.cells) return { fail: r.fail, failLeg: [pts[i - 1], pts[i]] };
-      segs.push(r);
-    }
-    const out = { segs, cells: [], legs: [], dist: 0, turns: 0, secs: 0 };
-    for (const s of segs) {
-      out.cells.push(...(out.cells.length ? s.cells.slice(1) : s.cells));
-      out.legs.push(...s.legs);
-      out.dist += s.dist; out.turns += s.turns; out.secs += s.secs;
-    }
-    return out;
-  };
-  const r = chain();
+  const run = () => findRoute([voyage.from.x, voyage.from.y], [voyage.to.x, voyage.to.y]);
+  const r = run();
   voyage.route = r;
   if (!r.cells) {
     if (r.fail === null)
       // blocked by loadout — find out what would open the way
-      r.needed = diagnoseRoute([r.failLeg[0].x, r.failLeg[0].y], [r.failLeg[1].x, r.failLeg[1].y]);
-  } else {
-    r.stops = [{ xy: cellCenterTile(r.segs[0].cells[0]), kind: 'start' }];
-    r.segs.forEach((s, i) => r.stops.push({
-      xy: cellCenterTile(s.cells[s.cells.length - 1]),
-      kind: i === r.segs.length - 1 ? 'end' : 'via',
-    }));
-    // the ghost line: the same voyage with the caution settings flipped
-    if (document.getElementById('showAlt').checked) {
-      const saved = [ship.avoidMon, ship.avoidReef];
-      const daring = ship.avoidMon || ship.avoidReef;
-      ship.avoidMon = ship.avoidReef = !daring;
-      const a = chain();
-      [ship.avoidMon, ship.avoidReef] = saved;
-      if (a.cells && (a.dist !== r.dist || a.turns !== r.turns))
-        voyage.alt = { cells: a.cells, dist: a.dist, turns: a.turns, secs: a.secs, daring };
-    }
+      r.needed = diagnoseRoute([voyage.from.x, voyage.from.y], [voyage.to.x, voyage.to.y]);
+  } else if (document.getElementById('showAlt').checked) {
+    // the ghost line: the same passage with the caution settings flipped
+    const saved = [ship.avoidMon, ship.avoidReef];
+    const daring = ship.avoidMon || ship.avoidReef;
+    ship.avoidMon = ship.avoidReef = !daring;
+    const a = run();
+    [ship.avoidMon, ship.avoidReef] = saved;
+    if (a.cells && (a.dist !== r.dist || a.turns !== r.turns))
+      voyage.alt = { cells: a.cells, dist: a.dist, turns: a.turns, secs: a.secs, daring };
   }
   drawRoute(r.cells ? r : null);
   renderLog();
@@ -1741,62 +1671,50 @@ function updateStats() {
   const r = voyage.route;
   if (!r || !r.cells) { el.innerHTML = ''; return; }
   el.innerHTML = `<span class="chip"><b>${r.dist}</b> tiles</span>
-    <span class="chip"><b>${r.turns}</b> turn${r.turns === 1 ? '' : 's'}</span>` +
-    (voyage.via.length ? `<span class="chip"><b>${voyage.via.length}</b> stop${voyage.via.length === 1 ? '' : 's'}</span>` : '') +
-    `<span class="chip">~<b>${fmtTime(r.secs)}</b></span>`;
+    <span class="chip"><b>${r.turns}</b> turn${r.turns === 1 ? '' : 's'}</span>
+    <span class="chip">~<b>${fmtTime(r.secs)}</b></span>`;
 }
 
 function renderLog() {
   const log = document.getElementById('log');
   const r = voyage.route;
-  const pts = voyagePoints();
-  if (pts.length < 2 || !r) { log.style.display = 'none'; return; }
+  if (!voyage.from || !voyage.to || !r) { log.style.display = 'none'; return; }
   log.style.display = 'block';
-  document.getElementById('logRoute').textContent = pts.map(p => p.name).join(' → ');
+  document.getElementById('logRoute').textContent = `${voyage.from.name} → ${voyage.to.name}`;
   const list = document.getElementById('legList');
   const warn = document.getElementById('logWarn');
   const tots = document.getElementById('logTotals');
   const altBox = document.getElementById('logAlt');
   list.innerHTML = ''; warn.textContent = ''; tots.textContent = ''; altBox.innerHTML = '';
   if (!r.cells) {
-    const legNote = r.failLeg && pts.length > 2 ? `${r.failLeg[0].name} → ${r.failLeg[1].name}: ` : '';
-    if (r.fail) warn.textContent = legNote + r.fail;
+    if (r.fail) warn.textContent = r.fail;
     else if (r.needed && r.needed.length)
-      warn.innerHTML = `${legNote}No route for this ship. You need:<br>` +
+      warn.innerHTML = `No route for this ship. You need:<br>` +
         r.needed.map(k => {
           const h = NAV.hazards[k];
-          return `• ${h.gate} (Sailing ${h.sailing})${prof.s && h.sailing > prof.s ? ` — above your ⛵${prof.s}` : ''}`;
+          return `• ${h.gate} (Sailing ${h.sailing})${h.sailing > prof.s ? ` — above your ⛵${prof.s}` : ''}`;
         }).join('<br>');
-    else warn.textContent = legNote + 'No sailable route — even with every fitting. The far shore may be beyond today’s seas.';
+    else warn.textContent = 'No sailable route — even with every fitting. The far shore may be beyond today’s seas.';
     return;
   }
   let li = document.createElement('li');
-  li.innerHTML = `<span class="n">☸</span>Weigh anchor at <b>${pts[0].name}</b>`;
+  li.innerHTML = `<span class="n">☸</span>Weigh anchor at <b>${voyage.from.name}</b>`;
   list.appendChild(li);
-  let n = 0;
-  r.segs.forEach((seg, si) => {
-    const lastSeg = si === r.segs.length - 1;
-    seg.legs.forEach((leg, i) => {
-      const [ex, ey] = cellCenterTile(leg.end);
-      const midTurn = i < seg.legs.length - 1;
-      const sea = midTurn ? nearestSeaName(ex, ey) : null;
-      li = document.createElement('li');
-      li.innerHTML = `<span class="n">${++n}.</span>Sail <b>${DIRNAME[leg.dir]}</b> for ${Math.round(leg.tiles)} tiles` +
-        (midTurn ? `<br><em>then turn ${sea ? 'near ' + sea : `at ${Math.round(ex)}, ${Math.round(ey)}`}</em>` : '');
-      if (midTurn) li.prepend(makeThumb(ex, ey, '#ffe95c'));
-      list.appendChild(li);
-    });
-    const [bx, by] = cellCenterTile(seg.cells[seg.cells.length - 1]);
+  r.legs.forEach((leg, i) => {
+    const [ex, ey] = cellCenterTile(leg.end);
+    const midTurn = i < r.legs.length - 1;
+    const sea = midTurn ? nearestSeaName(ex, ey) : null;
     li = document.createElement('li');
-    if (lastSeg) {
-      li.innerHTML = `<span class="n">⚓</span>Make berth at <b>${pts[pts.length - 1].name}</b>`;
-      li.prepend(makeThumb(bx, by, '#ff6a4d'));
-    } else {
-      li.innerHTML = `<span class="n">⚓</span>Call at <b>${pts[si + 1].name}</b>`;
-      li.prepend(makeThumb(bx, by, '#ffb83f'));
-    }
+    li.innerHTML = `<span class="n">${i + 1}.</span>Sail <b>${DIRNAME[leg.dir]}</b> for ${Math.round(leg.tiles)} tiles` +
+      (midTurn ? `<br><em>then turn ${sea ? 'near ' + sea : `at ${Math.round(ex)}, ${Math.round(ey)}`}</em>` : '');
+    if (midTurn) li.prepend(makeThumb(ex, ey, '#ffe95c'));
     list.appendChild(li);
   });
+  const [bx, by] = cellCenterTile(r.cells[r.cells.length - 1]);
+  li = document.createElement('li');
+  li.innerHTML = `<span class="n">⚓</span>Make berth at <b>${voyage.to.name}</b>`;
+  li.prepend(makeThumb(bx, by, '#ff6a4d'));
+  list.appendChild(li);
   tots.textContent = `${r.dist} tiles · ${r.turns} turns · ~${fmtTime(r.secs)} under way` +
     (voyage.bankRun ? ` · ~${fmtTime(r.secs * 2)} there & back` : '');
   // hazards en route worth mentioning
@@ -1837,7 +1755,6 @@ function routeHash(full) {
   const p = new URLSearchParams();
   if (voyage.from) p.set('from', `${voyage.from.x},${voyage.from.y},${voyage.from.name}`);
   if (voyage.to) p.set('to', `${voyage.to.x},${voyage.to.y},${voyage.to.name}`);
-  if (voyage.via.length) p.set('via', voyage.via.map(v => `${v.x},${v.y},${v.name}`).join(';'));
   p.set('opt', Math.round((1 - ship.lambda) * 100));
   p.set('hull', ship.hull);
   p.set('fac', gearHazKeys().map(k => ship.fac[k] ? 1 : 0).join(''));
@@ -1878,7 +1795,6 @@ function loadHash() {
       clampView();
     }
     rebuildOverlay();
-    if (p.get('via')) { voyage.via = p.get('via').split(';').map(parse); renderViaList(); }
     if (p.get('from')) setEndpoint('from', parse(p.get('from')));
     if (p.get('to')) setEndpoint('to', parse(p.get('to')));
     redraw();
