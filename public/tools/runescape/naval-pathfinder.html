@@ -58,6 +58,22 @@
   .sliderbox{margin:6px 0 2px;}
   .sliderbox .ends{display:flex;justify-content:space-between;font-family:"VT323",monospace;font-size:14px;color:var(--dim);}
   input[type=range]{width:100%;accent-color:var(--gold);}
+  .via{display:flex;gap:6px;align-items:center;font-family:"VT323",monospace;font-size:15px;
+    color:var(--parch);padding:1px 0 1px 6px;}
+  .via .n{color:var(--gold);}
+  .via .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .via button{background:none;border:0;color:var(--dim);cursor:pointer;font-family:inherit;font-size:14px;padding:0 4px;}
+  .via button:hover{color:var(--red);}
+  .subhint{font-family:"VT323",monospace;font-size:12.5px;color:#7a6c52;padding-left:6px;margin-bottom:4px;}
+  .lvlin{display:flex;align-items:center;gap:3px;font-size:14px;}
+  .lvlin input{width:46px;font-family:"VT323",monospace;font-size:16px;color:var(--yellow);background:#1c150c;
+    border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);padding:3px 5px;outline:none;}
+  #chartTypes{display:grid;grid-template-columns:1fr 1fr;gap:0 8px;}
+  .drop div.lk{opacity:.55;}
+  .altline{font-family:"VT323",monospace;font-size:15px;line-height:1.3;margin-top:5px;cursor:pointer;}
+  .altline:hover{filter:brightness(1.3);}
+  .altline.daring{color:var(--red);}
+  .altline.cautious{color:var(--teal);}
   .lgd{font-size:11.5px;line-height:1.7;color:var(--dim);}
   .sw{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border:1px solid #0008;}
   #log{position:fixed;left:10px;bottom:34px;z-index:24;width:300px;max-height:44vh;overflow-y:auto;
@@ -149,9 +165,16 @@
   <div class="frow"><label>From</label><div class="pick"><input id="fromIn" placeholder="port, wreck, sea…" autocomplete="off"><div class="drop" id="fromDrop"></div></div></div>
   <div class="frow"><label>To</label><div class="pick"><input id="toIn" placeholder="destination…" autocomplete="off"><div class="drop" id="toDrop"></div></div>
     <button id="swapBtn" title="Swap">⇅</button></div>
+  <div id="viaList"></div>
+  <div class="subhint">shift-click the chart to add ports of call</div>
 
   <h2>Your ship</h2>
   <div class="frow"><label style="width:auto">Hull</label><select id="hullSel"></select></div>
+  <div class="frow"><label style="width:auto">Levels</label>
+    <span class="lvlin" title="your Sailing level">⛵<input id="lvlSail" type="number" min="1" max="99" placeholder="—" inputmode="numeric"></span>
+    <span class="lvlin" title="your Construction level">🔨<input id="lvlCon" type="number" min="1" max="99" placeholder="—" inputmode="numeric"></span>
+  </div>
+  <div class="subhint">set them and the chart greys what you can't use yet</div>
   <div id="facilities"></div>
 
   <h2>Course plotting</h2>
@@ -161,11 +184,19 @@
   </div>
   <label class="ck"><input type="checkbox" id="avoidMon" checked>Steer clear of sea monsters<small>ship-attackers get a wide berth; harmless quarry never bends the course</small></label>
   <label class="ck"><input type="checkbox" id="avoidReef" checked>Avoid jagged reefs<small>uncheck to brave hull damage at Crandor &amp; Aehecatl</small></label>
+  <label class="ck"><input type="checkbox" id="showAlt" checked>Ghost the road not taken<small>dashed line: the same voyage with your caution flipped</small></label>
 
   <h2>Chart layers</h2>
   <div id="layers"></div>
   <label class="ck"><input type="checkbox" id="hazOverlay" checked>Tint hazardous waters</label>
   <div class="lgd" id="legend"></div>
+
+  <h2>Charting tasks</h2>
+  <div id="chartTypes"></div>
+  <div class="frow" style="margin-top:4px"><label style="width:auto">Max level</label>
+    <span class="lvlin"><input id="chartMaxLvl" type="number" min="1" max="99" placeholder="99" inputmode="numeric"></span></div>
+  <label class="ck"><input type="checkbox" id="chartHideDone">Hide charted tasks</label>
+  <div class="lgd" id="chartProg"></div>
 </div>
 
 <div id="log" class="panel">
@@ -174,13 +205,14 @@
   <ol id="legList"></ol>
   <div class="tot" id="logTotals"></div>
   <div class="warnbox" id="logWarn"></div>
+  <div id="logAlt"></div>
   <div class="btns"><button id="copyLink">⚓ Copy route link</button><button id="clearRoute">✕ Clear</button></div>
 </div>
 
 <div id="tooltip"></div>
 <div id="ctx"></div>
 <div id="info" class="panel"><button id="infoX">✕</button><div class="t"></div><div class="b"></div></div>
-<div id="hint"><b>drag</b> pan · <b>wheel</b> zoom · <b>tap</b> examine · <b>right-click / hold</b> sail menu</div>
+<div id="hint"><b>drag</b> pan · <b>wheel</b> zoom · <b>tap</b> examine · <b>right-click / hold</b> sail menu · <b>shift-click</b> add stop</div>
 <div id="attrib">Fan-made planner. Map imagery &amp; data from the <a href="https://oldschool.runescape.wiki" target="_blank" rel="noopener">OSRS Wiki</a> (CC BY-NC-SA). RuneScape © Jagex. Times are estimates.</div>
 
 <script>
@@ -228,6 +260,16 @@ const ship = {
   avoidMon: true,
   avoidReef: true,
 };
+
+// ============================================================ captain's profile
+// levels and per-device prefs live in localStorage — never in share links
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('navpf.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('navpf.' + k, JSON.stringify(v)); } catch {} },
+};
+const prof = Object.assign({ s: null, c: null }, store.get('profile', {}));  // Sailing / Construction
+const lockedItem = it => !!(prof.s && it.level && it.level > prof.s);
+const lockNote = it => lockedItem(it) ? `\n🔒 needs Sailing ${it.level} — beyond your ${prof.s}` : '';
 
 // ============================================================ pathfinder
 // 16 grid-aligned winds: 8 unit steps + 8 knight-move half-winds.
@@ -549,6 +591,7 @@ function draw() {
   drawRouteLayer();
   drawMarkers();
   drawSeaLabels();
+  drawMeasure();
 }
 
 // hazard overlay canvas: static hazard tints + red for waters your ship can't take
@@ -679,7 +722,7 @@ function buildMarkers() {
     markerItems[key] = items;
   };
   mk('ports', NAV.ports.map(p => ({
-    x: p.x, y: p.y, label: p.name,
+    x: p.x, y: p.y, label: p.name, level: p.level,
     desc: `Sailing ${p.level}${p.req ? ' · ' + p.req : ''}${p.facilities ? '\n' + ['shipwright', 'notice board', 'salvaging', 'ledger', 'crew registrar', 'bank'].filter((f, i) => Object.values(p.facilities)[i]).join(' · ') : ''}`,
     poi: { kind: 'port', name: p.name },
   })));
@@ -697,6 +740,7 @@ function buildMarkers() {
   mk('charting', NAV.charting.map(t => ({
     x: t.x, y: t.y, label: `Charting · ${t.sea || t.ocean || ''}`,
     desc: `${t.task}${t.level ? `\nSailing ${t.level}` : ''}${t.hazard ? ' · ' + t.hazard : ''}`,
+    ctype: t.type || 'Generic', level: t.level, ck: chartKey(t),
     poi: { kind: 'chart', name: `Charting (${t.x},${t.y})` },
   })));
   mk('shoals', NAV.shoals.flatMap(s => s.points.map(pt => ({
@@ -744,7 +788,7 @@ function wreckDisplayItems() {
       const [x, y] = centroid(grp);
       const g0 = grp[0];
       items.push({
-        cluster: true, count: grp.length, x, y, wt: g0.wt,
+        cluster: true, count: grp.length, x, y, wt: g0.wt, level: g0.level,
         label: `${cap(g0.wt)} shipwrecks`,
         desc: `${grp.length} salvage sites${g0.level ? ` · Sailing ${g0.level}` : ''}\nzoom in to single out a wreck`,
         poi: { kind: 'wrecks', name: `${g0.wt} wrecks (${x},${y})` },
@@ -753,7 +797,19 @@ function wreckDisplayItems() {
   wreckDisp = { scale: view.scale, items };
   return items;
 }
-const layerItems = key => key === 'wrecks' ? wreckDisplayItems() : markerItems[key];
+// ---- charting task prefs: which kinds show, and which are already charted
+const chartKey = t => `${t.x},${t.y},${t.level ?? ''}`;
+const chartDone = new Set(store.get('charted', []));
+const chartPrefs = Object.assign({ types: null, maxLvl: null, hideDone: false }, store.get('chartprefs', {}));
+const saveCharted = () => store.set('charted', [...chartDone]);
+function chartingDisplayItems() {
+  return markerItems.charting.filter(it =>
+    (!chartPrefs.types || chartPrefs.types.includes(it.ctype)) &&
+    !(chartPrefs.maxLvl && it.level > chartPrefs.maxLvl) &&
+    !(chartPrefs.hideDone && chartDone.has(it.ck)));
+}
+const layerItems = key => key === 'wrecks' ? wreckDisplayItems()
+  : key === 'charting' ? chartingDisplayItems() : markerItems[key];
 
 function drawMarkers() {
   for (const l of LAYERS) {
@@ -764,7 +820,16 @@ function drawMarkers() {
       const px = it.cluster ? clusterPx(it.count) : base;
       const [sx, sy] = worldToScreen(it.x, it.y);
       if (sx < -px || sx > innerWidth + px || sy < -px || sy > innerHeight + px) continue;
+      const done = it.ck && chartDone.has(it.ck);
+      if (done || lockedItem(it)) ctx2.globalAlpha = 0.38;   // charted, or beyond your level
       ctx2.drawImage(icon, sx - px / 2, sy - px / 2, px, px);
+      ctx2.globalAlpha = 1;
+      if (done) {
+        ctx2.font = `${Math.max(12, px * 0.7)}px VT323, monospace`;
+        ctx2.textAlign = 'left'; ctx2.textBaseline = 'middle';
+        ctx2.fillStyle = '#000d'; ctx2.fillText('✓', sx + px * 0.16 + 1, sy + px * 0.3 + 1);
+        ctx2.fillStyle = '#9fe36f'; ctx2.fillText('✓', sx + px * 0.16, sy + px * 0.3);
+      }
       if (it.cluster) {
         const fs = Math.max(14, px * 0.44);
         ctx2.font = `${fs}px VT323, monospace`;
@@ -816,43 +881,80 @@ function drawSeaLabels() {
 }
 
 // ---------------------------------------------------------------- route drawing
-let routePts = null, routeLegs = null;
+let routePts = null, routeSegs = null, routeStops = null, altPts = null, altDaring = false;
 function drawRoute(route) {
   if (route && route.cells) {
-    routePts = route.cells.map(c => cellCenterTile(c));
-    routeLegs = route.legs;
-  } else routePts = routeLegs = null;
+    routePts = route.cells.map(cellCenterTile);   // whole voyage, for turn thumbnails
+    routeSegs = route.segs.map(s => ({ pts: s.cells.map(cellCenterTile), legs: s.legs }));
+    routeStops = route.stops;
+  } else routePts = routeSegs = routeStops = null;
+  altPts = voyage.alt ? voyage.alt.cells.map(cellCenterTile) : null;
+  altDaring = !!voyage.alt?.daring;
   redraw();
 }
-function drawRouteLayer() {
-  if (!routePts) return;
+function strokeWorldLine(pts, style, width) {
   ctx2.beginPath();
-  routePts.forEach(([x, y], i) => {
+  pts.forEach(([x, y], i) => {
     const [sx, sy] = worldToScreen(x, y);
     if (i) ctx2.lineTo(sx, sy); else ctx2.moveTo(sx, sy);
   });
-  ctx2.strokeStyle = 'rgba(255,210,77,0.9)';
-  ctx2.lineWidth = Math.max(2.5, Math.min(9, 6.4 * view.scale));
+  ctx2.strokeStyle = style;
+  ctx2.lineWidth = width;
   ctx2.lineJoin = 'round'; ctx2.lineCap = 'round';
   ctx2.stroke();
-  // waypoint flags at each turn
-  for (let li = 0; li < routeLegs.length - 1; li++) {
-    const [x, y] = cellCenterTile(routeLegs[li].end);
-    const [sx, sy] = worldToScreen(x, y);
-    ctx2.strokeStyle = '#6f5b39'; ctx2.lineWidth = 2;
-    ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.lineTo(sx, sy - 15); ctx2.stroke();
-    ctx2.fillStyle = '#ffb83f';
-    ctx2.beginPath(); ctx2.moveTo(sx, sy - 15); ctx2.lineTo(sx + 10, sy - 11); ctx2.lineTo(sx, sy - 7);
-    ctx2.closePath(); ctx2.fill();
+}
+function drawRouteLayer() {
+  // the road not taken: same voyage, caution settings flipped, drawn as a ghost
+  if (altPts) {
+    ctx2.setLineDash([11, 9]);
+    strokeWorldLine(altPts, altDaring ? 'rgba(255,106,77,0.55)' : 'rgba(111,215,200,0.55)',
+      Math.max(2, Math.min(6, 4.2 * view.scale)));
+    ctx2.setLineDash([]);
   }
-  // start / end beacons
-  const ring = (pt, color) => {
-    const [sx, sy] = worldToScreen(pt[0], pt[1]);
+  if (!routeSegs) return;
+  for (const seg of routeSegs) {
+    strokeWorldLine(seg.pts, 'rgba(255,210,77,0.9)', Math.max(2.5, Math.min(9, 6.4 * view.scale)));
+    // waypoint flags at each turn
+    for (let li = 0; li < seg.legs.length - 1; li++) {
+      const [x, y] = cellCenterTile(seg.legs[li].end);
+      const [sx, sy] = worldToScreen(x, y);
+      ctx2.strokeStyle = '#6f5b39'; ctx2.lineWidth = 2;
+      ctx2.beginPath(); ctx2.moveTo(sx, sy); ctx2.lineTo(sx, sy - 15); ctx2.stroke();
+      ctx2.fillStyle = '#ffb83f';
+      ctx2.beginPath(); ctx2.moveTo(sx, sy - 15); ctx2.lineTo(sx + 10, sy - 11); ctx2.lineTo(sx, sy - 7);
+      ctx2.closePath(); ctx2.fill();
+    }
+  }
+  // beacons: teal anchorage, gold ports of call, red landfall
+  const ringColor = { start: '#6fd7c8', via: '#ffb83f', end: '#ff6a4d' };
+  for (const st of routeStops) {
+    const [sx, sy] = worldToScreen(st.xy[0], st.xy[1]);
     ctx2.beginPath(); ctx2.arc(sx, sy, Math.max(7, Math.min(16, 11 * view.scale)), 0, 7);
-    ctx2.lineWidth = 3.5; ctx2.strokeStyle = color; ctx2.stroke();
-  };
-  ring(routePts[0], '#6fd7c8');
-  ring(routePts[routePts.length - 1], '#ff6a4d');
+    ctx2.lineWidth = 3.5; ctx2.strokeStyle = ringColor[st.kind]; ctx2.stroke();
+  }
+}
+
+// ---------------------------------------------------------------- measure ruler
+let measure = null;      // ruler anchor {x, y} in world tiles
+let cursorPt = null;     // tile under the mouse, the ruler's free end
+function drawMeasure() {
+  if (!measure || !cursorPt) return;
+  const [ax, ay] = worldToScreen(measure.x, measure.y);
+  const [bx, by] = worldToScreen(cursorPt[0], cursorPt[1]);
+  ctx2.setLineDash([9, 7]);
+  ctx2.beginPath(); ctx2.moveTo(ax, ay); ctx2.lineTo(bx, by);
+  ctx2.strokeStyle = '#f0e6d2d9'; ctx2.lineWidth = 2; ctx2.stroke();
+  ctx2.setLineDash([]);
+  ctx2.beginPath(); ctx2.arc(ax, ay, 7, 0, 7);
+  ctx2.strokeStyle = '#f0e6d2d9'; ctx2.lineWidth = 2.5; ctx2.stroke();
+  const dx = cursorPt[0] - measure.x, dy = cursorPt[1] - measure.y;
+  const dist = Math.hypot(dx, dy);
+  const wind = DIRNAME[((Math.round(Math.atan2(dx, dy) / (Math.PI / 8)) % 16) + 16) % 16];
+  const label = `${Math.round(dist)} tiles${dist > 2 ? ' ' + wind : ''} · ~${fmtTime(dist / NAV.hulls[ship.hull].speed * 0.6)} as the gull flies`;
+  ctx2.font = '17px VT323, monospace'; ctx2.textAlign = 'left'; ctx2.textBaseline = 'bottom';
+  const lx = Math.min(bx + 14, innerWidth - ctx2.measureText(label).width - 8), ly = by - 10;
+  ctx2.fillStyle = '#000d'; ctx2.fillText(label, lx + 1.5, ly + 1.5);
+  ctx2.fillStyle = '#ffe95c'; ctx2.fillText(label, lx, ly);
 }
 
 // ---------------------------------------------------------------- turn thumbnails
@@ -925,8 +1027,8 @@ function makeThumb(tx, ty, ringColor) {
 // ============================================================ interaction
 // RuneScape rules: a left click (or tap) only examines what's under it;
 // committing to anything — set sail to / from — takes a right click or a
-// long-press, which opens a Choose Option menu. Shift stays unbound,
-// reserved for multi-point routes later.
+// long-press, which opens a Choose Option menu. Shift-click grows the
+// voyage: anchorage first, then destination, then ports of call between.
 let dragging = false, moved = 0, lastX = 0, lastY = 0, downAt = 0;
 let downX = 0, downY = 0, lpTimer = 0, suppressTap = false, suppressTapOnce = false;
 function zoomAt(px, py, f) {
@@ -975,8 +1077,11 @@ function setupInput() {
   el.addEventListener('pointerup', e => {
     clearTimeout(lpTimer);
     const wasDrag = dragging; dragging = false;
-    if (wasDrag && !suppressTap && moved < 6 && Date.now() - downAt < 450 && e.button === 0)
-      examineAt(e.clientX, e.clientY);
+    if (wasDrag && !suppressTap && moved < 6 && Date.now() - downAt < 450 && e.button === 0) {
+      if (e.shiftKey) addStopAt(e.clientX, e.clientY);
+      else if (measure) { measure = null; redraw(); }   // a tap puts the ruler away
+      else examineAt(e.clientX, e.clientY);
+    }
     suppressTap = false;
   });
   el.addEventListener('pointercancel', () => { clearTimeout(lpTimer); dragging = false; });
@@ -993,7 +1098,9 @@ function setupInput() {
     if (e.clientX < r.left - m || e.clientX > r.right + m || e.clientY < r.top - m || e.clientY > r.bottom + m)
       closeMenu();
   });
-  addEventListener('keydown', e => { if (e.key === 'Escape') { closeMenu(); closeInfo(); } });
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeMenu(); closeInfo(); if (measure) { measure = null; redraw(); } }
+  });
   // touch pinch: zoom about the midpoint between the two fingers
   let pinch = 0;
   el.addEventListener('touchstart', e => {
@@ -1021,6 +1128,9 @@ const tooltip = document.getElementById('tooltip');
 const hideTooltip = () => { tooltip.style.display = 'none'; document.body.style.cursor = ''; };
 function hover(e) {
   if (ctxOpen) { hideTooltip(); return; }
+  const [gx, gy] = screenToWorld(e.clientX, e.clientY);
+  cursorPt = [gx, gy];
+  if (measure) redraw();
   const show = (title, desc) => {
     tooltip.innerHTML = `<div class="t">${title}</div><div class="d">${(desc || '').replace(/\n/g, '<br>')}</div>`;
     tooltip.style.display = 'block';
@@ -1029,13 +1139,13 @@ function hover(e) {
   };
   const hit = markerAt(e.clientX, e.clientY);
   if (hit) {
-    show(hit.label, hit.desc);
+    show(hit.label, hit.desc +
+      (hit.ck && chartDone.has(hit.ck) ? '\n✓ charted' : '') + lockNote(hit));
     document.body.style.cursor = 'pointer';
     return;
   }
   // hovering a monster field?
   if (layerOn('monsters') && monsterDanger) {
-    const [gx, gy] = screenToWorld(e.clientX, e.clientY);
     const [cx, cy] = tileToCell(gx, gy);
     if (cx >= 0 && cx < CW && cy >= 0 && cy < CH) {
       const i = cellIx(cx, cy);
@@ -1088,6 +1198,18 @@ function menuEntries(px, py) {
   if (water) {
     opts.push({ a: 'Sail here', f: () => setEndpoint('to', { name: `Open water (${x}, ${y})`, x, y }) });
     opts.push({ a: 'Sail from here', f: () => setEndpoint('from', { name: `Open water (${x}, ${y})`, x, y }) });
+  }
+  // acting on "the spot": the top marker if one is under the cursor, else the water
+  const top = hits[0] ? { name: hits[0].label, x: hits[0].x, y: hits[0].y, c: hits[0].layer.color }
+            : water ? { name: `Open water (${x}, ${y})`, x, y } : null;
+  if (top) {
+    if (voyage.from || voyage.to)
+      opts.push(hits[0] ? { a: 'Add stop', t: top.name, c: top.c, f: () => addStop(top) }
+                        : { a: 'Add stop here', f: () => addStop(top) });
+    opts.push({ a: 'Find nearest bank', c: '#9fe36f', f: () => findNearestBank(top.x, top.y, top.name) });
+    opts.push(measure
+      ? { a: 'Stop measuring', f: () => { measure = null; redraw(); } }
+      : { a: 'Measure from here', f: () => { measure = { x: top.x, y: top.y }; redraw(); } });
   }
   if (water && layerOn('monsters') && monsterDanger) {
     (NAV.monsters || []).forEach((m, mi) => {
@@ -1146,9 +1268,18 @@ function showCard(title, html, px, py) {
 
 function showMarkerCard(hit, px, py) {
   const lines = (hit.desc || '').split('\n').filter(Boolean).map(t => `<div>${t}</div>`);
+  if (lockedItem(hit))
+    lines.push(`<div class="bad">🔒 needs Sailing ${hit.level} — beyond your ${prof.s}</div>`);
   const sea = nearestSeaName(hit.x, hit.y, 200);
   lines.push(`<div class="dim">${sea ? sea + ' · ' : ''}(${hit.x}, ${hit.y})</div>`);
+  if (hit.ck)
+    lines.push(`<label class="ck" style="margin-top:5px"><input type="checkbox" id="ckDone"${chartDone.has(hit.ck) ? ' checked' : ''}><span>charted — task done</span></label>`);
   showCard(hit.label, lines.join(''), px, py);
+  const box = infoEl.querySelector('#ckDone');
+  if (box) box.addEventListener('change', () => {
+    if (box.checked) chartDone.add(hit.ck); else chartDone.delete(hit.ck);
+    saveCharted(); chartProgress(); redraw();
+  });
 }
 
 function monsterLines(i) {
@@ -1208,24 +1339,117 @@ function examineAt(px, py) {
 }
 
 // ============================================================ UI state
-const voyage = { from: null, to: null, route: null };
+const voyage = { from: null, to: null, via: [], route: null, alt: null, bankRun: false };
+const voyagePoints = () => [voyage.from, ...voyage.via, voyage.to].filter(Boolean);
 
 function clearRoute() {
-  voyage.from = voyage.to = voyage.route = null;
+  voyage.from = voyage.to = voyage.route = voyage.alt = null;
+  voyage.via = []; voyage.bankRun = false;
+  renderViaList();
   document.getElementById('fromIn').value = document.getElementById('toIn').value = '';
   drawRoute(null); renderLog(); updateStats(); history.replaceState(null, '', location.pathname);
 }
 
+function renderViaList() {
+  const box = document.getElementById('viaList');
+  box.innerHTML = '';
+  voyage.via.forEach((v, i) => {
+    const d = document.createElement('div');
+    d.className = 'via';
+    d.innerHTML = `<span class="n">⚓${i + 1}</span><span class="nm">${v.name}</span><button title="remove this stop">✕</button>`;
+    d.querySelector('button').addEventListener('click', () => {
+      voyage.via.splice(i, 1); renderViaList(); reroute();
+    });
+    box.appendChild(d);
+  });
+}
+
+// shift-click (or the menu's Add stop) grows the voyage at its end:
+// anchorage first, then destination, then ports of call slot in between
+function addStop(poi) {
+  const p = { name: poi.name, x: poi.x, y: poi.y };
+  voyage.bankRun = false;
+  if (!voyage.from) { voyage.from = p; document.getElementById('fromIn').value = p.name; }
+  else if (!voyage.to) { voyage.to = p; document.getElementById('toIn').value = p.name; }
+  else {
+    voyage.via.push(voyage.to);
+    voyage.to = p;
+    document.getElementById('toIn').value = p.name;
+    renderViaList();
+  }
+  reroute();
+}
+function addStopAt(px, py) {
+  const hit = markerAt(px, py);
+  if (hit) return addStop({ name: hit.label, x: hit.x, y: hit.y });
+  const [gx, gy] = screenToWorld(px, py);
+  const i = cellAt(gx, gy);
+  if (i < 0 || !CLS[i]) return;          // no ports of call on dry land
+  addStop({ name: `Open water (${Math.round(gx)}, ${Math.round(gy)})`, x: Math.round(gx), y: Math.round(gy) });
+}
+
+// every place a hold can be emptied: the bank boats plus each port with a bank
+let bankPts = null;
+const bankPoints = () => bankPts ??= [
+  ...(NAV.services || []).filter(s => s.kind === 'bank').map(s => ({ name: s.name, x: s.x, y: s.y })),
+  ...NAV.ports.filter(p => p.facilities?.bank).map(p => ({ name: p.name, x: p.x, y: p.y })),
+];
+function findNearestBank(x, y, fromName) {
+  // try the few closest as the gull flies; the sea decides which is truly nearest
+  const cands = [...bankPoints()].sort((a, b) =>
+    ((a.x - x) ** 2 + (a.y - y) ** 2) - ((b.x - x) ** 2 + (b.y - y) ** 2)).slice(0, 4);
+  let best = null, bestSecs = Infinity;
+  for (const c of cands) {
+    const r = findRoute([x, y], [c.x, c.y]);
+    if (r.cells && r.secs < bestSecs) { bestSecs = r.secs; best = c; }
+  }
+  if (!best) {
+    showCard('No bank in reach',
+      '<div class="bad">No sailable line from here to any bank — a missing fitting may be the wall.</div>',
+      innerWidth / 2 - 130, 80);
+    return;
+  }
+  voyage.via = []; renderViaList();
+  setEndpoint('from', { name: fromName, x, y }, true);
+  setEndpoint('to', best, true);
+  voyage.bankRun = true;
+}
+
+// forgiving matcher for the pickers: a substring beats word starts beats a
+// scattered subsequence, and one dropped or wrong letter is tolerated
+// ("sarmi" still finds Port Sarim)
+function fuzzyScore(q, s) {
+  s = s.toLowerCase();
+  const at = s.indexOf(q);
+  if (at >= 0) return 300 - at * 2 - s.length * 0.1 + (at === 0 || /[^a-z0-9]/.test(s[at - 1]) ? 40 : 0);
+  const subseq = n => {
+    let qi = 0, sc = 100, prev = -2;
+    for (let i = 0; i < s.length && qi < n.length; i++) {
+      if (s[i] !== n[qi]) continue;
+      sc += (i === prev + 1 ? 7 : 2) + (i === 0 || /[^a-z0-9]/.test(s[i - 1]) ? 6 : 0);
+      prev = i; qi++;
+    }
+    return qi === n.length ? sc - s.length * 0.1 : -1;
+  };
+  let best = subseq(q);
+  if (best < 0 && q.length > 3)
+    for (let j = 0; j < q.length; j++) {
+      const sc = subseq(q.slice(0, j) + q.slice(j + 1));
+      if (sc >= 0) { best = sc - 30; break; }
+    }
+  return best;
+}
+
 function poiCatalog() {
   const cat = [];
-  cat.push({ grp: '⚓ Ports & moorings', items: NAV.ports.map(p => ({ name: p.name, x: p.x, y: p.y, sub: `Sailing ${p.level}` })) });
+  cat.push({ grp: '⚓ Ports & moorings', items: NAV.ports.map(p => ({ name: p.name, x: p.x, y: p.y, level: p.level, sub: `Sailing ${p.level}` })) });
   cat.push({ grp: '💰 Bank boats', items: (NAV.services || []).map(s => ({
     name: s.name, x: s.x, y: s.y, sub: nearestSeaName(s.x, s.y, 200) || '' })) });
   // wrecks are listed as salvage fields, not one entry per hull on the seabed
   cat.push({ grp: '🏴 Shipwrecks', items: NAV.wrecks.flatMap(g =>
     unionGroups(g.points, (a, b) => Math.hypot(a.x - b.x, a.y - b.y) < 90).map(f => {
       const [x, y] = centroid(f);
-      return { name: `${cap(g.type)} wreck${f.length > 1 ? `s ×${f.length}` : ''}`, x, y,
+      return { name: `${cap(g.type)} wreck${f.length > 1 ? `s ×${f.length}` : ''}`, x, y, level: g.level,
         sub: nearestSeaName(x, y, 200) || `${x},${y}` };
     })) });
   cat.push({ grp: '🐟 Trawling shoals', items: NAV.shoals.flatMap(s => s.points.map((pt, i) => ({
@@ -1237,7 +1461,8 @@ function poiCatalog() {
       sub: `level ${f.level ?? m.combat ?? '?'}${isAggro(m) ? '' : ' · harmless'}` };
   })) });
   cat.push({ grp: '🗺 Charting tasks', items: NAV.charting.map(t => ({
-    name: `${t.sea || t.ocean || 'Sea'} · ${t.type || 'task'} (${t.level ?? '?'})`, x: t.x, y: t.y, sub: t.task.slice(0, 60) })) });
+    name: `${t.sea || t.ocean || 'Sea'} · ${t.type || 'task'} (${t.level ?? '?'})`, x: t.x, y: t.y,
+    level: t.level, ck: chartKey(t), sub: t.task.slice(0, 60) })) });
   cat.push({ grp: '🌊 Seas', items: NAV.seas.map(s => ({ name: s.name, x: s.x, y: s.y, sub: 'sea region' })) });
   return cat;
 }
@@ -1252,12 +1477,21 @@ function setupPickers() {
       const ql = q.trim().toLowerCase();
       let shown = 0;
       for (const c of catalog) {
-        const matches = c.items.filter(it => !ql || it.name.toLowerCase().includes(ql) || (it.sub || '').toLowerCase().includes(ql));
+        let matches;
+        if (!ql) matches = c.items.slice(0, 8);
+        else matches = c.items
+          .map(it => ({ it, sc: Math.max(fuzzyScore(ql, it.name), it.sub ? fuzzyScore(ql, it.sub) - 25 : -1) }))
+          .filter(m => m.sc >= 0)
+          .sort((a, b) => b.sc - a.sc)
+          .slice(0, 25)
+          .map(m => m.it);
         if (!matches.length) continue;
         const g = document.createElement('div'); g.className = 'grp'; g.textContent = c.grp; drop.appendChild(g);
-        for (const it of matches.slice(0, ql ? 25 : 8)) {
+        for (const it of matches) {
           const d = document.createElement('div');
-          d.innerHTML = `${it.name} <small>${it.sub || ''}</small>`;
+          const locked = lockedItem(it);
+          if (locked) d.className = 'lk';
+          d.innerHTML = `${it.ck && chartDone.has(it.ck) ? '✓ ' : ''}${locked ? '🔒 ' : ''}${it.name} <small>${it.sub || ''}</small>`;
           d.addEventListener('pointerdown', ev => { ev.preventDefault(); setEndpoint(which, it); drop.style.display = 'none'; });
           drop.appendChild(d); shown++;
         }
@@ -1271,13 +1505,15 @@ function setupPickers() {
   }
   document.getElementById('swapBtn').addEventListener('click', () => {
     [voyage.from, voyage.to] = [voyage.to, voyage.from];
+    voyage.via.reverse(); renderViaList();
     document.getElementById('fromIn').value = voyage.from?.name || '';
     document.getElementById('toIn').value = voyage.to?.name || '';
     reroute();
   });
 }
 
-function setEndpoint(which, poi) {
+function setEndpoint(which, poi, keepRun) {
+  if (!keepRun) voyage.bankRun = false;
   voyage[which] = { name: poi.name, x: poi.x, y: poi.y };
   document.getElementById(which + 'In').value = poi.name;
   reroute();
@@ -1292,6 +1528,18 @@ function setupShipPanel() {
   });
   hullSel.value = ship.hull;
   hullSel.addEventListener('change', () => { ship.hull = +hullSel.value; reroute(); });
+
+  const sIn = document.getElementById('lvlSail'), cIn = document.getElementById('lvlCon');
+  if (prof.s) sIn.value = prof.s;
+  if (prof.c) cIn.value = prof.c;
+  const onProf = () => {
+    const p = el => { const v = parseInt(el.value, 10); return v >= 1 && v <= 99 ? v : null; };
+    prof.s = p(sIn); prof.c = p(cIn);
+    store.set('profile', prof);
+    applyProfile();
+  };
+  sIn.addEventListener('input', onProf);
+  cIn.addEventListener('input', onProf);
 
   const facBox = document.getElementById('facilities');
   for (const key of gearHazKeys()) {
@@ -1314,13 +1562,14 @@ function setupShipPanel() {
   ship.lambda = 1 - 55 / 100;
   document.getElementById('avoidMon').addEventListener('change', e => { ship.avoidMon = e.target.checked; reroute(); });
   document.getElementById('avoidReef').addEventListener('change', e => { ship.avoidReef = e.target.checked; reroute(); });
+  document.getElementById('showAlt').addEventListener('change', reroute);
   document.getElementById('hazOverlay').addEventListener('change', () => { rebuildOverlay(); renderLog(); });
 
   const layersBox = document.getElementById('layers');
   for (const l of LAYERS) {
     const lab = document.createElement('label');
     lab.className = 'ck';
-    lab.innerHTML = `<input type="checkbox" ${l.on ? 'checked' : ''}><span>${l.glyph} ${l.name}</span>`;
+    lab.innerHTML = `<input type="checkbox" data-lk="${l.key}" ${l.on ? 'checked' : ''}><span>${l.glyph} ${l.name}</span>`;
     lab.querySelector('input').addEventListener('change', e => { l.on = e.target.checked; redraw(); });
     layersBox.appendChild(lab);
   }
@@ -1338,7 +1587,7 @@ function setupShipPanel() {
 
   document.getElementById('copyLink').addEventListener('click', () => {
     const u = new URL(location.href);
-    u.hash = routeHash();
+    u.hash = routeHash(true);
     navigator.clipboard?.writeText(u.href);
     document.getElementById('copyLink').textContent = '✓ Copied';
     setTimeout(() => document.getElementById('copyLink').textContent = '⚓ Copy route link', 1400);
@@ -1354,6 +1603,76 @@ function setupShipPanel() {
   });
 }
 
+function syncLayerBoxes() {
+  for (const l of LAYERS) {
+    const b = document.querySelector(`#layers input[data-lk="${l.key}"]`);
+    if (b) b.checked = l.on;
+  }
+}
+
+// grey out or unhook whatever the captain's levels can't yet use
+function applyProfile() {
+  const hullSel = document.getElementById('hullSel');
+  NAV.hulls.forEach((h, i) => {
+    const o = hullSel.options[i];
+    o.disabled = !!(prof.s && h.level > prof.s);
+    o.textContent = `${h.name} — ${h.speed} tiles/tick${o.disabled ? ` (⛵${h.level})` : ''}`;
+  });
+  if (prof.s && NAV.hulls[ship.hull].level > prof.s) {
+    let best = 0;
+    NAV.hulls.forEach((h, i) => { if (h.level <= prof.s) best = i; });
+    ship.hull = best; hullSel.value = best;
+  }
+  for (const key of gearHazKeys()) {
+    const h = NAV.hazards[key];
+    const box = document.querySelector(`#facilities input[data-k="${key}"]`);
+    const locked = !!(prof.s && h.sailing > prof.s) || !!(prof.c && h.construction > prof.c);
+    box.disabled = locked;
+    box.closest('label').style.opacity = locked ? 0.5 : '';
+    if (locked && ship.fac[key]) { ship.fac[key] = false; box.checked = false; }
+  }
+  rebuildOverlay(); redraw(); reroute();
+}
+
+function chartProgress() {
+  const done = NAV.charting.filter(t => chartDone.has(chartKey(t))).length;
+  document.getElementById('chartProg').textContent = `${done} of ${NAV.charting.length} tasks charted`;
+}
+
+function setupChartPanel() {
+  const typesBox = document.getElementById('chartTypes');
+  const allTypes = [...new Set(NAV.charting.map(t => t.type || 'Generic'))];
+  const savePrefs = () => store.set('chartprefs', chartPrefs);
+  const wakeLayer = () => {          // touching the filters means you want the layer visible
+    const l = LAYERS.find(v => v.key === 'charting');
+    if (!l.on) { l.on = true; syncLayerBoxes(); }
+    redraw();
+  };
+  allTypes.forEach((ty, i) => {
+    const l = document.createElement('label');
+    l.className = 'ck';
+    const on = !chartPrefs.types || chartPrefs.types.includes(ty);
+    l.innerHTML = `<input type="checkbox" ${on ? 'checked' : ''}><span>${ty}</span>`;
+    l.querySelector('input').addEventListener('change', () => {
+      const picked = [...typesBox.querySelectorAll('input')].flatMap((b, j) => b.checked ? [allTypes[j]] : []);
+      chartPrefs.types = picked.length === allTypes.length ? null : picked;
+      savePrefs(); wakeLayer();
+    });
+    typesBox.appendChild(l);
+  });
+  const maxIn = document.getElementById('chartMaxLvl');
+  if (chartPrefs.maxLvl) maxIn.value = chartPrefs.maxLvl;
+  maxIn.addEventListener('input', () => {
+    const v = parseInt(maxIn.value, 10);
+    chartPrefs.maxLvl = v >= 1 && v <= 99 ? v : null;
+    savePrefs(); wakeLayer();
+  });
+  const hd = document.getElementById('chartHideDone');
+  hd.checked = !!chartPrefs.hideDone;
+  hd.addEventListener('change', () => { chartPrefs.hideDone = hd.checked; savePrefs(); wakeLayer(); });
+  chartProgress();
+}
+
 // ============================================================ routing + log
 let rerouteTimer = 0;
 function reroute() {
@@ -1361,15 +1680,53 @@ function reroute() {
   rerouteTimer = setTimeout(doRoute, 60);
 }
 function doRoute() {
-  if (!voyage.from || !voyage.to) { updateStats(); return; }
-  const t0 = performance.now();
-  const r = findRoute([voyage.from.x, voyage.from.y], [voyage.to.x, voyage.to.y]);
-  voyage.route = r;
-  if (r.fail === null) {
-    // blocked by loadout — find out what would open the way
-    r.needed = diagnoseRoute([voyage.from.x, voyage.from.y], [voyage.to.x, voyage.to.y]);
+  const pts = voyagePoints();
+  voyage.alt = null;
+  if (pts.length < 2) {
+    voyage.route = null;
+    drawRoute(null); renderLog(); updateStats();
+    return;
   }
-  drawRoute(r);
+  // chain the voyage stop by stop; every leg between calls is its own passage
+  const chain = () => {
+    const segs = [];
+    for (let i = 1; i < pts.length; i++) {
+      const r = findRoute([pts[i - 1].x, pts[i - 1].y], [pts[i].x, pts[i].y]);
+      if (!r.cells) return { fail: r.fail, failLeg: [pts[i - 1], pts[i]] };
+      segs.push(r);
+    }
+    const out = { segs, cells: [], legs: [], dist: 0, turns: 0, secs: 0 };
+    for (const s of segs) {
+      out.cells.push(...(out.cells.length ? s.cells.slice(1) : s.cells));
+      out.legs.push(...s.legs);
+      out.dist += s.dist; out.turns += s.turns; out.secs += s.secs;
+    }
+    return out;
+  };
+  const r = chain();
+  voyage.route = r;
+  if (!r.cells) {
+    if (r.fail === null)
+      // blocked by loadout — find out what would open the way
+      r.needed = diagnoseRoute([r.failLeg[0].x, r.failLeg[0].y], [r.failLeg[1].x, r.failLeg[1].y]);
+  } else {
+    r.stops = [{ xy: cellCenterTile(r.segs[0].cells[0]), kind: 'start' }];
+    r.segs.forEach((s, i) => r.stops.push({
+      xy: cellCenterTile(s.cells[s.cells.length - 1]),
+      kind: i === r.segs.length - 1 ? 'end' : 'via',
+    }));
+    // the ghost line: the same voyage with the caution settings flipped
+    if (document.getElementById('showAlt').checked) {
+      const saved = [ship.avoidMon, ship.avoidReef];
+      const daring = ship.avoidMon || ship.avoidReef;
+      ship.avoidMon = ship.avoidReef = !daring;
+      const a = chain();
+      [ship.avoidMon, ship.avoidReef] = saved;
+      if (a.cells && (a.dist !== r.dist || a.turns !== r.turns))
+        voyage.alt = { cells: a.cells, dist: a.dist, turns: a.turns, secs: a.secs, daring };
+    }
+  }
+  drawRoute(r.cells ? r : null);
   renderLog();
   updateStats();
   history.replaceState(null, '', '#' + routeHash());
@@ -1384,46 +1741,64 @@ function updateStats() {
   const r = voyage.route;
   if (!r || !r.cells) { el.innerHTML = ''; return; }
   el.innerHTML = `<span class="chip"><b>${r.dist}</b> tiles</span>
-    <span class="chip"><b>${r.turns}</b> turn${r.turns === 1 ? '' : 's'}</span>
-    <span class="chip">~<b>${fmtTime(r.secs)}</b></span>`;
+    <span class="chip"><b>${r.turns}</b> turn${r.turns === 1 ? '' : 's'}</span>` +
+    (voyage.via.length ? `<span class="chip"><b>${voyage.via.length}</b> stop${voyage.via.length === 1 ? '' : 's'}</span>` : '') +
+    `<span class="chip">~<b>${fmtTime(r.secs)}</b></span>`;
 }
 
 function renderLog() {
   const log = document.getElementById('log');
   const r = voyage.route;
-  if (!voyage.from || !voyage.to || !r) { log.style.display = 'none'; return; }
+  const pts = voyagePoints();
+  if (pts.length < 2 || !r) { log.style.display = 'none'; return; }
   log.style.display = 'block';
-  document.getElementById('logRoute').textContent = `${voyage.from.name} → ${voyage.to.name}`;
+  document.getElementById('logRoute').textContent = pts.map(p => p.name).join(' → ');
   const list = document.getElementById('legList');
   const warn = document.getElementById('logWarn');
   const tots = document.getElementById('logTotals');
-  list.innerHTML = ''; warn.textContent = ''; tots.textContent = '';
+  const altBox = document.getElementById('logAlt');
+  list.innerHTML = ''; warn.textContent = ''; tots.textContent = ''; altBox.innerHTML = '';
   if (!r.cells) {
-    if (r.fail) warn.textContent = r.fail;
+    const legNote = r.failLeg && pts.length > 2 ? `${r.failLeg[0].name} → ${r.failLeg[1].name}: ` : '';
+    if (r.fail) warn.textContent = legNote + r.fail;
     else if (r.needed && r.needed.length)
-      warn.innerHTML = 'No route for this ship. You need:<br>' +
-        r.needed.map(k => `• ${NAV.hazards[k].gate} (Sailing ${NAV.hazards[k].sailing})`).join('<br>');
-    else warn.textContent = 'No sailable route — even with every fitting. The far shore may be beyond today’s seas.';
+      warn.innerHTML = `${legNote}No route for this ship. You need:<br>` +
+        r.needed.map(k => {
+          const h = NAV.hazards[k];
+          return `• ${h.gate} (Sailing ${h.sailing})${prof.s && h.sailing > prof.s ? ` — above your ⛵${prof.s}` : ''}`;
+        }).join('<br>');
+    else warn.textContent = legNote + 'No sailable route — even with every fitting. The far shore may be beyond today’s seas.';
     return;
   }
   let li = document.createElement('li');
-  li.innerHTML = `<span class="n">☸</span>Weigh anchor at <b>${voyage.from.name}</b>`;
+  li.innerHTML = `<span class="n">☸</span>Weigh anchor at <b>${pts[0].name}</b>`;
   list.appendChild(li);
-  r.legs.forEach((leg, i) => {
-    const [ex, ey] = cellCenterTile(leg.end);
-    const sea = i < r.legs.length - 1 ? nearestSeaName(ex, ey) : null;
+  let n = 0;
+  r.segs.forEach((seg, si) => {
+    const lastSeg = si === r.segs.length - 1;
+    seg.legs.forEach((leg, i) => {
+      const [ex, ey] = cellCenterTile(leg.end);
+      const midTurn = i < seg.legs.length - 1;
+      const sea = midTurn ? nearestSeaName(ex, ey) : null;
+      li = document.createElement('li');
+      li.innerHTML = `<span class="n">${++n}.</span>Sail <b>${DIRNAME[leg.dir]}</b> for ${Math.round(leg.tiles)} tiles` +
+        (midTurn ? `<br><em>then turn ${sea ? 'near ' + sea : `at ${Math.round(ex)}, ${Math.round(ey)}`}</em>` : '');
+      if (midTurn) li.prepend(makeThumb(ex, ey, '#ffe95c'));
+      list.appendChild(li);
+    });
+    const [bx, by] = cellCenterTile(seg.cells[seg.cells.length - 1]);
     li = document.createElement('li');
-    li.innerHTML = `<span class="n">${i + 1}.</span>Sail <b>${DIRNAME[leg.dir]}</b> for ${Math.round(leg.tiles)} tiles` +
-      (i < r.legs.length - 1 ? `<br><em>then turn ${sea ? 'near ' + sea : `at ${Math.round(ex)}, ${Math.round(ey)}`}</em>` : '');
-    if (i < r.legs.length - 1) li.prepend(makeThumb(ex, ey, '#ffe95c'));
+    if (lastSeg) {
+      li.innerHTML = `<span class="n">⚓</span>Make berth at <b>${pts[pts.length - 1].name}</b>`;
+      li.prepend(makeThumb(bx, by, '#ff6a4d'));
+    } else {
+      li.innerHTML = `<span class="n">⚓</span>Call at <b>${pts[si + 1].name}</b>`;
+      li.prepend(makeThumb(bx, by, '#ffb83f'));
+    }
     list.appendChild(li);
   });
-  li = document.createElement('li');
-  li.innerHTML = `<span class="n">⚓</span>Make berth at <b>${voyage.to.name}</b>`;
-  const [bx, by] = cellCenterTile(r.cells[r.cells.length - 1]);
-  li.prepend(makeThumb(bx, by, '#ff6a4d'));
-  list.appendChild(li);
-  tots.textContent = `${r.dist} tiles · ${r.turns} turns · ~${fmtTime(r.secs)} under way`;
+  tots.textContent = `${r.dist} tiles · ${r.turns} turns · ~${fmtTime(r.secs)} under way` +
+    (voyage.bankRun ? ` · ~${fmtTime(r.secs * 2)} there & back` : '');
   // hazards en route worth mentioning
   const crossed = new Set();
   for (const c of r.cells) {
@@ -1433,18 +1808,47 @@ function renderLog() {
   if (crossed.size)
     warn.innerHTML = [...crossed].map(k => `⚠ crosses ${NAV.hazards[k].name.toLowerCase()}` +
       (NAV.hazards[k].mode === 'penalty' ? ' — expect hull damage' : '')).join('<br>');
+  // the road not taken, in numbers
+  const alt = voyage.alt;
+  if (alt) {
+    const dd = alt.dist - r.dist, dt = alt.secs - r.secs;
+    const fd = v => `${v >= 0 ? '+' : '−'}${Math.abs(Math.round(v))}`;
+    const ft = v => `${v >= 0 ? '+' : '−'}${fmtTime(Math.abs(v))}`;
+    const el = document.createElement('div');
+    el.className = 'altline ' + (alt.daring ? 'daring' : 'cautious');
+    el.title = 'click to sail it — flips your caution settings';
+    el.textContent = alt.daring
+      ? `↯ daring line (dashed): ${fd(dd)} tiles, ${ft(dt)} — braves what you avoid. Click to sail it.`
+      : `☂ cautious line (dashed): ${fd(dd)} tiles, ${ft(dt)} — skirts monsters & reefs. Click to sail it.`;
+    el.addEventListener('click', () => {
+      ship.avoidMon = ship.avoidReef = !alt.daring;
+      document.getElementById('avoidMon').checked = ship.avoidMon;
+      document.getElementById('avoidReef').checked = ship.avoidReef;
+      reroute();
+    });
+    altBox.appendChild(el);
+  }
 }
 
 // ============================================================ share links
-function routeHash() {
+// the address bar carries the route + ship; Copy route link adds the exact
+// view and layer set on top, so a shared link reproduces the whole picture
+function routeHash(full) {
   const p = new URLSearchParams();
   if (voyage.from) p.set('from', `${voyage.from.x},${voyage.from.y},${voyage.from.name}`);
   if (voyage.to) p.set('to', `${voyage.to.x},${voyage.to.y},${voyage.to.name}`);
+  if (voyage.via.length) p.set('via', voyage.via.map(v => `${v.x},${v.y},${v.name}`).join(';'));
   p.set('opt', Math.round((1 - ship.lambda) * 100));
   p.set('hull', ship.hull);
   p.set('fac', gearHazKeys().map(k => ship.fac[k] ? 1 : 0).join(''));
   if (!ship.avoidMon) p.set('mon', 0);
   if (!ship.avoidReef) p.set('reef', 0);
+  if (!document.getElementById('showAlt').checked) p.set('alt', 0);
+  if (full) {
+    p.set('v', `${Math.round(view.x)},${Math.round(view.y)},${+view.scale.toFixed(2)}`);
+    p.set('ly', LAYERS.map(l => l.on ? 1 : 0).join(''));
+    if (!document.getElementById('hazOverlay').checked) p.set('haz', 0);
+  }
   return p.toString();
 }
 function loadHash() {
@@ -1462,9 +1866,22 @@ function loadHash() {
     if (p.get('opt') !== null) { document.getElementById('lambda').value = +p.get('opt'); ship.lambda = 1 - (+p.get('opt')) / 100; }
     if (p.get('mon') === '0') { ship.avoidMon = false; document.getElementById('avoidMon').checked = false; }
     if (p.get('reef') === '0') { ship.avoidReef = false; document.getElementById('avoidReef').checked = false; }
+    if (p.get('alt') === '0') document.getElementById('showAlt').checked = false;
+    const ly = p.get('ly');
+    if (ly) { LAYERS.forEach((l, i) => { if (ly[i] !== undefined) l.on = ly[i] === '1'; }); syncLayerBoxes(); }
+    if (p.get('haz') === '0') document.getElementById('hazOverlay').checked = false;
+    const v = p.get('v');
+    if (v) {
+      const m = v.split(',');
+      view.x = +m[0]; view.y = +m[1];
+      view.scale = Math.min(SC_MAX, Math.max(SC_MIN, +m[2] || view.scale));
+      clampView();
+    }
     rebuildOverlay();
+    if (p.get('via')) { voyage.via = p.get('via').split(';').map(parse); renderViaList(); }
     if (p.get('from')) setEndpoint('from', parse(p.get('from')));
     if (p.get('to')) setEndpoint('to', parse(p.get('to')));
+    redraw();
   } catch (e) { console.warn('bad route link', e); }
 }
 
@@ -1484,7 +1901,9 @@ function animate() {
     setupInput();
     setupPickers();
     setupShipPanel();
+    setupChartPanel();
     loadHash();
+    applyProfile();
     ld(100, 'Fair winds!');
     setTimeout(() => {
       const l = document.getElementById('loading');
