@@ -1,0 +1,49 @@
+This repository mixes original code with data and imagery derived from
+third-party sources, and they carry different terms:
+
+1. ORIGINAL CODE AND SITE CONTENT — the HTML/JS/CSS tools, build and data
+   scripts, worker, and site chrome — are licensed under the MIT License
+   below.
+
+2. GAME DATA derived from the Old School RuneScape Wiki
+   (https://oldschool.runescape.wiki) — including
+   public/tools/runescape/data/naval/naval.json and navcells.png — is a
+   derivative of wiki content and is licensed under the Creative Commons
+   Attribution-NonCommercial-ShareAlike 3.0 license (CC BY-NC-SA 3.0,
+   https://creativecommons.org/licenses/by-nc-sa/3.0/), the same license
+   as its source. See https://meta.weirdgloop.org/w/Licensing.
+
+3. GAME IMAGERY AND OTHER GAME MATERIAL — including
+   public/tools/runescape/data/naval/map.jpg (rendered from the game's
+   world map) — remains the intellectual property of its owners and is NOT
+   covered by the MIT License. RuneScape and Old School RuneScape are
+   trademarks of Jagex Limited; game material is used non-commercially
+   under the terms of Jagex's Fan Content Policy
+   (https://legal.jagex.com/docs/policies/fan-content-policy). Material
+   relating to other games belongs to their respective owners. This
+   project is not endorsed by or affiliated with Jagex or any other game
+   publisher.
+
+---------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2026 peligwen
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

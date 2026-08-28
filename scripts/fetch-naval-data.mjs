@@ -902,7 +902,7 @@ const cellClass = new Uint8Array(CW * CH);
 const naval = {
   generated: new Date().toISOString().slice(0, 10),
   mapVersion: MAP_VERSION,
-  attribution: 'Map data and imagery from the Old School RuneScape Wiki (oldschool.runescape.wiki), CC BY-NC-SA 3.0. RuneScape is a trademark of Jagex Ltd.',
+  attribution: 'Data and map imagery from the Old School RuneScape Wiki (oldschool.runescape.wiki), CC BY-NC-SA 3.0. Map imagery derives from Old School RuneScape, intellectual property of Jagex Limited, used under the terms of Jagex’s Fan Content Policy (legal.jagex.com); not endorsed by or affiliated with Jagex.',
   world: { x0: WX0, y0: WY0, x1: WX1, y1: WY1 },
   cell: CELL,
   grid: { w: CW, h: CH },
