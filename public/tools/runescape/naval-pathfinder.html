@@ -72,6 +72,30 @@
   .altline.daring{color:var(--red);}
   .altline.cautious{color:var(--teal);}
   .lgd{font-size:11.5px;line-height:1.7;color:var(--dim);}
+  .frow select{flex:1;width:auto;min-width:0;}
+  .srbtns{display:flex;gap:6px;margin:6px 0 4px;}
+  .srbtns button{font-family:"VT323",monospace;font-size:15px;background:#1c150c;color:var(--parch);cursor:pointer;
+    border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:4px 8px;}
+  .srbtns button:first-child{flex:1;color:var(--yellow);}
+  .srbtns button:hover{color:var(--gold);} .srbtns button:disabled{opacity:.5;cursor:wait;}
+  .srl{font-family:"VT323",monospace;font-size:15px;line-height:1.2;padding:3px 5px;cursor:pointer;
+    border-left:3px solid transparent;margin:2px 0;}
+  .srl:hover{background:#39301f;} .srl.on{border-left-color:var(--gold);background:#2b2216;}
+  .srl b{color:var(--yellow);font-weight:400;} .srl small{color:var(--dim);font-size:13px;display:block;}
+  .srp{font-family:"VT323",monospace;font-size:15px;line-height:1.2;}
+  .srp .port{color:var(--gold);font-size:17px;margin-top:7px;border-top:1px solid var(--bevel-lo);padding-top:4px;}
+  .srp .port .n{display:inline-block;width:20px;color:var(--parch);}
+  .srp .tk{padding:2px 0 2px 4px;color:var(--parch);display:flex;gap:5px;align-items:flex-start;}
+  .srp .tk b{color:var(--yellow);font-weight:400;} .srp .tk em{font-style:normal;color:var(--dim);font-size:13px;}
+  .srp .tk .v{color:var(--teal);} .srp .tk .x{color:var(--dim);cursor:pointer;flex:none;} .srp .tk .x:hover{color:var(--red);}
+  .srp .static{color:#9fe36f;}
+  .srp .leg{padding:2px 0 2px 8px;color:var(--dim);cursor:pointer;font-size:14px;} .srp .leg:hover{color:var(--yellow);}
+  .srp .leg b{color:var(--parch);font-weight:400;} .srp .bad{color:var(--red);}
+  .srp .tot{border-top:1px solid var(--bevel-hi);margin-top:7px;padding-top:5px;color:var(--parch);}
+  .srp .tot b{color:var(--gold);font-weight:400;font-size:17px;}
+  .srp .dim,.srx .dim{color:#7a6c52;font-size:12.5px;line-height:1.25;margin-top:3px;}
+  .srx{font-family:"VT323",monospace;font-size:13px;margin:3px 0;}
+  .lnk{color:var(--teal);cursor:pointer;} .lnk:hover{color:var(--yellow);}
   .sw{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border:1px solid #0008;}
   #log{position:fixed;left:10px;bottom:34px;z-index:24;width:300px;max-height:44vh;overflow-y:auto;
     padding:10px;display:none;scrollbar-width:thin;}
@@ -180,6 +204,23 @@
   <label class="ck"><input type="checkbox" id="avoidMon" checked>Steer clear of sea monsters<small>ship-attackers get a wide berth; harmless quarry never bends the course</small></label>
   <label class="ck"><input type="checkbox" id="avoidReef" checked>Avoid jagged reefs<small>uncheck to brave hull damage at Crandor &amp; Aehecatl</small></label>
   <label class="ck"><input type="checkbox" id="showAlt" checked>Ghost the road not taken<small>dashed line: the same voyage with your caution flipped</small></label>
+
+  <div id="srSection">
+  <h2>Courier runs</h2>
+  <div class="subhint">silk roads — port loops that keep every task slot earning</div>
+  <div class="frow"><label>Start</label><select id="srStart"><option value="">anywhere</option></select></div>
+  <div class="frow"><label>Chase</label><select id="srObj"><option value="gp">coin per hour</option><option value="xp">xp per hour</option></select></div>
+  <div class="frow"><label>Loop</label><select id="srK"><option value="2">2 ports</option><option value="3">3 ports</option><option value="4" selected>up to 4 ports</option><option value="5">up to 5 ports</option></select></div>
+  <div class="frow"><label>Hold</label><select id="srHold"></select><select id="srBoat"></select></div>
+  <div class="frow"><label>Pace</label><select id="srPace"></select></div>
+  <div class="subhint" id="srCap"></div>
+  <div class="srbtns"><button id="srPlot">⚓ Plot silk roads</button><button id="srClear" title="clear the loop">✕</button></div>
+  <div class="subhint" id="srStatus"></div>
+  <div class="srx" id="srExcl"></div>
+  <div id="srLoops"></div>
+  <div class="srp" id="srPlan"></div>
+  <div class="srp" id="srBoard"></div>
+  </div>
 
   <h2>Chart layers</h2>
   <div id="layers"></div>
@@ -588,6 +629,7 @@ function draw() {
   if (monCanvas && layerOn('monsters')) drawWorldImage(monCanvas, 1 / CELL);
   if (layerOn('monsters')) drawMonsterStuds();
 
+  drawPlanLayer();
   drawRouteLayer();
   drawMarkers();
   drawSeaLabels();
@@ -715,6 +757,16 @@ const MARKER_SIZE = { ports: 26, wrecks: 17, services: 22, charting: 13, shoals:
 const markerPx = key => Math.max(9, Math.min(34, MARKER_SIZE[key] * view.scale));
 const cap = s => s[0].toUpperCase() + s.slice(1);
 
+// one line on a port's card: what its notice board deals in
+function boardNote(name) {
+  const c = NAV.courier; if (!c) return '';
+  const posted = c.tasks.filter(t => t.board === name);
+  const bound = c.tasks.filter(t => t.dest === name && t.board !== name).length;
+  if (!posted.length) return bound ? `\n📦 receives ${bound} courier deliveries` : '';
+  const lv = posted.map(t => t.level);
+  const dests = new Set(posted.map(t => t.board === t.cargo ? t.dest : t.cargo));
+  return `\n📋 board: ${posted.length} courier tasks, Sailing ${Math.min(...lv)}–${Math.max(...lv)}, trading with ${dests.size} ports`;
+}
 function buildMarkers() {
   const mk = (key, items) => {
     const l = LAYERS.find(v => v.key === key);
@@ -723,7 +775,8 @@ function buildMarkers() {
   };
   mk('ports', NAV.ports.map(p => ({
     x: p.x, y: p.y, label: p.name, level: p.level,
-    desc: `Sailing ${p.level}${p.req ? ' · ' + p.req : ''}${p.facilities ? '\n' + ['shipwright', 'notice board', 'salvaging', 'ledger', 'crew registrar', 'bank'].filter((f, i) => Object.values(p.facilities)[i]).join(' · ') : ''}`,
+    desc: `Sailing ${p.level}${p.req ? ' · ' + p.req : ''}${p.facilities ? '\n' + ['shipwright', 'notice board', 'salvaging', 'ledger', 'crew registrar', 'bank'].filter((f, i) => Object.values(p.facilities)[i]).join(' · ') : ''}` +
+      boardNote(p.name),
     poi: { kind: 'port', name: p.name },
   })));
   mk('wrecks', NAV.wrecks.flatMap(g => g.points.map(pt => ({
@@ -1336,7 +1389,8 @@ function clearRoute() {
   voyage.from = voyage.to = voyage.route = voyage.alt = null;
   voyage.bankRun = false;
   document.getElementById('fromIn').value = document.getElementById('toIn').value = '';
-  drawRoute(null); renderLog(); updateStats(); history.replaceState(null, '', location.pathname);
+  drawRoute(null); renderLog(); updateStats();
+  history.replaceState(null, '', SR.plans[SR.sel] ? '#' + routeHash() : location.pathname);
 }
 
 // every place a hold can be emptied: the bank boats plus each port with a bank
@@ -1585,6 +1639,8 @@ function applyProfile() {
     box.checked = ship.fac[key];
   }
   rebuildOverlay(); redraw(); reroute();
+  if (SR.showCap) SR.showCap();
+  replan();
 }
 
 function chartProgress() {
@@ -1663,13 +1719,19 @@ function doRoute() {
 }
 
 function fmtTime(secs) {
-  const m = Math.floor(secs / 60), s = Math.round(secs % 60);
+  const t = Math.round(secs), m = Math.floor(t / 60), s = t % 60;
   return m ? `${m}:${String(s).padStart(2, '0')} min` : `${s}s`;
 }
 function updateStats() {
   const el = document.getElementById('stats');
   const r = voyage.route;
-  if (!r || !r.cells) { el.innerHTML = ''; return; }
+  if (!r || !r.cells) {
+    const p = SR.plans[SR.sel];
+    el.innerHTML = p ? `<span class="chip"><b>${fmtGp(p.gph)}</b> gp/h</span>
+      <span class="chip"><b>${fmtGp(p.xph)}</b> xp/h</span>
+      <span class="chip">~<b>${fmtTime(p.secs)}</b> a lap</span>` : '';
+    return;
+  }
   el.innerHTML = `<span class="chip"><b>${r.dist}</b> tiles</span>
     <span class="chip"><b>${r.turns}</b> turn${r.turns === 1 ? '' : 's'}</span>
     <span class="chip">~<b>${fmtTime(r.secs)}</b></span>`;
@@ -1748,6 +1810,518 @@ function renderLog() {
   }
 }
 
+// ============================================================ courier runs — silk roads
+// A silk road is a loop of ports sailed over and over with every task slot
+// earning: cargo aboard on each leg, a board to restock at each call. The
+// wiki lists every notice board's full task pool (naval.json → courier);
+// the board you actually face shows a random draw from that pool, so the
+// planner ranks loops by what their pools can pay, then tells you what to
+// look for at each board. A task you don't find can be ticked off ("not on
+// my board") and the plan routes around it until the boards reroll — every
+// 8 tasks completed, and for everyone at 00:00 UTC.
+//
+// Pay per task: the base XP the wiki lists, and coin: four completions in
+// five drop a coin bag whose tier follows that XP; the fifth drops a port
+// reward bag of supplies (grapes, cannonballs, astral runes…) that is left
+// out of the gp figure. Time per loop: sea time between ports from the same
+// grid the pathfinder sails, plus a dockside allowance per call and per
+// crate carried.
+const COURIER = () => NAV.courier || null;
+// dockside pace: seconds per port call (tie up, walk to board and ledger,
+// cast off) and per crate carried between ledger and hold — paid once
+// loading and again unloading. Brisk is a crewmate carrying two at a time
+// with the ledger by the dock; leisurely is a long walk with one crate.
+const PACES = [
+  { name: 'brisk dockside', call: 15, crate: 3 },
+  { name: 'steady dockside', call: 25, crate: 5 },
+  { name: 'leisurely dockside', call: 40, crate: 8 },
+];
+const pace = () => PACES[Math.min(prof.pace ?? 1, PACES.length - 1)];
+const LEG_TURN_SECS = 12;    // heading changes the sea-distance field can't see; exact once charted
+const MAX_VISITS = 2;        // a hub port may appear twice in one loop
+const SR = {
+  ports: [], idx: {}, matrix: null, key: '',
+  plans: [], sel: -1, legs: null, busy: false, ran: false,
+  excluded: new Set(), only: null,
+};
+let portByName = {};
+
+const slotsAt = lvl => (COURIER()?.slots || [[1, 1]]).reduce((n, [l, s]) => lvl >= l ? s : n, 1);
+const bagFor = xp => { let b = COURIER().bags[0]; for (const t of COURIER().bags) if (xp >= t.minXp) b = t; return b; };
+const taskGp = t => Math.round(COURIER().coinChance * (bagFor(t.xp).coins[0] + bagFor(t.xp).coins[1]) / 2);
+const holdCap = () => {
+  const c = COURIER(); if (!c?.holds?.rows?.length) return 40;
+  const row = c.holds.rows[Math.min(prof.hold ?? 0, c.holds.rows.length - 1)];
+  return row.capacity[Math.min(prof.boat ?? row.capacity.length - 1, row.capacity.length - 1)] || 40;
+};
+const fmtGp = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(Math.round(n));
+const utcDay = () => new Date().toISOString().slice(0, 10);
+
+// exclusions live until the boards reroll: kept per UTC day, cleared by hand
+function loadExcluded() {
+  const s = store.get('srx', null);
+  if (s && s.day === utcDay()) SR.excluded = new Set(s.ids);
+}
+const saveExcluded = () => store.set('srx', { day: utcDay(), ids: [...SR.excluded] });
+
+function courierPortTile(name) { const p = portByName[name]; return [p.x, p.y]; }
+const portOpen = name => { const p = portByName[name]; return !!p && (p.level || 1) <= prof.s; };
+const taskOpen = t => t.xp > 0 && t.level <= prof.s && portOpen(t.board) && portOpen(t.cargo) && portOpen(t.dest) && !SR.excluded.has(t.id);
+
+// ---- sea time between every pair of courier ports
+// One Dijkstra per port over the navigation grid, same water rules and
+// penalties as the pathfinder minus the heading bookkeeping (LEG_TURN_SECS
+// stands in for that until a loop is charted leg by leg).
+function seaField(start) {
+  const speed = NAV.hulls[ship.hull].speed;
+  const reefPen = ship.avoidReef ? 9 : 0.5;
+  const N = CW * CH;
+  const dist = new Float64Array(N).fill(Infinity);   // float64: a rounded-down float32 would out-race its own heap key
+  const hf = [], hs = [];
+  const push = (f, s) => {
+    let i = hf.length; hf.push(f); hs.push(s);
+    while (i > 0) { const p = (i - 1) >> 1; if (hf[p] <= hf[i]) break;
+      [hf[p], hf[i]] = [hf[i], hf[p]]; [hs[p], hs[i]] = [hs[i], hs[p]]; i = p; }
+  };
+  const pop = () => {
+    const f = hf[0], s = hs[0], lf = hf.pop(), ls = hs.pop();
+    if (hf.length) { hf[0] = lf; hs[0] = ls;
+      let i = 0; for (;;) { const a = 2 * i + 1, b = a + 1; let m = i;
+        if (a < hf.length && hf[a] < hf[m]) m = a;
+        if (b < hf.length && hf[b] < hf[m]) m = b;
+        if (m === i) break; [hf[m], hf[i]] = [hf[i], hf[m]]; [hs[m], hs[i]] = [hs[i], hs[m]]; i = m; } }
+    return [f, s];
+  };
+  dist[start] = 0; push(0, start);
+  while (hf.length) {
+    const [f, c] = pop();
+    if (f > dist[c]) continue;
+    const cx = c % CW, cy = (c / CW) | 0;
+    for (let nd = 0; nd < 16; nd += 2) {            // the eight unit winds
+      const nx = cx + DIRS[nd][0], ny = cy + DIRS[nd][1];
+      if (nx < 0 || nx >= CW || ny < 0 || ny >= CH) continue;
+      const n = cellIx(nx, ny), ncls = CLS[n];
+      if (!passable(ncls)) continue;
+      let cost = DIRLEN[nd] * CELL / speed;
+      if (NAV.classes[ncls] === 'reefs') cost += reefPen * DIRLEN[nd];
+      if (ship.avoidMon && monsterDanger && monsterDanger[n] > 0)
+        cost += monsterDanger[n] * (2 + monsterLevel[n] / 30) * DIRLEN[nd];
+      const g = f + cost;
+      if (g < dist[n]) { dist[n] = g; push(g, n); }
+    }
+  }
+  return dist;
+}
+const loadoutKey = () => [ship.hull, gearHazKeys().map(k => ship.fac[k] ? 1 : 0).join(''), +ship.avoidMon, +ship.avoidReef].join('|');
+async function ensureMatrix(status) {
+  const key = loadoutKey();
+  if (SR.matrix && SR.key === key) return SR.matrix;
+  const names = SR.ports, n = names.length;
+  const M = Array.from({ length: n }, () => new Float64Array(n).fill(Infinity));
+  const cells = names.map(nm => snapCell(courierPortTile(nm)));
+  for (let i = 0; i < n; i++) {
+    status(`Sounding the seas from ${names[i]}… ${i + 1}/${n}`);
+    await new Promise(r => setTimeout(r, 0));
+    if (cells[i] < 0) continue;
+    const field = seaField(cells[i]);
+    for (let j = 0; j < n; j++) if (cells[j] >= 0) M[i][j] = field[cells[j]] * 0.6;
+    M[i][i] = 0;
+  }
+  SR.matrix = M; SR.key = key;
+  return M;
+}
+
+// ---- pricing one loop: which of the pool's tasks fit its slots and hold
+// Each task becomes an instance pinned to the loop's positions: accepted at
+// its board, loaded at its cargo port, delivered at its destination, holding
+// a slot for `span` legs and `qty` crates for `cspan` of them. Packing is
+// greedy — by value, and again by value per slot-hour — and the better of
+// the two stands; loops are small enough that this lands on the answer.
+function evalLoop(seq, ctx) {
+  const k = seq.length, M = ctx.M;
+  const T = new Float64Array(k);
+  let sail = 0;
+  for (let i = 0; i < k; i++) {
+    T[i] = M[SR.idx[seq[i]]][SR.idx[seq[(i + 1) % k]]] + LEG_TURN_SECS;
+    if (!isFinite(T[i])) return null;
+    sail += T[i];
+  }
+  const pos = new Map();
+  seq.forEach((p, i) => { if (!pos.has(p)) pos.set(p, []); pos.get(p).push(i); });
+  const nextAfter = (i, p) => {
+    let best = k + 1;
+    for (const j of pos.get(p)) { const d = ((j - i) % k + k) % k || k; if (d < best) best = d; }
+    return best;
+  };
+  const inst = [];
+  for (const p of pos.keys()) {
+    for (const t of ctx.byCargo.get(p) || []) {
+      if (t.board !== t.cargo || !pos.has(t.dest)) continue;
+      for (const i of pos.get(p)) { const n = nextAfter(i, t.dest); inst.push({ t, at: i, load: i, span: n, cspan: n, v: ctx.val(t) }); }
+    }
+    for (const t of ctx.byBoard.get(p) || []) {
+      if (t.board === t.cargo || !pos.has(t.cargo)) continue;
+      for (const d of pos.get(p)) {
+        const dc = nextAfter(d, t.cargo), c = (d + dc) % k, cj = nextAfter(c, t.dest);
+        if (dc + cj > k) continue;
+        inst.push({ t, at: d, load: c, span: dc + cj, cspan: cj, v: ctx.val(t) });
+      }
+    }
+  }
+  if (!inst.length) return null;
+  for (const it of inst) { let s = 0; for (let i = 0; i < it.span; i++) s += T[(it.at + i) % k]; it.dens = it.v / s; }
+  const pack = order => {
+    const slotUse = new Uint8Array(k), crateUse = new Uint16Array(k), used = new Set(), chosen = [];
+    let total = 0;
+    for (const it of order) {
+      if (used.has(it.t.id)) continue;
+      let ok = true;
+      for (let s = 0; s < it.span && ok; s++) if (slotUse[(it.at + s) % k] >= ctx.slots) ok = false;
+      for (let s = 0; s < it.cspan && ok; s++) if (crateUse[(it.load + s) % k] + it.t.qty > ctx.hold) ok = false;
+      if (!ok) continue;
+      for (let s = 0; s < it.span; s++) slotUse[(it.at + s) % k]++;
+      for (let s = 0; s < it.cspan; s++) crateUse[(it.load + s) % k] += it.t.qty;
+      used.add(it.t.id); chosen.push(it); total += it.v;
+    }
+    return { chosen, total, slotUse, crateUse };
+  };
+  const A = pack(inst.slice().sort((a, b) => b.v - a.v));
+  const B = pack(inst.slice().sort((a, b) => b.dens - a.dens));
+  const best = A.total >= B.total ? A : B;
+  if (!best.chosen.length) return null;
+  return finishPlan({ seq, T: Array.from(T), sail, chosen: best.chosen, slotUse: best.slotUse, crateUse: best.crateUse, obj: ctx.obj });
+}
+function finishPlan(p) {
+  const k = p.seq.length;
+  let crates = 0, xp = 0, gp = 0;
+  for (const it of p.chosen) { crates += it.t.qty; xp += it.t.xp; gp += taskGp(it.t); }
+  p.sail = p.T.reduce((a, b) => a + b, 0);
+  p.secs = p.sail + k * pace().call + 2 * crates * pace().crate;
+  p.xp = xp; p.gp = gp; p.crates = crates;
+  p.xph = xp / p.secs * 3600; p.gph = gp / p.secs * 3600;
+  p.rate = p.obj === 'xp' ? p.xph : p.gph;
+  return p;
+}
+
+// every closed walk of 2..K courier ports whose legs are trade pairs
+function* loopWalks(adj, order, K, start) {
+  const seen = new Set();
+  const seq = [], visits = new Map();
+  const canon = () => {
+    let best = null;
+    for (let r = 0; r < seq.length; r++) {
+      const s = seq.slice(r).concat(seq.slice(0, r)).join('>');
+      if (best === null || s < best) best = s;
+    }
+    return best;
+  };
+  function* dfs() {
+    const last = seq[seq.length - 1];
+    if (seq.length >= 2 && adj.get(last).has(seq[0])) {
+      const key = canon();
+      if (!seen.has(key)) { seen.add(key); yield seq.slice(); }
+    }
+    if (seq.length >= K) return;
+    for (const nx of adj.get(last)) {
+      if ((visits.get(nx) || 0) >= MAX_VISITS) continue;
+      if (!start && order[nx] < order[seq[0]]) continue;   // rotations meet at their lowest port
+      seq.push(nx); visits.set(nx, (visits.get(nx) || 0) + 1);
+      yield* dfs();
+      seq.pop(); visits.set(nx, visits.get(nx) - 1);
+    }
+  }
+  for (const p0 of start ? [start] : [...adj.keys()]) {
+    if (!adj.has(p0)) continue;
+    seq.length = 0; seq.push(p0); visits.clear(); visits.set(p0, 1);
+    yield* dfs();
+  }
+}
+
+function plannerContext() {
+  const c = COURIER();
+  const obj = document.getElementById('srObj').value;
+  const tasks = c.tasks.filter(taskOpen);
+  const byCargo = new Map(), byBoard = new Map(), adj = new Map();
+  const link = (a, b) => { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); };
+  for (const t of tasks) {
+    if (!isFinite(SR.matrix[SR.idx[t.cargo]][SR.idx[t.dest]])) continue;
+    if (!byCargo.has(t.cargo)) byCargo.set(t.cargo, []); byCargo.get(t.cargo).push(t);
+    if (!byBoard.has(t.board)) byBoard.set(t.board, []); byBoard.get(t.board).push(t);
+    link(t.cargo, t.dest); link(t.dest, t.cargo);
+  }
+  const order = Object.fromEntries(SR.ports.map((p, i) => [p, i]));
+  return { M: SR.matrix, obj, tasks, byCargo, byBoard, adj, order,
+    slots: slotsAt(prof.s), hold: holdCap(), val: obj === 'xp' ? (t => t.xp) : taskGp };
+}
+
+let srRun = 0;
+async function plotSilkRoads(opts = {}) {
+  const c = COURIER(); if (!c) return;
+  const status = document.getElementById('srStatus');
+  const say = m => { status.textContent = m; };
+  const run = ++srRun;
+  SR.busy = true; SR.ran = true;
+  document.getElementById('srPlot').disabled = true;
+  try {
+    await ensureMatrix(say);
+    if (run !== srRun) return;
+    const ctx = plannerContext();
+    const K = +document.getElementById('srK').value || 4;
+    const start = document.getElementById('srStart').value || null;
+    if (start && !ctx.adj.has(start)) { say(`${start} has no courier trade open to you at Sailing ${prof.s}.`); SR.plans = []; renderLoops(); return; }
+    const top = [];
+    const consider = p => {
+      if (!p) return;
+      // one entry per set of ports: the best direction and shape of that trade
+      const key = p.seq.slice().sort().join('>');
+      const i = top.findIndex(q => q.key === key);
+      if (i >= 0) { if (p.rate > top[i].rate) top[i] = { key, ...p }; }
+      else top.push({ key, ...p });
+      if (top.length > 40) { top.sort((a, b) => b.rate - a.rate); top.length = 24; }
+    };
+    let n = 0;
+    if (opts.only) consider(evalLoop(opts.only, ctx));
+    else for (const seq of loopWalks(ctx.adj, ctx.order, K, start)) {
+      consider(evalLoop(seq, ctx));
+      if (++n % 3000 === 0) {
+        say(`Weighing trade loops… ${n.toLocaleString()} tried`);
+        await new Promise(r => setTimeout(r, 0));
+        if (run !== srRun) return;
+      }
+    }
+    top.sort((a, b) => b.rate - a.rate);
+    SR.plans = top.slice(0, 8);
+    SR.sel = -1; SR.legs = null;
+    say(SR.plans.length
+      ? `${n ? n.toLocaleString() + ' loops weighed · ' : ''}${ctx.slots} task slot${ctx.slots === 1 ? '' : 's'} · hold ${ctx.hold} crates · Sailing ${prof.s}`
+      : opts.only ? `The shared loop ${opts.only.join(' → ')} has no trade open to you at Sailing ${prof.s} with this ship.`
+      : `No paying loop of up to ${K} ports at Sailing ${prof.s} with this ship.`);
+    renderLoops();
+    if (SR.plans.length) selectPlan(0);
+    renderBoard(start);
+  } finally {
+    if (run === srRun) { SR.busy = false; document.getElementById('srPlot').disabled = false; }
+  }
+}
+
+// chart the chosen loop leg by leg with the real pathfinder, then re-price it
+function fitToPlan(p) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const take = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
+  for (const leg of p.legs || []) if (leg) for (const c of leg.cells) take(...cellCenterTile(c));
+  for (const name of p.seq) take(...courierPortTile(name));
+  if (!isFinite(x0)) return;
+  const panelW = innerWidth > 820 ? 300 : 0;      // keep the loop clear of the side panel
+  const sc = Math.min(SC_MAX, Math.max(SC_MIN, 0.8 * Math.min((innerWidth - panelW) / Math.max(60, x1 - x0), (innerHeight - 120) / Math.max(60, y1 - y0))));
+  view.scale = sc;
+  view.x = (x0 + x1) / 2 + panelW / 2 / sc; view.y = (y0 + y1) / 2 - 20 / sc;
+  clampView();
+}
+function selectPlan(i, fit = true) {
+  SR.sel = i;
+  const p = SR.plans[i];
+  if (!p) { SR.legs = null; renderPlan(); redraw(); return; }
+  if (!p.charted) {
+    const legs = [];
+    for (let l = 0; l < p.seq.length; l++) {
+      const r = findRoute(courierPortTile(p.seq[l]), courierPortTile(p.seq[(l + 1) % p.seq.length]));
+      legs.push(r.cells ? r : null);
+      if (r.cells) p.T[l] = r.secs;                 // exact sea time
+    }
+    p.legs = legs; p.charted = true;
+    finishPlan(p);
+  }
+  SR.legs = p.legs;
+  if (fit) fitToPlan(p);
+  renderLoops(); renderPlan(); updateStats(); redraw();
+  history.replaceState(null, '', '#' + routeHash());
+}
+function clearPlan() {
+  srRun++;
+  SR.plans = []; SR.sel = -1; SR.legs = null; SR.ran = false; SR.busy = false;
+  document.getElementById('srPlot').disabled = false;
+  document.getElementById('srStatus').textContent = '';
+  renderLoops(); renderPlan(); renderBoard(null); updateStats(); redraw();
+  history.replaceState(null, '', '#' + routeHash());
+}
+function replan() { if (SR.ran && !SR.busy) plotSilkRoads(); }
+
+function renderLoops() {
+  const box = document.getElementById('srLoops');
+  box.innerHTML = '';
+  SR.plans.forEach((p, i) => {
+    const d = document.createElement('div');
+    d.className = 'srl' + (i === SR.sel ? ' on' : '');
+    d.innerHTML = `<b>${fmtGp(p.gph)}</b> gp/h · <b>${fmtGp(p.xph)}</b> xp/h · ${fmtTime(p.secs)} a lap` +
+      `<small>${p.seq.map(s => s.replace(/^The |^Port /, '')).join(' → ')} ↺ · ${p.chosen.length} task${p.chosen.length === 1 ? '' : 's'}, ${p.crates} crates</small>`;
+    d.addEventListener('click', () => selectPlan(i));
+    box.appendChild(d);
+  });
+}
+
+function taskLine(it, verb, extra) {
+  const t = it.t, tier = bagFor(t.xp).tier.toLowerCase();
+  const d = document.createElement('div');
+  d.className = 'tk';
+  d.innerHTML = `<span class="x" title="not on my board — plan without it">✕</span><span>${verb} <b>${t.name}</b>` +
+    (t.static ? ' <span class="static" title="always on this board">★</span>' : '') +
+    `<br><em>${extra}${t.qty} crate${t.qty === 1 ? '' : 's'} of ${t.item} · <span class="v">+${t.xp.toLocaleString()} xp · ~${fmtGp(taskGp(t))} gp</span> (${tier} bag) · ⛵${t.level}</em></span>`;
+  d.querySelector('.x').addEventListener('click', () => {
+    SR.excluded.add(t.id); saveExcluded(); renderExcluded(); replan();
+  });
+  return d;
+}
+function renderPlan() {
+  const box = document.getElementById('srPlan');
+  box.innerHTML = '';
+  const p = SR.plans[SR.sel];
+  if (!p) return;
+  const k = p.seq.length;
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < k; i++) {
+    const port = p.seq[i];
+    const h = document.createElement('div');
+    h.className = 'port';
+    h.innerHTML = `<span class="n">${i + 1}.</span>⚓ ${port}`;
+    frag.appendChild(h);
+    // deliveries first (they free the slot the next pickup needs)
+    for (const it of p.chosen) if ((it.at + it.span) % k === i && it.span)
+      frag.appendChild(taskLine(it, 'Deliver', ''));
+    for (const it of p.chosen) if (it.at === i) {
+      const aba = it.t.board !== it.t.cargo;
+      frag.appendChild(taskLine(it, 'Accept', aba ? `round trip — cargo waits at ${it.t.cargo} · ` : ''));
+    }
+    for (const it of p.chosen) if (it.load === i && it.t.board !== it.t.cargo) {
+      const l = document.createElement('div');
+      l.className = 'tk'; l.innerHTML = `<span class="x" style="visibility:hidden">✕</span><span>Load ${it.t.qty} crate${it.t.qty === 1 ? '' : 's'} of ${it.t.item} for <b>${it.t.dest}</b></span>`;
+      frag.appendChild(l);
+    }
+    const next = p.seq[(i + 1) % k];
+    const leg = p.legs?.[i];
+    const l = document.createElement('div');
+    l.className = 'leg';
+    l.title = 'chart this leg — turn-by-turn directions';
+    const aboard = p.slotUse[i], crates = p.crateUse[i];
+    l.innerHTML = `⛵ sail to <b>${next}</b> · ${leg ? `${leg.dist} tiles, ${leg.turns} turns, ` : ''}~${fmtTime(p.T[i])}` +
+      (leg ? '' : ' <span class="bad">(no charted line)</span>') +
+      `<br>${aboard} of ${slotsAt(prof.s)} slot${slotsAt(prof.s) === 1 ? '' : 's'} busy · ${crates} crate${crates === 1 ? '' : 's'} aboard`;
+    l.addEventListener('click', () => {
+      setEndpoint('from', { name: port, ...portByName[port] }, true);
+      setEndpoint('to', { name: next, ...portByName[next] }, true);
+    });
+    frag.appendChild(l);
+  }
+  const tot = document.createElement('div');
+  tot.className = 'tot';
+  tot.innerHTML = `Lap: ~${fmtTime(p.secs)} — ${fmtTime(p.sail)} at sea, ${fmtTime(p.secs - p.sail)} dockside · +${p.xp.toLocaleString()} xp · ~${fmtGp(p.gp)} gp<br>` +
+    `<b>${fmtGp(p.gph)} gp/h · ${fmtGp(p.xph)} xp/h</b>` +
+    `<div class="dim">coin only — one delivery in five pays a reward bag of supplies instead · boards show a random draw of their pool: tick ✕ on what yours lacks</div>`;
+  frag.appendChild(tot);
+  box.appendChild(frag);
+}
+function renderExcluded() {
+  const box = document.getElementById('srExcl');
+  const c = COURIER();
+  if (!c || !SR.excluded.size) { box.innerHTML = ''; return; }
+  const names = [...SR.excluded].map(id => c.tasks.find(t => t.id === id)?.name).filter(Boolean);
+  box.innerHTML = `<span class="dim">${names.length} task${names.length === 1 ? '' : 's'} ticked off until the boards reroll</span> ` +
+    `<span class="lnk" id="srUnex">↻ boards rerolled</span>`;
+  box.querySelector('#srUnex').addEventListener('click', () => { SR.excluded.clear(); saveExcluded(); renderExcluded(); replan(); });
+}
+// the board at your start port: its best single tasks, priced from here
+function renderBoard(port) {
+  const box = document.getElementById('srBoard');
+  box.innerHTML = '';
+  const c = COURIER();
+  if (!port || !c || !SR.matrix) return;
+  const M = SR.matrix, ix = SR.idx;
+  const rows = c.tasks.filter(t => t.board === port && taskOpen(t)).map(t => {
+    const aba = t.board !== t.cargo;
+    const sea = aba ? M[ix[port]][ix[t.cargo]] + M[ix[t.cargo]][ix[port]] + 2 * LEG_TURN_SECS
+                    : M[ix[port]][ix[t.dest]] + LEG_TURN_SECS;
+    const secs = sea + (aba ? 3 : 2) * pace().call + 2 * t.qty * pace().crate;
+    return { t, secs, gph: taskGp(t) / secs * 3600, xph: t.xp / secs * 3600 };
+  }).filter(r => isFinite(r.secs));
+  if (!rows.length) return;
+  const obj = document.getElementById('srObj').value;
+  rows.sort((a, b) => obj === 'xp' ? b.xph - a.xph : b.gph - a.gph);
+  const h = document.createElement('div');
+  h.className = 'port';
+  h.innerHTML = `📋 ${port} board — one task at a time`;
+  box.appendChild(h);
+  for (const r of rows.slice(0, 8)) {
+    const aba = r.t.board !== r.t.cargo;
+    box.appendChild(taskLine({ t: r.t }, aba ? `↔ ${r.t.cargo}:` : `→ ${r.t.dest}:`,
+      `${fmtGp(r.gph)} gp/h · ${fmtGp(r.xph)} xp/h · ~${fmtTime(r.secs)} · `));
+  }
+}
+
+function setupCourierPanel() {
+  const c = COURIER();
+  const sec = document.getElementById('srSection');
+  if (!c || !c.tasks?.length) { sec.style.display = 'none'; return; }
+  portByName = Object.fromEntries(NAV.ports.map(p => [p.name, p]));
+  SR.ports = [...new Set(c.tasks.flatMap(t => [t.board, t.cargo, t.dest]))].filter(n => portByName[n]).sort();
+  SR.idx = Object.fromEntries(SR.ports.map((p, i) => [p, i]));
+  loadExcluded();
+  const startSel = document.getElementById('srStart');
+  for (const p of SR.ports) {
+    if (!c.tasks.some(t => t.board === p)) continue;
+    const o = document.createElement('option'); o.value = p; o.textContent = p; startSel.appendChild(o);
+  }
+  const holdSel = document.getElementById('srHold'), boatSel = document.getElementById('srBoat');
+  (c.holds?.rows || []).forEach((r, i) => { const o = document.createElement('option'); o.value = i; o.textContent = r.name; holdSel.appendChild(o); });
+  (c.holds?.sizes || []).forEach((s, i) => { const o = document.createElement('option'); o.value = i; o.textContent = s.toLowerCase(); boatSel.appendChild(o); });
+  prof.hold = Math.min(prof.hold ?? 0, holdSel.options.length - 1);
+  prof.boat = Math.min(prof.boat ?? boatSel.options.length - 1, boatSel.options.length - 1);
+  holdSel.value = prof.hold; boatSel.value = prof.boat;
+  const cap = document.getElementById('srCap');
+  const showCap = () => { cap.textContent = `${holdCap()} crates of cargo · ${slotsAt(prof.s)} task slot${slotsAt(prof.s) === 1 ? '' : 's'} at Sailing ${prof.s} · ${pace().call}s a port call, ${pace().crate}s a crate carried`; };
+  showCap();
+  const onHold = () => { prof.hold = +holdSel.value; prof.boat = +boatSel.value; store.set('profile', prof); showCap(); replan(); };
+  holdSel.addEventListener('change', onHold); boatSel.addEventListener('change', onHold);
+  const paceSel = document.getElementById('srPace');
+  PACES.forEach((pc, i) => { const o = document.createElement('option'); o.value = i; o.textContent = pc.name; paceSel.appendChild(o); });
+  prof.pace = Math.min(prof.pace ?? 1, PACES.length - 1); paceSel.value = prof.pace;
+  paceSel.addEventListener('change', () => {
+    prof.pace = +paceSel.value; store.set('profile', prof); showCap();
+    for (const pl of SR.plans) finishPlan(pl);     // same loops, re-priced
+    SR.plans.sort((a, b) => b.rate - a.rate); SR.sel = SR.plans.length ? 0 : -1;
+    SR.legs = SR.plans[0]?.legs || null;
+    renderLoops(); renderPlan(); renderBoard(document.getElementById('srStart').value || null); updateStats(); redraw();
+  });
+  for (const id of ['srObj', 'srK', 'srStart']) document.getElementById(id).addEventListener('change', replan);
+  document.getElementById('srPlot').addEventListener('click', () => plotSilkRoads());
+  document.getElementById('srClear').addEventListener('click', clearPlan);
+  renderExcluded();
+  SR.showCap = showCap;
+}
+
+// the loop on the chart: each leg a line, each call a numbered beacon
+function drawPlanLayer() {
+  const p = SR.plans[SR.sel];
+  if (!p || !SR.legs) return;
+  const w = Math.max(2.5, Math.min(8, 5.6 * view.scale));
+  SR.legs.forEach((leg, i) => {
+    if (!leg) {
+      const a = courierPortTile(p.seq[i]), b = courierPortTile(p.seq[(i + 1) % p.seq.length]);
+      ctx2.setLineDash([6, 8]); strokeWorldLine([a, b], 'rgba(255,106,77,0.7)', w); ctx2.setLineDash([]);
+      return;
+    }
+    strokeWorldLine(leg.cells.map(cellCenterTile), 'rgba(255,150,60,0.9)', w);
+  });
+  const r = Math.max(8, Math.min(18, 12 * view.scale));
+  ctx2.font = `${Math.max(12, r * 1.3)}px VT323, monospace`;
+  ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+  p.seq.forEach((name, i) => {
+    const [sx, sy] = worldToScreen(...courierPortTile(name));
+    ctx2.beginPath(); ctx2.arc(sx, sy, r, 0, 7);
+    ctx2.fillStyle = '#1c150cee'; ctx2.fill();
+    ctx2.lineWidth = 3; ctx2.strokeStyle = '#ff9a3c'; ctx2.stroke();
+    ctx2.fillStyle = '#ffe95c'; ctx2.fillText(String(i + 1), sx, sy + 1);
+  });
+}
+
 // ============================================================ share links
 // the address bar carries the route + ship; Copy route link adds the exact
 // view and layer set on top, so a shared link reproduces the whole picture
@@ -1761,6 +2335,8 @@ function routeHash(full) {
   if (!ship.avoidMon) p.set('mon', 0);
   if (!ship.avoidReef) p.set('reef', 0);
   if (!document.getElementById('showAlt').checked) p.set('alt', 0);
+  const plan = SR.plans[SR.sel];
+  if (plan) { p.set('sr', plan.seq.join('>')); p.set('chase', plan.obj); }
   if (full) {
     p.set('v', `${Math.round(view.x)},${Math.round(view.y)},${+view.scale.toFixed(2)}`);
     p.set('ly', LAYERS.map(l => l.on ? 1 : 0).join(''));
@@ -1798,6 +2374,13 @@ function loadHash() {
     rebuildOverlay();
     if (p.get('from')) setEndpoint('from', parse(p.get('from')));
     if (p.get('to')) setEndpoint('to', parse(p.get('to')));
+    if (p.get('sr') && COURIER()) {
+      const seq = p.get('sr').split('>').filter(n => SR.idx[n] !== undefined);
+      if (seq.length >= 2) {
+        SR.only = seq;
+        if (p.get('chase') === 'xp') document.getElementById('srObj').value = 'xp';
+      }
+    }
     redraw();
   } catch (e) { console.warn('bad route link', e); }
 }
@@ -1819,8 +2402,10 @@ function animate() {
     setupPickers();
     setupShipPanel();
     setupChartPanel();
+    setupCourierPanel();
     loadHash();
     applyProfile();
+    if (SR.only) plotSilkRoads({ only: SR.only });
     ld(100, 'Fair winds!');
     setTimeout(() => {
       const l = document.getElementById('loading');

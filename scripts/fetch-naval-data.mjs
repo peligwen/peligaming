@@ -4,7 +4,7 @@
 //     map.jpg       stitched sea-level world map texture (2 px per game tile)
 //     navcells.png  navigation grid, 1 px per 4x4-tile cell; red channel is the
 //                   water class index (0 = not navigable), see naval.json legend
-//     naval.json    ports, shipwrecks, charting tasks, sea labels, shoals,
+//     naval.json    ports, shipwrecks, charting tasks, courier tasks, sea labels, shoals,
 //                   monsters, hazard metadata, hull speeds, world bounds
 //
 // Run manually to refresh: `node scripts/fetch-naval-data.mjs`. All wiki
@@ -29,6 +29,7 @@ import { PNG } from 'pngjs';
 import jpeg from 'jpeg-js';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { scrapeCourier } from './lib/courier-tasks.mjs';
 
 const API = 'https://oldschool.runescape.wiki/api.php';
 const CACHE = '.naval-cache';
@@ -666,6 +667,9 @@ const monsters = [];
   console.log(`monsters: ${monsters.length} (${nf} fields, ${np} spawn points)`);
 }
 
+// courier tasks — every board's task pool, priced (see scripts/lib/courier-tasks.mjs)
+const courier = await scrapeCourier(pageWikitext, ports.map(p => p.name));
+
 // ---------------------------------------------------------------------------
 // stage 5: cell grid (4x4 tiles per cell), harbour dredging, outputs
 // ---------------------------------------------------------------------------
@@ -919,7 +923,7 @@ const naval = {
     { name: 'Rosewood hull', speed: 3.0, level: 90 },
   ],
   seas: seaLabels,
-  ports, wrecks, services, charting, shoals, monsters,
+  ports, wrecks, services, charting, shoals, monsters, courier,
 };
 writeFileSync(join(OUT, 'naval.json'), JSON.stringify(naval));
 console.log(`naval.json: ${(JSON.stringify(naval).length / 1024).toFixed(0)} KB`);

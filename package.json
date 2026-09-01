@@ -5,6 +5,7 @@
   "scripts": {
     "build:tools": "node scripts/build-tools.mjs",
     "data:recipes": "node scripts/fetch-recipes.mjs",
+    "data:courier": "node scripts/fetch-courier-tasks.mjs",
     "data:snapshot": "node scripts/capture-snapshot.mjs"
   },
   "devDependencies": {

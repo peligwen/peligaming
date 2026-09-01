@@ -30,6 +30,15 @@ shipwrecks, shoals and charting-task spots.
 - Right-click (or long-press) anywhere for a sail menu; tap anything to
   examine it. Share links reproduce your exact view, endpoints and loadout.
 - Sea-monster overlay: kraken and shark waters marked with their reach.
+- **Courier runs** — silk roads for port tasks. Every notice board's courier
+  task pool from the wiki (level, xp, cargo port, destination, crates), priced
+  in coin from the port coin-bag tiers. The planner sails the same grid to
+  time every port pair, then weighs every loop of up to five ports for the
+  one that keeps your task slots and cargo hold earning: which tasks to
+  accept, load and deliver at each call, gp/h and xp/h, the loop drawn on
+  the chart. Set a start port to see its board's best single tasks too;
+  tick off tasks your board didn't roll and it plans around them until the
+  boards reset.
 
 Everything runs client-side in one HTML file — no backend, no build step.
 
@@ -40,7 +49,10 @@ Everything runs client-side in one HTML file — no backend, no build step.
   rendered map tiles into `map.jpg`, learns per-sea water colours from the
   wiki's sea polygons and the Sailing hazards page, classifies every game
   tile into a navigation class, and scrapes ports, wrecks, shoals, services
-  and charting tasks into `naval.json`.
+  and charting tasks into `naval.json`, and (via
+  `scripts/lib/courier-tasks.mjs`) every notice board's courier task pool
+  with the task-slot, coin-bag and cargo-hold tables the planner prices
+  with. `scripts/fetch-courier-tasks.mjs` refreshes just that block.
 - `navcells.png` is the navigation grid — one pixel per 4×4-tile cell, the
   red channel indexing thirteen water classes (open, stormy, reefs, fetid,
   crystal, kelp, icy, plus impassable "wall" seas).
@@ -57,7 +69,20 @@ To refresh the data after a game update:
 ```sh
 node scripts/fetch-naval-data.mjs        # rebuild map.jpg / navcells.png / naval.json
 python3 scripts/audit-naval-grid.py --repair   # deps: pip install pillow numpy
+node scripts/fetch-courier-tasks.mjs     # or just the courier task pools (npm run data:courier)
 ```
+
+The courier planner's model, for the curious: a loop is a closed walk over
+ports that trade with each other; each task is pinned to the loop (accepted
+at its board, loaded at its cargo port, delivered at its destination) and
+holds a task slot for the legs in between, so packing tasks into slots and
+hold is a small interval-packing problem solved greedily by value and by
+value per slot-hour. Time is sea time between ports (a Dijkstra per port on
+the navigation grid, then the real A\* per leg once a loop is chosen) plus
+a tunable dockside allowance per call and per crate. Coin is the expected
+coin bag (four completions in five) for the task's XP tier; the reward bag
+of supplies on the fifth is left out. The wiki lists each board's full pool
+and a board shows a random draw of it, so treat a plan as what to look for.
 
 ## Other tools
 

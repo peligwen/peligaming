@@ -40,7 +40,7 @@ window.PELIGAMING = {
         },
         {
           name: "Naval Pathfinder",
-          description: "Chart sailing routes between ports, wrecks and shoals — around krakens, fetid waters and icy seas — tuned from fewest turns to fastest passage.",
+          description: "Chart sailing routes between ports, wrecks and shoals — around krakens, fetid waters and icy seas — and plot courier-task silk roads: port loops that keep every task slot earning, priced in gp/h and xp/h.",
           path: "tools/runescape/naval-pathfinder.html",
         },
       ],
