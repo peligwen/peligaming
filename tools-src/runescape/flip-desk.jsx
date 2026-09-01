@@ -211,9 +211,10 @@ async function apiGet(kind, path) {
 
 /* the full tradeable universe from /mapping, slimmed and cached ~weekly */
 async function loadUniverse() {
-  const LS = "fd:universe-v2"; // v2 carries high-alch values for the Job Board
+  const LS = "fd:universe-v3"; // v3 carries both alch values for the Job Board
   try {
     localStorage.removeItem("fd:universe-v1");
+    localStorage.removeItem("fd:universe-v2");
     const j = JSON.parse(localStorage.getItem(LS));
     if (j && Date.now() - j.ts < TTL.mapping && j.items?.length > 500) return j.items;
   } catch (e) { /* no storage / stale — refetch */ }
@@ -222,7 +223,7 @@ async function loadUniverse() {
     if (!Array.isArray(map) || map.length < 500) return null;
     const items = map
       .filter((m) => m.id != null && m.name && m.limit > 0)
-      .map((m) => ({ id: m.id, name: m.name, limit: m.limit, members: !!m.members, ha: m.highalch || 0 }));
+      .map((m) => ({ id: m.id, name: m.name, limit: m.limit, members: !!m.members, ha: m.highalch || 0, la: m.lowalch || 0 }));
     try { localStorage.setItem(LS, JSON.stringify({ ts: Date.now(), items })); } catch (e) {}
     return items;
   } catch (e) { return null; }
@@ -299,7 +300,7 @@ async function pullLive() {
       high1h: ok1 ? Math.round(h.avgHighPrice) : null,
       lastLow: p?.low ?? null, lastHigh: p?.high ?? null, crossed,
       dv, staleHi, staleLo, tier, src: ok5 ? "5m" : "1h", moving, movePct,
-      official: guide > 0 ? guide : null, dev, ha: base.ha || 0,
+      official: guide > 0 ? guide : null, dev, ha: base.ha || 0, la: base.la || 0,
     });
   }
   if (items.length < 20) throw new Error("thin response");
@@ -749,7 +750,7 @@ const OVERHEAD = 1.15; // bank trips, misclicks, being human
 const RICH_GP_PER_WORK_HOUR = 2_000_000;
 const verbOf = (r) => {
   if (r.s === "Magic") {
-    if (r.a) return "Alch";
+    if (r.a) return r.l >= 55 ? "High alch" : "Low alch";
     return r.m?.some(([i]) => RECIPES.names[i] === "Cosmic rune") ? "Enchant" : "Cast";
   }
   if (r.f === "Furnace") return "Smelt";
@@ -931,23 +932,30 @@ function buildJobs(items, mode, skills) {
       defaultN: Math.min(niceRound(450 / best.secs), maxN),
     });
   }
-  /* ---- high alchemy: the spell that turns the catalogue into coins ----
+  /* ---- alchemy: the spells that turn the catalogue into coins ----
      Priced like any other job: buy the item and the runes, cast, pocket the
      fixed alch value. No sell leg and no GE tax — the gold comes from the game
      itself, which is exactly why the alch floor exists (see Econ 101). Runes
      are priced off the exchange like every other material; a fire staff covers
-     the five fire runes, so the board lists them but notes the saving. */
+     the fire runes, so the board lists them but notes the saving. High alchemy
+     (Magic 55, 5 ticks, 5 fires) pays 60% of shop value; Low (Magic 21,
+     3 ticks, 3 fires) pays 40% — strictly worse gp when you can cast both,
+     but the only alch a mid-level mage has, so each gates on its own level. */
   const nat = byName.get("Nature rune");
   const fire = byName.get("Fire rune");
   if (nat && fire) {
     const natPx = jobBuyPx(nat, mode), firePx = jobBuyPx(fire, mode);
-    const secs = 3.0 * OVERHEAD; // 5 ticks a cast, plus the usual overhead
-    for (const it of items) {
-      if (!(it.ha > 0) || it.id === nat.id || it.id === fire.id) continue;
-      const cost = jobBuyPx(it, mode) + natPx + 5 * firePx;
-      const profitUnit = it.ha - cost;
+    const SPELLS = [
+      { tag: "hi", lvl: 55, fires: 5, secs: 3.0 * OVERHEAD, val: (it) => it.ha },
+      { tag: "lo", lvl: 21, fires: 3, secs: 1.8 * OVERHEAD, val: (it) => it.la },
+    ];
+    for (const sp of SPELLS) for (const it of items) {
+      const value = sp.val(it);
+      if (!(value > 0) || it.id === nat.id || it.id === fire.id) continue;
+      const cost = jobBuyPx(it, mode) + natPx + sp.fires * firePx;
+      const profitUnit = value - cost;
       if (profitUnit <= 0) continue;
-      const buyList = [{ it, perUnit: 1 }, { it: nat, perUnit: 1 }, { it: fire, perUnit: 5 }];
+      const buyList = [{ it, perUnit: 1 }, { it: nat, perUnit: 1 }, { it: fire, perUnit: sp.fires }];
       const caps = [];
       for (const b of buyList) {
         caps.push(Math.floor(b.it.limit / b.perUnit));
@@ -958,18 +966,18 @@ function buildJobs(items, mode, skills) {
       const maxN = Math.max(0, Math.min(...caps));
       if (maxN < 1) continue;
       const legs = [it, nat, fire];
-      const wage = (profitUnit * 3600) / secs;
+      const wage = (profitUnit * 3600) / sp.secs;
       jobs.push({
-        key: "alch:" + it.id + ":" + mode, out: it, mode, alch: true,
-        r: { s: "Magic", l: 55, f: "", a: 1 },
-        cost, secs, coins: 0, profitUnit, sellUnit: it.ha,
+        key: "alch:" + sp.tag + ":" + it.id + ":" + mode, out: it, mode, alch: true,
+        r: { s: "Magic", l: sp.lvl, f: "", a: 1 },
+        cost, secs: sp.secs, coins: 0, profitUnit, sellUnit: value,
         stepList: [], buyList, maxN, members: it.members,
-        levels: [{ s: "Magic", l: 55 }], facilities: [], unlocks: [],
+        levels: [{ s: "Magic", l: sp.lvl }], facilities: [], unlocks: [],
         wage, rich: wage > RICH_GP_PER_WORK_HOUR,
         staleLegs: legs.filter((x) => x.tier === "C").map((x) => x.name),
         movingLegs: legs.filter((x) => x.moving).map((x) => x.name),
         crush: 0,
-        defaultN: Math.min(niceRound(450 / secs), maxN),
+        defaultN: Math.min(niceRound(450 / sp.secs), maxN),
       });
     }
   }
@@ -1016,7 +1024,7 @@ function JobCard({ job, n, setN, sheet }) {
         })}
         {job.facilities.map((f) => <span key={f} className="ge-req unk">{f}</span>)}
         {job.alch && (
-          <span className="ge-req unk" title="The buy list prices all five fire runes per cast to stay honest — wielding any fire staff supplies them for free and fattens the pay by that much.">
+          <span className="ge-req unk" title="The buy list prices every fire rune per cast to stay honest — wielding any fire staff supplies them for free and fattens the pay by that much.">
             fire staff optional
           </span>
         )}
@@ -1221,7 +1229,8 @@ function JobBoard({ items, status }) {
       <p className="ge-foot">
         Default batches are sized to roughly 5–10 minutes of work and capped by 4-hour buy limits and what the
         books can absorb (≈10% of daily volume when taking the market; ≈4 hours of patient fills when quoting).<br />
-        Action speeds are desk assumptions per facility, +15% for banking. High-alch jobs price every rune off
+        Action speeds are desk assumptions per facility, +15% for banking. Alch jobs (Low at Magic 21, High
+        at 55) price every rune off
         the exchange (a fire staff makes the fire runes free) and pay the spell's fixed coin value on the spot —
         no sell leg, no GE tax — so they light up exactly when an item dips below its alch floor.
         Quote &amp; wait prices anchor to the
