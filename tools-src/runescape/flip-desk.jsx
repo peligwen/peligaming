@@ -428,7 +428,11 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
   font-weight:600; font-size:11px; letter-spacing:.12em; text-transform:uppercase; text-align:right;
   padding:8px 10px; border-bottom:2px solid var(--edge); cursor:pointer; white-space:nowrap;
   text-shadow:1px 1px 0 #000; box-shadow:inset 0 1px 0 var(--stone-hi); }
-.ge-t thead th:first-child { text-align:left; }
+.ge-t thead th:first-child { text-align:left; left:0; z-index:3; }
+/* the item column stays put while the board scrolls sideways — a row should
+   never lose its name */
+.ge-t tbody td:first-child { position:sticky; left:0; z-index:1; background:var(--inset); }
+.ge-t tbody tr:hover td:first-child { background:#332c22; }
 .ge-t thead th.on { color:var(--yellow); }
 .ge-t thead th .arr { font-size:9px; margin-left:3px; }
 .ge-t tbody td { padding:6px 10px; text-align:right; font-family:var(--mono); font-size:12.5px;
@@ -1121,7 +1125,9 @@ function JobCard({ job, n, setN, sheet, focus }) {
           return (
             <div key={i}>
               <span className="op work">{verbOf(s.r).toUpperCase()}</span>
-              {fmtFull(count)}× {RECIPES.names[s.r.o]}{s.r.f ? ` at ${s.r.f.toLowerCase()}` : ""}
+              {fmtFull(count)}× {RECIPES.names[s.r.o]}
+              {s.r.q > 1 ? <span className="clock"> ({fmtFull(s.r.q)} per {verbOf(s.r).toLowerCase()})</span> : null}
+              {s.r.f ? ` at ${s.r.f.toLowerCase()}` : ""}
               <span className="clock"> · ≈ {fmtDurShort((count * secsOf(s.r) * OVERHEAD) / 3600)}</span>
             </div>
           );
@@ -1167,7 +1173,10 @@ function JobCard({ job, n, setN, sheet, focus }) {
           <button className="ge-btn" onClick={() => setN(Math.max(1, niceRound(n / 2)))} aria-label="Halve batch">−</button>
           <b>{fmtFull(n)}</b>
           <button className="ge-btn" onClick={() => setN(Math.min(job.maxN, niceRound(n * 2)))} aria-label="Double batch">+</button>
-          <button className="ge-btn" onClick={() => setN(job.maxN)}>Max</button>
+          <button className="ge-btn" onClick={() => setN(job.maxN)}
+            title={mode === "express"
+              ? "The biggest batch these books can absorb without moving them (≈10% of daily volume), inside the 4-hour buy limits."
+              : "The most the books can patiently fill in ≈4 hours, inside the 4-hour buy limits."}>Max</button>
         </div>
       </div>
       {capNote && <p className="ge-note caution" style={{ padding: "0 13px 10px", margin: 0 }}>⚠ {capNote}.</p>}
@@ -1668,6 +1677,7 @@ export default function FlipDesk() {
           {filtered.length !== assessed.length && <> · <b>{filtered.length.toLocaleString()}</b> match your filters</>}
           {hiddenN > 0 && <> · {hiddenN.toLocaleString()} unpriceable books set aside (one-sided, crossed or dislocated)</>}
           {" "}· tap an item for its recommended flip.
+          {sortKey === "turnover" && <> Ranked by gp moved/day — the deepest books, not the fattest margins; click any column to re-rank.</>}
         </p>
 
         {/* filters */}
