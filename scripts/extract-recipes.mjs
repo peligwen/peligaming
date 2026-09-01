@@ -21,7 +21,7 @@ const recipes = gdata.recipes; // { nodeIdx: [{s, l, q, f, m: [[nodeIdx, qty]]}]
 
 // Only processing verbs the Job Board can price honestly. Construction and
 // "General" cover POH furniture, quest one-offs and other non-market output.
-const SKILLS = new Set(['Smithing', 'Crafting', 'Fletching', 'Cooking', 'Herblore', 'Smelting']);
+const SKILLS = new Set(['Smithing', 'Crafting', 'Fletching', 'Cooking', 'Herblore', 'Smelting', 'Magic']);
 // Everyday facilities only — minigame, quest-gated and POH-buildable stations
 // would put jobs on the board most players can't walk up to.
 const FACILITIES = new Set([
@@ -35,9 +35,16 @@ const EXCLUDE_OUTPUTS = new Set([
 // Quest and reward unlocks the recipe data doesn't carry but the game enforces.
 // Rule-based so whole families (every dart tip, every cannonball) get tagged
 // consistently; joins to the character sheet's quest checklist on the board.
-function unlockOf(name, skill, facility) {
+function unlockOf(name, skill, facility, level, matNames) {
   const n = name.toLowerCase();
   if (skill === 'Herblore') return 'Druidic Ritual'; // gates the whole skill
+  if (skill === 'Magic') {
+    // spellbook-gated Magic: astral runes mean Lunar spells (Spin Flax, Tan
+    // Leather, Superglass Make, Humidify...); String Jewellery and Plank Make
+    // sit behind Dream Mentor on top. Degrime (herb cleaning) is Arceuus.
+    if (matNames.includes('Astral rune')) return level >= 80 ? 'Dream Mentor' : 'Lunar Diplomacy';
+    if (matNames.some((m) => m.startsWith('Grimy '))) return 'Arceuus spellbook';
+  }
   if (n.includes('dart') && !n.includes('atlatl') && !n.includes('prototype')) return 'The Tourist Trap';
   if (n.includes('cannonball') && facility === 'Furnace') return 'Dwarf Cannon';
   if (n.includes('blurite') && skill === 'Smithing') return "The Knight's Sword";
@@ -103,7 +110,8 @@ for (const [nodeIdx, variantList] of Object.entries(recipes)) {
     };
     const g = gearOf(outNode.n, v.s, v.f || '');
     if (g) rec.g = g;
-    const u = unlockOf(outNode.n, v.s, v.f || '');
+    const matNames = (v.m || []).map(([i]) => nodes[+i]?.n || '');
+    const u = unlockOf(outNode.n, v.s, v.f || '', +v.l || 1, matNames);
     if (u) rec.u = u;
     if (v.s === 'Crafting' && !(v.f || '') && CRUSH[outNode.n]) rec.x = CRUSH[outNode.n];
     out.push(rec);
