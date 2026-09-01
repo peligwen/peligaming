@@ -1153,7 +1153,7 @@ function JobCard({ job, n, setN, sheet, focus }) {
           <div><span>The job pays</span><b className={profit > 0 ? "good" : "bad"}>{profit > 0 ? "+" : ""}{fmtGp(profit)} gp</b></div>
           {job.xp.length > 0 && (
             <div><span>Xp earned</span><b className="gold">
-              {job.xp.slice(0, 2).map(([s, v]) => `${fmtXp(v * n)} ${s}`).join(" · ")}{job.xp.length > 2 ? " +" : ""}
+              {job.xp.map(([s, v]) => `${fmtXp(v * n)} ${s}`).join(" · ")}
             </b></div>
           )}
           {focus && focusXp > 0 && (
