@@ -63,11 +63,28 @@ python3 scripts/audit-naval-grid.py --repair   # deps: pip install pillow numpy
 
 | Game | Tool | What it does |
 | --- | --- | --- |
-| RuneScape | Flip Desk | Live Grand Exchange market board with recommended flip orders |
-| RuneScape | Gielinor Crafting Web | Every craftable item as an explorable 3D recipe web |
+| RuneScape | Flip Desk | Live Grand Exchange market board, job board (skilling work priced by the market, or ranked by gp/xp for training), econ primer |
+| RuneScape | Gielinor Crafting Web | Every craftable item as an explorable 3D recipe web, with per-skill xp lenses |
 | Fortnite | Tactical Terrain | The island in 3D — sightlines, dead ground, cover |
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
 | Skyrim | Alchemy Lab | Best-value potions from your ingredient stock |
+
+### RuneScape data plumbing
+
+Both economy tools draw from one canonical recipe dataset and one shared edge
+cache:
+
+- `scripts/fetch-recipes.mjs` pulls every `{{Infobox Recipe}}` from the
+  [OSRS Wiki's Bucket API](https://oldschool.runescape.wiki/w/RuneScape:Bucket)
+  — materials, facilities, tools, real tick counts, and xp per action — and
+  writes `tools-src/runescape/recipes.json` (the Flip Desk Job Board's graph)
+  while also joining xp onto the Crafting Web's embedded data. Run it after
+  game updates, then `npm run build:tools` and commit all three files.
+- `src/worker.mjs` proxies the wiki price API **and** Jagex's public OSRS
+  hiscores under `/api/osrs/*`, so every visitor shares one polite edge cache
+  and requests carry a descriptive User-Agent (the hiscores send no CORS
+  headers, so the proxy is the only browser route in). No sign-in anywhere —
+  hiscores lookups are per-name and public.
 
 ## Repository structure
 

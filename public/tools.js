@@ -30,12 +30,12 @@ window.PELIGAMING = {
       tools: [
         {
           name: "Flip Desk",
-          description: "The Grand Exchange as it stands — a live market board; tap an item for its recommended flip orders and fill times.",
+          description: "The Grand Exchange as it stands — a live market board with a job board that prices skilling work and ranks the cheapest xp; tap an item for its recommended flip orders.",
           path: "tools/runescape/flip-desk.html",
         },
         {
           name: "Gielinor Crafting Web",
-          description: "Every craftable item in OSRS as an explorable 3D web of recipes.",
+          description: "Every craftable item in OSRS as an explorable 3D web of recipes, with xp lenses that paint each skill's training map.",
           path: "tools/runescape/osrs-crafting-web-3d.html",
         },
         {

@@ -67,6 +67,15 @@ const fmtSecs = (s) => {
   return (s < 36000 ? (s / 3600).toFixed(1) : Math.round(s / 3600)) + " hr";
 };
 const paceClass = (s) => (!isFinite(s) ? "bad" : s <= 10 ? "good" : s <= 120 ? "" : s <= 900 ? "warn" : "bad");
+// xp amounts: fine-grained when small, compact when big
+const fmtXp = (n) => {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + "m";
+  if (n >= 10000) return (n / 1000).toFixed(1) + "k";
+  if (n >= 100) return Math.round(n).toLocaleString();
+  return String(+n.toFixed(1));
+};
+// gp per xp: sign carried by the caller's label
+const fmtGpx = (g) => (Math.abs(g) >= 100 ? Math.round(Math.abs(g)).toLocaleString() : Math.abs(g).toFixed(Math.abs(g) >= 10 ? 1 : 2));
 // signed % gap between real trades and the official guide index
 const fmtDev = (d) => (d > 0 ? "+" : "") + d.toFixed(Math.abs(d) >= 10 ? 0 : 1) + "%";
 const devClass = (d) => (Math.abs(d) < 2 ? "mut" : Math.abs(d) < 10 ? "" : "warn");
@@ -163,8 +172,18 @@ const cooloff = new Map();    // kind -> {streak, until}
 // Cloudflare edge cache for every visitor, and a descriptive User-Agent for the
 // wiki. Anywhere else (file://, previews) — or if the proxy misbehaves — fall
 // back to the wiki directly.
-let apiBase =
-  typeof location !== "undefined" && /^https?:$/.test(location.protocol) ? "/api/osrs" : API;
+const PROXIED = typeof location !== "undefined" && /^https?:$/.test(location.protocol);
+let apiBase = PROXIED ? "/api/osrs" : API;
+
+/* hiscores lookups exist only through the site's proxy (Jagex sends no CORS
+   headers), and never touch the price-API fallback logic above */
+async function fetchHiscores(rsn) {
+  const res = await fetch("/api/osrs/hiscores?player=" + encodeURIComponent(rsn), {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
 
 async function apiGet(kind, path) {
   const ttl = TTL[kind] ?? 300_000;
@@ -188,10 +207,13 @@ async function apiGet(kind, path) {
   const p = (async () => {
     try {
       let data;
+      // capture the base up front: concurrent callers each get their own
+      // direct-API retry even after the first failure flips the shared base
+      const base = apiBase;
       try {
-        data = await one(apiBase);
+        data = await one(base);
       } catch (e) {
-        if (apiBase === API) throw e;
+        if (base === API) throw e;
         apiBase = API;                       // proxy unavailable — go direct from now on
         data = await one(API);
       }
@@ -732,12 +754,20 @@ const UNLOCK_NOTE = {
   "Arceuus spellbook": "Spellbook swap at Tyss beside the Dark Altar — free, no quest",
 };
 const unlockNote = (u) => UNLOCK_NOTE[u] || "Quest required — tick it off in your sheet once it's done";
-// seconds per action by facility — desk assumptions (banking overhead added on top)
+const GEAR_NOTE = {
+  "Ring of forging": "Wear one at the furnace — without it half your iron ore burns away. One ring covers ~140 smelts for a few gp each.",
+};
+const gearNote = (g) => GEAR_NOTE[g] || "Hand tool required — a few gp from a shop";
+// seconds per action by facility — desk-assumption FALLBACKS only: since the
+// recipe data moved to the wiki's Bucket API, most recipes carry their real
+// tick count (r.t) and these cover the few that don't
 const RATE = {
   Furnace: 3.0, Anvil: 3.0, "Cooking range": 2.4, Fire: 2.4,
   "Spinning wheel": 3.0, Loom: 4.8, "Pottery Oven": 3.0, "Potter's Wheel": 3.0,
-  "Dairy churn": 3.0, "": 1.8,
+  "Dairy churn": 3.0, Tannery: 1.2, "": 1.8,
 };
+const TICK = 0.6; // one game tick, in seconds
+const secsOf = (r) => (r.t ? r.t * TICK : RATE[r.f] ?? 3.0);
 const OVERHEAD = 1.15; // bank trips, misclicks, being human
 /* A chain's margin is the market paying a wage for the labor in it, so "too
    good to be true" is judged against the WORK, not the outlay: a labor-heavy
@@ -753,6 +783,8 @@ const verbOf = (r) => {
     if (r.a) return r.l >= 55 ? "High alch" : "Low alch";
     return r.m?.some(([i]) => RECIPES.names[i] === "Cosmic rune") ? "Enchant" : "Cast";
   }
+  if (r.f === "Tannery") return "Tan";
+  if (!r.s) return "Combine"; // skill-less work: tanning fees, doughs, poisons
   if (r.f === "Furnace") return "Smelt";
   if (r.f === "Anvil") return "Smith";
   if (r.f === "Cooking range" || r.f === "Fire") return "Cook";
@@ -813,7 +845,7 @@ function sourceUnit(nameIdx, mode, byName, memo, visiting, skills) {
   if (!visiting.has(nameIdx) && visiting.size < 3) {
     visiting.add(nameIdx);
     for (const r of RECIPES_BY_OUT.get(nameIdx) || []) {
-      let cost = 0, secs = (RATE[r.f] ?? 3.0) / r.q, coins = 0, ok = true;
+      let cost = 0, secs = secsOf(r) / r.q, coins = 0, ok = true;
       const buys = new Map(), steps = new Map([[JSON.stringify(r), 1 / r.q]]);
       for (const [mi, mq] of r.m) {
         const sub = sourceUnit(mi, mode, byName, memo, visiting, skills);
@@ -843,8 +875,10 @@ function sourceUnit(nameIdx, mode, byName, memo, visiting, skills) {
 }
 
 /* every job worth posting for the current mode: one card per craftable,
-   tradeable output whose sale beats the cost of its parts */
-function buildJobs(items, mode, skills) {
+   tradeable output whose sale beats the cost of its parts. A training focus
+   loosens the profit gate: work that costs gp but pays xp in that skill is
+   exactly what a trainee is shopping for. */
+function buildJobs(items, mode, skills, focus) {
   const byName = new Map(items.map((it) => [it.name, it]));
   const memo = new Map();
   const jobs = [];
@@ -856,7 +890,7 @@ function buildJobs(items, mode, skills) {
     let best = null;
     for (const r of variants) {
       // force the final step through THIS recipe; parts sourced their cheapest way
-      let cost = 0, secs = (RATE[r.f] ?? 3.0) / r.q, coins = 0, ok = true;
+      let cost = 0, secs = secsOf(r) / r.q, coins = 0, ok = true;
       const buys = new Map(), steps = new Map([[JSON.stringify(r), 1 / r.q]]);
       const visiting = new Set([outIdx]);
       for (const [mi, mq] of r.m) {
@@ -880,18 +914,28 @@ function buildJobs(items, mode, skills) {
         best = { r, cost, secs: secs * OVERHEAD, coins, buys, steps, profitUnit };
       }
     }
-    if (!best || best.profitUnit <= 0) continue;
+    if (!best) continue;
+
+    const stepList = [...best.steps].reverse().map(([sk, perUnit]) => ({ r: JSON.parse(sk), perUnit }));
+    // xp earned per crafted unit, by skill: every step's action count × the
+    // wiki's per-action xp (secondary skills too — superheat pays Magic xp)
+    const xpMap = new Map();
+    for (const s of stepList) {
+      if (s.r.e && s.r.s) xpMap.set(s.r.s, (xpMap.get(s.r.s) || 0) + s.perUnit * s.r.e);
+      for (const [kn, , kxp] of s.r.k || []) if (kxp) xpMap.set(kn, (xpMap.get(kn) || 0) + s.perUnit * kxp);
+    }
+    // paying jobs make the board on their own; when training a skill, work
+    // that costs gp but pays xp in that skill belongs on it too
+    if (best.profitUnit <= 0 && !(focus && xpMap.get(focus) > 0)) continue;
 
     // requirements across every step — listed in work order, raw materials first
     const levels = new Map(); const facilities = new Set(); const unlocks = new Set();
     let members = out.members;
-    const stepList = [...best.steps].reverse().map(([sk, perUnit]) => ({ r: JSON.parse(sk), perUnit }));
     for (const s of stepList) {
-      levels.set(s.r.s, Math.max(levels.get(s.r.s) || 0, s.r.l));
-      // Superheat Item is a Magic 43 spell even though the recipe data files it
-      // under Smithing (a furnace-free smelt with nature runes in the mix)
-      if (s.r.s === "Smithing" && !s.r.f && s.r.m.some(([i]) => RECIPES.names[i] === "Nature rune"))
-        levels.set("Magic", Math.max(levels.get("Magic") || 0, 43));
+      if (s.r.s) levels.set(s.r.s, Math.max(levels.get(s.r.s) || 0, s.r.l));
+      // secondary skill requirements ride in with the recipe data now
+      // (superheat's Magic 43, Lunar spinning's Crafting, ...)
+      for (const [kn, kl] of s.r.k || []) levels.set(kn, Math.max(levels.get(kn) || 0, kl));
       if (s.r.f) facilities.add(s.r.f);
       if (s.r.u) unlocks.add(s.r.u);
     }
@@ -928,6 +972,7 @@ function buildJobs(items, mode, skills) {
       levels: [...levels].map(([s, l]) => ({ s, l })),
       facilities: [...facilities],
       unlocks: [...unlocks],
+      xp: [...xpMap].sort((a, b) => b[1] - a[1]),
       wage, rich, staleLegs, movingLegs, crush: crushP < 1 ? 1 - crushP : 0,
       defaultN: Math.min(niceRound(450 / best.secs), maxN),
     });
@@ -946,15 +991,16 @@ function buildJobs(items, mode, skills) {
   if (nat && fire) {
     const natPx = jobBuyPx(nat, mode), firePx = jobBuyPx(fire, mode);
     const SPELLS = [
-      { tag: "hi", lvl: 55, fires: 5, secs: 3.0 * OVERHEAD, val: (it) => it.ha },
-      { tag: "lo", lvl: 21, fires: 3, secs: 1.8 * OVERHEAD, val: (it) => it.la },
+      { tag: "hi", lvl: 55, fires: 5, secs: 3.0 * OVERHEAD, xp: 65, val: (it) => it.ha },
+      { tag: "lo", lvl: 21, fires: 3, secs: 1.8 * OVERHEAD, xp: 31, val: (it) => it.la },
     ];
     for (const sp of SPELLS) for (const it of items) {
       const value = sp.val(it);
       if (!(value > 0) || it.id === nat.id || it.id === fire.id) continue;
       const cost = jobBuyPx(it, mode) + natPx + sp.fires * firePx;
       const profitUnit = value - cost;
-      if (profitUnit <= 0) continue;
+      // training Magic, a cheap loss per cast is the product — keep those jobs
+      if (profitUnit <= 0 && focus !== "Magic") continue;
       const buyList = [{ it, perUnit: 1 }, { it: nat, perUnit: 1 }, { it: fire, perUnit: sp.fires }];
       const caps = [];
       for (const b of buyList) {
@@ -973,6 +1019,7 @@ function buildJobs(items, mode, skills) {
         cost, secs: sp.secs, coins: 0, profitUnit, sellUnit: value,
         stepList: [], buyList, maxN, members: it.members,
         levels: [{ s: "Magic", l: sp.lvl }], facilities: [], unlocks: [],
+        xp: [["Magic", sp.xp]],
         wage, rich: wage > RICH_GP_PER_WORK_HOUR,
         staleLegs: legs.filter((x) => x.tier === "C").map((x) => x.name),
         movingLegs: legs.filter((x) => x.moving).map((x) => x.name),
@@ -987,7 +1034,7 @@ function buildJobs(items, mode, skills) {
 }
 
 /* one job posting */
-function JobCard({ job, n, setN, sheet }) {
+function JobCard({ job, n, setN, sheet, focus }) {
   const { out, mode } = job;
   const clockH = (units, flow) => (flow > 0 ? Math.max(units / (flow * SHARE_TOUCH), 1 / 60) : Infinity);
   const workH = (n * job.secs) / 3600;
@@ -1006,6 +1053,7 @@ function JobCard({ job, n, setN, sheet }) {
   const capNote = n >= job.maxN
     ? (mode === "express" ? "capped — a bigger batch would move these books" : "capped — the books can't fill more inside ~4h")
     : null;
+  const focusXp = focus ? (job.xp.find(([s]) => s === focus)?.[1] || 0) : 0;
   return (
     <section className="ge-panel ge-job">
       <div className="ge-jobhead">
@@ -1029,7 +1077,7 @@ function JobCard({ job, n, setN, sheet }) {
           </span>
         )}
         {[...new Set(job.stepList.map((s) => s.r.g).filter(Boolean))].map((g) => (
-          <span key={g} className="ge-req unk" title="Hand tool required — a few gp from a shop">{g}</span>
+          <span key={g} className="ge-req unk" title={gearNote(g)}>{g}</span>
         ))}
         {job.crush > 0 && (
           <span className="ge-req warn" title={`Semi-precious gems crush on a failed cut — at your Crafting level ≈${Math.round(job.crush * 100)}% of attempts fail. The buy list below already includes the extra uncut gems.`}>
@@ -1074,7 +1122,7 @@ function JobCard({ job, n, setN, sheet }) {
             <div key={i}>
               <span className="op work">{verbOf(s.r).toUpperCase()}</span>
               {fmtFull(count)}× {RECIPES.names[s.r.o]}{s.r.f ? ` at ${s.r.f.toLowerCase()}` : ""}
-              <span className="clock"> · ≈ {fmtDurShort((count * (RATE[s.r.f] ?? 3.0) * OVERHEAD) / 3600)}</span>
+              <span className="clock"> · ≈ {fmtDurShort((count * secsOf(s.r) * OVERHEAD) / 3600)}</span>
             </div>
           );
         })}
@@ -1103,6 +1151,15 @@ function JobCard({ job, n, setN, sheet }) {
         <div className="facts">
           <div><span>You lay out</span><b>{fmtGp(cost)} gp</b></div>
           <div><span>The job pays</span><b className={profit > 0 ? "good" : "bad"}>{profit > 0 ? "+" : ""}{fmtGp(profit)} gp</b></div>
+          {job.xp.length > 0 && (
+            <div><span>Xp earned</span><b className="gold">
+              {job.xp.slice(0, 2).map(([s, v]) => `${fmtXp(v * n)} ${s}`).join(" · ")}{job.xp.length > 2 ? " +" : ""}
+            </b></div>
+          )}
+          {focus && focusXp > 0 && (
+            <div><span>{job.profitUnit >= 0 ? "Pays per xp" : "Costs per xp"}</span>
+              <b className={job.profitUnit >= 0 ? "good" : "warn"}>{fmtGpx(job.profitUnit / focusXp)} gp</b></div>
+          )}
           <div><span>Return</span><b>{cost > 0 ? ((profit / cost) * 100).toFixed(1) : "–"}%</b></div>
           <div><span>Takes about</span><b className="gold">{fmtDurShort(totalH)}</b></div>
         </div>
@@ -1128,6 +1185,7 @@ function JobCard({ job, n, setN, sheet }) {
 
 function JobBoard({ items, status }) {
   const [mode, setMode] = useState("express");
+  const [focus, setFocus] = useState(""); // "" = best pay; a skill name = train it
   const [search, setSearch] = useState("");
   const [hideCant, setHideCant] = useState(true);
   const [batches, setBatches] = useState({}); // job key -> chosen n
@@ -1137,7 +1195,34 @@ function JobBoard({ items, status }) {
   });
   useEffect(() => { try { localStorage.setItem("fd-sheet-v1", JSON.stringify(sheet)); } catch (e) {} }, [sheet]);
 
-  const jobs = useMemo(() => buildJobs(items, mode, sheet.skills), [items, mode, sheet.skills]);
+  // pull real levels off the hiscores by RuneScape name — one click, no login
+  const [rsnBusy, setRsnBusy] = useState(false);
+  const [rsnMsg, setRsnMsg] = useState("");
+  const importRsn = async () => {
+    const rsn = (sheet.rsn || "").trim();
+    if (!rsn || rsnBusy) return;
+    setRsnBusy(true); setRsnMsg("");
+    try {
+      const d = await fetchHiscores(rsn);
+      const got = {};
+      for (const s of d.skills || []) if (SKILL_LIST.includes(s.name) && s.level > 0) got[s.name] = String(s.level);
+      if (!Object.keys(got).length) throw new Error("empty");
+      setSheet((sh) => ({ ...sh, skills: { ...sh.skills, ...got } }));
+      setRsnMsg("✓ levels loaded");
+    } catch (e) {
+      setRsnMsg(/404/.test(e.message || "") ? "not on the hiscores" : "lookup failed — try again shortly");
+    }
+    setRsnBusy(false);
+  };
+
+  const jobs = useMemo(() => buildJobs(items, mode, sheet.skills, focus), [items, mode, sheet.skills, focus]);
+  // training focus: only work that pays xp in the chosen skill, cheapest xp first
+  const ranked = useMemo(() => {
+    if (!focus) return jobs;
+    const xpOf = (j) => j.xp.find(([s]) => s === focus)?.[1] || 0;
+    return jobs.filter((j) => xpOf(j) > 0)
+      .sort((a, b) => (-a.profitUnit / xpOf(a)) - (-b.profitUnit / xpOf(b)));
+  }, [jobs, focus]);
   // only the quests that actually gate a job on today's board make the sheet
   const questList = useMemo(() => [...new Set(jobs.flatMap((j) => j.unlocks))].sort(), [jobs]);
 
@@ -1152,7 +1237,7 @@ function JobBoard({ items, status }) {
     return true;
   };
   const q = search.trim().toLowerCase();
-  const shown = jobs
+  const shown = ranked
     .filter((j) => (!hideCant || canDo(j)) && (!q || j.out.name.toLowerCase().includes(q)))
     .slice(0, 30);
 
@@ -1173,6 +1258,10 @@ function JobBoard({ items, status }) {
           </span>
         </div>
         <div className="ge-filters">
+          <select className="ge-sel" value={focus} onChange={(e) => setFocus(e.target.value)} aria-label="Board focus">
+            <option value="">Best pay</option>
+            {SKILL_LIST.map((s) => <option key={s} value={s}>Train {s}</option>)}
+          </select>
           <div className="grow">
             <input className="ge-in" placeholder="Search the job board… e.g. keel, glory, pie" value={search}
               onChange={(e) => setSearch(e.target.value)} aria-label="Search jobs" />
@@ -1190,6 +1279,20 @@ function JobBoard({ items, status }) {
           ))}
           <label className="ge-tog"><input type="checkbox" checked={sheet.members}
             onChange={(e) => setSheet((sh) => ({ ...sh, members: e.target.checked }))} />members</label>
+          {PROXIED && (
+            <>
+              <label className="sk">or fetch them —
+                <input className="ge-in" style={{ width: 120, textAlign: "left" }} placeholder="RuneScape name"
+                  value={sheet.rsn ?? ""} maxLength={12}
+                  onChange={(e) => setSheet((sh) => ({ ...sh, rsn: e.target.value }))}
+                  onKeyDown={(e) => { if (e.key === "Enter") importRsn(); }} />
+              </label>
+              <button className="ge-btn" onClick={importRsn} disabled={rsnBusy || !(sheet.rsn || "").trim()}>
+                {rsnBusy ? "…" : "Hiscores"}
+              </button>
+              {rsnMsg && <span style={{ color: "var(--tan)" }}>{rsnMsg}</span>}
+            </>
+          )}
         </div>
         {questList.length > 0 && (
           <div className="ge-sheet" style={{ marginTop: 8 }}>
@@ -1209,27 +1312,32 @@ function JobBoard({ items, status }) {
         <p className="ge-read">Offline snapshot — the job board only sees the {items.length} baked items, so most work is hidden until the live feed returns.</p>
       )}
       <p className="ge-read">
-        <b>{jobs.length}</b> jobs pay on the exchange right now{shown.length < jobs.length ? <> · showing {shown.length}</> : null}.
-        Blank skills count as level 1 and unticked quests as not done — fill in your sheet to unlock more of the board.
+        {focus
+          ? <><b>{ranked.length}</b> jobs train {focus} on today's market, cheapest xp first — the market pays for the ones in green.</>
+          : <><b>{ranked.length}</b> jobs pay on the exchange right now{shown.length < ranked.length ? <> · showing {shown.length}</> : null}.</>}
+        {" "}Blank skills count as level 1 and unticked quests as not done — fill in your sheet (or fetch it off the hiscores) to unlock more of the board.
       </p>
 
       {shown.map((job) => (
-        <JobCard key={job.key} job={job} sheet={sheet}
+        <JobCard key={job.key} job={job} sheet={sheet} focus={focus}
           n={clamp(batches[job.key] ?? job.defaultN, 1, job.maxN)}
           setN={(v) => setBatches((b) => ({ ...b, [job.key]: clamp(v, 1, job.maxN) }))} />
       ))}
       {shown.length === 0 && (
         <section className="ge-panel"><p className="ge-read" style={{ margin: 0 }}>
-          No paying jobs match. {mode === "express"
-            ? "Taking the market eats both spreads — try Quote & wait for the full margins."
-            : "Loosen the search, or check back when the books move."}
+          {focus
+            ? `Nothing trains ${focus} within your filters — loosen the search, or untick "only jobs I can start".`
+            : <>No paying jobs match. {mode === "express"
+              ? "Taking the market eats both spreads — try Quote & wait for the full margins."
+              : "Loosen the search, or check back when the books move."}</>}
         </p></section>
       )}
 
       <p className="ge-foot">
         Default batches are sized to roughly 5–10 minutes of work and capped by 4-hour buy limits and what the
         books can absorb (≈10% of daily volume when taking the market; ≈4 hours of patient fills when quoting).<br />
-        Action speeds are desk assumptions per facility, +15% for banking. Alch jobs (Low at Magic 21, High
+        Action speeds and xp come from the wiki's own recipe data (real tick counts, +15% for banking); the few
+        recipes without tick data fall back to desk assumptions. Alch jobs (Low at Magic 21, High
         at 55) price every rune off
         the exchange (a fire staff makes the fire runes free) and pay the spell's fixed coin value on the spot —
         no sell leg, no GE tax — so they light up exactly when an item dips below its alch floor.
@@ -1237,7 +1345,10 @@ function JobBoard({ items, status }) {
         1-hour averages — patient work should lean on slower data. A fat margin on labor-heavy work is just a
         wage; chains whose pay outruns any honest wage for the hands-on work in them (≈2m gp/hr), or that lean
         on weak or fast-moving legs, wear a ⚠ — verify before you trust them. The market moves while you work —
-        the pay is an estimate, not a contract.
+        the pay is an estimate, not a contract.<br />
+        Training focus flips the board around: every job that grants xp in the chosen skill, ranked by gp per
+        xp — negative cost (green) means the market pays you to train. Cooking pay ignores burn chance, so
+        low-level cooks should budget for some losses the board can't see.
       </p>
     </>
   );
@@ -1374,7 +1485,9 @@ function Econ101() {
             holds, casual players still anchored to the guide keep handing the informed side cheap fills — or
             it's one of the two prices being painted. Thin volume plus a wide gap: assume painted.</li>
           <li>The <b>Job Board</b> prices whole production chains from the same tape — buy the inputs, work
-            them, sell the output, tax and buy limits included.</li>
+            them, sell the output, tax and buy limits included — with the wiki's own tick counts and xp per
+            action on every step. Set a training focus and the same chains rank by <b>gp per xp</b> instead:
+            the market's true price list for levelling a skill, green when it pays you.</li>
         </ul>
       </section>
     </div>
