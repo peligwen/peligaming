@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:tools": "node scripts/build-tools.mjs"
+    "build:tools": "node scripts/build-tools.mjs",
+    "data:recipes": "node scripts/fetch-recipes.mjs",
+    "data:snapshot": "node scripts/capture-snapshot.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",
