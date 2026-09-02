@@ -23,13 +23,25 @@ shipwrecks, shoals and charting-task spots.
   waters are only crossed when your ship is fitted for them; cursed,
   scalding, profane, sunbaked and cold seas are avoided outright; reefs are
   routed around unless they genuinely pay off.
-- A captain profile with Sailing/Construction level sliders that
-  auto-fit the facilities you qualify for, or tick fittings by hand.
+- A ship's sheet: a side view of your boat where you click the hull, keel,
+  helm, mast & sails, cargo hold and deck fittings to pick their tier, with
+  the wiki's numbers for each — speed, hull hitpoints, armour (one point of
+  damage shaved off every hit per 100), defence, and which hazard waters
+  the loadout opens. Type your RuneScape name to pull Sailing and
+  Construction off the hiscores and it fits the biggest boat and strongest
+  parts those levels can build; slide the levels by hand otherwise.
 - Route tuning from *fewest turns* to *fastest passage*, with hull-speed
   aware time estimates and a turn-by-turn sailing log.
 - Right-click (or long-press) anywhere for a sail menu; tap anything to
   examine it. Share links reproduce your exact view, endpoints and loadout.
-- Sea-monster overlay: kraken and shark waters marked with their reach.
+- Sea monsters weighed by what they can do to *your* ship: every attacker's
+  max hit, attack speed and accuracy against your keel's flat armour and
+  hull's defence become expected hull damage per tick in its waters, and
+  routes trade sailing time against it — a bronze-keel raft skirts even a
+  lone hammerhead, a steel-keel skiff clips a field's edge and takes the odd
+  hit, a dragon-keel sloop sails straight through what can no longer scratch
+  it (hollow studs on the chart). The log says how much hull to expect to
+  lose and to whom.
 - **Courier runs** — silk roads for port tasks. Every notice board's courier
   task pool from the wiki (level, xp, cargo port, destination, crates), priced
   in coin from the port coin-bag tiers. The planner sails the same grid to
@@ -49,10 +61,14 @@ Everything runs client-side in one HTML file — no backend, no build step.
   rendered map tiles into `map.jpg`, learns per-sea water colours from the
   wiki's sea polygons and the Sailing hazards page, classifies every game
   tile into a navigation class, and scrapes ports, wrecks, shoals, services
-  and charting tasks into `naval.json`, and (via
+  and charting tasks into `naval.json`, (via
   `scripts/lib/courier-tasks.mjs`) every notice board's courier task pool
   with the task-slot, coin-bag and cargo-hold tables the planner prices
-  with. `scripts/fetch-courier-tasks.mjs` refreshes just that block.
+  with, and (via `scripts/lib/ship-parts.mjs`) the boat types, the tier
+  tables of every core boat part and cargo hold, and each sea monster's
+  attack against a boat from the Boat combat page.
+  `scripts/fetch-courier-tasks.mjs` and `scripts/fetch-ship-data.mjs`
+  refresh just those blocks.
 - `navcells.png` is the navigation grid — one pixel per 4×4-tile cell, the
   red channel indexing thirteen water classes (open, stormy, reefs, fetid,
   crystal, kelp, icy, plus impassable "wall" seas).
@@ -70,7 +86,20 @@ To refresh the data after a game update:
 node scripts/fetch-naval-data.mjs        # rebuild map.jpg / navcells.png / naval.json
 python3 scripts/audit-naval-grid.py --repair   # deps: pip install pillow numpy
 node scripts/fetch-courier-tasks.mjs     # or just the courier task pools (npm run data:courier)
+node scripts/fetch-ship-data.mjs         # or just ship parts & monster attacks (npm run data:ship)
 ```
+
+The damage model, for the curious: a boat's keel grants one flat armour per
+100 armour, subtracted from every hit that lands, so a creature whose max hit
+is at or below it can never dent the hull; hits roll uniformly up to the max,
+and accuracy follows the standard roll of the creature's attack level against
+the hull's defence level (the boats' defence bonuses are unpublished and taken
+as zero). Each attacker's spawn points are rasterised into a reach scaled by
+its level, summed into "how many are on you" per cell, and multiplied by its
+expected damage per tick for the ship at hand; the pathfinder then charges a
+few ticks of sailing per expected point of hull, scaled by how much hull there
+is to lose, so a fragile raft detours far and a stout sloop only where it
+would truly bleed. Harmless quarry (birds, rays, orcas) never bends a course.
 
 The courier planner's model, for the curious: a loop is a closed walk over
 ports that trade with each other; each task is pinned to the loop (accepted

@@ -156,6 +156,44 @@
   #attrib{position:fixed;left:0;right:0;bottom:0;z-index:20;text-align:center;font-size:10px;color:#7a6c52;
     background:#0d0a07d9;padding:2px 8px;}
   #attrib a{color:#a99a7e;}
+  /* ---- the ship's character sheet */
+  .rsnrow{display:flex;gap:5px;align-items:center;margin-bottom:3px;}
+  .rsnrow input{flex:1;min-width:0;font-family:"VT323",monospace;font-size:16px;color:var(--yellow);background:#1c150c;
+    border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);padding:4px 7px;outline:none;}
+  .rsnrow input::placeholder{color:#7a6c52;}
+  .sbtn{font-family:"VT323",monospace;font-size:15px;background:#1c150c;color:var(--yellow);cursor:pointer;border:2px solid;
+    border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:3px 8px;white-space:nowrap;}
+  .sbtn:hover{color:var(--gold);} .sbtn:disabled{opacity:.5;cursor:wait;}
+  .boattabs{display:flex;gap:4px;margin:7px 0 4px;}
+  .boattabs button{flex:1;font-family:"VT323",monospace;font-size:15px;background:#1c150c;color:var(--dim);cursor:pointer;
+    border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:3px 4px;}
+  .boattabs button.on{color:var(--yellow);background:#39301f;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);}
+  .boattabs button:disabled{opacity:.45;cursor:not-allowed;}
+  .boattabs button small{color:var(--teal);font-size:12px;}
+  #sheet{position:relative;background:linear-gradient(#2a3340 0%,#151a21 100%);border:2px solid;
+    border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);}
+  #shipSvg{display:block;width:100%;height:auto;}
+  #shipSvg g.part{cursor:pointer;}
+  #shipSvg g.part .hit{fill:transparent;stroke:transparent;}
+  #shipSvg g.part:hover .hit{stroke:var(--yellow);stroke-width:1.5;}
+  #shipSvg g.part.sel .hit{stroke:var(--gold);stroke-width:1.5;stroke-dasharray:3 2;}
+  #shipSvg g.part.lk{cursor:not-allowed;}
+  #shipSvg text{font-family:"VT323",monospace;pointer-events:none;}
+  #sheetCap{font-family:"VT323",monospace;font-size:14px;color:var(--dim);min-height:17px;padding:2px 3px 0;line-height:1.2;}
+  #sheetCap b{color:var(--yellow);font-weight:400;} #sheetCap .lvl{color:var(--teal);}
+  #partPick{top:0;bottom:auto;left:0;right:0;max-height:260px;}
+  #partPick div.tier{white-space:normal;line-height:1.15;padding:4px 8px;border-left:3px solid transparent;}
+  #partPick div.tier small{display:block;font-size:12.5px;white-space:normal;}
+  #partPick div.tier .lvl{color:var(--teal);}
+  #partPick div.tier.sel{color:var(--yellow);background:#2b2216;border-left-color:var(--gold);}
+  #partPick div.tier.lk{opacity:.5;cursor:not-allowed;}
+  .sheetstats{display:flex;flex-wrap:wrap;gap:1px 12px;font-family:"VT323",monospace;font-size:15px;color:var(--parch);margin:6px 0 2px;}
+  .sheetstats span{white-space:nowrap;} .sheetstats span b{color:var(--yellow);font-weight:400;}
+  .sheetstats .wide{flex-basis:100%;white-space:normal;color:var(--dim);font-size:14px;line-height:1.25;margin-top:2px;}
+  .sheetstats .wide i{font-style:normal;color:var(--teal);} .sheetstats .wide s{text-decoration:none;color:#7a6c52;}
+  .sheetstats .wide .pl{cursor:pointer;color:var(--parch);} .sheetstats .wide .pl:hover{color:var(--yellow);}
+  .threats{font-family:"VT323",monospace;font-size:13.5px;line-height:1.3;margin-top:4px;color:var(--dim);}
+  .threats .bad{color:var(--red);} .threats .ok{color:var(--teal);}
   @media (max-width:820px){
     #panel{display:none;}
     #panel.open{display:block;left:10px;right:10px;width:auto;top:auto;bottom:74px;max-height:56vh;}
@@ -188,20 +226,27 @@
     <button id="swapBtn" title="Swap">⇅</button></div>
 
   <h2>Your ship</h2>
-  <div class="frow"><label style="width:auto">Hull</label><select id="hullSel"></select></div>
+  <div class="rsnrow"><input id="rsnIn" placeholder="RuneScape name" maxlength="12" autocomplete="off" spellcheck="false">
+    <button id="rsnBtn" class="sbtn" title="pull Sailing &amp; Construction off the hiscores and fit the best parts you can build">⚓ Look up</button></div>
+  <div class="subhint" id="rsnMsg"></div>
   <div class="frow lvlrow"><label title="your Sailing level">⛵ Sailing</label>
     <input id="lvlSail" type="range" min="1" max="99" value="99"><span class="lvlval" id="lvlSailV">99</span></div>
   <div class="frow lvlrow"><label title="your Construction level">🔨 Constr.</label>
     <input id="lvlCon" type="range" min="1" max="99" value="99"><span class="lvlval" id="lvlConV">99</span></div>
-  <div class="subhint">fittings within your levels check themselves — untick any you'd rather sail without</div>
+  <div class="boattabs" id="boatTabs"></div>
+  <div id="sheet"><svg id="shipSvg" viewBox="0 0 260 150" role="img" aria-label="your ship, part by part"></svg><div class="drop" id="partPick"></div></div>
+  <div id="sheetCap">click a part of the ship to refit it</div>
+  <div class="sheetstats" id="shipStats"></div>
+  <div class="threats" id="threatList"></div>
   <div id="facilities"></div>
+  <div class="subhint">the best parts within your levels come fitted; click any part or fitting to change it</div>
 
   <h2>Course plotting</h2>
   <div class="sliderbox">
     <div class="ends"><span>fewest turns</span><span>fastest</span></div>
     <input type="range" id="lambda" min="0" max="100" value="55">
   </div>
-  <label class="ck"><input type="checkbox" id="avoidMon" checked>Steer clear of sea monsters<small>ship-attackers get a wide berth; harmless quarry never bends the course</small></label>
+  <label class="ck"><input type="checkbox" id="avoidMon" checked>Weigh hull damage from sea monsters<small>detours scale with what each creature can do to <em>this</em> ship — armour that shrugs one off sails straight through</small></label>
   <label class="ck"><input type="checkbox" id="avoidReef" checked>Avoid jagged reefs<small>uncheck to brave hull damage at Crandor &amp; Aehecatl</small></label>
   <label class="ck"><input type="checkbox" id="showAlt" checked>Ghost the road not taken<small>dashed line: the same voyage with your caution flipped</small></label>
 
@@ -211,7 +256,6 @@
   <div class="frow"><label>Start</label><select id="srStart"><option value="">anywhere</option></select></div>
   <div class="frow"><label>Chase</label><select id="srObj"><option value="gp">coin per hour</option><option value="xp">xp per hour</option></select></div>
   <div class="frow"><label>Loop</label><select id="srK"><option value="2">2 ports</option><option value="3">3 ports</option><option value="4" selected>up to 4 ports</option><option value="5">up to 5 ports</option></select></div>
-  <div class="frow"><label>Hold</label><select id="srHold"></select><select id="srBoat"></select></div>
   <div class="frow"><label>Pace</label><select id="srPace"></select></div>
   <div class="subhint" id="srCap"></div>
   <div class="srbtns"><button id="srPlot">⚓ Plot silk roads</button><button id="srClear" title="clear the loop">✕</button></div>
@@ -289,13 +333,51 @@ let CI = {};
 const gearHazKeys = () => Object.entries(NAV.hazards).filter(([k, h]) => h.mode === 'gear').map(([k]) => k);
 
 // ============================================================ ship state
+// the captain's ship: a boat type, a tier of each core part, and the two deck
+// fittings that open hazard waters. Everything the planner needs — speed,
+// hull hitpoints, armour, defence, which seas are open — derives from it.
 const ship = {
-  hull: 1,                 // index into NAV.hulls
-  fac: {},                 // hazard key -> bool (has the protective fitting)
+  boat: 'skiff',
+  part: { hull: 0, keel: 0, helm: 0, mast: 0, hold: 0 },  // tier indices into NAV.ship.parts
+  fx: { fetid: false, icy: false },                         // inoculation station, eternal brazier
+  fac: {},                 // derived: hazard key -> bool (the water is open to this ship)
   lambda: 0.55,
   avoidMon: true,
   avoidReef: true,
 };
+const PARTS = ['hull', 'keel', 'helm', 'mast', 'hold'];
+const PART_NAME = { hull: 'Hull', keel: 'Keel', helm: 'Helm', mast: 'Mast & sails', hold: 'Cargo hold' };
+const FX = ['fetid', 'icy'];
+const boatDef = (key = ship.boat) => NAV.ship.boats.find(b => b.key === key) || NAV.ship.boats[0];
+const partList = (part, boat = ship.boat) => part === 'hold' ? NAV.ship.parts.hold : (NAV.ship.parts[part][boat] || []);
+const partSel = part => partList(part)[ship.part[part]] || null;   // null: a raft has no keel
+const partLocked = t => (t.sailing || 0) > prof.s || (t.construction || 0) > prof.c;
+const tierIndex = (part, tier) => partList(part).findIndex(t => t.tier === tier);
+const facilityDef = key => NAV.ship.facilities?.[key] ||
+  { name: NAV.hazards[key].gate, sailing: NAV.hazards[key].sailing, construction: NAV.hazards[key].construction };
+const facilityLocked = key => partLocked(facilityDef(key));
+
+let SS = null;   // shipStats() of the current loadout, refreshed by syncShip()
+function shipStats() {
+  const hull = partSel('hull'), keel = partSel('keel'), helm = partSel('helm'), mast = partSel('mast');
+  const armour = keel ? keel.armour : 0;
+  const adamant = tierIndex('keel', 'Adamant');
+  return {
+    boat: boatDef(), hull, keel, helm, mast, hold: partSel('hold'),
+    speed: hull.speed, hp: hull.hp + (keel ? keel.hp : 0), defence: hull.defence,
+    armour, flat: Math.floor(armour / (NAV.ship.armourPerFlat || 100)),  // shaved off every hit
+    storm: mast.storm || 'none', kelp: !!helm.kelp,
+    crystal: !!keel && adamant >= 0 && ship.part.keel >= adamant,
+  };
+}
+// which hazard waters this ship may enter: three follow from its parts (oak
+// mast for storms, adamant keel for crystal, adamant helm for kelp), two from
+// facilities built on deck
+function syncFittings() {
+  for (const key of gearHazKeys())
+    ship.fac[key] = key === 'stormy' ? SS.storm !== 'none' : key === 'crystal' ? SS.crystal
+      : key === 'kelp' ? SS.kelp : !!ship.fx[key];
+}
 
 // ============================================================ captain's profile
 // levels and per-device prefs live in localStorage — never in share links
@@ -307,10 +389,6 @@ const prof = Object.assign({ s: 99, c: 99 }, store.get('profile', {}));  // Sail
 prof.s = prof.s ?? 99; prof.c = prof.c ?? 99;   // older saves used null for "unset"
 const lockedItem = it => !!(it.level && it.level > prof.s);
 const lockNote = it => lockedItem(it) ? `\n🔒 needs Sailing ${it.level} — beyond your ${prof.s}` : '';
-const fittingLocked = key => {
-  const h = NAV.hazards[key];
-  return (h.sailing || 0) > prof.s || (h.construction || 0) > prof.c;
-};
 
 // ============================================================ pathfinder
 // 16 grid-aligned winds: 8 unit steps + 8 knight-move half-winds.
@@ -330,17 +408,19 @@ const SWEPT = DIRS.map(([dx, dy]) => {
 });
 
 // Monster hunting grounds. Each field is a cluster of exact spawn points from
-// the wiki; we rasterise them into a per-cell danger grid, with the reach and
-// weight of each spawn scaled by the creature's combat level — a field of
-// level-211 vampyre krakens casts a far wider shadow than a flock of terns.
-// Ship-attackers (wiki aggressive = Yes: the big sharks and every kraken) get
-// the red studs and a routing penalty; harmless quarry (birds, rays, orcas…)
-// get a faint teal haze and never bend the course — they're bounty targets
-// you sail to on purpose.
+// the wiki; we rasterise them into per-cell grids, the reach of each spawn
+// scaled by the creature's combat level — a field of level-211 vampyre krakens
+// casts a far wider shadow than a flock of terns. Ship-attackers (wiki
+// aggressive = Yes: the big sharks and every kraken) also get a sparse cover
+// list per creature that buildThreat() turns into expected hull damage for
+// the ship at hand; harmless quarry (birds, rays, orcas…) get a faint teal
+// haze and never bend the course — they're bounty targets you sail to on
+// purpose.
 let monsterDanger = null;  // Float32, 0..1 proximity to the nearest attacker spawn
-let monsterLevel = null;   // Uint16, highest combat level threatening the cell
+let monsterLevel = null;   // Uint16, highest combat level hunting the cell
 let monsterMask = null;    // Int32 bitmask of attacker indices covering the cell
 let calmDanger = null, calmLevel = null, calmMask = null;  // harmless quarry
+const MONF = [];           // per attacker: { mi, m, cells, w } — w ≈ how many of them are on you there
 const monsterReach = lvl => 6 + lvl / 10; // tiles
 const isAggro = m => m.aggressive !== false;
 function buildMonsterDanger() {
@@ -350,10 +430,13 @@ function buildMonsterDanger() {
   calmDanger = new Float32Array(CW * CH);
   calmLevel = new Uint16Array(CW * CH);
   calmMask = new Int32Array(CW * CH);
+  MONF.length = 0;
   (NAV.monsters || []).forEach((m, mi) => {
-    const [dArr, lArr, mArr] = isAggro(m)
+    const aggro = isAggro(m);
+    const [dArr, lArr, mArr] = aggro
       ? [monsterDanger, monsterLevel, monsterMask]
       : [calmDanger, calmLevel, calmMask];
+    const cover = aggro ? new Map() : null;
     for (const f of m.fields) {
       const lvl = f.level || m.combat || 50;
       const R = Math.ceil(monsterReach(lvl) / CELL);
@@ -370,11 +453,56 @@ function buildMonsterDanger() {
             if (s > dArr[i]) dArr[i] = s;
             if (lvl > lArr[i]) lArr[i] = lvl;
             mArr[i] |= 1 << (mi & 31);
+            if (cover) cover.set(i, (cover.get(i) || 0) + s);
           }
       }
     }
+    if (cover) MONF.push({ mi, m, cells: Int32Array.from(cover.keys()),
+      w: Float32Array.from(cover.values(), v => Math.min(2.5, v)) });
   });
 }
+
+// ---- what the sea does to this ship
+// A keel grants one flat armour per 100 armour, shaved off every hit, so a
+// creature whose max hit is at or below that can never dent the hull (the
+// wiki's Boat combat page). Hits roll uniformly 0..max; accuracy follows the
+// usual roll — the creature's attack level against the hull's defence level
+// (nobody has published the boats' defence bonuses, so they count as 0).
+const hitChance = (att, def) => {
+  const A = (att + 9) * 64, D = (def + 9) * 64;
+  return A > D ? 1 - (D + 2) / (2 * (A + 1)) : A / (2 * (D + 1));
+};
+const monMaxHit = m => m.maxHit ?? Math.max(1, Math.round((m.combat || 50) / 10));  // a creature without stats
+const biteOnYou = (m, s = SS) => Math.max(0, monMaxHit(m) - s.flat);   // the hardest hit left after armour
+function damagePerTick(m, s = SS) {
+  const eff = biteOnYou(m, s);
+  if (eff <= 0) return 0;
+  const mean = eff * (eff + 1) / (2 * (monMaxHit(m) + 1));            // E[max(0, roll − flat)]
+  return hitChance(m.attack ?? m.combat ?? 50, s.defence) * mean / (m.speed || 4);
+}
+let threat = null;      // Float32, expected hull damage per tick spent in the cell, for this ship
+let threatBite = null;  // Uint8, hardest post-armour hit among the attackers there
+function buildThreat() {
+  threat = new Float32Array(CW * CH);
+  threatBite = new Uint8Array(CW * CH);
+  for (const f of MONF) {
+    const dpt = damagePerTick(f.m), bite = biteOnYou(f.m);
+    if (dpt <= 0) continue;
+    for (let k = 0; k < f.cells.length; k++) {
+      const i = f.cells[k];
+      threat[i] += dpt * f.w[k];
+      if (bite > threatBite[i]) threatBite[i] = bite;
+    }
+  }
+}
+// the route cost of expected damage: ticks a captain would sail to spare one
+// point of hull, scaled by how much hull there is to lose — a point off a
+// 20-hp raft weighs ten times one off a 200-hp sloop, so the raft skirts
+// even a lone hammerhead while a mid ship clips a field's edge and takes the
+// odd hit. A ship nothing can scratch pays nothing and sails straight through.
+const DMG_TICKS = 6, HP_REF = 200;
+const dmgWeight = () => DMG_TICKS * HP_REF / Math.max(10, SS.hp);
+const fmtDmg = v => v >= 10 ? String(Math.round(v)) : v >= 1 ? v.toFixed(1) : v.toFixed(2);
 
 // passability under current loadout; returns 0 blocked, else 1
 function passable(cls) {
@@ -389,11 +517,12 @@ function passable(cls) {
 }
 
 function findRoute(fromTile, toTile) {
-  const speed = NAV.hulls[ship.hull].speed;        // tiles per tick
+  const speed = SS.speed;                          // tiles per tick
   // turn penalty in ticks; the small floor breaks ties between the countless
   // equal-time staircase paths, keeping "fastest" routes sane
   const lambda = 0.6 + ship.lambda * 60;
   const reefPen = ship.avoidReef ? 9 : 0.5;        // ticks per step through reefs
+  const dmgW = ship.avoidMon && threat ? dmgWeight() : 0;   // ticks per expected point of hull
   const start = snapCell(fromTile), goal = snapCell(toTile);
   if (start < 0 || goal < 0) return { fail: null }; // caller diagnoses missing fittings
 
@@ -450,8 +579,8 @@ function findRoute(fromTile, toTile) {
       let dd = Math.abs(nd - dir); if (dd > 8) dd = 16 - dd;
       if (dd) cost += lambda * (0.55 + 0.45 * (dd * 22.5) / 45);
       if (NAV.classes[ncls] === 'reefs') cost += reefPen * DIRLEN[nd];
-      if (ship.avoidMon && monsterDanger && monsterDanger[ncell] > 0)
-        cost += monsterDanger[ncell] * (2 + monsterLevel[ncell] / 30) * DIRLEN[nd];
+      if (dmgW && threat[ncell] > 0)
+        cost += threat[ncell] * (DIRLEN[nd] * CELL / speed) * dmgW;
       const ns = ncell * 16 + nd;
       if (g0 + cost < g[ns] - 1e-9) {
         g[ns] = g0 + cost; parent[ns] = s;
@@ -478,7 +607,15 @@ function findRoute(fromTile, toTile) {
   let dist = 0; for (const l of legs) dist += l.tiles;
   const TURN_TICKS = 2; // rough cost of clicking a new heading and settling on it
   const ticks = dist / speed + Math.max(0, legs.length - 1) * TURN_TICKS;
-  return { cells, legs, dist: Math.round(dist), turns: Math.max(0, legs.length - 1), secs: ticks * 0.6 };
+  // expected hull damage along the way, and whose waters the line crosses
+  let dmg = 0, hunted = 0;
+  if (threat) for (let i = 1; i < cells.length; i++) {
+    const c = cells[i];
+    const stepTicks = Math.hypot(c % CW - cells[i - 1] % CW, ((c / CW) | 0) - ((cells[i - 1] / CW) | 0)) * CELL / speed;
+    dmg += threat[c] * stepTicks;
+    hunted |= monsterMask[c];
+  }
+  return { cells, legs, dist: Math.round(dist), turns: Math.max(0, legs.length - 1), secs: ticks * 0.6, dmg, hunted };
 }
 
 function snapCell(tile, R = 16) {
@@ -696,7 +833,8 @@ function buildMonsterOverlay() {
 
 // attacker fields as bright-red beveled studs on a hex lattice pinned to the
 // world like buoys: they hold still under pan and never smear when zoomed.
-// Stud size carries the threat (bigger = higher level, fuller danger).
+// Stud size carries the threat to this ship (bigger = harder hits get through
+// the armour); waters whose hunters can't dent the hull show hollow studs.
 const STUD_PITCH = 12;                       // lattice pitch in game tiles
 function drawStudsInto(g, toPx, pxPerTile, wx0, wy0, wx1, wy1) {
   let T = STUD_PITCH;
@@ -715,7 +853,14 @@ function drawStudsInto(g, toPx, pxPerTile, wx0, wy0, wx1, wy1) {
       const i = cellIx(cx, cy);
       if (!CLS[i] || monsterDanger[i] <= 0.15) continue;
       const [px, py] = toPx(wx, wy);
-      const r = (2.2 + Math.min(1.8, monsterLevel[i] / 110))
+      const bite = threatBite ? threatBite[i] : Math.round(monsterLevel[i] / 12);
+      if (!bite) {   // they hunt here, but this ship shrugs them off
+        const r = 2 * grow * (0.75 + 0.3 * Math.min(1, monsterDanger[i]));
+        g.beginPath(); g.arc(px, py, r, 0, 7);
+        g.lineWidth = 1.2; g.strokeStyle = 'rgba(245,52,31,0.5)'; g.stroke();
+        continue;
+      }
+      const r = (2 + Math.min(2.2, bite / 6))
               * (0.7 + 0.45 * Math.min(1, monsterDanger[i])) * grow;
       g.beginPath(); g.arc(px + 0.9, py + 1, r, 0, 7); g.fillStyle = 'rgba(26,7,3,0.75)'; g.fill();
       g.beginPath(); g.arc(px, py, r, 0, 7); g.fillStyle = '#f5341f'; g.fill();
@@ -999,7 +1144,7 @@ function drawMeasure() {
   const dx = cursorPt[0] - measure.x, dy = cursorPt[1] - measure.y;
   const dist = Math.hypot(dx, dy);
   const wind = DIRNAME[((Math.round(Math.atan2(dx, dy) / (Math.PI / 8)) % 16) + 16) % 16];
-  const label = `${Math.round(dist)} tiles${dist > 2 ? ' ' + wind : ''} · ~${fmtTime(dist / NAV.hulls[ship.hull].speed * 0.6)} as the gull flies`;
+  const label = `${Math.round(dist)} tiles${dist > 2 ? ' ' + wind : ''} · ~${fmtTime(dist / SS.speed * 0.6)} as the gull flies`;
   ctx2.font = '17px VT323, monospace'; ctx2.textAlign = 'left'; ctx2.textBaseline = 'bottom';
   const lx = Math.min(bx + 14, innerWidth - ctx2.measureText(label).width - 8), ly = by - 10;
   ctx2.fillStyle = '#000d'; ctx2.fillText(label, lx + 1.5, ly + 1.5);
@@ -1199,16 +1344,19 @@ function hover(e) {
       const hasA = monsterDanger[i] > 0.03, hasQ = calmDanger[i] > 0.03;
       if ((hasA || hasQ) && CLS[i]) {
         const lines = [];
+        let bitten = false;
         (NAV.monsters || []).forEach((m, mi) => {
           const bit = 1 << (mi & 31);
-          if (hasA && isAggro(m) && (monsterMask[i] & bit))
-            lines.push(`☠ ${m.name} (level ${m.combat ?? '?'})`);
-          else if (hasQ && !isAggro(m) && (calmMask[i] & bit))
+          if (hasA && isAggro(m) && (monsterMask[i] & bit)) {
+            const b = biteOnYou(m);
+            if (b) { bitten = true; lines.push(`☠ ${m.name} (level ${m.combat ?? '?'}) — hits you for up to ${b}`); }
+            else lines.push(`🛡 ${m.name} (level ${m.combat ?? '?'}) — can't dent your armour`);
+          } else if (hasQ && !isAggro(m) && (calmMask[i] & bit))
             lines.push(`○ ${m.name} (level ${m.combat ?? '?'}) — harmless`);
         });
-        show(hasA ? '☠ Hunting grounds' : '○ Quarry waters',
+        show(bitten ? '☠ Hunting grounds' : hasA ? '🛡 Hunting grounds — safe for this ship' : '○ Quarry waters',
           lines.slice(0, 5).join('\n') +
-          (hasA && ship.avoidMon ? '\nroutes give these waters a wide berth' : ''));
+          (bitten && threat ? `\n~${fmtDmg(threat[i])} hull a tick here${ship.avoidMon ? ' — routes weigh it' : ''}` : ''));
         document.body.style.cursor = '';
         return;
       }
@@ -1332,12 +1480,17 @@ function monsterLines(i) {
   const hasA = monsterDanger[i] > 0.03, hasQ = calmDanger[i] > 0.03;
   (NAV.monsters || []).forEach((m, mi) => {
     const bit = 1 << (mi & 31);
-    if (hasA && isAggro(m) && (monsterMask[i] & bit))
-      out.push(`<div class="bad">☠ ${m.name} (level-${m.combat ?? '?'}) hunts these waters</div>`);
-    else if (hasQ && !isAggro(m) && (calmMask[i] & bit))
+    if (hasA && isAggro(m) && (monsterMask[i] & bit)) {
+      const b = biteOnYou(m);
+      out.push(b
+        ? `<div class="bad">☠ ${m.name} (level-${m.combat ?? '?'}) hunts here — max hit ${monMaxHit(m)}, ${b} through your armour</div>`
+        : `<div class="good">🛡 ${m.name} (level-${m.combat ?? '?'}) hunts here — max hit ${monMaxHit(m)}, nothing through your armour</div>`);
+    } else if (hasQ && !isAggro(m) && (calmMask[i] & bit))
       out.push(`<div class="dim">○ ${m.name} (level-${m.combat ?? '?'}) — harmless quarry</div>`);
   });
-  return out.slice(0, 5);
+  if (hasA && threat && threat[i] > 0)
+    out.push(`<div class="bad">~${fmtDmg(threat[i])} hull damage a tick spent here</div>`);
+  return out.slice(0, 6);
 }
 
 function showWaterCard(px, py) {
@@ -1522,15 +1675,329 @@ function setEndpoint(which, poi, keepRun) {
   reroute();
 }
 
-function setupShipPanel() {
-  const hullSel = document.getElementById('hullSel');
-  NAV.hulls.forEach((h, i) => {
-    const o = document.createElement('option');
-    o.value = i; o.textContent = `${h.name} — ${h.speed} tiles/tick`;
-    hullSel.appendChild(o);
+// ============================================================ the ship's sheet
+// A side view of the boat with every core part clickable — hull, keel, helm,
+// mast & sails, cargo hold — plus the deck fittings that open hazard waters.
+// Tiers colour the parts (pale wooden through dark rosewood; bronze up to
+// dragon) so the picture reads at a glance; the numbers underneath are what
+// the pathfinder actually sails with.
+const WOOD_COL = { Wooden: '#c9a26b', Basic: '#c9a26b', Oak: '#b3873f', Teak: '#9c6a33', Mahogany: '#7a3a2a',
+  Camphor: '#d6c28e', Ironwood: '#544636', Rosewood: '#8c2d3c' };
+const METAL_COL = { Bronze: '#b47a3c', Iron: '#8d8d8d', Steel: '#c9ccd6', Mithril: '#5f6fb8', Adamant: '#4f8f5f',
+  Rune: '#5ab0c9', Dragon: '#b8382a' };
+const SAIL_COL = { linen: '#efe6cf', canvas: '#d9c9a3', cotton: '#f8f3e8' };
+const sailCol = mast => SAIL_COL[Object.keys(SAIL_COL).find(f => (mast.name || '').toLowerCase().includes(f))] || SAIL_COL.linen;
+const shade = (hex, k) => '#' + [1, 3, 5].map(i =>
+  Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16) * k))).toString(16).padStart(2, '0')).join('');
+// where each part sits on each boat (viewBox 260×150, y down)
+const RIG = {
+  raft:  { hull: 'M60,102 H200 Q208,102 208,111 V113 Q208,120 200,120 H60 Q52,120 52,112 Q52,102 60,102 Z', px: [56, 204], deck: 102, keel: null,
+           mast: [128, 102, 40], sail: [[131, 46], [131, 98], [184, 98]], jib: null,
+           helm: [82, 94, 6], badges: { hold: [150, 90], icy: [104, 90] }, water: 118 },
+  skiff: { hull: 'M48,92 H206 C224,92 228,104 214,116 L206,122 H66 C52,122 42,108 48,92 Z', px: [50, 214], deck: 92,
+           keel: 'M112,122 H158 L151,134 H120 Z', mast: [128, 92, 22], sail: [[131, 28], [131, 88], [198, 88]], jib: [[125, 34], [125, 88], [74, 88]],
+           helm: [66, 82, 8], badges: { hold: [148, 78], fetid: [176, 78], icy: [100, 78] }, water: 120 },
+  sloop: { hull: 'M22,86 H232 C254,86 256,104 240,120 L230,126 H44 C26,126 12,106 22,86 Z', px: [24, 242], deck: 86,
+           keel: 'M96,126 H180 L170,140 H108 Z', mast: [132, 86, 10], sail: [[135, 16], [135, 82], [214, 82]], jib: [[129, 22], [129, 82], [60, 82]],
+           helm: [46, 74, 9], badges: { hold: [160, 72], fetid: [192, 72], icy: [98, 72] }, water: 124 },
+};
+let pickOpen = null;   // which part's schematics list is open
+const CAP_DEFAULT = 'click a part of the ship to refit it';
+
+function shipSvgMarkup() {
+  const s = SS, R = RIG[ship.boat] || RIG.skiff;
+  const wood = WOOD_COL[s.hull.tier] || '#a0703a', mastC = WOOD_COL[s.mast.tier] || wood;
+  const sail = sailCol(s.mast), helmC = METAL_COL[s.helm.tier] || '#999';
+  const part = (key, inner, hit, locked) =>
+    `<g class="part${pickOpen === key ? ' sel' : ''}${locked ? ' lk' : ''}" data-part="${key}">${inner}${hit}</g>`;
+  const poly = pts => 'M' + pts.map(p => p.join(',')).join(' L') + ' Z';
+  const g = [];
+  // keel first so the hull sits on it
+  if (R.keel && s.keel) {
+    const kc = METAL_COL[s.keel.tier] || '#999';
+    g.push(part('keel', `<path d="${R.keel}" fill="${kc}" stroke="#0e0b07" stroke-width="1"/>` +
+      `<path d="${R.keel}" fill="none" stroke="${shade(kc, 1.35)}" stroke-width="1" transform="translate(0,1.5)" opacity=".5"/>`,
+      `<path class="hit" d="${R.keel}"/>`));
+  }
+  // hull with plank lines and a lit deck edge
+  let planks = '';
+  for (let y = R.deck + 7; y < R.water - 1; y += 7) planks += `M${R.px[0] + 6},${y} H${R.px[1] - (y - R.deck) * 0.55} `;
+  g.push(part('hull', `<path d="${R.hull}" fill="${wood}" stroke="#0e0b07" stroke-width="1.2"/>` +
+    `<path d="${planks}" stroke="${shade(wood, 0.72)}" stroke-width="1" fill="none"/>` +
+    `<path d="M${R.px[0]},${R.deck} H${R.px[1] - 8}" stroke="${shade(wood, 1.3)}" stroke-width="2"/>`,
+    `<path class="hit" d="${R.hull}"/>`));
+  // mast and sails, with a pennant coloured by storm resistance: red none, gold partial, teal full
+  const [mx, my0, my1] = R.mast;
+  let rig = `<line x1="${mx}" y1="${my0}" x2="${mx}" y2="${my1}" stroke="${mastC}" stroke-width="3"/>`;
+  rig += `<path d="${poly(R.sail)}" fill="${sail}" stroke="#0e0b07" stroke-width="1"/>`;
+  if (R.jib) rig += `<path d="${poly(R.jib)}" fill="${shade(sail, 0.9)}" stroke="#0e0b07" stroke-width="1"/>`;
+  const pen = s.storm === 'full' ? '#6fd7c8' : s.storm === 'partial' ? '#ffb83f' : '#ff6a4d';
+  rig += `<path d="M${mx},${my1} l14,4 l-14,4 Z" fill="${pen}"/>`;
+  const xs = [...R.sail, ...(R.jib || [])].map(p => p[0]);
+  const sx = Math.min(...xs) - 4, ex = Math.max(...xs) + 4;
+  g.push(part('mast', rig, `<rect class="hit" x="${sx}" y="${my1 - 3}" width="${ex - sx}" height="${my0 - my1 + 3}"/>`));
+  // helm: a wheel on a post at the stern
+  const [wx, wy, wr] = R.helm;
+  let wheel = `<line x1="${wx}" y1="${wy}" x2="${wx}" y2="${R.deck}" stroke="#6f5b39" stroke-width="2"/>` +
+    `<circle cx="${wx}" cy="${wy}" r="${wr}" fill="none" stroke="${helmC}" stroke-width="2.2"/>` +
+    `<circle cx="${wx}" cy="${wy}" r="${(wr * 0.3).toFixed(1)}" fill="${helmC}"/>`;
+  for (let k = 0; k < 4; k++) {
+    const a = k * Math.PI / 4, dx = Math.cos(a) * (wr + 2), dy = Math.sin(a) * (wr + 2);
+    wheel += `<line x1="${(wx - dx).toFixed(1)}" y1="${(wy - dy).toFixed(1)}" x2="${(wx + dx).toFixed(1)}" y2="${(wy + dy).toFixed(1)}" stroke="${helmC}" stroke-width="1.4"/>`;
+  }
+  g.push(part('helm', wheel, `<circle class="hit" cx="${wx}" cy="${wy}" r="${wr + 4}"/>`));
+  // deck fittings: the cargo hold (always aboard), then the hazard fittings
+  for (const [key, [bx, by]] of Object.entries(R.badges)) {
+    let icon = '', locked = false;
+    if (key === 'hold') {
+      const hc = WOOD_COL[s.hold.tier] || wood;
+      icon = `<rect x="${bx}" y="${by}" width="14" height="12" fill="${hc}" stroke="#0e0b07"/>` +
+        `<path d="M${bx},${by} l14,12 M${bx + 14},${by} l-14,12" stroke="${shade(hc, 0.6)}" stroke-width="1"/>`;
+    } else {
+      locked = facilityLocked(key);
+      const on = !!ship.fx[key];
+      const edge = on ? '#0e0b07' : '#8a7550', dash = on ? '0' : '2 1.5';
+      if (key === 'icy')
+        icon = `<path d="M${bx + 1},${by + 7} h12 l-2,5 h-8 Z" fill="${on ? '#6f5b39' : 'none'}" stroke="${edge}" stroke-dasharray="${dash}"/>` +
+          (on ? `<path d="M${bx + 7},${by - 1} q5,4 1,8 q-1,-2 -2,-1 q-4,-3 1,-7 Z" fill="#ff9a3c"/>` : '');
+      else
+        icon = `<path d="M${bx + 5},${by} h4 v4 l4,8 h-12 l4,-8 Z" fill="${on ? '#9fe36f' : 'none'}" stroke="${edge}" stroke-dasharray="${dash}"/>`;
+      if (locked) icon += `<text x="${bx + 7}" y="${by - 2}" font-size="9" text-anchor="middle" fill="#a99a7e">🔒</text>`;
+    }
+    g.push(part(key, icon, `<rect class="hit" x="${bx - 3}" y="${by - 3}" width="20" height="18" rx="2"/>`, locked));
+  }
+  // the sea, over the keel
+  let wave = `M0,${R.water}`;
+  for (let x = 0; x < 260; x += 20) wave += ' q10,-3 20,0';
+  g.push(`<rect x="0" y="${R.water}" width="260" height="${150 - R.water}" fill="rgba(111,215,200,0.13)" pointer-events="none"/>` +
+    `<path d="${wave}" stroke="rgba(111,215,200,0.55)" stroke-width="1.2" fill="none" pointer-events="none"/>`);
+  g.push(`<text x="6" y="146" font-size="12" fill="#a99a7e">${s.boat.name} · ${s.hull.tier.toLowerCase()} hull` +
+    `${s.keel ? ` · ${s.keel.tier.toLowerCase()} keel` : ' · no keel'}</text>`);
+  return g.join('');
+}
+
+function tierStats(key, t) {
+  switch (key) {
+    case 'hull': return `⚡${t.speed} tiles/tick · ❤${t.hp} · 🎯${t.defence} defence`;
+    case 'keel': return `❤${t.hp} · 🛡${t.armour} armour (−${Math.floor(t.armour / (NAV.ship.armourPerFlat || 100))} off every hit)`;
+    case 'helm': return `${(t.rapids || 'no').toLowerCase()} rapids${t.kelp ? ' · kelp-proof' : ''}`;
+    case 'mast': return `${t.storm === 'none' ? 'no storm resistance' : t.storm + ' storm resistance'} · ${t.boost}-tick boosts · accel ${t.accel}`;
+    case 'hold': return `${t.capacity?.[ship.boat] ?? '?'} crates`;
+  }
+  return '';
+}
+function partCaption(key) {
+  if (FX.includes(key)) {
+    const f = facilityDef(key), locked = facilityLocked(key);
+    return `<b>${f.name}</b> — ${ship.fx[key] ? 'built' : 'not built'} · opens ${NAV.hazards[key].name.toLowerCase()} ` +
+      `<span class="lvl">⛵${f.sailing} 🔨${f.construction}</span>${locked ? ' 🔒 beyond your levels' : ' · click to toggle'}`;
+  }
+  const t = partSel(key);
+  return `<b>${PART_NAME[key]}</b> — ${t ? `${t.name} · ${tierStats(key, t)}` : 'a raft carries no keel'}${t ? ' · click to refit' : ''}`;
+}
+
+function renderSheet() {
+  document.getElementById('shipSvg').innerHTML = shipSvgMarkup();
+  const tabs = document.getElementById('boatTabs');
+  tabs.innerHTML = '';
+  for (const b of NAV.ship.boats) {
+    const bt = document.createElement('button');
+    bt.className = b.key === ship.boat ? 'on' : '';
+    bt.disabled = b.sailing > prof.s;
+    bt.innerHTML = `${b.name} <small>⛵${b.sailing}</small>`;
+    bt.title = `${b.name}: ${b.hotspots} facility hotspot${b.hotspots === 1 ? '' : 's'}, ${b.crew} crew${b.keel ? '' : ', no keel'}` +
+      (bt.disabled ? ` — needs Sailing ${b.sailing}` : '');
+    bt.addEventListener('click', () => setBoat(b.key));
+    tabs.appendChild(bt);
+  }
+  const s = SS;
+  const seas = gearHazKeys().map(k => ship.fac[k]
+    ? `<i>✓ ${NAV.hazards[k].name.toLowerCase()}</i>` : `<s>✗ ${NAV.hazards[k].name.toLowerCase()}</s>`).join(' · ');
+  const partsLine = PARTS.map(p => {
+    const t = partSel(p);
+    if (!t) return null;
+    const what = p === 'mast' ? `${t.tier.toLowerCase()} mast, ${Object.keys(SAIL_COL).find(f => t.name.toLowerCase().includes(f)) || 'linen'} sails`
+      : p === 'hold' ? `${t.tier.toLowerCase()} hold (${t.capacity?.[ship.boat] ?? '?'} crates)` : `${t.tier.toLowerCase()} ${p}`;
+    return `<span class="pl" data-part="${p}" title="click to refit">${what}</span>`;
+  }).filter(Boolean).join(' · ');
+  document.getElementById('shipStats').innerHTML =
+    `<span title="base speed">⚡ <b>${s.speed}</b> tiles/tick</span><span title="hull + keel hitpoints">❤ <b>${s.hp}</b> hull</span>` +
+    `<span title="one flat armour per 100 — shaved off every hit that lands">🛡 <b>${s.armour}</b> armour${s.flat ? ` → −${s.flat} a hit` : ''}</span>` +
+    `<span title="the defence level rolled against a creature's attack">🎯 <b>${s.defence}</b> defence</span>` +
+    `<span class="wide">${partsLine}</span><span class="wide">${seas}</span>`;
+  // what hunts these seas, and what it can do to this ship
+  const atk = (NAV.monsters || []).filter(isAggro).map(m => ({ m, b: biteOnYou(m), d: damagePerTick(m) }))
+    .sort((a, b) => b.d - a.d || b.b - a.b);
+  const hurt = atk.filter(a => a.b > 0), safe = atk.filter(a => a.b <= 0);
+  document.getElementById('threatList').innerHTML =
+    (hurt.length ? `<div><span class="bad">☠ can hurt you:</span> ${hurt.map(a => `${a.m.name} ≤${a.b}`).join(', ')}</div>`
+      : `<div class="ok">☠ nothing that hunts these seas can scratch this ship</div>`) +
+    (safe.length ? `<div><span class="ok">🛡 shrugs off:</span> ${safe.map(a => a.m.name).join(', ')}</div>` : '');
+  const facBox = document.getElementById('facilities');
+  facBox.innerHTML = '';
+  for (const key of FX) {
+    const f = facilityDef(key), locked = facilityLocked(key);
+    const l = document.createElement('label');
+    l.className = 'ck';
+    if (locked) l.style.opacity = 0.5;
+    l.innerHTML = `<input type="checkbox" data-fx="${key}"${ship.fx[key] ? ' checked' : ''}${locked ? ' disabled' : ''}><span>${f.name}
+      <span class="lvl">⛵${f.sailing} 🔨${f.construction}</span><small>opens ${NAV.hazards[key].name.toLowerCase()}${locked ? ' — beyond your levels' : ''}</small></span>`;
+    l.querySelector('input').addEventListener('change', e => { ship.fx[key] = e.target.checked; shipChanged(); });
+    facBox.appendChild(l);
+  }
+  if (pickOpen) document.getElementById('sheetCap').innerHTML = partCaption(pickOpen);
+}
+
+function closePartPicker() {
+  if (!pickOpen) return;
+  pickOpen = null;
+  document.getElementById('partPick').style.display = 'none';
+  document.getElementById('sheetCap').textContent = CAP_DEFAULT;
+  document.getElementById('shipSvg').innerHTML = shipSvgMarkup();
+}
+// the boat schematics board for one part: every tier, locked past your levels
+function openPartPicker(key) {
+  if (pickOpen === key) { closePartPicker(); return; }
+  const list = partList(key);
+  if (!list.length) return;
+  pickOpen = key;
+  const box = document.getElementById('partPick');
+  box.innerHTML = `<div class="grp">${PART_NAME[key]} — boat schematics</div>`;
+  list.forEach((t, i) => {
+    const d = document.createElement('div');
+    const locked = partLocked(t);
+    d.className = 'tier' + (i === ship.part[key] ? ' sel' : '') + (locked ? ' lk' : '');
+    d.innerHTML = `${locked ? '🔒 ' : ''}${t.name}<small>${tierStats(key, t)} · <span class="lvl">⛵${t.sailing} 🔨${t.construction}</span></small>`;
+    if (locked) d.title = `needs Sailing ${t.sailing} and Construction ${t.construction}`;
+    else d.addEventListener('pointerdown', ev => { ev.preventDefault(); ship.part[key] = i; closePartPicker(); shipChanged(); });
+    box.appendChild(d);
   });
-  hullSel.value = ship.hull;
-  hullSel.addEventListener('change', () => { ship.hull = +hullSel.value; reroute(); });
+  box.style.display = 'block';
+  document.getElementById('sheetCap').innerHTML = partCaption(key);
+  document.getElementById('shipSvg').innerHTML = shipSvgMarkup();
+}
+function partClicked(key) {
+  if (FX.includes(key)) {
+    if (facilityLocked(key)) { document.getElementById('sheetCap').innerHTML = partCaption(key); return; }
+    ship.fx[key] = !ship.fx[key];
+    shipChanged();
+    return;
+  }
+  openPartPicker(key);
+}
+
+// ---- fitting the ship to the captain
+const bestIndex = p => { let best = 0; partList(p).forEach((t, i) => { if (!partLocked(t)) best = i; }); return best; };
+const biggestBoat = () => { const ok = NAV.ship.boats.filter(b => b.sailing <= prof.s); return (ok[ok.length - 1] || NAV.ship.boats[0]).key; };
+// change boat, keeping each part's tier where the new boat offers it
+function setBoatKey(key) {
+  const prevBoat = ship.boat, prev = { ...ship.part };
+  ship.boat = key;
+  for (const p of PARTS) {
+    const was = partList(p, prevBoat)[prev[p]];
+    const i = was ? tierIndex(p, was.tier) : -1;
+    ship.part[p] = i >= 0 ? i : bestIndex(p);
+  }
+}
+function setBoat(key) { closePartPicker(); setBoatKey(key); clampShipToLevels(); shipChanged(); }
+// parts the captain can't build fall back to the best tier within reach
+function clampShipToLevels() {
+  if (boatDef().sailing > prof.s) setBoatKey(biggestBoat());
+  for (const p of PARTS) {
+    const list = partList(p);
+    if (!list.length) { ship.part[p] = 0; continue; }
+    ship.part[p] = Math.max(0, Math.min(list.length - 1, ship.part[p] | 0));
+    if (partLocked(list[ship.part[p]])) ship.part[p] = bestIndex(p);
+  }
+  for (const k of FX) if (ship.fx[k] && facilityLocked(k)) ship.fx[k] = false;
+}
+// the biggest boat and the strongest parts the captain's levels allow
+function bestFit() {
+  setBoatKey(biggestBoat());
+  for (const p of PARTS) ship.part[p] = bestIndex(p);
+  for (const k of FX) ship.fx[k] = !facilityLocked(k);
+}
+// everything downstream of the loadout: stats, open seas, the threat grid,
+// the chart tints, the sheet, the saved profile, the route
+function syncShip() {
+  for (const p of PARTS) { const n = partList(p).length; ship.part[p] = n ? Math.max(0, Math.min(n - 1, ship.part[p] | 0)) : 0; }
+  SS = shipStats();
+  syncFittings();
+  buildThreat();
+  prof.ship = { boat: ship.boat, part: { ...ship.part }, fx: { ...ship.fx } };
+  store.set('profile', prof);
+  renderSheet();
+  rebuildOverlay();
+  reroute();
+}
+function shipChanged() { syncShip(); if (SR.showCap) SR.showCap(); replan(); }
+
+// the captain's name → Sailing and Construction off the hiscores, then the
+// best ship those levels can build. Lookups go through the site's edge proxy
+// (Jagex sends no CORS headers); parts stay yours to change afterwards.
+async function lookupRsn() {
+  const rsnIn = document.getElementById('rsnIn'), btn = document.getElementById('rsnBtn'), msg = document.getElementById('rsnMsg');
+  const rsn = rsnIn.value.trim().replace(/\s+/g, ' ');
+  if (!rsn || btn.disabled) return;
+  if (!/^[\w -]{1,12}$/.test(rsn)) { msg.textContent = 'that is not a RuneScape name'; return; }
+  btn.disabled = true; msg.textContent = 'Consulting the hiscores…';
+  try {
+    const res = await fetch('/api/osrs/hiscores?player=' + encodeURIComponent(rsn), { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    const skill = name => d.skills?.find(k => k.name === name);
+    const sail = skill('Sailing'), con = skill('Construction');
+    if (!sail && !con) throw new Error('empty');
+    prof.s = Math.max(1, Math.min(99, sail?.level || 1));
+    prof.c = Math.max(1, Math.min(99, con?.level || 1));
+    prof.rsn = rsn;
+    document.getElementById('lvlSail').value = prof.s; document.getElementById('lvlCon').value = prof.c;
+    document.getElementById('lvlSailV').textContent = prof.s; document.getElementById('lvlConV').textContent = prof.c;
+    store.set('profile', prof);
+    bestFit(); applyProfile();
+    msg.textContent = `✓ ${d.name || rsn}: Sailing ${prof.s}, Construction ${prof.c} — fitted the best ship those levels build` +
+      (sail && sail.rank < 0 ? ' (Sailing not yet ranked)' : '');
+  } catch (e) {
+    msg.textContent = /404/.test(e.message) ? `${rsn} is not on the hiscores — check the spelling`
+      : 'the hiscores are not answering — try again shortly';
+  }
+  btn.disabled = false;
+}
+
+function setupShipPanel() {
+  // the saved ship, else the best one the saved levels allow
+  const saved = prof.ship;
+  if (saved && NAV.ship.boats.some(b => b.key === saved.boat)) {
+    ship.boat = saved.boat;
+    for (const p of PARTS) ship.part[p] = Math.max(0, Math.min(partList(p).length - 1, +(saved.part?.[p] ?? 0) || 0));
+    for (const k of FX) ship.fx[k] = !!saved.fx?.[k];
+  } else {
+    bestFit();
+    // an older profile kept the courier hold and boat size apart from the ship
+    if (prof.boat != null && NAV.ship.boats[prof.boat]) setBoatKey(NAV.ship.boats[prof.boat].key);
+    if (prof.hold != null) ship.part.hold = Math.max(0, Math.min(partList('hold').length - 1, +prof.hold || 0));
+  }
+  delete prof.boat; delete prof.hold;
+  clampShipToLevels();
+  syncShip();
+
+  const svg = document.getElementById('shipSvg'), cap = document.getElementById('sheetCap');
+  const partOf = e => e.target.closest?.('g.part')?.dataset.part;
+  svg.addEventListener('pointerover', e => { const k = partOf(e); if (k) cap.innerHTML = partCaption(k); });
+  svg.addEventListener('pointerout', e => { if (partOf(e) && !pickOpen) cap.textContent = CAP_DEFAULT; });
+  svg.addEventListener('click', e => { const k = partOf(e); if (k) partClicked(k); });
+  document.getElementById('shipStats').addEventListener('click', e => {
+    const k = e.target.closest?.('.pl')?.dataset.part; if (k) partClicked(k);
+  });
+  document.addEventListener('pointerdown', e => {
+    if (pickOpen && !document.getElementById('sheet').contains(e.target) && !e.target.closest?.('.pl')) closePartPicker();
+  }, true);
+  addEventListener('keydown', e => { if (e.key === 'Escape') closePartPicker(); });
+
+  const rsnIn = document.getElementById('rsnIn');
+  rsnIn.value = prof.rsn || '';
+  document.getElementById('rsnBtn').addEventListener('click', lookupRsn);
+  rsnIn.addEventListener('keydown', e => { if (e.key === 'Enter') lookupRsn(); });
 
   const sIn = document.getElementById('lvlSail'), cIn = document.getElementById('lvlCon');
   const sV = document.getElementById('lvlSailV'), cV = document.getElementById('lvlConV');
@@ -1541,27 +2008,12 @@ function setupShipPanel() {
     prof.s = +sIn.value; prof.c = +cIn.value;
     showLvls();
     store.set('profile', prof);
-    // everything within reach comes fitted by default; untick to sail without
-    for (const key of gearHazKeys()) ship.fac[key] = !fittingLocked(key);
+    // the best ship these levels build comes fitted; click any part to change it
+    bestFit();
     applyProfile();
   };
   sIn.addEventListener('input', onProf);
   cIn.addEventListener('input', onProf);
-
-  const facBox = document.getElementById('facilities');
-  for (const key of gearHazKeys()) {
-    const h = NAV.hazards[key];
-    ship.fac[key] = !fittingLocked(key);
-    const l = document.createElement('label');
-    l.className = 'ck';
-    l.innerHTML = `<input type="checkbox" data-k="${key}"${ship.fac[key] ? ' checked' : ''}><span>${h.gate}
-      <span class="lvl">${h.sailing ? ` ⛵${h.sailing}` : ''}${h.construction ? ` 🔨${h.construction}` : ''}</span>
-      <small>opens ${h.name.toLowerCase()}</small></span>`;
-    l.querySelector('input').addEventListener('change', e => {
-      ship.fac[key] = e.target.checked; rebuildOverlay(); reroute();
-    });
-    facBox.appendChild(l);
-  }
 
   document.getElementById('lambda').addEventListener('input', e => {
     ship.lambda = 1 - e.target.value / 100; reroute();
@@ -1589,7 +2041,8 @@ function setupShipPanel() {
   });
   legend.innerHTML = rows.join('') +
     `<span class="sw" style="background:rgb(255,40,40)"></span>red tint — closed to your current ship<br>` +
-    `<span class="sw" style="background:rgb(245,52,31)"></span>red studs — attackers hunt here (bigger stud = deadlier)<br>` +
+    `<span class="sw" style="background:rgb(245,52,31)"></span>red studs — attackers that can hurt this ship (bigger = harder hits get through)<br>` +
+    `<span class="sw" style="background:none;border:2px solid rgb(245,52,31)"></span>hollow studs — they hunt here, but can't dent your armour<br>` +
     `<span class="sw" style="background:rgb(70,205,185)"></span>teal haze — harmless quarry for bounties`;
 
   document.getElementById('copyLink').addEventListener('click', () => {
@@ -1617,30 +2070,10 @@ function syncLayerBoxes() {
   }
 }
 
-// grey out or unhook whatever the captain's levels can't yet use
+// whatever the captain's levels can't build falls back; everything downstream follows
 function applyProfile() {
-  const hullSel = document.getElementById('hullSel');
-  NAV.hulls.forEach((h, i) => {
-    const o = hullSel.options[i];
-    o.disabled = h.level > prof.s;
-    o.textContent = `${h.name} — ${h.speed} tiles/tick${o.disabled ? ` (⛵${h.level})` : ''}`;
-  });
-  if (NAV.hulls[ship.hull].level > prof.s) {
-    let best = 0;
-    NAV.hulls.forEach((h, i) => { if (h.level <= prof.s) best = i; });
-    ship.hull = best; hullSel.value = best;
-  }
-  for (const key of gearHazKeys()) {
-    const box = document.querySelector(`#facilities input[data-k="${key}"]`);
-    const locked = fittingLocked(key);
-    if (locked) ship.fac[key] = false;
-    box.disabled = locked;
-    box.closest('label').style.opacity = locked ? 0.5 : '';
-    box.checked = ship.fac[key];
-  }
-  rebuildOverlay(); redraw(); reroute();
-  if (SR.showCap) SR.showCap();
-  replan();
+  clampShipToLevels();
+  shipChanged();
 }
 
 function chartProgress() {
@@ -1734,7 +2167,8 @@ function updateStats() {
   }
   el.innerHTML = `<span class="chip"><b>${r.dist}</b> tiles</span>
     <span class="chip"><b>${r.turns}</b> turn${r.turns === 1 ? '' : 's'}</span>
-    <span class="chip">~<b>${fmtTime(r.secs)}</b></span>`;
+    <span class="chip">~<b>${fmtTime(r.secs)}</b></span>` +
+    (r.dmg >= 0.5 ? `<span class="chip" title="expected hull damage from sea monsters along this line">☠ ~<b>${fmtDmg(r.dmg)}</b> hull</span>` : '');
 }
 
 function renderLog() {
@@ -1785,9 +2219,25 @@ function renderLog() {
     const key = NAV.classes[CLS[c]];
     if (NAV.hazards[key]) crossed.add(key);
   }
-  if (crossed.size)
-    warn.innerHTML = [...crossed].map(k => `⚠ crosses ${NAV.hazards[k].name.toLowerCase()}` +
-      (NAV.hazards[k].mode === 'penalty' ? ' — expect hull damage' : '')).join('<br>');
+  const warnLines = [...crossed].map(k => `⚠ crosses ${NAV.hazards[k].name.toLowerCase()}` +
+    (NAV.hazards[k].mode === 'penalty' ? ' — expect hull damage' : ''));
+  // sea monsters along the line, as this ship would feel them
+  if (r.hunted) {
+    const hurt = [], shrug = [];
+    (NAV.monsters || []).forEach((m, mi) => {
+      if (!isAggro(m) || !(r.hunted & (1 << (mi & 31)))) return;
+      (biteOnYou(m) > 0 ? hurt : shrug).push(m);
+    });
+    const plural = m => m.name.toLowerCase() + 's';
+    if (hurt.length && r.dmg < 0.05)
+      warnLines.push(`☠ ${hurt.map(m => `${plural(m)} (≤${biteOnYou(m)} a hit)`).join(', ')} close aboard — the line keeps to the edge of their reach`);
+    else if (hurt.length)
+      warnLines.push(`☠ ${hurt.map(m => `${plural(m)} (≤${biteOnYou(m)} a hit)`).join(', ')} en route — expect ~${fmtDmg(r.dmg)} of your ${SS.hp} hull` +
+        (r.dmg >= SS.hp * 0.5 ? ' — carry repair kits' : r.dmg < 1 ? ', a scratch' : ''));
+    if (shrug.length)
+      warnLines.push(`<span style="color:var(--dim)">🛡 ${shrug.map(plural).join(', ')} hunt these waters but can't dent your armour</span>`);
+  }
+  warn.innerHTML = warnLines.join('<br>');
   // the road not taken, in numbers
   const alt = voyage.alt;
   if (alt) {
@@ -1849,11 +2299,7 @@ let portByName = {};
 const slotsAt = lvl => (COURIER()?.slots || [[1, 1]]).reduce((n, [l, s]) => lvl >= l ? s : n, 1);
 const bagFor = xp => { let b = COURIER().bags[0]; for (const t of COURIER().bags) if (xp >= t.minXp) b = t; return b; };
 const taskGp = t => Math.round(COURIER().coinChance * (bagFor(t.xp).coins[0] + bagFor(t.xp).coins[1]) / 2);
-const holdCap = () => {
-  const c = COURIER(); if (!c?.holds?.rows?.length) return 40;
-  const row = c.holds.rows[Math.min(prof.hold ?? 0, c.holds.rows.length - 1)];
-  return row.capacity[Math.min(prof.boat ?? row.capacity.length - 1, row.capacity.length - 1)] || 40;
-};
+const holdCap = () => SS?.hold?.capacity?.[ship.boat] || 40;   // the cargo hold on the ship's sheet
 const fmtGp = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(Math.round(n));
 const utcDay = () => new Date().toISOString().slice(0, 10);
 
@@ -1873,8 +2319,9 @@ const taskOpen = t => t.xp > 0 && t.level <= prof.s && portOpen(t.board) && port
 // penalties as the pathfinder minus the heading bookkeeping (LEG_TURN_SECS
 // stands in for that until a loop is charted leg by leg).
 function seaField(start) {
-  const speed = NAV.hulls[ship.hull].speed;
+  const speed = SS.speed;
   const reefPen = ship.avoidReef ? 9 : 0.5;
+  const dmgW = ship.avoidMon && threat ? dmgWeight() : 0;
   const N = CW * CH;
   const dist = new Float64Array(N).fill(Infinity);   // float64: a rounded-down float32 would out-race its own heap key
   const hf = [], hs = [];
@@ -1904,15 +2351,15 @@ function seaField(start) {
       if (!passable(ncls)) continue;
       let cost = DIRLEN[nd] * CELL / speed;
       if (NAV.classes[ncls] === 'reefs') cost += reefPen * DIRLEN[nd];
-      if (ship.avoidMon && monsterDanger && monsterDanger[n] > 0)
-        cost += monsterDanger[n] * (2 + monsterLevel[n] / 30) * DIRLEN[nd];
+      if (dmgW && threat[n] > 0) cost += threat[n] * (DIRLEN[nd] * CELL / speed) * dmgW;
       const g = f + cost;
       if (g < dist[n]) { dist[n] = g; push(g, n); }
     }
   }
   return dist;
 }
-const loadoutKey = () => [ship.hull, gearHazKeys().map(k => ship.fac[k] ? 1 : 0).join(''), +ship.avoidMon, +ship.avoidReef].join('|');
+const loadoutKey = () => [ship.boat, PARTS.map(p => ship.part[p]).join('.'), FX.map(k => ship.fx[k] ? 1 : 0).join(''),
+  +ship.avoidMon, +ship.avoidReef].join('|');
 async function ensureMatrix(status) {
   const key = loadoutKey();
   if (SR.matrix && SR.key === key) return SR.matrix;
@@ -2269,17 +2716,13 @@ function setupCourierPanel() {
     if (!c.tasks.some(t => t.board === p)) continue;
     const o = document.createElement('option'); o.value = p; o.textContent = p; startSel.appendChild(o);
   }
-  const holdSel = document.getElementById('srHold'), boatSel = document.getElementById('srBoat');
-  (c.holds?.rows || []).forEach((r, i) => { const o = document.createElement('option'); o.value = i; o.textContent = r.name; holdSel.appendChild(o); });
-  (c.holds?.sizes || []).forEach((s, i) => { const o = document.createElement('option'); o.value = i; o.textContent = s.toLowerCase(); boatSel.appendChild(o); });
-  prof.hold = Math.min(prof.hold ?? 0, holdSel.options.length - 1);
-  prof.boat = Math.min(prof.boat ?? boatSel.options.length - 1, boatSel.options.length - 1);
-  holdSel.value = prof.hold; boatSel.value = prof.boat;
+  // hold and boat come off the ship's sheet
   const cap = document.getElementById('srCap');
-  const showCap = () => { cap.textContent = `${holdCap()} crates of cargo · ${slotsAt(prof.s)} task slot${slotsAt(prof.s) === 1 ? '' : 's'} at Sailing ${prof.s} · ${pace().call}s a port call, ${pace().crate}s a crate carried`; };
+  const showCap = () => {
+    cap.textContent = `${holdCap()} crates of cargo (${SS.hold.tier.toLowerCase()} hold on a ${ship.boat}) · ` +
+      `${slotsAt(prof.s)} task slot${slotsAt(prof.s) === 1 ? '' : 's'} at Sailing ${prof.s} · ${pace().call}s a port call, ${pace().crate}s a crate carried`;
+  };
   showCap();
-  const onHold = () => { prof.hold = +holdSel.value; prof.boat = +boatSel.value; store.set('profile', prof); showCap(); replan(); };
-  holdSel.addEventListener('change', onHold); boatSel.addEventListener('change', onHold);
   const paceSel = document.getElementById('srPace');
   PACES.forEach((pc, i) => { const o = document.createElement('option'); o.value = i; o.textContent = pc.name; paceSel.appendChild(o); });
   prof.pace = Math.min(prof.pace ?? 1, PACES.length - 1); paceSel.value = prof.pace;
@@ -2330,8 +2773,9 @@ function routeHash(full) {
   if (voyage.from) p.set('from', `${voyage.from.x},${voyage.from.y},${voyage.from.name}`);
   if (voyage.to) p.set('to', `${voyage.to.x},${voyage.to.y},${voyage.to.name}`);
   p.set('opt', Math.round((1 - ship.lambda) * 100));
-  p.set('hull', ship.hull);
-  p.set('fac', gearHazKeys().map(k => ship.fac[k] ? 1 : 0).join(''));
+  p.set('boat', ship.boat);
+  p.set('fit', PARTS.map(k => ship.part[k]).join('.'));
+  p.set('fx', FX.map(k => ship.fx[k] ? 1 : 0).join(''));
   if (!ship.avoidMon) p.set('mon', 0);
   if (!ship.avoidReef) p.set('reef', 0);
   if (!document.getElementById('showAlt').checked) p.set('alt', 0);
@@ -2349,14 +2793,31 @@ function loadHash() {
   try {
     const p = new URLSearchParams(location.hash.slice(1));
     const parse = v => { const m = v.split(','); return { x: +m[0], y: +m[1], name: m.slice(2).join(',') || 'Open water' }; };
-    if (p.get('hull') !== null) { ship.hull = Math.min(NAV.hulls.length - 1, +p.get('hull') || 0); document.getElementById('hullSel').value = ship.hull; }
+    // the ship: only a link that names a loadout overrides the saved one
+    let refit = false;
+    if (p.get('boat') && NAV.ship.boats.some(b => b.key === p.get('boat'))) { setBoatKey(p.get('boat')); refit = true; }
+    if (p.get('fit') !== null) {
+      p.get('fit').split('.').forEach((v, i) => { if (PARTS[i] && v !== '') ship.part[PARTS[i]] = Math.max(0, +v | 0); });
+      refit = true;
+    }
+    if (p.get('fx') !== null) { FX.forEach((k, i) => { ship.fx[k] = p.get('fx')[i] === '1'; }); refit = true; }
+    // links from before the sheet named one of four hull classes and a fittings bitmask
+    if (p.get('hull') !== null && p.get('fit') === null) {
+      setBoatKey('skiff');
+      const tier = ['Oak', 'Mahogany', 'Ironwood', 'Rosewood'][Math.max(0, Math.min(3, +p.get('hull') || 0))];
+      ship.part.hull = Math.max(0, tierIndex('hull', tier));
+      refit = true;
+    }
     const fac = p.get('fac');
-    if (fac !== null) gearHazKeys().forEach((k, i) => {
-      // only a link that names a loadout overrides the default-fitted ship
-      ship.fac[k] = fac[i] === '1';
-      const box = document.querySelector(`#facilities input[data-k="${k}"]`);
-      if (box) box.checked = ship.fac[k];
-    });
+    if (fac !== null && p.get('fx') === null) {
+      const keys = gearHazKeys(), has = k => fac[keys.indexOf(k)] === '1';
+      ship.fx.fetid = has('fetid'); ship.fx.icy = has('icy');
+      if (has('stormy')) ship.part.mast = Math.max(ship.part.mast, tierIndex('mast', 'Oak'));
+      if (has('crystal')) ship.part.keel = Math.max(ship.part.keel, tierIndex('keel', 'Adamant'));
+      if (has('kelp')) ship.part.helm = Math.max(ship.part.helm, tierIndex('helm', 'Adamant'));
+      refit = true;
+    }
+    if (refit) syncShip();
     if (p.get('opt') !== null) { document.getElementById('lambda').value = +p.get('opt'); ship.lambda = 1 - (+p.get('opt')) / 100; }
     if (p.get('mon') === '0') { ship.avoidMon = false; document.getElementById('avoidMon').checked = false; }
     if (p.get('reef') === '0') { ship.avoidReef = false; document.getElementById('avoidReef').checked = false; }

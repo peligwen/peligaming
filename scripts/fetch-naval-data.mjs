@@ -5,7 +5,8 @@
 //     navcells.png  navigation grid, 1 px per 4x4-tile cell; red channel is the
 //                   water class index (0 = not navigable), see naval.json legend
 //     naval.json    ports, shipwrecks, charting tasks, courier tasks, sea labels, shoals,
-//                   monsters, hazard metadata, hull speeds, world bounds
+//                   monsters (with their attacks against boats), hazard metadata,
+//                   boat types and core-part tier tables, world bounds
 //
 // Run manually to refresh: `node scripts/fetch-naval-data.mjs`. All wiki
 // fetches are cached under .naval-cache/ so re-runs are cheap; delete the
@@ -30,6 +31,7 @@ import jpeg from 'jpeg-js';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { scrapeCourier } from './lib/courier-tasks.mjs';
+import { scrapeShipParts, scrapeBoatCombat, monsterCombatStats } from './lib/ship-parts.mjs';
 
 const API = 'https://oldschool.runescape.wiki/api.php';
 const CACHE = '.naval-cache';
@@ -638,6 +640,9 @@ const monsters = [];
 {
   const bounty = await pageWikitext('Bounty tasks');
   const names = [...new Set([...bounty.matchAll(/monster=([^|}]+)/g)].map(m => m[1].trim()))];
+  // what each creature does to a boat: max hit against a keel-less boat,
+  // attack speed and style, the level it rolls with (scripts/lib/ship-parts.mjs)
+  const shipCombat = await scrapeBoatCombat(pageWikitext);
   for (const title of names) {
     const wt = await pageWikitext(title);
     if (!wt) { console.log(`  [skip] no page: ${title}`); continue; }
@@ -658,7 +663,8 @@ const monsters = [];
       if (pts.length) fields.push({ name: loc || 'At sea', level, points: pts });
     }
     if (fields.length) monsters.push({
-      name: title.replace(/ \((monster|sea|Sailing)\)/i, ''), combat, aggressive, fields,
+      name: title.replace(/ \((monster|sea|Sailing)\)/i, ''), combat, aggressive,
+      ...monsterCombatStats(wt, shipCombat.get(title)), fields,
     });
     else console.log(`  [warn] no spawn fields: ${title}`);
   }
@@ -669,6 +675,10 @@ const monsters = [];
 
 // courier tasks — every board's task pool, priced (see scripts/lib/courier-tasks.mjs)
 const courier = await scrapeCourier(pageWikitext, ports.map(p => p.name));
+
+// the captain's ship — boat types, core-part tiers with their stats and level
+// gates, cargo holds (see scripts/lib/ship-parts.mjs)
+const ship = await scrapeShipParts(pageWikitext);
 
 // ---------------------------------------------------------------------------
 // stage 5: cell grid (4x4 tiles per cell), harbour dredging, outputs
@@ -916,12 +926,7 @@ const naval = {
     sailing: h.sailing ?? null, construction: h.construction ?? null,
     seas: [...(h.keptContainers ?? []), ...(h.seeds ?? [])].map(s => s.title),
   }])),
-  hulls: [
-    { name: 'Wooden / Oak hull', speed: 1.5, level: 1 },
-    { name: 'Teak / Mahogany hull', speed: 2.0, level: 31 },
-    { name: 'Camphor / Ironwood hull', speed: 2.5, level: 67 },
-    { name: 'Rosewood hull', speed: 3.0, level: 90 },
-  ],
+  ship,
   seas: seaLabels,
   ports, wrecks, services, charting, shoals, monsters, courier,
 };
