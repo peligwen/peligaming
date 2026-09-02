@@ -33,24 +33,33 @@ shipwrecks, shoals and charting-task spots.
 - Route tuning from *fewest turns* to *fastest passage*, with hull-speed
   aware time estimates and a turn-by-turn sailing log.
 - Right-click (or long-press) anywhere for a sail menu; tap anything to
-  examine it. Share links reproduce your exact view, endpoints and loadout.
+  examine it. Type a game tile as `x, y` into From or To to sail from where
+  a RuneLite location overlay says you are. Share links reproduce your exact
+  view, endpoints, loadout and damage tolerance.
 - Sea monsters weighed by what they can do to *your* ship: every attacker's
   max hit, attack speed and accuracy against your keel's flat armour and
-  hull's defence become expected hull damage per tick in its waters, and
-  routes trade sailing time against it — a bronze-keel raft skirts even a
-  lone hammerhead, a steel-keel skiff clips a field's edge and takes the odd
-  hit, a dragon-keel sloop sails straight through what can no longer scratch
-  it (hollow studs on the chart). The log says how much hull to expect to
-  lose and to whom.
+  hull's defence become expected hull damage per hour in its waters, and a
+  slider names the hull damage per hour you will put up with — water that
+  would bleed you faster is avoided outright, slower bleeds still cost
+  detours in proportion. At the default (a 1-point hit every 36 seconds)
+  creatures that get one point through your armour pass, anything hitting
+  for two or more reads as water to skirt, and a dragon-keel sloop sails
+  straight through what can no longer scratch it (hollow studs on the
+  chart). The ship's sheet lists every attacker's bite and bleed rate for
+  your ship; the log says how much hull to expect to lose, at what rate,
+  and to whom.
 - **Courier runs** — silk roads for port tasks. Every notice board's courier
   task pool from the wiki (level, xp, cargo port, destination, crates), priced
   in coin from the port coin-bag tiers. The planner sails the same grid to
   time every port pair, then weighs every loop of up to five ports for the
   one that keeps your task slots and cargo hold earning: which tasks to
   accept, load and deliver at each call, gp/h and xp/h, the loop drawn on
-  the chart. Set a start port to see its board's best single tasks too;
-  tick off tasks your board didn't roll and it plans around them until the
-  boards reset.
+  the chart. A board only ever shows eight notices — one bounty always up,
+  the odd pinned courier task, the rest a random draw from its pool — so a
+  lap is priced on what you can expect to find there, with the odds of each
+  task and the next-best pick at every call, not on the whole pool at once.
+  Set a start port to see its board's best single tasks too; tick off tasks
+  your board didn't roll and it plans around them until the boards reset.
 
 Everything runs client-side in one HTML file — no backend, no build step.
 
@@ -62,9 +71,9 @@ Everything runs client-side in one HTML file — no backend, no build step.
   wiki's sea polygons and the Sailing hazards page, classifies every game
   tile into a navigation class, and scrapes ports, wrecks, shoals, services
   and charting tasks into `naval.json`, (via
-  `scripts/lib/courier-tasks.mjs`) every notice board's courier task pool
-  with the task-slot, coin-bag and cargo-hold tables the planner prices
-  with, and (via `scripts/lib/ship-parts.mjs`) the boat types, the tier
+  `scripts/lib/courier-tasks.mjs`) every notice board's courier and bounty
+  task pools with the task-slot, coin-bag and cargo-hold tables the planner
+  prices with, and (via `scripts/lib/ship-parts.mjs`) the boat types, the tier
   tables of every core boat part and cargo hold, and each sea monster's
   attack against a boat from the Boat combat page.
   `scripts/fetch-courier-tasks.mjs` and `scripts/fetch-ship-data.mjs`
@@ -96,10 +105,14 @@ and accuracy follows the standard roll of the creature's attack level against
 the hull's defence level (the boats' defence bonuses are unpublished and taken
 as zero). Each attacker's spawn points are rasterised into a reach scaled by
 its level, summed into "how many are on you" per cell, and multiplied by its
-expected damage per tick for the ship at hand; the pathfinder then charges a
-few ticks of sailing per expected point of hull, scaled by how much hull there
-is to lose, so a fragile raft detours far and a stout sloop only where it
-would truly bleed. Harmless quarry (birds, rays, orcas) never bends a course.
+expected damage per tick for the ship at hand, which read as hull lost per
+hour of sailing that cell. The captain's tolerance turns that into a cost:
+time spent in water bleeding at the tolerance counts double, at a tenth of it
+a tenth more, and water bleeding faster than the tolerance climbs steeply
+enough to be a wall in all but the last resort — so a raft detours around
+everything, a mid ship brushes the fringe of a field where few of its hunters
+reach, and a stout sloop sails straight through what can only nick it.
+Harmless quarry (birds, rays, orcas) never bends a course.
 
 The courier planner's model, for the curious: a loop is a closed walk over
 ports that trade with each other; each task is pinned to the loop (accepted
@@ -111,7 +124,17 @@ the navigation grid, then the real A\* per leg once a loop is chosen) plus
 a tunable dockside allowance per call and per crate. Coin is the expected
 coin bag (four completions in five) for the task's XP tier; the reward bag
 of supplies on the fifth is left out. The wiki lists each board's full pool
-and a board shows a random draw of it, so treat a plan as what to look for.
+(about nineteen courier and seven bounty tasks) but a board shows eight
+notices: its guaranteed bounty task, any courier task the community has
+found pinned to it, and a random draw from the rest — locked tasks included,
+as the roll pays your level no heed — so a given task is up on roughly a
+quarter of rolls. A lap's worth is therefore an expectation: every loop gets
+a cheap ceiling (the whole pool at once, and every candidate task weighted by
+its odds, whichever is lower), then, in ceiling order, the boards are rolled
+a few dozen times for each loop and what came up is packed, until no
+remaining ceiling could beat the eighth best expectation. The plan shows the
+pack with every task up as what to look for, each task's odds, and the
+next-best pick at each call when those aren't there.
 
 ## Other tools
 

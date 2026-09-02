@@ -193,7 +193,7 @@
   .sheetstats .wide i{font-style:normal;color:var(--teal);} .sheetstats .wide s{text-decoration:none;color:#7a6c52;}
   .sheetstats .wide .pl{cursor:pointer;color:var(--parch);} .sheetstats .wide .pl:hover{color:var(--yellow);}
   .threats{font-family:"VT323",monospace;font-size:13.5px;line-height:1.3;margin-top:4px;color:var(--dim);}
-  .threats .bad{color:var(--red);} .threats .ok{color:var(--teal);}
+  .threats .bad{color:var(--red);} .threats .ok{color:var(--teal);} .threats .warn{color:var(--yellow);}
   @media (max-width:820px){
     #panel{display:none;}
     #panel.open{display:block;left:10px;right:10px;width:auto;top:auto;bottom:74px;max-height:56vh;}
@@ -221,7 +221,7 @@
 
 <div id="panel" class="panel">
   <h2>Voyage</h2>
-  <div class="frow"><label>From</label><div class="pick"><input id="fromIn" placeholder="port, wreck, sea…" autocomplete="off"><div class="drop" id="fromDrop"></div></div></div>
+  <div class="frow"><label>From</label><div class="pick"><input id="fromIn" placeholder="port, wreck… or x, y" autocomplete="off"><div class="drop" id="fromDrop"></div></div></div>
   <div class="frow"><label>To</label><div class="pick"><input id="toIn" placeholder="destination…" autocomplete="off"><div class="drop" id="toDrop"></div></div>
     <button id="swapBtn" title="Swap">⇅</button></div>
 
@@ -246,7 +246,11 @@
     <div class="ends"><span>fewest turns</span><span>fastest</span></div>
     <input type="range" id="lambda" min="0" max="100" value="55">
   </div>
-  <label class="ck"><input type="checkbox" id="avoidMon" checked>Weigh hull damage from sea monsters<small>detours scale with what each creature can do to <em>this</em> ship — armour that shrugs one off sails straight through</small></label>
+  <div class="sliderbox" title="hull damage per hour of sailing you will put up with">
+    <div class="ends"><span>no hull damage</span><span>sail through anything</span></div>
+    <input type="range" id="dmgTol" min="0" max="11" value="5">
+    <div class="subhint" id="dmgTolCap"></div>
+  </div>
   <label class="ck"><input type="checkbox" id="avoidReef" checked>Avoid jagged reefs<small>uncheck to brave hull damage at Crandor &amp; Aehecatl</small></label>
   <label class="ck"><input type="checkbox" id="showAlt" checked>Ghost the road not taken<small>dashed line: the same voyage with your caution flipped</small></label>
 
@@ -342,7 +346,7 @@ const ship = {
   fx: { fetid: false, icy: false },                         // inoculation station, eternal brazier
   fac: {},                 // derived: hazard key -> bool (the water is open to this ship)
   lambda: 0.55,
-  avoidMon: true,
+  dmgTol: 100,             // hull damage per hour of sailing the captain will put up with; Infinity = sail through anything
   avoidReef: true,
 };
 const PARTS = ['hull', 'keel', 'helm', 'mast', 'hold'];
@@ -495,14 +499,25 @@ function buildThreat() {
     }
   }
 }
-// the route cost of expected damage: ticks a captain would sail to spare one
-// point of hull, scaled by how much hull there is to lose — a point off a
-// 20-hp raft weighs ten times one off a 200-hp sloop, so the raft skirts
-// even a lone hammerhead while a mid ship clips a field's edge and takes the
-// odd hit. A ship nothing can scratch pays nothing and sails straight through.
-const DMG_TICKS = 6, HP_REF = 200;
-const dmgWeight = () => DMG_TICKS * HP_REF / Math.max(10, SS.hp);
+// How damage bends a course: the captain names the hull damage per hour of
+// sailing they will put up with. Water that would bleed the ship faster than
+// that is all but a wall — crossed only when nothing else reaches the far
+// shore — and slower bleeds still cost in proportion: water at the tolerance
+// counts double the time spent in it, water at a tenth of it a tenth more.
+// A ship nothing can scratch pays nothing and sails straight through
+// whatever the setting; at "sail through anything" nothing bends the course.
+const TICKS_PER_HOUR = 6000;
+const TOL_STEPS = [0, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, Infinity];
+const TOL_DEFAULT = 100;   // a 1-point hit every 36 s: creatures that get 1 through pass, anything hitting for 2+ reads as water to avoid
+const cellRate = i => threat ? threat[i] * TICKS_PER_HOUR : 0;      // hull lost per hour of sailing this cell
+function dmgMult(rate) {                                             // multiplier on the time spent in a cell
+  if (rate <= 0 || !isFinite(ship.dmgTol)) return 1;
+  const x = ship.dmgTol > 0 ? Math.min(1e4, rate / ship.dmgTol) : 1e4;
+  return x <= 1 ? 1 + x : 2 + 40 * (x - 1);
+}
+const weighingDmg = () => !!threat && isFinite(ship.dmgTol);
 const fmtDmg = v => v >= 10 ? String(Math.round(v)) : v >= 1 ? v.toFixed(1) : v.toFixed(2);
+const fmtRate = v => v >= 10000 ? Math.round(v / 1000) + 'k' : v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v >= 10 ? String(Math.round(v)) : v.toFixed(1);
 
 // passability under current loadout; returns 0 blocked, else 1
 function passable(cls) {
@@ -522,7 +537,7 @@ function findRoute(fromTile, toTile) {
   // equal-time staircase paths, keeping "fastest" routes sane
   const lambda = 0.6 + ship.lambda * 60;
   const reefPen = ship.avoidReef ? 9 : 0.5;        // ticks per step through reefs
-  const dmgW = ship.avoidMon && threat ? dmgWeight() : 0;   // ticks per expected point of hull
+  const weighDmg = weighingDmg();
   const start = snapCell(fromTile), goal = snapCell(toTile);
   if (start < 0 || goal < 0) return { fail: null }; // caller diagnoses missing fittings
 
@@ -579,8 +594,8 @@ function findRoute(fromTile, toTile) {
       let dd = Math.abs(nd - dir); if (dd > 8) dd = 16 - dd;
       if (dd) cost += lambda * (0.55 + 0.45 * (dd * 22.5) / 45);
       if (NAV.classes[ncls] === 'reefs') cost += reefPen * DIRLEN[nd];
-      if (dmgW && threat[ncell] > 0)
-        cost += threat[ncell] * (DIRLEN[nd] * CELL / speed) * dmgW;
+      if (weighDmg && threat[ncell] > 0)
+        cost += (DIRLEN[nd] * CELL / speed) * (dmgMult(threat[ncell] * TICKS_PER_HOUR) - 1);
       const ns = ncell * 16 + nd;
       if (g0 + cost < g[ns] - 1e-9) {
         g[ns] = g0 + cost; parent[ns] = s;
@@ -615,7 +630,8 @@ function findRoute(fromTile, toTile) {
     dmg += threat[c] * stepTicks;
     hunted |= monsterMask[c];
   }
-  return { cells, legs, dist: Math.round(dist), turns: Math.max(0, legs.length - 1), secs: ticks * 0.6, dmg, hunted };
+  const secs = ticks * 0.6;
+  return { cells, legs, dist: Math.round(dist), turns: Math.max(0, legs.length - 1), secs, dmg, dmgRate: dmg / Math.max(1, secs) * 3600, hunted };
 }
 
 function snapCell(tile, R = 16) {
@@ -1356,7 +1372,8 @@ function hover(e) {
         });
         show(bitten ? '☠ Hunting grounds' : hasA ? '🛡 Hunting grounds — safe for this ship' : '○ Quarry waters',
           lines.slice(0, 5).join('\n') +
-          (bitten && threat ? `\n~${fmtDmg(threat[i])} hull a tick here${ship.avoidMon ? ' — routes weigh it' : ''}` : ''));
+          (bitten && threat ? `\n~${fmtRate(cellRate(i))} hull an hour here — ${!isFinite(ship.dmgTol) ? 'routes ignore it'
+            : cellRate(i) > ship.dmgTol ? 'routes avoid it' : 'routes weigh it'}` : ''));
         document.body.style.cursor = '';
         return;
       }
@@ -1629,10 +1646,26 @@ function setupPickers() {
   for (const which of ['from', 'to']) {
     const input = document.getElementById(which + 'In');
     const drop = document.getElementById(which + 'Drop');
+    // a bare "x, y" is a game tile — where a RuneLite location overlay says you are
+    const tileOf = q => {
+      const m = q.trim().match(/^\(?\s*(\d{3,5})\s*[, ]\s*(\d{3,5})\s*\)?$/);
+      if (!m) return null;
+      const x = +m[1], y = +m[2];
+      return { name: `Open water (${x}, ${y})`, x, y, water: snapCell([x, y], 6) >= 0 };
+    };
     const render = q => {
       drop.innerHTML = '';
       const ql = q.trim().toLowerCase();
       let shown = 0;
+      const tile = tileOf(q);
+      if (tile) {
+        const g = document.createElement('div'); g.className = 'grp'; g.textContent = '📍 Game tile'; drop.appendChild(g);
+        const d = document.createElement('div');
+        if (!tile.water) d.className = 'lk';
+        d.innerHTML = `${tile.x}, ${tile.y} <small>${tile.water ? 'open water at this tile' : 'no water within 6 tiles of this spot'}</small>`;
+        if (tile.water) d.addEventListener('pointerdown', ev => { ev.preventDefault(); setEndpoint(which, tile); drop.style.display = 'none'; });
+        drop.appendChild(d); shown++;
+      }
       for (const c of catalog) {
         let matches;
         if (!ql) matches = c.items.slice(0, 8);
@@ -1658,6 +1691,11 @@ function setupPickers() {
     };
     input.addEventListener('focus', () => render(input.value));
     input.addEventListener('input', () => render(input.value));
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const tile = tileOf(input.value);
+      if (tile?.water) { setEndpoint(which, tile); drop.style.display = 'none'; input.blur(); }
+    });
     input.addEventListener('blur', () => setTimeout(() => drop.style.display = 'none', 180));
   }
   document.getElementById('swapBtn').addEventListener('click', () => {
@@ -1826,12 +1864,15 @@ function renderSheet() {
     `<span title="the defence level rolled against a creature's attack">🎯 <b>${s.defence}</b> defence</span>` +
     `<span class="wide">${partsLine}</span><span class="wide">${seas}</span>`;
   // what hunts these seas, and what it can do to this ship
-  const atk = (NAV.monsters || []).filter(isAggro).map(m => ({ m, b: biteOnYou(m), d: damagePerTick(m) }))
-    .sort((a, b) => b.d - a.d || b.b - a.b);
-  const hurt = atk.filter(a => a.b > 0), safe = atk.filter(a => a.b <= 0);
+  const atk = (NAV.monsters || []).filter(isAggro).map(m => ({ m, b: biteOnYou(m), r: damagePerTick(m) * TICKS_PER_HOUR }))
+    .sort((a, b) => b.r - a.r || b.b - a.b);
+  const D = ship.dmgTol;
+  const avoid = atk.filter(a => a.b > 0 && a.r > D), weigh = atk.filter(a => a.b > 0 && a.r <= D), safe = atk.filter(a => a.b <= 0);
+  const desc = a => `<span title="the hardest hit that gets through your armour, and hull lost per hour in the thick of their waters">${a.m.name} ≤${a.b}, ~${fmtRate(a.r)}/h</span>`;
   document.getElementById('threatList').innerHTML =
-    (hurt.length ? `<div><span class="bad">☠ can hurt you:</span> ${hurt.map(a => `${a.m.name} ≤${a.b}`).join(', ')}</div>`
-      : `<div class="ok">☠ nothing that hunts these seas can scratch this ship</div>`) +
+    (avoid.length ? `<div><span class="bad">☠ avoided:</span> ${avoid.map(desc).join(', ')}</div>` : '') +
+    (weigh.length ? `<div><span class="warn">${isFinite(D) ? '⚠ weighed, not avoided:' : '☠ can hurt you — routes ignore them:'}</span> ${weigh.map(desc).join(', ')}</div>` : '') +
+    (!avoid.length && !weigh.length ? `<div class="ok">☠ nothing that hunts these seas can scratch this ship</div>` : '') +
     (safe.length ? `<div><span class="ok">🛡 shrugs off:</span> ${safe.map(a => a.m.name).join(', ')}</div>` : '');
   const facBox = document.getElementById('facilities');
   facBox.innerHTML = '';
@@ -1964,7 +2005,45 @@ async function lookupRsn() {
   btn.disabled = false;
 }
 
+// ---- the damage tolerance: a slider over TOL_STEPS, kept with the profile
+function tolIndex(v) {
+  if (!isFinite(v)) return TOL_STEPS.length - 1;
+  let best = 0;
+  for (let i = 0; i < TOL_STEPS.length - 1; i++) if (Math.abs(TOL_STEPS[i] - v) < Math.abs(TOL_STEPS[best] - v)) best = i;
+  return best;
+}
+function tolCaption() {
+  const D = ship.dmgTol;
+  if (!isFinite(D)) return 'sail through anything — sea monsters never bend the course, whatever they could do to the hull';
+  if (D <= 0) return 'no hull damage — every hunting ground whose creatures can scratch this ship is avoided outright';
+  const gap = 3600 / D;
+  return `up to <b>${D}</b> hull an hour under way — a 1-point hit every ${gap >= 60 ? fmtTime(gap) : Math.round(gap) + 's'}. ` +
+    'Water that would bleed you faster is avoided outright; slower bleeds still cost detours in proportion.';
+}
+function loadTolerance() {
+  const v = prof.dmgTol;
+  ship.dmgTol = v === 'inf' ? Infinity : v != null && isFinite(+v) && +v >= 0 ? +v : TOL_DEFAULT;
+}
+function setTolerance(v, fromSlider) {
+  ship.dmgTol = v;
+  if (!fromSlider) document.getElementById('dmgTol').value = tolIndex(v);
+  document.getElementById('dmgTolCap').innerHTML = tolCaption();
+  prof.dmgTol = isFinite(v) ? v : 'inf';
+  store.set('profile', prof);
+  renderSheet();           // the threat list sorts itself around the tolerance
+  reroute();
+}
+function setupTolerance() {
+  const sl = document.getElementById('dmgTol');
+  sl.max = TOL_STEPS.length - 1;
+  sl.value = tolIndex(ship.dmgTol);
+  document.getElementById('dmgTolCap').innerHTML = tolCaption();
+  sl.addEventListener('input', () => setTolerance(TOL_STEPS[+sl.value], true));
+  sl.addEventListener('change', replan);   // the sea-time matrix depends on it; re-sound once the slider settles
+}
+
 function setupShipPanel() {
+  loadTolerance();
   // the saved ship, else the best one the saved levels allow
   const saved = prof.ship;
   if (saved && NAV.ship.boats.some(b => b.key === saved.boat)) {
@@ -2019,7 +2098,7 @@ function setupShipPanel() {
     ship.lambda = 1 - e.target.value / 100; reroute();
   });
   ship.lambda = 1 - 55 / 100;
-  document.getElementById('avoidMon').addEventListener('change', e => { ship.avoidMon = e.target.checked; reroute(); });
+  setupTolerance();
   document.getElementById('avoidReef').addEventListener('change', e => { ship.avoidReef = e.target.checked; reroute(); });
   document.getElementById('showAlt').addEventListener('change', reroute);
   document.getElementById('hazOverlay').addEventListener('change', () => { rebuildOverlay(); renderLog(); });
@@ -2137,13 +2216,13 @@ function doRoute() {
       r.needed = diagnoseRoute([voyage.from.x, voyage.from.y], [voyage.to.x, voyage.to.y]);
   } else if (document.getElementById('showAlt').checked) {
     // the ghost line: the same passage with the caution settings flipped
-    const saved = [ship.avoidMon, ship.avoidReef];
-    const daring = ship.avoidMon || ship.avoidReef;
-    ship.avoidMon = ship.avoidReef = !daring;
+    const saved = [ship.dmgTol, ship.avoidReef];
+    const daring = isFinite(ship.dmgTol) || ship.avoidReef;   // cautious now → the ghost is the daring line
+    ship.dmgTol = daring ? Infinity : TOL_DEFAULT; ship.avoidReef = !daring;
     const a = run();
-    [ship.avoidMon, ship.avoidReef] = saved;
+    [ship.dmgTol, ship.avoidReef] = saved;
     if (a.cells && (a.dist !== r.dist || a.turns !== r.turns))
-      voyage.alt = { cells: a.cells, dist: a.dist, turns: a.turns, secs: a.secs, daring };
+      voyage.alt = { cells: a.cells, dist: a.dist, turns: a.turns, secs: a.secs, dmg: a.dmg, daring };
   }
   drawRoute(r.cells ? r : null);
   renderLog();
@@ -2168,7 +2247,7 @@ function updateStats() {
   el.innerHTML = `<span class="chip"><b>${r.dist}</b> tiles</span>
     <span class="chip"><b>${r.turns}</b> turn${r.turns === 1 ? '' : 's'}</span>
     <span class="chip">~<b>${fmtTime(r.secs)}</b></span>` +
-    (r.dmg >= 0.5 ? `<span class="chip" title="expected hull damage from sea monsters along this line">☠ ~<b>${fmtDmg(r.dmg)}</b> hull</span>` : '');
+    (r.dmg >= 0.5 ? `<span class="chip" title="expected hull damage from sea monsters along this line, and the rate it comes at">☠ ~<b>${fmtDmg(r.dmg)}</b> hull · ~${fmtRate(r.dmgRate)}/h</span>` : '');
 }
 
 function renderLog() {
@@ -2232,8 +2311,8 @@ function renderLog() {
     if (hurt.length && r.dmg < 0.05)
       warnLines.push(`☠ ${hurt.map(m => `${plural(m)} (≤${biteOnYou(m)} a hit)`).join(', ')} close aboard — the line keeps to the edge of their reach`);
     else if (hurt.length)
-      warnLines.push(`☠ ${hurt.map(m => `${plural(m)} (≤${biteOnYou(m)} a hit)`).join(', ')} en route — expect ~${fmtDmg(r.dmg)} of your ${SS.hp} hull` +
-        (r.dmg >= SS.hp * 0.5 ? ' — carry repair kits' : r.dmg < 1 ? ', a scratch' : ''));
+      warnLines.push(`☠ ${hurt.map(m => `${plural(m)} (≤${biteOnYou(m)} a hit)`).join(', ')} en route — expect ~${fmtDmg(r.dmg)} of your ${SS.hp} hull, ` +
+        `~${fmtRate(r.dmgRate)} an hour at this pace` + (r.dmg >= SS.hp * 0.5 ? ' — carry repair kits' : r.dmg < 1 ? ', a scratch' : ''));
     if (shrug.length)
       warnLines.push(`<span style="color:var(--dim)">🛡 ${shrug.map(plural).join(', ')} hunt these waters but can't dent your armour</span>`);
   }
@@ -2248,13 +2327,13 @@ function renderLog() {
     el.className = 'altline ' + (alt.daring ? 'daring' : 'cautious');
     el.title = 'click to sail it — flips your caution settings';
     el.textContent = alt.daring
-      ? `↯ daring line (dashed): ${fd(dd)} tiles, ${ft(dt)} — braves what you avoid. Click to sail it.`
-      : `☂ cautious line (dashed): ${fd(dd)} tiles, ${ft(dt)} — skirts monsters & reefs. Click to sail it.`;
+      ? `↯ daring line (dashed): ${fd(dd)} tiles, ${ft(dt)}${alt.dmg >= 0.05 ? `, ~${fmtDmg(alt.dmg)} hull` : ''} — braves what you avoid. Click to sail it.`
+      : `☂ cautious line (dashed): ${fd(dd)} tiles, ${ft(dt)}${r.dmg >= 0.05 && alt.dmg < r.dmg ? `, spares ~${fmtDmg(r.dmg - alt.dmg)} hull` : ''} — skirts monsters & reefs. Click to sail it.`;
     el.addEventListener('click', () => {
-      ship.avoidMon = ship.avoidReef = !alt.daring;
-      document.getElementById('avoidMon').checked = ship.avoidMon;
+      ship.avoidReef = !alt.daring;
       document.getElementById('avoidReef').checked = ship.avoidReef;
-      reroute();
+      setTolerance(alt.daring ? Infinity : TOL_DEFAULT);
+      replan();
     });
     altBox.appendChild(el);
   }
@@ -2314,6 +2393,57 @@ function courierPortTile(name) { const p = portByName[name]; return [p.x, p.y]; 
 const portOpen = name => { const p = portByName[name]; return !!p && (p.level || 1) <= prof.s; };
 const taskOpen = t => t.xp > 0 && t.level <= prof.s && portOpen(t.board) && portOpen(t.cargo) && portOpen(t.dest) && !SR.excluded.has(t.id);
 
+// ---- what a board actually shows
+// A notice board has eight notices: one bounty task that is always there,
+// any courier task the community has found pinned to that board, and the
+// rest a random draw from the remainder of its pool — bounty and courier
+// tasks alike, locked ones included, for the roll pays your level no heed.
+// A given courier task is therefore up on roughly a quarter of rolls, and a
+// lap is priced on what you can expect to find, not on the whole pool at once.
+let BOARDS = new Map();
+const boardShows = () => COURIER()?.board?.shows || 8;
+function buildBoards() {
+  const c = COURIER(); BOARDS = new Map();
+  if (!c) return;
+  const bounty = new Map();
+  for (const b of c.bounty || []) {
+    const e = bounty.get(b.board) || { n: 0, fixed: 0 };
+    e.n++; if (b.guaranteed) e.fixed++;
+    bounty.set(b.board, e);
+  }
+  for (const t of c.tasks) {
+    let e = BOARDS.get(t.board);
+    if (!e) {
+      const bb = bounty.get(t.board) || { n: 0, fixed: 0 };
+      e = { pool: [], fixed: bb.fixed, bountyPool: bb.n - bb.fixed };
+      BOARDS.set(t.board, e);
+    }
+    if (t.static) e.fixed++; else e.pool.push(t.id);
+  }
+  for (const e of BOARDS.values()) {
+    e.draws = Math.max(0, boardShows() - e.fixed);
+    e.poolSize = e.pool.length + e.bountyPool;
+    e.p = e.poolSize ? Math.min(1, e.draws / e.poolSize) : 1;
+    e.scratch = new Int32Array(e.poolSize);
+  }
+}
+const taskOdds = t => t.static ? 1 : (BOARDS.get(t.board)?.p ?? 1);
+const oddsText = t => t.static ? '<span class="static">★ always on this board</span>' : `up on ~${Math.round(taskOdds(t) * 100)}% of rolls`;
+// one roll of a board: adds the courier tasks that came up to `out`
+function rollBoard(e, rnd, out) {
+  const n = e.poolSize, k = Math.min(e.draws, n), idx = e.scratch;
+  for (let i = 0; i < n; i++) idx[i] = i;
+  for (let i = 0; i < k; i++) {                 // partial Fisher–Yates; the courier tasks are the first pool.length indices
+    const j = i + Math.floor(rnd() * (n - i));
+    const t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+    if (idx[i] < e.pool.length) out.add(e.pool[idx[i]]);
+  }
+}
+function mulberry32(a) {
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+
 // ---- sea time between every pair of courier ports
 // One Dijkstra per port over the navigation grid, same water rules and
 // penalties as the pathfinder minus the heading bookkeeping (LEG_TURN_SECS
@@ -2321,7 +2451,7 @@ const taskOpen = t => t.xp > 0 && t.level <= prof.s && portOpen(t.board) && port
 function seaField(start) {
   const speed = SS.speed;
   const reefPen = ship.avoidReef ? 9 : 0.5;
-  const dmgW = ship.avoidMon && threat ? dmgWeight() : 0;
+  const weighDmg = weighingDmg();
   const N = CW * CH;
   const dist = new Float64Array(N).fill(Infinity);   // float64: a rounded-down float32 would out-race its own heap key
   const hf = [], hs = [];
@@ -2351,7 +2481,7 @@ function seaField(start) {
       if (!passable(ncls)) continue;
       let cost = DIRLEN[nd] * CELL / speed;
       if (NAV.classes[ncls] === 'reefs') cost += reefPen * DIRLEN[nd];
-      if (dmgW && threat[n] > 0) cost += threat[n] * (DIRLEN[nd] * CELL / speed) * dmgW;
+      if (weighDmg && threat[n] > 0) cost += (DIRLEN[nd] * CELL / speed) * (dmgMult(threat[n] * TICKS_PER_HOUR) - 1);
       const g = f + cost;
       if (g < dist[n]) { dist[n] = g; push(g, n); }
     }
@@ -2359,7 +2489,7 @@ function seaField(start) {
   return dist;
 }
 const loadoutKey = () => [ship.boat, PARTS.map(p => ship.part[p]).join('.'), FX.map(k => ship.fx[k] ? 1 : 0).join(''),
-  +ship.avoidMon, +ship.avoidReef].join('|');
+  isFinite(ship.dmgTol) ? ship.dmgTol : 'inf', +ship.avoidReef].join('|');
 async function ensureMatrix(status) {
   const key = loadoutKey();
   if (SR.matrix && SR.key === key) return SR.matrix;
@@ -2384,7 +2514,7 @@ async function ensureMatrix(status) {
 // a slot for `span` legs and `qty` crates for `cspan` of them. Packing is
 // greedy — by value, and again by value per slot-hour — and the better of
 // the two stands; loops are small enough that this lands on the answer.
-function evalLoop(seq, ctx) {
+function loopInstances(seq, ctx) {
   const k = seq.length, M = ctx.M;
   const T = new Float64Array(k);
   let sail = 0;
@@ -2417,6 +2547,15 @@ function evalLoop(seq, ctx) {
   }
   if (!inst.length) return null;
   for (const it of inst) { let s = 0; for (let i = 0; i < it.span; i++) s += T[(it.at + i) % k]; it.dens = it.v / s; }
+  // sorted once here; every roll of the boards then only filters
+  return { T, sail, inst, byV: inst.slice().sort((a, b) => b.v - a.v), byDens: inst.slice().sort((a, b) => b.dens - a.dens) };
+}
+// greedy packing of the instances that are up — by value, and again by value
+// per slot-hour — and the better of the two stands
+function packInstances(L, ctx, k, isUp) {
+  const byV = isUp ? L.byV.filter(it => isUp(it.t)) : L.byV;
+  if (!byV.length) return null;
+  const byDens = isUp ? L.byDens.filter(it => isUp(it.t)) : L.byDens;
   const pack = order => {
     const slotUse = new Uint8Array(k), crateUse = new Uint16Array(k), used = new Set(), chosen = [];
     let total = 0;
@@ -2432,20 +2571,62 @@ function evalLoop(seq, ctx) {
     }
     return { chosen, total, slotUse, crateUse };
   };
-  const A = pack(inst.slice().sort((a, b) => b.v - a.v));
-  const B = pack(inst.slice().sort((a, b) => b.dens - a.dens));
+  const A = pack(byV), B = pack(byDens);
   const best = A.total >= B.total ? A : B;
-  if (!best.chosen.length) return null;
-  return finishPlan({ seq, T: Array.from(T), sail, chosen: best.chosen, slotUse: best.slotUse, crateUse: best.crateUse, obj: ctx.obj });
+  return best.chosen.length ? best : null;
+}
+// the loop with every task up at once — what to look for — and an upper
+// bound on what a lap can expect: no roll of the boards beats the whole pool
+// at once, nor the sum of every candidate weighted by its odds of being up
+function evalLoop(seq, ctx) {
+  const L = loopInstances(seq, ctx);
+  if (!L) return null;
+  const best = packInstances(L, ctx, seq.length, null);
+  if (!best) return null;
+  const byTask = new Map();
+  for (const it of L.inst) if ((byTask.get(it.t) || 0) < it.v) byTask.set(it.t, it.v);
+  let sumOdds = 0;
+  for (const [t, v] of byTask) sumOdds += v * taskOdds(t);
+  const p = finishPlan({ seq, T: Array.from(L.T), sail: L.sail, L, inst: L.inst, chosen: best.chosen, slotUse: best.slotUse, crateUse: best.crateUse, obj: ctx.obj });
+  p.bound = Math.min(best.total, sumOdds) / (p.sail + seq.length * pace().call) * 3600;
+  return p;
+}
+// what a lap can expect: roll every board on the loop many times, pack what
+// came up each time, and average — substitutes, slots and hold included.
+// Seeded by the loop so the same loop prices the same on every replan.
+function expectLoop(p, ctx, M = 80) {
+  const k = p.seq.length;
+  const boards = [...new Set(p.inst.map(it => it.t.board))].map(b => BOARDS.get(b)).filter(Boolean);
+  const rnd = mulberry32(hashStr(p.seq.join('>')));
+  const up = new Set(), found = new Map();
+  let gp = 0, xp = 0, crates = 0, tasks = 0;
+  for (let s = 0; s < M; s++) {
+    up.clear();
+    for (const e of boards) rollBoard(e, rnd, up);
+    const best = packInstances(p.L, ctx, k, t => t.static || up.has(t.id));
+    if (!best) continue;
+    for (const it of best.chosen) {
+      gp += taskGp(it.t); xp += it.t.xp; crates += it.t.qty; tasks++;
+      found.set(it.t.id, (found.get(it.t.id) || 0) + 1);
+    }
+  }
+  p.exp = { gp: gp / M, xp: xp / M, crates: crates / M, tasks: tasks / M, samples: M, found };
+  return finishPlan(p);
 }
 function finishPlan(p) {
-  const k = p.seq.length;
+  const k = p.seq.length, pc = pace();
   let crates = 0, xp = 0, gp = 0;
   for (const it of p.chosen) { crates += it.t.qty; xp += it.t.xp; gp += taskGp(it.t); }
   p.sail = p.T.reduce((a, b) => a + b, 0);
-  p.secs = p.sail + k * pace().call + 2 * crates * pace().crate;
-  p.xp = xp; p.gp = gp; p.crates = crates;
-  p.xph = xp / p.secs * 3600; p.gph = gp / p.secs * 3600;
+  const dock = k * pc.call;
+  // every task up at once — the ceiling
+  p.opt = { crates, xp, gp, secs: p.sail + dock + 2 * crates * pc.crate };
+  p.opt.xph = p.opt.xp / p.opt.secs * 3600; p.opt.gph = p.opt.gp / p.opt.secs * 3600;
+  // what a lap can expect to find on the boards (expectLoop), else that ceiling
+  const e = p.exp || p.opt;
+  p.secs = p.sail + dock + 2 * e.crates * pc.crate;
+  p.xp = e.xp; p.gp = e.gp; p.crates = e.crates;
+  p.xph = p.xp / p.secs * 3600; p.gph = p.gp / p.secs * 3600;
   p.rate = p.obj === 'xp' ? p.xph : p.gph;
   return p;
 }
@@ -2516,17 +2697,12 @@ async function plotSilkRoads(opts = {}) {
     const K = +document.getElementById('srK').value || 4;
     const start = document.getElementById('srStart').value || null;
     if (start && !ctx.adj.has(start)) { say(`${start} has no courier trade open to you at Sailing ${prof.s}.`); SR.plans = []; renderLoops(); return; }
-    const top = [];
-    const consider = p => {
-      if (!p) return;
-      // one entry per set of ports: the best direction and shape of that trade
-      const key = p.seq.slice().sort().join('>');
-      const i = top.findIndex(q => q.key === key);
-      if (i >= 0) { if (p.rate > top[i].rate) top[i] = { key, ...p }; }
-      else top.push({ key, ...p });
-      if (top.length > 40) { top.sort((a, b) => b.rate - a.rate); top.length = 24; }
-    };
-    let n = 0;
+    // two passes: every loop's ceiling first, then — in ceiling order — the
+    // boards are rolled for a loop only while its ceiling could still beat
+    // the eighth best expectation found so far, so nothing is dropped unseen
+    const all = [];
+    let n = 0, rolled = 0;
+    const consider = p => { if (p) all.push({ seq: p.seq, bound: p.bound }); };
     if (opts.only) consider(evalLoop(opts.only, ctx));
     else for (const seq of loopWalks(ctx.adj, ctx.order, K, start)) {
       consider(evalLoop(seq, ctx));
@@ -2536,11 +2712,32 @@ async function plotSilkRoads(opts = {}) {
         if (run !== srRun) return;
       }
     }
+    all.sort((a, b) => b.bound - a.bound);
+    const top = [];                       // by expectation, one entry per set of ports
+    const QUICK = 24, FINAL = 96;
+    for (const c of all) {
+      if (top.length >= 8 && c.bound <= top[7].rate) break;
+      const p = evalLoop(c.seq, ctx);     // the instances again — they are not kept for every loop
+      if (!p) continue;
+      expectLoop(p, ctx, QUICK);
+      const key = p.seq.slice().sort().join('>');
+      const i = top.findIndex(q => q.key === key);
+      if (i >= 0) { if (p.rate > top[i].rate) top[i] = { key, ...p }; }
+      else top.push({ key, ...p });
+      top.sort((a, b) => b.rate - a.rate);
+      if (top.length > 32) top.length = 32;
+      if (++rolled % 250 === 0) {
+        say(`Rolling the boards… ${rolled.toLocaleString()} loops`);
+        await new Promise(r => setTimeout(r, 0));
+        if (run !== srRun) return;
+      }
+    }
+    for (const p of top.slice(0, 16)) expectLoop(p, ctx, FINAL);   // a steadier hand for the ones that show
     top.sort((a, b) => b.rate - a.rate);
     SR.plans = top.slice(0, 8);
     SR.sel = -1; SR.legs = null;
     say(SR.plans.length
-      ? `${n ? n.toLocaleString() + ' loops weighed · ' : ''}${ctx.slots} task slot${ctx.slots === 1 ? '' : 's'} · hold ${ctx.hold} crates · Sailing ${prof.s}`
+      ? `${n ? `${n.toLocaleString()} loops weighed, ${rolled.toLocaleString()} rolled on the boards · ` : ''}${ctx.slots} task slot${ctx.slots === 1 ? '' : 's'} · hold ${ctx.hold} crates · Sailing ${prof.s}`
       : opts.only ? `The shared loop ${opts.only.join(' → ')} has no trade open to you at Sailing ${prof.s} with this ship.`
       : `No paying loop of up to ${K} ports at Sailing ${prof.s} with this ship.`);
     renderLoops();
@@ -2600,7 +2797,9 @@ function renderLoops() {
     const d = document.createElement('div');
     d.className = 'srl' + (i === SR.sel ? ' on' : '');
     d.innerHTML = `<b>${fmtGp(p.gph)}</b> gp/h · <b>${fmtGp(p.xph)}</b> xp/h · ${fmtTime(p.secs)} a lap` +
-      `<small>${p.seq.map(s => s.replace(/^The |^Port /, '')).join(' → ')} ↺ · ${p.chosen.length} task${p.chosen.length === 1 ? '' : 's'}, ${p.crates} crates</small>`;
+      `<small>${p.seq.map(s => s.replace(/^The |^Port /, '')).join(' → ')} ↺ · ` +
+      (p.exp ? `~${p.exp.tasks.toFixed(1)} of ${p.chosen.length} tasks up a lap, ~${Math.round(p.crates)} crates`
+             : `${p.chosen.length} task${p.chosen.length === 1 ? '' : 's'}, ${p.crates} crates`) + `</small>`;
     d.addEventListener('click', () => selectPlan(i));
     box.appendChild(d);
   });
@@ -2612,7 +2811,7 @@ function taskLine(it, verb, extra) {
   d.className = 'tk';
   d.innerHTML = `<span class="x" title="not on my board — plan without it">✕</span><span>${verb} <b>${t.name}</b>` +
     (t.static ? ' <span class="static" title="always on this board">★</span>' : '') +
-    `<br><em>${extra}${t.qty} crate${t.qty === 1 ? '' : 's'} of ${t.item} · <span class="v">+${t.xp.toLocaleString()} xp · ~${fmtGp(taskGp(t))} gp</span> (${tier} bag) · ⛵${t.level}</em></span>`;
+    `<br><em>${extra}${t.qty} crate${t.qty === 1 ? '' : 's'} of ${t.item} · <span class="v">+${t.xp.toLocaleString()} xp · ~${fmtGp(taskGp(t))} gp</span> (${tier} bag) · ⛵${t.level} · ${oddsText(t)}</em></span>`;
   d.querySelector('.x').addEventListener('click', () => {
     SR.excluded.add(t.id); saveExcluded(); renderExcluded(); replan();
   });
@@ -2624,6 +2823,7 @@ function renderPlan() {
   const p = SR.plans[SR.sel];
   if (!p) return;
   const k = p.seq.length;
+  const chosenIds = new Set(p.chosen.map(it => it.t.id));
   const frag = document.createDocumentFragment();
   for (let i = 0; i < k; i++) {
     const port = p.seq[i];
@@ -2637,6 +2837,19 @@ function renderPlan() {
     for (const it of p.chosen) if (it.at === i) {
       const aba = it.t.board !== it.t.cargo;
       frag.appendChild(taskLine(it, 'Accept', aba ? `round trip — cargo waits at ${it.t.cargo} · ` : ''));
+    }
+    // what else to take here when those aren't up, by how often the rolls packed it
+    if (p.exp) {
+      const alts = [], seen = new Set();
+      for (const it of p.inst) if (it.at === i && !chosenIds.has(it.t.id) && !seen.has(it.t.id) && p.exp.found.get(it.t.id)) { seen.add(it.t.id); alts.push(it); }
+      alts.sort((a, b) => p.exp.found.get(b.t.id) - p.exp.found.get(a.t.id));
+      if (alts.length) {
+        const l = document.createElement('div');
+        l.className = 'tk';
+        l.innerHTML = `<span class="x" style="visibility:hidden">✕</span><span class="dim">if those aren't up, next best here: ` +
+          alts.slice(0, 3).map(it => `<b>${it.t.name}</b> (+${it.t.xp.toLocaleString()} xp · ~${fmtGp(taskGp(it.t))} gp${it.t.board !== it.t.cargo ? ', round trip' : ''})`).join(', ') + `</span>`;
+        frag.appendChild(l);
+      }
     }
     for (const it of p.chosen) if (it.load === i && it.t.board !== it.t.cargo) {
       const l = document.createElement('div');
@@ -2660,9 +2873,11 @@ function renderPlan() {
   }
   const tot = document.createElement('div');
   tot.className = 'tot';
-  tot.innerHTML = `Lap: ~${fmtTime(p.secs)} — ${fmtTime(p.sail)} at sea, ${fmtTime(p.secs - p.sail)} dockside · +${p.xp.toLocaleString()} xp · ~${fmtGp(p.gp)} gp<br>` +
+  tot.innerHTML = `Lap: ~${fmtTime(p.secs)} — ${fmtTime(p.sail)} at sea, ${fmtTime(p.secs - p.sail)} dockside · +${Math.round(p.xp).toLocaleString()} xp · ~${fmtGp(p.gp)} gp<br>` +
     `<b>${fmtGp(p.gph)} gp/h · ${fmtGp(p.xph)} xp/h</b>` +
-    `<div class="dim">coin only — one delivery in five pays a reward bag of supplies instead · boards show a random draw of their pool: tick ✕ on what yours lacks</div>`;
+    (p.exp ? `<div class="dim">what a lap can expect over ${p.exp.samples} rolls of its boards — ~${p.exp.tasks.toFixed(1)} of the ${p.chosen.length} tasks above up at once. ` +
+      `With every one up: ${fmtGp(p.opt.gph)} gp/h · ${fmtGp(p.opt.xph)} xp/h, ${fmtTime(p.opt.secs)} a lap.</div>` : '') +
+    `<div class="dim">coin only — one delivery in five pays a reward bag of supplies instead · a board shows ${boardShows()} notices: one bounty always, the rest a random draw from its pool · tick ✕ on what yours lacks</div>`;
   frag.appendChild(tot);
   box.appendChild(frag);
 }
@@ -2696,6 +2911,13 @@ function renderBoard(port) {
   h.className = 'port';
   h.innerHTML = `📋 ${port} board — one task at a time`;
   box.appendChild(h);
+  const e = BOARDS.get(port);
+  if (e) {
+    const note = document.createElement('div');
+    note.className = 'dim';
+    note.textContent = `${boardShows()} notices: ${e.fixed} always up, ${e.draws} drawn from a pool of ${e.poolSize} (${e.pool.length} courier, ${e.bountyPool} bounty)`;
+    box.appendChild(note);
+  }
   for (const r of rows.slice(0, 8)) {
     const aba = r.t.board !== r.t.cargo;
     box.appendChild(taskLine({ t: r.t }, aba ? `↔ ${r.t.cargo}:` : `→ ${r.t.dest}:`,
@@ -2710,6 +2932,7 @@ function setupCourierPanel() {
   portByName = Object.fromEntries(NAV.ports.map(p => [p.name, p]));
   SR.ports = [...new Set(c.tasks.flatMap(t => [t.board, t.cargo, t.dest]))].filter(n => portByName[n]).sort();
   SR.idx = Object.fromEntries(SR.ports.map((p, i) => [p, i]));
+  buildBoards();
   loadExcluded();
   const startSel = document.getElementById('srStart');
   for (const p of SR.ports) {
@@ -2776,7 +2999,7 @@ function routeHash(full) {
   p.set('boat', ship.boat);
   p.set('fit', PARTS.map(k => ship.part[k]).join('.'));
   p.set('fx', FX.map(k => ship.fx[k] ? 1 : 0).join(''));
-  if (!ship.avoidMon) p.set('mon', 0);
+  if (ship.dmgTol !== TOL_DEFAULT) p.set('dmg', isFinite(ship.dmgTol) ? ship.dmgTol : 'inf');
   if (!ship.avoidReef) p.set('reef', 0);
   if (!document.getElementById('showAlt').checked) p.set('alt', 0);
   const plan = SR.plans[SR.sel];
@@ -2819,7 +3042,8 @@ function loadHash() {
     }
     if (refit) syncShip();
     if (p.get('opt') !== null) { document.getElementById('lambda').value = +p.get('opt'); ship.lambda = 1 - (+p.get('opt')) / 100; }
-    if (p.get('mon') === '0') { ship.avoidMon = false; document.getElementById('avoidMon').checked = false; }
+    if (p.get('dmg') !== null) setTolerance(p.get('dmg') === 'inf' ? Infinity : Math.max(0, +p.get('dmg') || 0));
+    else if (p.get('mon') === '0') setTolerance(Infinity);     // links from before the tolerance slider
     if (p.get('reef') === '0') { ship.avoidReef = false; document.getElementById('avoidReef').checked = false; }
     if (p.get('alt') === '0') document.getElementById('showAlt').checked = false;
     const ly = p.get('ly');
