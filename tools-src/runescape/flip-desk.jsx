@@ -674,11 +674,13 @@ function ItemPopup({ it, status, onClose }) {
     const week = hist.slice(-LOOKBACK);
     const fills = dayFills(week, q, CAPTURE);
     const n = fills.length;
-    const k = Math.max(1, n - slack);
+    // a thin history can't spare the misses asked for — settle on the most it can
+    const s = Math.min(slack, Math.max(0, n - 1));
+    const k = Math.max(1, n - s);
     const o = cycleOrders(fills, k, taxOf);
     const buyHits = o.buyDays.filter(Boolean).length;
     const sellHits = o.sellDays.filter(Boolean).length;
-    return { week, fills, n, k, o, buyHits, sellHits, prof: hourProfile(week), ho: holdout(hist, q, CAPTURE, k, taxOf) };
+    return { week, fills, n, k, slack: s, o, buyHits, sellHits, prof: hourProfile(week), ho: holdout(hist, q, CAPTURE, k, taxOf) };
   }, [hist, q, slack, taxOf]);
   const o = m?.o;
   const cost = o?.buy != null ? q * o.buy : null;
@@ -769,13 +771,13 @@ function ItemPopup({ it, status, onClose }) {
               </div>
               <div className="ge-conf" role="radiogroup" aria-label="How many of the last days the orders must have filled on">
                 {SLACKS.map((c) => (
-                  <button key={c.s} className={"ge-btn" + (slack === c.s ? " on" : "")} role="radio" aria-checked={slack === c.s}
+                  <button key={c.s} className={"ge-btn" + (m.slack === c.s ? " on" : "")} role="radio" aria-checked={m.slack === c.s}
                     disabled={m.n - c.s < 1} onClick={() => setSlack(c.s)}>
                     {c.label} · {Math.max(1, m.n - c.s)} of {m.n}
                   </button>
                 ))}
               </div>
-              <div className="ge-hint">{SLACKS[slack].hint.replace("%n", m.n)} A day to buy, a day to sell — the orders sit and the cycle comes to them.</div>
+              <div className="ge-hint">{SLACKS[m.slack].hint.replace("%n", m.n)} A day to buy, a day to sell — the orders sit and the cycle comes to them.</div>
             </div>
 
             {/* quantity */}

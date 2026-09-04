@@ -70,7 +70,10 @@ async function osrs(req, url, ctx) {
       const v = url.searchParams.get(k);
       if (v != null && /^[\w-]{1,32}$/.test(v)) qs.set(k, v);
     }
-    const tsRaw = url.searchParams.get("timestamp");
+    // only the block endpoints take a timestamp; anywhere else it would just
+    // fragment the shared cache key, so it isn't read at all
+    const period = PERIOD[ep];
+    const tsRaw = period != null ? url.searchParams.get("timestamp") : null;
     let timestamp = null;
     if (tsRaw != null) {
       if (!/^\d{1,12}$/.test(tsRaw)) return new Response("bad timestamp", { status: 400 });
@@ -83,8 +86,7 @@ async function osrs(req, url, ctx) {
     if (ep === "24h" && timestamp != null && timestamp % 86400 !== 0) {
       return new Response("timestamp must be divisible by 86400", { status: 400 });
     }
-    const period = PERIOD[ep];
-    if (timestamp != null && period != null && timestamp + period <= Math.floor(Date.now() / 1000)) {
+    if (timestamp != null && timestamp + period <= Math.floor(Date.now() / 1000)) {
       ttl = LONG_TTL[ep];
     }
     upstream = `${UPSTREAM}/${ep}${qs.toString() ? "?" + qs : ""}`;
