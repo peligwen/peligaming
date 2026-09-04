@@ -3,7 +3,9 @@
 //   public/tools/runescape/data/naval/
 //     map.jpg       stitched sea-level world map texture (2 px per game tile)
 //     navcells.png  navigation grid, 1 px per 4x4-tile cell; red channel is the
-//                   water class index (0 = not navigable), see naval.json legend
+//                   water class index (0 = not navigable), see naval.json legend;
+//                   green channel is 1 where the game client's own collision
+//                   data vouched for the cell (scripts/lib/collision-seed.mjs)
 //     naval.json    ports, shipwrecks, charting tasks, courier tasks, sea labels, shoals,
 //                   monsters (with their attacks against boats), hazard metadata,
 //                   boat types and core-part tier tables, world bounds
@@ -27,6 +29,9 @@
 // away cannot mislabel. QA previews land in .naval-cache/preview-*.png.
 
 import { PNG } from 'pngjs';
+import {
+  SEED, seedUrl, seedCacheName, parseCollisionSeed, applyCollisionSeed, isVoidColour,
+} from './lib/collision-seed.mjs';
 import jpeg from 'jpeg-js';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -713,6 +718,50 @@ const cellClass = new Uint8Array(CW * CH);
   console.log(`nav cells: ${nav}/${CW * CH} (${CW}x${CH})`);
 }
 
+// wall seas render on the map but block routes; several stages below need the set
+const WALLS = new Set(Object.entries(HAZARDS)
+  .filter(([, h]) => h.mode === 'wall').map(([k]) => classIndex[k]));
+
+// Ground truth from the game client: the Chart Plotter plugin's collision
+// capture overrides the colour classifier wherever it is certain (see
+// scripts/lib/collision-seed.mjs). Void cells — where the wiki render shows no
+// world — are exempt, because the client reports the void as open water.
+// Pocket pruning waits until after dredging, like the rest of the pipeline.
+let collision = null;
+const verifiedCells = new Uint8Array(CW * CH);
+{
+  const text = await cached(seedCacheName(), seedUrl());
+  if (!text) {
+    console.log('  [warn] collision seed unavailable; grid is colour-only');
+  } else {
+    const seed = parseCollisionSeed(text);
+    console.log(`collision seed ${seed.version}: ${seed.chunks.size} chunks, ${seed.tiles.open} open / ${seed.tiles.blocked} blocked tiles`);
+    const isVoidCell = (cx, cy) => {
+      let n = 0;
+      for (let dy = 0; dy < CELL; dy++)
+        for (let dx = 0; dx < CELL; dx++) {
+          const x = cx * CELL + dx, y = cy * CELL + dy;
+          if (x >= W || y >= H) { n++; continue; }
+          const i = y * W + x;
+          if (!havePx[i] || isVoidColour(meanR[i], meanG[i], meanB[i])) n++;
+        }
+      return n * 8 >= CELL * CELL * 7;
+    };
+    const { stats, verified } = applyCollisionSeed({
+      cellClass, CW, CH, CELL, WX0, WY0, classes: CLASS_KEYS, walls: WALLS, seed, isVoidCell,
+      absorb: false, log: console.log,
+    });
+    verifiedCells.set(verified);
+    collision = {
+      source: 'Chart Plotter RuneLite plugin collision seed',
+      repo: SEED.repo, commit: SEED.commit, url: seedUrl(),
+      seedVersion: seed.version, license: SEED.license, copyright: SEED.copyright,
+      applied: new Date().toISOString().slice(0, 10),
+      cells: stats,
+    };
+  }
+}
+
 // Harbour dredging. The 2-tile clearance dilation can seal genuinely sailable
 // narrow approaches (Brimhaven's passage, the reef ring at Rainbow's End).
 // Boats demonstrably dock at every mooring point, so for each port cut off
@@ -748,8 +797,6 @@ const cellClass = new Uint8Array(CW * CH);
   // SAILABLE water only. Wall seas (eternal cold, sunbaked, ...) render on the
   // map but block routes, so water joined to the sea only through a wall is
   // landlocked for the pathfinder even though it looks connected here.
-  const WALLS = new Set(Object.entries(HAZARDS)
-    .filter(([, h]) => h.mode === 'wall').map(([k]) => classIndex[k]));
   const isSailable = i => cellClass[i] !== 0 && !WALLS.has(cellClass[i]);
   const mainComponent = () => {
     // largest 8-connected component of sailable water (walls stay comp -1)
@@ -875,14 +922,15 @@ const cellClass = new Uint8Array(CW * CH);
   }
 }
 
-// navcells.png — 1 px per cell, red = class index, rows top-down (north first)
+// navcells.png — 1 px per cell, red = class index, green = collision-verified,
+// rows top-down (north first)
 {
   const png = new PNG({ width: CW, height: CH });
   for (let cy = 0; cy < CH; cy++)
     for (let cx = 0; cx < CW; cx++) {
       const o = ((CH - 1 - cy) * CW + cx) * 4;
       png.data[o] = cellClass[cy * CW + cx];
-      png.data[o + 1] = 0; png.data[o + 2] = 0; png.data[o + 3] = 255;
+      png.data[o + 1] = verifiedCells[cy * CW + cx]; png.data[o + 2] = 0; png.data[o + 3] = 255;
     }
   writeFileSync(join(OUT, 'navcells.png'), PNG.sync.write(png));
 }
@@ -916,11 +964,13 @@ const cellClass = new Uint8Array(CW * CH);
 const naval = {
   generated: new Date().toISOString().slice(0, 10),
   mapVersion: MAP_VERSION,
-  attribution: 'Data and map imagery from the Old School RuneScape Wiki (oldschool.runescape.wiki), CC BY-NC-SA 3.0. Map imagery derives from Old School RuneScape, intellectual property of Jagex Limited, used under the terms of Jagex’s Fan Content Policy (legal.jagex.com); not endorsed by or affiliated with Jagex.',
+  attribution: 'Data and map imagery from the Old School RuneScape Wiki (oldschool.runescape.wiki), CC BY-NC-SA 3.0. Map imagery derives from Old School RuneScape, intellectual property of Jagex Limited, used under the terms of Jagex’s Fan Content Policy (legal.jagex.com); not endorsed by or affiliated with Jagex.'
+    + (collision ? ' Sea collision ground truth from the Chart Plotter RuneLite plugin by Dazuzi (github.com/Dazuzi/chart-plotter), BSD-2-Clause.' : ''),
   world: { x0: WX0, y0: WY0, x1: WX1, y1: WY1 },
   cell: CELL,
   grid: { w: CW, h: CH },
   classes: CLASS_KEYS,
+  collision,
   hazards: Object.fromEntries(Object.entries(HAZARDS).map(([k, h]) => [k, {
     name: h.name, mode: h.mode, gate: h.gate ?? null,
     sailing: h.sailing ?? null, construction: h.construction ?? null,

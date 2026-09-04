@@ -17,8 +17,9 @@
 #   A. Reclassify seas the colour classifier missed as land, by growing the
 #      main sea outward over land cells whose map.jpg colour matches nearby
 #      classified water (nearest-reference, per box). Growth starts from the
-#      main component only and never crosses wall seas, so it cannot open a
-#      passage the game doesn't have.
+#      main component only, never crosses wall seas, and never paints a cell
+#      the game client's collision data vouched for (navcells.png green
+#      channel), so it cannot open a passage the game doesn't have.
 #   B. Absorb landlocked water pockets into the wall sea that seals them off
 #      (or land when none does), so no snap can strand a route.
 #   C. Charting tasks with cave-plane coordinates (OSRS caves live at y+6400)
@@ -44,6 +45,9 @@ PASSABLE = [i for i, k in enumerate(CLASSES) if i and i not in WALL]
 img = np.asarray(Image.open(f'{ROOT}/navcells.png').convert('RGBA'))
 assert img.shape[:2] == (CH, CW)
 cls = img[::-1, :, 0].astype(np.uint8).copy()   # row 0 = south, as in the app
+# cells the game client's own collision data vouched for (scripts/lib/collision-seed.mjs);
+# the repairs below never repaint these
+verified = img[::-1, :, 1].astype(bool)
 
 # mean map colour per cell (map.jpg is 2 px/tile, so 8 px per 4-tile cell)
 mp = np.asarray(Image.open(f'{ROOT}/map.jpg').convert('RGB'), dtype=np.float32)
@@ -131,7 +135,7 @@ if REPAIR:
                     xx = x + dx
                     if xx < cx0 or xx >= cx1 or seen[yy, xx]: continue
                     seen[yy, xx] = True
-                    if cls[yy, xx] != 0 or landish[yy, xx]: continue
+                    if cls[yy, xx] != 0 or landish[yy, xx] or verified[yy, xx]: continue
                     ci, d = match(cellcol[yy, xx])
                     if d <= thr:
                         cls[yy, xx] = ci
@@ -188,7 +192,7 @@ if REPAIR:
         json.dump(nav, open(f'{ROOT}/naval.json', 'w'), separators=(',', ':'))
 
     out = np.zeros((CH, CW, 4), np.uint8)
-    out[:, :, 0] = cls[::-1]; out[:, :, 3] = 255
+    out[:, :, 0] = cls[::-1]; out[:, :, 1] = verified[::-1]; out[:, :, 3] = 255
     Image.fromarray(out).save(f'{ROOT}/navcells.png')
     print('wrote navcells.png\n')
 

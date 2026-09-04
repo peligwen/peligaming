@@ -80,11 +80,24 @@ Everything runs client-side in one HTML file — no backend, no build step.
   refresh just those blocks.
 - `navcells.png` is the navigation grid — one pixel per 4×4-tile cell, the
   red channel indexing thirteen water classes (open, stormy, reefs, fetid,
-  crystal, kelp, icy, plus impassable "wall" seas).
+  crystal, kelp, icy, plus impassable "wall" seas), the green channel marking
+  cells the game client's own collision data vouched for.
+- `scripts/lib/collision-seed.mjs` corrects the colour classifier against
+  that collision data: the [Chart Plotter](https://github.com/Dazuzi/chart-plotter)
+  RuneLite plugin captures the client's collision flags as its users sail and
+  ships the capture as a seed (BSD-2-Clause, see
+  [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). Wherever the seed is
+  certain it wins — map labels and over-eroded coastlines the classifier had
+  read as land become water, water it painted over solid rock becomes land —
+  under the same 2-tile clearance rule the classifier uses; the void beyond
+  the map edge, which the client reports as open, is exempt. The fetch
+  script applies it on every rebuild; `scripts/merge-collision-seed.mjs`
+  (`npm run data:collision`) re-applies it to the committed grid, for when
+  the seed's pinned commit is bumped.
 - `scripts/audit-naval-grid.py` audits the grid after a refresh (class
   histogram, connectivity, port snaps) and with `--repair` mends seas the
   colour classifier missed, absorbs landlocked pockets, and normalises
-  cave-plane coordinates.
+  cave-plane coordinates. It never repaints a collision-verified cell.
 - The app itself (`public/tools/runescape/naval-pathfinder.html`) loads the
   three data files and does snapping, A\* with per-class costs and gear
   gating, rendering and UI in vanilla JS on a canvas.
@@ -92,8 +105,9 @@ Everything runs client-side in one HTML file — no backend, no build step.
 To refresh the data after a game update:
 
 ```sh
-node scripts/fetch-naval-data.mjs        # rebuild map.jpg / navcells.png / naval.json
+node scripts/fetch-naval-data.mjs        # rebuild map.jpg / navcells.png / naval.json (applies the collision seed)
 python3 scripts/audit-naval-grid.py --repair   # deps: pip install pillow numpy
+node scripts/merge-collision-seed.mjs    # or re-apply just the collision seed (npm run data:collision)
 node scripts/fetch-courier-tasks.mjs     # or just the courier task pools (npm run data:courier)
 node scripts/fetch-ship-data.mjs         # or just ship parts & monster attacks (npm run data:ship)
 ```
@@ -216,7 +230,11 @@ Three kinds of things live here under different terms — see
   [Old School RuneScape Wiki](https://oldschool.runescape.wiki)
   (`naval.json`, `navcells.png`) is
   **[CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/)**,
-  the same license as the wiki content it comes from.
+  the same license as the wiki content it comes from. The navigation grid
+  is additionally corrected against the
+  [Chart Plotter](https://github.com/Dazuzi/chart-plotter) RuneLite plugin's
+  collision seed, **BSD-2-Clause** — notice in
+  [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - **Game imagery** (`map.jpg`, rendered from the game's world map) is the
   intellectual property of Jagex Limited, used non-commercially under
   [Jagex's Fan Content Policy](https://legal.jagex.com/docs/policies/fan-content-policy).

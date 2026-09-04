@@ -7,7 +7,8 @@
     "data:recipes": "node scripts/fetch-recipes.mjs",
     "data:courier": "node scripts/fetch-courier-tasks.mjs",
     "data:snapshot": "node scripts/capture-snapshot.mjs",
-    "data:ship": "node scripts/fetch-ship-data.mjs"
+    "data:ship": "node scripts/fetch-ship-data.mjs",
+    "data:collision": "node scripts/merge-collision-seed.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",
