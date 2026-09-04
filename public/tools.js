@@ -30,7 +30,7 @@ window.PELIGAMING = {
       tools: [
         {
           name: "Flip Desk",
-          description: "The Grand Exchange as it stands — a live market board with a job board that prices skilling work and ranks the cheapest xp; tap an item for its recommended flip orders.",
+          description: "The Grand Exchange week by week — what things are going for, how they're trending, and standing buy and sell orders priced to fill within a day of normal cycling; plus a job board that prices skilling work and ranks the cheapest xp.",
           path: "tools/runescape/flip-desk.html",
         },
         {

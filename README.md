@@ -140,7 +140,7 @@ next-best pick at each call when those aren't there.
 
 | Game | Tool | What it does |
 | --- | --- | --- |
-| RuneScape | Flip Desk | Live Grand Exchange market board, job board (skilling work priced by the market, or ranked by gp/xp for training), econ primer |
+| RuneScape | Flip Desk | The Grand Exchange as a day desk: weekly going rates and trends for every item, standing buy and sell orders priced to fill within a day of normal cycling, a job board (skilling work priced by the market, or ranked by gp/xp for training), econ primer |
 | RuneScape | Gielinor Crafting Web | Every craftable item as an explorable 3D recipe web, with per-skill xp lenses |
 | Fortnite | Tactical Terrain | The island in 3D — sightlines, dead ground, cover |
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
@@ -161,7 +161,30 @@ cache:
   hiscores under `/api/osrs/*`, so every visitor shares one polite edge cache
   and requests carry a descriptive User-Agent (the hiscores send no CORS
   headers, so the proxy is the only browser route in). No sign-in anywhere —
-  hiscores lookups are per-name and public.
+  hiscores lookups are per-name and public. Finished daily blocks
+  (`/24h?timestamp=`) never change, so the proxy holds each for a week.
+
+### The Flip Desk's day model
+
+The desk reads the week, not the minute. Every row's headline is the week's
+volume-weighted going rate over the last seven complete UTC days, from the
+wiki's bulk daily endpoint (seven cacheable requests for the whole exchange),
+with the trend, the week's range, and a typical day's after-tax spread beside
+it. Tap an item and the desk fetches its hourly tape for the last fortnight
+and prices two standing orders off it: for each of the last seven days, the
+cheapest price at which a standing buy could have filled your quantity (the
+day's hours sorted from the cheapest insta-sell average upward, accumulating
+half of each hour's flow as yours), and the dearest at which a standing sell
+could have; the orders are the prices that would have filled on all but one
+of those days (or every day, or all but two). A chart draws both lines across
+the week so you can see the cycle touch them, an hour-of-day profile says
+when the dips and peaks usually land, and a holdout check fits the same rule
+to the week before and reports how often it held on the week after.
+
+The pure model lives in `tools-src/runescape/day-model.js`;
+`npm run check:model [itemId] [qty]` prints its read on one item against the
+live API. `npm run data:snapshot` re-bakes the offline snapshot with the
+week's daily rows.
 
 ## Repository structure
 
