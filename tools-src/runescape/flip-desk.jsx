@@ -92,6 +92,12 @@ function withWeek(it, week) {
     todayVs: wk.rate > 0 ? ((mid - wk.rate) / wk.rate) * 100 : null,
   };
 }
+// the week's-range tooltip: today's price, and how far up the week's band it sits
+const rangeLabel = (it) => (it.rangeLo != null && it.rangeHi != null
+  ? `${fmtGp(it.mid)} today · ${it.rangePos != null && it.rangePos >= 0 && it.rangePos <= 1
+    ? Math.round(it.rangePos * 100) + "% of the way up"
+    : "outside"} the week's ${fmtGp(it.rangeLo)}–${fmtGp(it.rangeHi)} (left = the week's cheapest daily buy, right = its dearest daily sell)`
+  : "no weekly range");
 // a side's daily flow: the week's average, or the last hour scaled up when the week is silent
 const dayFlow = (it, side) => (side === "lo"
   ? (it.vLo7 > 0 ? it.vLo7 : it.hvLo * 24)
@@ -115,10 +121,11 @@ const rowToItem = (r) => {
 };
 const BASE_ITEMS = SNAPSHOT.items.map(rowToItem);
 
-/* board stats: the week's read on every row — what a limit's worth earns per
-   day cycle at the week's typical spread, gp through the book per day, and
-   where today's price sits in the week's range. The tape's own touch margin
-   rides along for the popup's "right now" strip. */
+/* board stats: the week's read on every row — the going rate, the units
+   through the book on a typical day and the gp they carry (units × rate: the
+   size of the river, and the board's default rank), and where today's price
+   sits in the week's range. The tape's own touch margin rides along for the
+   popup's "right now" strip. */
 function assess(it) {
   const tax = geTax(it.high, it.id);
   const margin = it.high - it.low - tax;
@@ -127,13 +134,10 @@ function assess(it) {
   const px = it.rate ?? mid;
   const units = it.dv7 > 0 ? it.dv7 : it.dv;
   const turnover = units * px;
-  // a limit's worth, capped by half the thinner side's daily flow; a book too
-  // quiet to hand a standing offer a couple of units a day has no day take —
-  // it can't fill the orders the popup would price, either
-  const lot = Math.min(it.limit, Math.floor(CAPTURE * Math.min(it.vLo7 || 0, it.vHi7 || 0)));
-  const dayTake = it.dayMargin != null && lot >= 2 ? it.dayMargin * lot : null;
   const rangePos = it.rangeHi > it.rangeLo ? (mid - it.rangeLo) / (it.rangeHi - it.rangeLo) : null;
-  return { ...it, tax, margin, roi, mid, turnover, lot, dayTake, rangePos, dev: it.dev ?? 0 };
+  // the index screen needs a real gap to judge: rows the guide doesn't cover carry null
+  const indexDev = it.official != null ? it.dev ?? 0 : null;
+  return { ...it, tax, margin, roi, mid, px, units, turnover, rangePos, indexDev, dev: it.dev ?? 0 };
 }
 
 /* ================= api citizenship =================
@@ -434,12 +438,43 @@ const CSS = `
 .ge-tog { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--white); cursor:pointer;
   user-select:none; white-space:nowrap; text-shadow:1px 1px 0 #000; }
 .ge-tog input { accent-color:var(--orange); width:15px; height:15px; }
-.ge-fslider { flex:1 1 150px; min-width:130px; max-width:210px; }
-.ge-fslider .fl { display:flex; justify-content:space-between; align-items:baseline; gap:8px;
-  font-size:10.5px; color:var(--tan); letter-spacing:.1em; text-transform:uppercase;
-  text-shadow:1px 1px 0 #000; margin-bottom:1px; cursor:help; }
-.ge-fslider .fl b { font-family:var(--mono); font-size:11.5px; color:var(--yellow); font-weight:600;
-  text-transform:none; letter-spacing:0; }
+
+/* screens — a min and a max on every column */
+.ge-active { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:9px; }
+.ge-achip { display:inline-flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11.5px; color:var(--yellow);
+  background:var(--inset); border:1px solid var(--edge); border-radius:2px; padding:3px 3px 3px 8px; box-shadow:inset 1px 1px 0 #1a1712; }
+.ge-achip > span { font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif; color:var(--tan); font-size:10.5px;
+  letter-spacing:.08em; text-transform:uppercase; text-shadow:1px 1px 0 #000; }
+.ge-achip button { font:inherit; font-size:11px; color:var(--tan); background:none; border:none; cursor:pointer; padding:1px 5px; line-height:1; }
+.ge-achip button:hover { color:var(--bad); }
+.ge-count { font-size:12px; color:var(--tan); margin-left:auto; text-shadow:1px 1px 0 #000; white-space:nowrap; }
+.ge-count b { color:var(--orange); font-family:var(--mono); }
+.ge-presets { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.ge-preset { font-family:inherit; font-size:12px; color:var(--tan); background:var(--inset2); border:1px solid var(--edge);
+  border-radius:12px; padding:3px 11px; cursor:pointer; text-shadow:1px 1px 0 #000; box-shadow:inset 1px 1px 0 #1a1712; }
+.ge-preset:hover { color:var(--yellow); }
+.ge-preset.on { color:var(--yellow); background:var(--stone-hi); border-color:#8a6f3d; box-shadow:inset 1px 1px 0 #6b5d45; }
+.ge-sgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:8px 20px; margin-top:12px; }
+.ge-screen .sl { display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:10.5px; color:var(--tan);
+  letter-spacing:.1em; text-transform:uppercase; text-shadow:1px 1px 0 #000; cursor:help; }
+.ge-screen .sl b { font-family:var(--mono); font-size:11.5px; color:var(--dark-tan); font-weight:600; text-transform:none; letter-spacing:0; }
+.ge-screen.on .sl { color:var(--orange); }
+.ge-screen.on .sl b { color:var(--yellow); }
+.ge-screen .row { display:flex; align-items:center; gap:6px; margin-top:2px; }
+.ge-screen .row input.ge-in { width:62px; flex:none; font-family:var(--mono); font-size:11.5px; padding:3px 5px; text-align:center; }
+.ge-dual { position:relative; flex:1; height:22px; min-width:80px; }
+.ge-dual .track { position:absolute; left:0; right:0; top:8px; height:6px; border-radius:2px; background:var(--inset2); border:1px solid var(--edge); }
+.ge-dual .fill { position:absolute; top:8px; height:6px; background:var(--orange); opacity:.5; border-radius:2px; pointer-events:none; }
+.ge-dual input[type=range] { position:absolute; left:0; top:0; width:100%; height:22px; margin:0; -webkit-appearance:none; appearance:none;
+  background:transparent; pointer-events:none; cursor:pointer; }
+.ge-dual input[type=range]:focus-visible { outline:none; }
+.ge-dual input[type=range]::-webkit-slider-runnable-track { height:6px; background:transparent; border:none; }
+.ge-dual input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; pointer-events:auto; width:14px; height:14px; border-radius:2px; margin-top:-4px;
+  background:linear-gradient(180deg,#ffd06a,var(--orange) 60%,#b06510); border:1px solid var(--edge); box-shadow:0 1px 3px rgba(0,0,0,.6); }
+.ge-dual input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 2px var(--yellow); }
+.ge-dual input[type=range]::-moz-range-track { height:6px; background:transparent; border:none; }
+.ge-dual input[type=range]::-moz-range-thumb { pointer-events:auto; width:13px; height:13px; border-radius:2px; background:var(--orange); border:1px solid var(--edge); }
+.ge-dual input[type=range]:focus-visible::-moz-range-thumb { box-shadow:0 0 0 2px var(--yellow); }
 
 /* the board */
 .ge-tablewrap { overflow:auto; max-height:calc(100vh - 130px); }
@@ -448,8 +483,8 @@ const CSS = `
 .ge-tablewrap::-webkit-scrollbar-thumb { background:var(--stone); border:1px solid var(--edge); }
 table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820px; }
 .ge-t thead th { position:sticky; top:0; z-index:2; background:var(--stone); color:var(--orange);
-  font-weight:600; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; text-align:right;
-  padding:8px 7px; border-bottom:2px solid var(--edge); cursor:pointer; white-space:nowrap;
+  font-weight:600; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; text-align:right;
+  padding:8px 5px; border-bottom:2px solid var(--edge); cursor:pointer; white-space:nowrap;
   text-shadow:1px 1px 0 #000; box-shadow:inset 0 1px 0 var(--stone-hi); }
 .ge-t thead th:first-child { text-align:left; left:0; z-index:3; }
 /* the item column stays put while the board scrolls sideways — a row should
@@ -458,14 +493,14 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 .ge-t tbody tr:hover td:first-child { background:#332c22; }
 .ge-t thead th.on { color:var(--yellow); }
 .ge-t thead th .arr { font-size:9px; margin-left:3px; }
-.ge-t tbody td { padding:6px 7px; text-align:right; font-family:var(--mono); font-size:12.5px;
+.ge-t tbody td { padding:6px 5px; text-align:right; font-family:var(--mono); font-size:12.5px;
   border-bottom:1px solid #221d16; white-space:nowrap; }
 .ge-t tbody td:first-child { text-align:left; font-family:inherit; font-size:13px; }
 .ge-t tbody tr { cursor:pointer; }
 .ge-t tbody tr:hover { background:#332c22; }
 .ge-t tbody tr:hover td:first-child .nm { color:var(--yellow); }
 /* a long name truncates so its flags and the rest of the row stay in view; the cell's title carries it whole */
-.ge-t .nm { color:var(--white); text-shadow:1px 1px 0 #000; display:inline-block; max-width:160px; overflow:hidden;
+.ge-t .nm { color:var(--white); text-shadow:1px 1px 0 #000; display:inline-block; max-width:150px; overflow:hidden;
   text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
 .ge-t .good { color:var(--good); } .ge-t .bad { color:var(--bad); } .ge-t .warn { color:var(--warn); }
 .ge-t .mut { color:var(--tan); } .ge-t .gold { color:var(--orange); }
@@ -510,6 +545,9 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 .ge-order .fill { font-size:12.5px; margin-top:6px; font-family:var(--mono); }
 .ge-order .fill b { font-weight:600; }
 .ge-order .fill .good { color:var(--good); } .ge-order .fill .warn { color:var(--warn); } .ge-order .fill .bad { color:var(--bad); }
+.ge-order .vs { font-size:12px; margin-top:4px; font-family:var(--mono); color:var(--tan); }
+.ge-order .vs b { font-weight:600; color:var(--white); }
+.ge-order .vs b.good { color:var(--good); } .ge-order .vs b.warn { color:var(--warn); }
 .ge-order .sub { font-size:11px; color:var(--dark-tan); margin-top:4px; line-height:1.4; }
 
 /* margin slider */
@@ -517,14 +555,6 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 .ge-slider .lab { display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;
   font-size:12px; color:var(--tan); margin-bottom:6px; text-shadow:1px 1px 0 #000; }
 .ge-slider .lab b { font-family:var(--mono); font-size:14px; color:var(--yellow); font-weight:600; }
-input.ge-range { -webkit-appearance:none; appearance:none; width:100%; height:20px; background:transparent; cursor:pointer; margin:0; display:block; }
-input.ge-range::-webkit-slider-runnable-track { height:6px; border-radius:2px; background:var(--inset2); border:1px solid var(--edge); }
-input.ge-range::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:2px; margin-top:-6px;
-  background:linear-gradient(180deg,#ffd06a,var(--orange) 60%,#b06510); border:1px solid var(--edge); box-shadow:0 1px 3px rgba(0,0,0,.6); }
-input.ge-range::-moz-range-track { height:6px; border-radius:2px; background:var(--inset2); border:1px solid var(--edge); }
-input.ge-range::-moz-range-thumb { width:15px; height:15px; border-radius:2px; background:var(--orange); border:1px solid var(--edge); }
-input.ge-range:disabled { opacity:.4; cursor:default; }
-.ge-ends { display:flex; justify-content:space-between; font-size:10.5px; color:var(--dark-tan); margin-top:3px; }
 .ge-hint { font-size:11.5px; color:var(--tan); margin-top:7px; line-height:1.45; }
 
 /* qty + summary */
@@ -536,6 +566,7 @@ input.ge-range:disabled { opacity:.4; cursor:default; }
   letter-spacing:.1em; text-transform:uppercase; margin-bottom:2px; text-shadow:1px 1px 0 #000; }
 .ge-sumrow div b { font-weight:600; color:var(--white); }
 .ge-sumrow .good { color:var(--good); } .ge-sumrow .bad { color:var(--bad); } .ge-sumrow .gold { color:var(--orange); }
+.ge-sumrow div b span { font-size:inherit; display:inline; margin:0; text-transform:none; letter-spacing:0; font-family:inherit; }
 .ge-note { font-size:11.5px; color:var(--tan); line-height:1.5; margin:8px 0 0; }
 .ge-note.caution { color:#f1c286; }
 .ge-link { color:var(--orange); text-decoration:none; border-bottom:1px dotted var(--orange); font-size:12px; }
@@ -604,6 +635,8 @@ input.ge-range:disabled { opacity:.4; cursor:default; }
 /* the week, on the board and in the popup */
 .ge-t .ge-spark { vertical-align:middle; margin-left:6px; }
 .ge-t td.rng { padding-top:3px; padding-bottom:3px; }
+.ge-rng { display:inline-flex; align-items:center; gap:4px; cursor:help; }
+.ge-rng small { font-size:10.5px; color:var(--dark-tan); }
 .ge-week { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px 16px; padding:10px 12px; margin-bottom:12px;
   font-family:var(--mono); font-size:13.5px; }
 .ge-week div { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
@@ -687,10 +720,13 @@ function ItemPopup({ it, status, onClose }) {
   const back = o?.sell != null ? q * (o.sell - o.tax) : null;
   const profit = o?.margin != null ? q * o.margin : null;
   const units = it.dv7 > 0 ? it.dv7 : it.dv;
+  // each order against the week's going rate: how far under market the buy
+  // sits, how far over it the sell — the desk's edge, as a percentage
+  const rate = it.rate ?? it.mid;
+  const vsRate = (p) => (p != null && rate > 0 ? ((p - rate) / rate) * 100 : null);
+  const buyVs = vsRate(o?.buy), sellVs = vsRate(o?.sell);
   const tc = trendClass(it.trend);
-  const weekLabel = it.rangeLo != null && it.rangeHi != null
-    ? `${fmtGp(it.mid)} · ${it.rangePos != null ? Math.round(clamp(it.rangePos, 0, 1) * 100) + "% of the way up" : "outside"} the week's ${fmtGp(it.rangeLo)}–${fmtGp(it.rangeHi)}`
-    : "no weekly range";
+  const weekLabel = rangeLabel(it);
 
   return (
     <div className="ge-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -711,8 +747,8 @@ function ItemPopup({ it, status, onClose }) {
 
           {/* the week */}
           <div className="ge-week ge-inset">
-            <div><span>Going rate</span><b>{fmtGp(it.rate ?? it.mid)}</b><small>{it.rate != null ? `${it.nDays}-day average` : "today only"}</small></div>
-            <div><span>This week</span><b>{it.rangeLo != null ? `${fmtGp(it.rangeLo)} – ${fmtGp(it.rangeHi)}` : "–"}</b></div>
+            <div><span>Going rate</span><b>{fmtGp(rate)}</b><small>{it.rate != null ? `${it.nDays}-day average` : "today only"}</small></div>
+            <div><span>Week's range</span><b>{it.rangeLo != null ? `${fmtGp(it.rangeLo)} – ${fmtGp(it.rangeHi)}` : "–"}</b></div>
             <div><span>Trend</span><b className={tc}>{fmtDev(it.trend)}</b><Sparkline points={it.mids || []} className={"ge-spark " + tc} /></div>
             <div><span>Today</span><b>{fmtGp(it.mid)}</b><RangeBar lo={it.rangeLo} hi={it.rangeHi} now={it.mid} label={weekLabel} /><small className={devClass(it.todayVs)}>{fmtDev(it.todayVs)} vs week</small></div>
           </div>
@@ -733,6 +769,7 @@ function ItemPopup({ it, status, onClose }) {
                 {o.buy != null ? <>
                   <div className="p">{fmtFull(o.buy)} <span>gp each × {fmtFull(q)}</span></div>
                   <div className="fill">filled on <b className={hitClass(m.buyHits, m.n)}>{m.buyHits} of {m.n}</b> days</div>
+                  <div className="vs"><b className={buyVs <= 0 ? "good" : "warn"}>{fmtDev(buyVs)}</b> vs the going rate of <b>{fmtGp(rate)}</b></div>
                   <div className="sub">
                     On each of those days at least {fmtFull(q)} insta-sold at or below this price, counting half the
                     flow as yours. Last insta-sell {agoStr(it.staleLo)}.
@@ -748,6 +785,7 @@ function ItemPopup({ it, status, onClose }) {
                 {o.sell != null ? <>
                   <div className="p">{fmtFull(o.sell)} <span>gp each × {fmtFull(q)}</span></div>
                   <div className="fill">filled on <b className={hitClass(m.sellHits, m.n)}>{m.sellHits} of {m.n}</b> days</div>
+                  <div className="vs"><b className={sellVs >= 0 ? "good" : "warn"}>{fmtDev(sellVs)}</b> vs the going rate of <b>{fmtGp(rate)}</b></div>
                   <div className="sub">
                     {o.tax > 0 ? <>GE tax takes {fmtFull(o.tax)} gp each. </> : null}
                     On each of those days at least {fmtFull(q)} insta-bought at or above this price, counting half the
@@ -793,12 +831,13 @@ function ItemPopup({ it, status, onClose }) {
               <div><span>You lay out</span><b>{cost != null ? fmtGp(cost) + " gp" : "—"}</b></div>
               <div><span>Back after tax</span><b>{back != null ? fmtGp(back) + " gp" : "—"}</b></div>
               <div><span>Profit</span><b className={profit == null ? "" : profit > 0 ? "good" : "bad"}>{profit == null ? "—" : (profit > 0 ? "+" : "") + fmtGp(profit) + " gp"}</b></div>
+              <div><span>Vs going rate</span><b><span className={buyVs <= 0 ? "good" : "bad"}>{fmtDev(buyVs)}</span> / <span className={sellVs >= 0 ? "good" : "bad"}>{fmtDev(sellVs)}</span></b></div>
               <div><span>Round trip</span><b className="gold">≈ 2 days</b></div>
             </div>
 
             {/* the week's cycle, with the orders drawn across it */}
             <div className="ge-chart ge-inset">
-              <CycleChart days={m.week} buy={o.buy} sell={o.sell} buyDays={o.buyDays} sellDays={o.sellDays} fmt={fmtGp} />
+              <CycleChart days={m.week} buy={o.buy} sell={o.sell} rate={it.rate} buyDays={o.buyDays} sellDays={o.sellDays} fmt={fmtGp} />
             </div>
 
             {/* time of day */}
@@ -1616,18 +1655,21 @@ function Econ101() {
         <h3>Reading this board</h3>
         <ul>
           <li><b>Going rate</b> is the week's volume-weighted average — what the item actually went for, over
-            the last seven complete days. <b>Today</b> is the current hour against it, and <b>This week</b> shows
-            where today sits between the week's lowest daily buy and highest daily sell: near the bottom is a
-            cheap day, near the top a dear one.</li>
+            the last seven complete days. <b>Today</b> is the current hour against it, and <b>Week's range</b> draws
+            the week's lowest daily buy and highest daily sell as a bar with today's price pinned between them: a pin
+            at the left end is a cheap day, at the right a dear one, and a hollow ring at either end means today has
+            broken out of the week's band.</li>
           <li><b>7d trend</b> is a line fitted through the daily averages, and the sparkline is the week itself.
             Flat, steady prices are the day flipper's friend; a strong trend means last week's dips or peaks
             may not come back, and the popup says which side that hurts.</li>
-          <li><b>Day margin</b> is a typical day's gap between what sellers got and what buyers paid, after tax.
-            <b>Day take</b> is that margin on a limit's worth, capped by half the thinner side's daily flow —
-            what one day cycle of the item is worth to a desk, and the board's default rank.</li>
-          <li><b>Gp moved/day</b> is daily volume × the going rate — the size of the river. A big number is a
-            deep, honest market that can absorb real size; a small one means every other number on the row
-            is fragile.</li>
+          <li><b>Day margin</b> is a typical day's gap between what sellers got and what buyers paid, after tax,
+            and <b>ROI</b> is that margin against the buy side's going rate.</li>
+          <li><b>Gp moved/day</b> is daily volume × the going rate — the size of the river, and the board's
+            default rank. A big number is a deep, honest market that can absorb real size; a small one means every
+            other number on the row is fragile. <b>Traded/day</b> is the same river counted in units.</li>
+          <li><b>Screens</b> put a min and a max on any column — type them in the desk's shorthand or drag the
+            two handles. The presets are saved screens (deep books, steady prices, a cheap day), every active screen
+            is a chip that clears with a click, and a bounded screen drops rows that have no number for it.</li>
           <li><b>The day orders</b> in the popup are read straight off the last week of hourly trading. For each
             day, the cheapest price at which a standing buy could have filled your quantity, and the dearest a
             standing sell could have; the orders are the prices that would have filled on all but one of those
@@ -1648,43 +1690,146 @@ function Econ101() {
   );
 }
 
-/* ================= filters ================= */
-// slider screens — each parks at one end meaning "any" so the board stays
-// unfiltered until the player reaches for the dial
-const ROI_ANY = 0;     // min day ROI %: 0 = any
-const TODAY_ANY = 10;  // max |today vs week| %: 10 = any
-const DEV_ANY = 25;    // max |vs official index| %: 25 = any
+/* ================= screens =================
+   One way to narrow the board: every numeric column takes a min and a max,
+   typed in the desk's own shorthand ("1.5k", "20m", "-3") or dragged on a
+   two-handled slider. A screen with neither end set is "any" and costs
+   nothing; once bounded, a row with no number for it falls out — it can't
+   show what's being asked of it. Gp and volume screens run on a log scale
+   (the exchange spans feathers to bonds), the percentage screens linear.
+   Presets are just saved screens, and every active screen is a chip that
+   clears with one click. */
 
-function FilterSlider({ label, value, min, max, step, onChange, display, title }) {
+// "1.5k", "2m", "0.5b", "1,200", "-3", "+2.5%" → a number; blank or garbage → null
+const parseNum = (str) => {
+  const t = String(str ?? "").trim().toLowerCase().replace(/[,\s]|gp|%/g, "");
+  const m = /^\+?(-?\d*\.?\d+)([kmb])?$/.exec(t);
+  return m ? +m[1] * ({ k: 1e3, m: 1e6, b: 1e9 }[m[2]] || 1) : null;
+};
+const fmtPct = (v) => String(+v.toFixed(1));
+const fmtSigned = (v) => (v > 0 ? "+" : "") + fmtPct(v);
+// a bound reads as a round number: "10m", not "10.0m"
+const fmtRound = (v) => fmtGp(v).replace(/(\.\d*?)0+(?=[kmb]$)/, "$1").replace(/\.(?=[kmb]$)/, "");
+const fmtRoundQty = (v) => fmtQty(v).replace(/(\.\d*?)0+(?=[kmb]$)/, "$1").replace(/\.(?=[kmb]$)/, "");
+// a screen's bound in words: "1.5k gp", "+2.5%", "10k"
+const withUnit = (def, v) => def.fmt(v) + (def.unit === "%" ? "%" : def.unit ? " " + def.unit : "");
+const boundsText = (def, b) => {
+  const lo = b?.min != null, hi = b?.max != null;
+  if (lo && hi) return `${withUnit(def, b.min)} – ${withUnit(def, b.max)}`;
+  if (lo) return `≥ ${withUnit(def, b.min)}`;
+  if (hi) return `≤ ${withUnit(def, b.max)}`;
+  return "any";
+};
+
+const SCREENS = [
+  { k: "price", label: "Going rate", unit: "gp", scale: "log", lo: 1, hi: 2e9, fmt: fmtRound, get: (it) => it.px,
+    title: "The week's volume-weighted average price. Under 50 gp pays no GE tax." },
+  { k: "gp", label: "Gp moved/day", unit: "gp", scale: "log", lo: 1e3, hi: 1e12, fmt: fmtRound, get: (it) => it.turnover,
+    title: "Daily units traded × the going rate — the size of the river. Screen high for books that can absorb real size." },
+  { k: "units", label: "Traded/day", unit: "", scale: "log", lo: 1, hi: 1e8, fmt: fmtRoundQty, get: (it) => it.units,
+    title: "Units through the book on a typical day of the week." },
+  { k: "margin", label: "Day margin", unit: "gp", scale: "log", lo: 1, hi: 1e7, fmt: fmtRound, get: (it) => it.dayMargin,
+    title: "A typical day's gap between the buy side and the sell side, after tax, per item. A minimum of 1 gp is \"in profit\"." },
+  { k: "roi", label: "ROI", unit: "%", scale: "lin", lo: -5, hi: 30, step: 0.5, fmt: fmtPct, get: (it) => it.dayRoi,
+    title: "Day margin as a return on the buy side's going rate." },
+  { k: "trend", label: "7d trend", unit: "%", scale: "lin", lo: -30, hi: 30, step: 1, fmt: fmtSigned, get: (it) => it.trend,
+    title: "Change across the week, from a line fitted through the daily averages. Keep it within a few percent either side for steady prices." },
+  { k: "today", label: "Today vs week", unit: "%", scale: "lin", lo: -20, hi: 20, step: 0.5, fmt: fmtSigned, get: (it) => it.todayVs,
+    title: "How far today's price sits from the week's going rate. Cap it below zero for items on a cheap day, floor it above zero for a dear one." },
+  { k: "dev", label: "Vs index", unit: "%", scale: "lin", lo: -30, hi: 30, step: 1, fmt: fmtSigned, get: (it) => it.indexDev,
+    title: "How far the week's real trades sit from the official guide index. Bounding this also hides items the index doesn't cover." },
+  { k: "limit", label: "Limit/4h", unit: "", scale: "log", lo: 1, hi: 1e5, fmt: fmtRoundQty, get: (it) => it.limit,
+    title: "The 4-hour buy limit — the most of the item one account can buy per window." },
+];
+const PRESETS = [
+  { k: "deep", label: "Deep books", hint: "Books moving 10m+ gp and 10k+ units a day — size fills without moving them.", set: { gp: { min: 1e7 }, units: { min: 1e4 } } },
+  { k: "profit", label: "In profit", hint: "A positive day margin after tax.", set: { margin: { min: 1 } } },
+  { k: "fat", label: "Fat margins", hint: "A day ROI of 3% or better.", set: { roi: { min: 3 } } },
+  { k: "steady", label: "Steady", hint: "Trend and today both within ±2% of the week — prices holding their level.", set: { trend: { min: -2, max: 2 }, today: { min: -2, max: 2 } } },
+  { k: "cheap", label: "Cheap today", hint: "Today sits 2% or more below the week's going rate.", set: { today: { max: -2 } } },
+  { k: "penny", label: "Penny stocks", hint: "Under 50 gp — no GE tax on the sale.", set: { price: { max: 49 } } },
+  { k: "big", label: "Big tickets", hint: "1m gp and up.", set: { price: { min: 1e6 } } },
+  { k: "honest", label: "Tracks the index", hint: "The week's trades within ±5% of the official guide price — a feed the index agrees with.", set: { dev: { min: -5, max: 5 } } },
+];
+const normBounds = (b) => ({ min: b?.min ?? null, max: b?.max ?? null });
+const presetOn = (pr, screens) => Object.entries(pr.set).every(([k, b]) => {
+  const cur = normBounds(screens[k]), want = normBounds(b);
+  return cur.min === want.min && cur.max === want.max;
+});
+
+/* slider stops: every step of a linear screen; round numbers through each
+   decade of a log one (1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8 × 10ⁿ). A handle
+   only ever lands on a stop, so dragging and the arrow keys never fight the
+   rounding — the text boxes take anything exact. */
+const NICE = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
+const buildTicks = ({ scale, lo, hi, step = 1 }) => {
+  const out = [];
+  if (scale === "log") {
+    for (let e = Math.floor(Math.log10(lo)); ; e++) {
+      for (const m of NICE) {
+        const v = +(m * 10 ** e).toPrecision(3);
+        if (v < lo) continue;
+        if (v > hi) return out;
+        out.push(v);
+      }
+    }
+  }
+  for (let v = lo; v <= hi + step * 1e-6; v += step) out.push(+v.toFixed(4));
+  return out;
+};
+for (const d of SCREENS) d.ticks = buildTicks(d);
+// the stop nearest a value — where a typed bound's handle sits
+const nearestTick = ({ ticks, scale }, v) => {
+  if (scale === "log" && !(v > 0)) return 0;
+  const dist = scale === "log" ? (a, b) => Math.abs(Math.log(a) - Math.log(b)) : (a, b) => Math.abs(a - b);
+  let best = 0;
+  for (let i = 1; i < ticks.length; i++) if (dist(ticks[i], v) < dist(ticks[best], v)) best = i;
+  return best;
+};
+
+// one typed bound: draft while focused, the formatted value otherwise
+function BoundInput({ value, fmt, placeholder, label, onCommit }) {
+  const [draft, setDraft] = useState(null);
+  const commit = () => { if (draft != null) { onCommit(parseNum(draft)); setDraft(null); } };
   return (
-    <div className="ge-fslider">
-      <span className="fl" title={title}>{label} <b>{display}</b></span>
-      <input className="ge-range" type="range" min={min} max={max} step={step}
-        value={value} onChange={(e) => onChange(+e.target.value)}
-        aria-label={label + " filter"} title={title} />
-    </div>
+    <input className="ge-in" type="text" inputMode="decimal" placeholder={placeholder} aria-label={label}
+      value={draft ?? (value == null ? "" : fmt(value))}
+      onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") { commit(); e.currentTarget.blur(); } else if (e.key === "Escape") setDraft(null); }} />
   );
 }
 
-const BANDS = [
-  { k: "any", label: "Any price", lo: 0, hi: Infinity },
-  { k: "p1", label: "Under 100 gp", lo: 0, hi: 100 },
-  { k: "p2", label: "100 gp – 10k", lo: 100, hi: 10_000 },
-  { k: "p3", label: "10k – 1m", lo: 10_000, hi: 1_000_000 },
-  { k: "p4", label: "Over 1m", lo: 1_000_000, hi: Infinity },
-];
-const VOLS = [
-  { k: "any", label: "Any volume", min: 0 },
-  { k: "v1", label: "10k+ traded/day", min: 10_000 },
-  { k: "v2", label: "100k+ traded/day", min: 100_000 },
-  { k: "v3", label: "1m+ traded/day", min: 1_000_000 },
-];
-const TRENDS = [
-  { k: "any", label: "Any trend" },
-  { k: "up", label: "Rising this week" },
-  { k: "flat", label: "Steady this week" },
-  { k: "down", label: "Falling this week" },
-];
+// a screen: label + current bounds, then min box, two-handled slider, max box
+function ScreenRange({ def, val, onChange }) {
+  const { label, fmt, title, ticks } = def;
+  const last = ticks.length - 1;
+  const min = val?.min ?? null, max = val?.max ?? null;
+  const minPos = min == null ? 0 : nearestTick(def, min);
+  const maxPos = max == null ? last : nearestTick(def, max);
+  // the slider's ends mean "any"; a handle dragged into the other never crosses it
+  const dragMin = (p) => onChange({ min: p <= 0 ? null : ticks[Math.min(p, maxPos)], max });
+  const dragMax = (p) => onChange({ min, max: p >= last ? null : ticks[Math.max(p, minPos)] });
+  const on = min != null || max != null;
+  // when both handles meet at an end, the one that can still move sits on top
+  const minOnTop = minPos > last / 2;
+  return (
+    <div className={"ge-screen" + (on ? " on" : "")}>
+      <div className="sl" title={title}><span>{label}</span><b>{boundsText(def, val)}</b></div>
+      <div className="row">
+        <BoundInput value={min} fmt={fmt} placeholder="min" label={label + " minimum"} onCommit={(v) => onChange({ min: v, max })} />
+        <div className="ge-dual">
+          <div className="track" />
+          <div className="fill" style={{ left: `${(minPos / last) * 100}%`, right: `${100 - (maxPos / last) * 100}%` }} />
+          <input type="range" min={0} max={last} step={1} value={minPos} onChange={(e) => dragMin(+e.target.value)}
+            aria-label={label + " minimum"} style={{ zIndex: minOnTop ? 3 : 2 }} />
+          <input type="range" min={0} max={last} step={1} value={maxPos} onChange={(e) => dragMax(+e.target.value)}
+            aria-label={label + " maximum"} style={{ zIndex: minOnTop ? 2 : 3 }} />
+        </div>
+        <BoundInput value={max} fmt={fmt} placeholder="max" label={label + " maximum"} onCommit={(v) => onChange({ min, max: v })} />
+      </div>
+    </div>
+  );
+}
 
 /* ================= app ================= */
 export default function FlipDesk() {
@@ -1694,15 +1839,24 @@ export default function FlipDesk() {
   const [, setTick] = useState(0);                 // periodic re-render for the age chip
 
   const [search, setSearch] = useState("");
-  const [band, setBand] = useState("any");
-  const [minVol, setMinVol] = useState("any");
-  const [trendF, setTrendF] = useState("any");
   const [f2pOnly, setF2pOnly] = useState(false);
-  const [profOnly, setProfOnly] = useState(false);
-  const [minRoi, setMinRoi] = useState(ROI_ANY);
-  const [maxToday, setMaxToday] = useState(TODAY_ANY);
-  const [maxDev, setMaxDev] = useState(DEV_ANY);
-  const [sortKey, setSortKey] = useState("dayTake");
+  const [screens, setScreens] = useState({});  // screen key -> {min, max}; absent = any
+  const [screensOpen, setScreensOpen] = useState(() => {
+    try { return localStorage.getItem("fd:screens-open") !== "0"; } catch (e) { return true; }
+  });
+  useEffect(() => { try { localStorage.setItem("fd:screens-open", screensOpen ? "1" : "0"); } catch (e) {} }, [screensOpen]);
+  const setScreen = useCallback((k, b) => setScreens((cur) => {
+    const next = { ...cur };
+    if (!b || (b.min == null && b.max == null)) delete next[k]; else next[k] = { min: b.min ?? null, max: b.max ?? null };
+    return next;
+  }), []);
+  const togglePreset = (pr) => setScreens((cur) => {
+    const next = { ...cur };
+    if (presetOn(pr, cur)) for (const k of Object.keys(pr.set)) delete next[k];
+    else for (const [k, b] of Object.entries(pr.set)) next[k] = normBounds(b);
+    return next;
+  });
+  const [sortKey, setSortKey] = useState("turnover");
   const [sortDir, setSortDir] = useState(-1);
   const [selId, setSelId] = useState(null);
   const [view, setView] = useState("market"); // market | jobs | econ
@@ -1735,28 +1889,24 @@ export default function FlipDesk() {
 
   const assessed = useMemo(() => (live?.items ?? BASE_ITEMS).map(assess), [live]);
 
+  const activeScreens = useMemo(() => SCREENS.filter((d) => screens[d.k]), [screens]);
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const b = BANDS.find((x) => x.k === band) || BANDS[0];
-    const v = VOLS.find((x) => x.k === minVol) || VOLS[0];
     return assessed.filter((it) => {
-      const px = it.rate ?? it.mid;
-      const units = it.dv7 > 0 ? it.dv7 : it.dv;
-      return px >= b.lo && px < b.hi &&
-        units >= v.min &&
-        (trendF === "any" || (trendF === "up" ? it.trend > 1 : trendF === "down" ? it.trend < -1 : it.trend != null && Math.abs(it.trend) <= 1)) &&
-        (!f2pOnly || !it.members) &&
-        (!profOnly || it.dayMargin > 0) &&
-        (minRoi <= ROI_ANY || it.dayRoi >= minRoi) &&
-        // steadiness: how far today's price may sit from the week's going rate
-        // (rows with no week carry null and pass — the thin-week flag covers them)
-        (maxToday >= TODAY_ANY || it.todayVs == null || Math.abs(it.todayVs) <= maxToday) &&
-        // tightening the index screen also drops rows the guide doesn't cover —
-        // they can't demonstrate closeness to an index they don't have
-        (maxDev >= DEV_ANY || (it.official != null && Math.abs(it.dev) <= maxDev)) &&
-        (!q || it.name.toLowerCase().includes(q));
+      if (f2pOnly && it.members) return false;
+      if (q && !it.name.toLowerCase().includes(q)) return false;
+      for (const d of activeScreens) {
+        // a bounded screen drops rows with no number for it — no week, no
+        // guide price — they can't show what's being asked
+        const v = d.get(it);
+        if (v == null || Number.isNaN(v)) return false;
+        const b = screens[d.k];
+        if (b.min != null && v < b.min) return false;
+        if (b.max != null && v > b.max) return false;
+      }
+      return true;
     });
-  }, [assessed, search, band, minVol, trendF, f2pOnly, profOnly, minRoi, maxToday, maxDev]);
+  }, [assessed, search, f2pOnly, screens, activeScreens]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -1789,8 +1939,10 @@ export default function FlipDesk() {
   const weekSpan = weekDays.length ? `${fmtDay(weekDays[0])} – ${fmtDay(weekDays[weekDays.length - 1])}` : null;
   const SHOW = 400;
   const SORT_NOTE = {
-    dayTake: "Ranked by day take — what a limit's worth earns per day cycle at the week's typical spread",
-    turnover: "Ranked by gp moved/day — the deepest books, not the fattest margins",
+    turnover: "Ranked by gp moved/day — the deepest books first, not the fattest margins",
+    units: "Ranked by units traded per day",
+    dayMargin: "Ranked by day margin — the fattest after-tax gap per item first",
+    dayRoi: "Ranked by day ROI — the fattest margin for the gp laid out first",
     rangePos: sortDir === 1 ? "Ranked by where today sits in the week — the cheapest first" : "Ranked by where today sits in the week — the dearest first",
     trend: sortDir === -1 ? "Ranked by the week's trend — strongest risers first" : "Ranked by the week's trend — steepest fallers first",
   };
@@ -1842,42 +1994,51 @@ export default function FlipDesk() {
         <p className="ge-read">
           <b>{assessed.length.toLocaleString()}</b> items on the exchange
           {weekSpan && <> · the week of <b>{weekSpan}</b></>}
-          {filtered.length !== assessed.length && <> · <b>{filtered.length.toLocaleString()}</b> match your filters</>}
+          {filtered.length !== assessed.length && <> · <b>{filtered.length.toLocaleString()}</b> make it through your screens</>}
           {hiddenN > 0 && <> · {hiddenN.toLocaleString()} unpriceable books set aside (no market, crossed or dislocated)</>}
           {" "}· tap an item for its day orders.
           {SORT_NOTE[sortKey] && <> {SORT_NOTE[sortKey]}; click any column to re-rank.</>}
         </p>
 
-        {/* filters */}
-        <section className="ge-panel">
+        {/* screens */}
+        <section className="ge-panel ge-screens">
           <div className="ge-filters">
             <div className="grow">
               <input className="ge-in" placeholder="Search the exchange… e.g. rune, shark, whip" value={search}
                 onChange={(e) => setSearch(e.target.value)} aria-label="Search items" />
             </div>
-            <select className="ge-sel" value={band} onChange={(e) => setBand(e.target.value)} aria-label="Price bracket">
-              {BANDS.map((b) => <option key={b.k} value={b.k}>{b.label}</option>)}
-            </select>
-            <select className="ge-sel" value={minVol} onChange={(e) => setMinVol(e.target.value)} aria-label="Minimum daily volume">
-              {VOLS.map((v) => <option key={v.k} value={v.k}>{v.label}</option>)}
-            </select>
-            <select className="ge-sel" value={trendF} onChange={(e) => setTrendF(e.target.value)} aria-label="Weekly trend">
-              {TRENDS.map((t) => <option key={t.k} value={t.k}>{t.label}</option>)}
-            </select>
             <label className="ge-tog"><input type="checkbox" checked={f2pOnly} onChange={(e) => setF2pOnly(e.target.checked)} />F2P only</label>
-            <label className="ge-tog"><input type="checkbox" checked={profOnly} onChange={(e) => setProfOnly(e.target.checked)} />in profit</label>
+            <button className="ge-btn" onClick={() => setScreensOpen((o) => !o)} aria-expanded={screensOpen}
+              title="A min and a max on every column — type them or drag the handles">
+              {screensOpen ? "▴ Hide screens" : "▾ Screens"}{activeScreens.length > 0 && !screensOpen ? ` (${activeScreens.length})` : ""}
+            </button>
+            <button className="ge-btn" onClick={() => { setScreens({}); setF2pOnly(false); setSearch(""); }}
+              disabled={activeScreens.length === 0 && !f2pOnly && !search}>Clear all</button>
           </div>
-          <div className="ge-filters" style={{ marginTop: 10 }}>
-            <FilterSlider label="Min ROI" value={minRoi} min={0} max={20} step={0.5} onChange={setMinRoi}
-              display={minRoi <= ROI_ANY ? "any" : `≥ ${minRoi}%`}
-              title="Hide rows whose typical day margin returns less than this on the buy side's going rate." />
-            <FilterSlider label="Today vs week" value={maxToday} min={0} max={TODAY_ANY} step={0.5} onChange={setMaxToday}
-              display={maxToday >= TODAY_ANY ? "any" : `≤ ±${maxToday}%`}
-              title="Steadiness screen: how far today's price may sit from the week's going rate. Tighten it to keep only prices holding their level." />
-            <FilterSlider label="Vs index" value={maxDev} min={0} max={DEV_ANY} step={1} onChange={setMaxDev}
-              display={maxDev >= DEV_ANY ? "any" : `≤ ±${maxDev}%`}
-              title="How far the week's real trades may sit from the official guide index. Tightening this also hides items the index doesn't cover." />
-          </div>
+          {(activeScreens.length > 0 || f2pOnly) && (
+            <div className="ge-active" aria-label="Active screens">
+              {f2pOnly && (
+                <span className="ge-achip"><span>F2P only</span>
+                  <button onClick={() => setF2pOnly(false)} aria-label="Clear F2P only">✕</button></span>
+              )}
+              {activeScreens.map((d) => (
+                <span key={d.k} className="ge-achip"><span>{d.label}</span>{boundsText(d, screens[d.k])}
+                  <button onClick={() => setScreen(d.k, null)} aria-label={`Clear the ${d.label} screen`}>✕</button></span>
+              ))}
+              <span className="ge-count"><b>{filtered.length.toLocaleString()}</b> of {assessed.length.toLocaleString()} make it through</span>
+            </div>
+          )}
+          {screensOpen && <>
+            <div className="ge-presets" role="group" aria-label="Preset screens">
+              {PRESETS.map((pr) => (
+                <button key={pr.k} className={"ge-preset" + (presetOn(pr, screens) ? " on" : "")} title={pr.hint}
+                  aria-pressed={presetOn(pr, screens)} onClick={() => togglePreset(pr)}>{pr.label}</button>
+              ))}
+            </div>
+            <div className="ge-sgrid">
+              {SCREENS.map((d) => <ScreenRange key={d.k} def={d} val={screens[d.k]} onChange={(b) => setScreen(d.k, b)} />)}
+            </div>
+          </>}
         </section>
 
         {/* the board */}
@@ -1889,11 +2050,11 @@ export default function FlipDesk() {
                 <Th k="rate" title="The week's volume-weighted average price">Going rate</Th>
                 <Th k="todayVs" cls="hide-sm" title="Today's price against the week's going rate">Today</Th>
                 <Th k="trend" cls="hide-sm" title="Change across the week, from a line fitted through the daily averages">7d trend</Th>
-                <Th k="rangePos" dir={1} cls="hide-sm" title="Where today sits between the week's lowest daily buy and highest daily sell">This week</Th>
+                <Th k="rangePos" dir={1} cls="hide-sm" title="The week's lowest daily buy and highest daily sell, with today's price marked between them — far left is a cheap day, far right a dear one; a hollow ring means today broke out of the week's band">Week's range</Th>
                 <Th k="dayMargin" title="A typical day's gap between the buy side and the sell side, after tax">Day margin</Th>
                 <Th k="dayRoi" title="Day margin as a return on the buy side's going rate">ROI</Th>
-                <Th k="dayTake" title="What a limit's worth earns per day cycle — the day margin on a limit, capped by half the thinner side's daily flow">Day take</Th>
-                <Th k="turnover" cls="hide-sm" title="Daily units traded × the going rate — the depth of the river">Moved/day</Th>
+                <Th k="turnover" title="Daily units traded × the going rate — the size of the river">Gp moved/day</Th>
+                <Th k="units" cls="hide-sm" title="Units through the book on a typical day of the week">Traded/day</Th>
                 <Th k="limit" cls="hide-sm hide-md">Limit/4h</Th>
               </tr>
             </thead>
@@ -1913,35 +2074,38 @@ export default function FlipDesk() {
                   <td className={"hide-sm " + devClass(it.todayVs)}>{fmtDev(it.todayVs)}</td>
                   <td className={"hide-sm " + trendClass(it.trend)}>{fmtDev(it.trend)}<Sparkline points={it.mids || []} w={48} h={16} className="ge-spark" /></td>
                   <td className="hide-sm rng">
-                    <RangeBar lo={it.rangeLo} hi={it.rangeHi} now={it.mid} w={56}
-                      label={it.rangeLo != null ? `${fmtGp(it.mid)} today · the week ran ${fmtGp(it.rangeLo)}–${fmtGp(it.rangeHi)}` : "no weekly range"} />
+                    {it.rangeLo != null && it.rangeHi != null ? (
+                      <span className="ge-rng" title={rangeLabel(it)}>
+                        <small>{fmtGp(it.rangeLo)}</small>
+                        <RangeBar lo={it.rangeLo} hi={it.rangeHi} now={it.mid} w={48} label={rangeLabel(it)} />
+                        <small>{fmtGp(it.rangeHi)}</small>
+                      </span>
+                    ) : <span className="mut">–</span>}
                   </td>
                   <td className={it.dayMargin == null ? "mut" : it.dayMargin > 0 ? "good" : "bad"}>{it.dayMargin == null ? "–" : fmtGp(it.dayMargin)}</td>
                   <td className={it.dayRoi == null ? "mut" : it.dayRoi > 0 ? "good" : "bad"}>{it.dayRoi == null ? "–" : it.dayRoi.toFixed(Math.abs(it.dayRoi) >= 100 ? 0 : 1) + "%"}</td>
-                  <td className={it.dayTake == null ? "mut" : it.dayTake > 0 ? "gold" : "bad"}
-                    title={it.dayTake == null ? "too quiet for a day desk — fewer than a few trades a day on the thinner side" : `${fmtFull(it.dayMargin)} gp on ${fmtFull(it.lot)} units a day — ${it.lot < it.limit ? "half the thinner side's daily flow" : "a full limit"}`}>
-                    {it.dayTake == null ? "–" : fmtGp(it.dayTake)}</td>
-                  <td className="gold hide-sm">{fmtGp(it.turnover)}</td>
+                  <td className="gold" title={`${fmtQty(it.units)} units × ${fmtGp(it.px)} gp`}>{fmtGp(it.turnover)}</td>
+                  <td className="mut hide-sm">{fmtQty(it.units)}</td>
                   <td className="mut hide-sm hide-md">{fmtQty(it.limit)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {sorted.length === 0 && <div className="ge-more">Nothing on the exchange matches — loosen the filters.</div>}
+          {sorted.length === 0 && <div className="ge-more">Nothing on the exchange makes it through — loosen a screen, or clear them all.</div>}
           {sorted.length > SHOW && <div className="ge-more">Showing the top {SHOW} of {sorted.length.toLocaleString()} — search or filter to narrow the board.</div>}
         </div>
 
         <p className="ge-foot">
           Going rate = the week's volume-weighted average of every trade the feed saw, over the last {LOOKBACK} complete
           days — never a single print, so one bait trade can't paint the board. Today = the current hour's average
-          against that rate; 7d trend = a line through the daily averages; This week = where today sits between the
-          week's lowest daily buy and highest daily sell.<br />
+          against that rate; 7d trend = a line through the daily averages; Week's range = the week's lowest daily buy
+          and highest daily sell, with today's price marked between them.<br />
           Day margin = a typical day's gap between what sellers got and what buyers paid, after GE tax (2% of sale,
-          capped at 5m; under 50 gp and bonds exempt). Day take = that margin on a limit's worth, capped by half the
-          thinner side's daily flow — what one day cycle of this item is worth to a desk. Gp moved/day = daily units ×
-          the going rate — the depth of the river, not your share of it.<br />
-          Unpriceable books (no market, crossed, dislocated) are set aside; a thin week wears its day count. Tap an
-          item for standing orders priced to fill within a day of normal cycling.<br />
+          capped at 5m; under 50 gp and bonds exempt); ROI = that margin against the buy side's rate. Gp moved/day =
+          daily units × the going rate — the depth of the river, not your share of it; Traded/day = the units themselves.<br />
+          Screens put a min and a max on any column — type them (1.5k, 20m, -3) or drag the handles; a bounded screen
+          drops rows with no number for it. Unpriceable books (no market, crossed, dislocated) are set aside; a thin
+          week wears its day count. Tap an item for standing orders priced to fill within a day of normal cycling.<br />
           Live prices courtesy of the <a className="ge-link" href="https://prices.runescape.wiki" target="_blank" rel="noreferrer">OSRS Wiki price API</a> — estimates, not promises.
         </p>
         </>}

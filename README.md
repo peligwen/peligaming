@@ -169,15 +169,19 @@ cache:
 The desk reads the week, not the minute. Every row's headline is the week's
 volume-weighted going rate over the last seven complete UTC days, from the
 wiki's bulk daily endpoint (seven cacheable requests for the whole exchange),
-with the trend, the week's range, and a typical day's after-tax spread beside
-it. Tap an item and the desk fetches its hourly tape for the last fortnight
+with the trend, the week's range, a typical day's after-tax spread, and the
+gp the book moves a day (units × rate, the board's rank) beside it. Every
+column takes a min and a max — typed or dragged — with presets for the usual
+screens. Tap an item and the desk fetches its hourly tape for the last fortnight
 and prices two standing orders off it: for each of the last seven days, the
 cheapest price at which a standing buy could have filled your quantity (the
 day's hours sorted from the cheapest insta-sell average upward, accumulating
 half of each hour's flow as yours), and the dearest at which a standing sell
 could have; the orders are the prices that would have filled on all but one
-of those days (or every day, or all but two). A chart draws both lines across
-the week so you can see the cycle touch them, an hour-of-day profile says
+of those days (or every day, or all but two). Each order is read against
+the week's going rate as a percentage; a chart draws both lines across the
+week, with the going rate between them, so you can see the cycle touch them;
+an hour-of-day profile says
 when the dips and peaks usually land, and a holdout check fits the same rule
 to the week before and reports how often it held on the week after.
 

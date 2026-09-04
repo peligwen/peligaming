@@ -136,8 +136,8 @@ export function RangeBar({ lo, hi, now, w = 72, h = 10, label }) {
 const VB_W = 640; // fixed viewBox width; the <svg> scales uniformly so text never stretches
 const CC_PAD = { l: 46, r: 8, t: 10, b: 32 }; // b leaves room for the fill-mark strip + weekday ticks below it
 
-export function CycleChart({ days, buy, sell, buyDays, sellDays, fmt, height = 220 }) {
-  const geo = useMemo(() => buildCycleGeometry(days, buy, sell, height), [days, buy, sell, height]);
+export function CycleChart({ days, buy, sell, rate, buyDays, sellDays, fmt, height = 220 }) {
+  const geo = useMemo(() => buildCycleGeometry(days, buy, sell, rate, height), [days, buy, sell, rate, height]);
 
   if (!geo) {
     return (
@@ -180,6 +180,14 @@ export function CycleChart({ days, buy, sell, buyDays, sellDays, fmt, height = 2
       {lowPath ? <path d={lowPath} className="dc-series dc-series-good" /> : null}
       {highPath ? <path d={highPath} className="dc-series dc-series-bad" /> : null}
 
+      {/* the week's going rate — the reference the two orders are read against, dotted and quiet */}
+      {rate != null ? (
+        <g>
+          <line x1={x0} x2={x1} y1={yOf(rate)} y2={yOf(rate)} className="dc-orderline dc-orderline-rate" />
+          <TextChip x={x0 + 3} y={yOf(rate) - 3} anchor="start" text={"going " + fmt(rate)} className="dc-orderlabel dc-orderlabel-rate" />
+        </g>
+      ) : null}
+
       {/* standing order lines, dashed, brighter+thicker than the series they sit near */}
       {buy != null ? (
         <g>
@@ -216,7 +224,7 @@ export function CycleChart({ days, buy, sell, buyDays, sellDays, fmt, height = 2
 
 // geometry builder split out of the component so useMemo has a plain function
 // to call — path strings, tick positions, and the y-scale all live here
-function buildCycleGeometry(days, buy, sell, height) {
+function buildCycleGeometry(days, buy, sell, rate, height) {
   if (!days || !days.length) return null;
   const plotB = height - CC_PAD.b;
   const plotT = CC_PAD.t;
@@ -242,6 +250,7 @@ function buildCycleGeometry(days, buy, sell, height) {
   });
   if (buy != null) { lo = Math.min(lo, buy); hi = Math.max(hi, buy); }
   if (sell != null) { lo = Math.min(lo, sell); hi = Math.max(hi, sell); }
+  if (rate != null) { lo = Math.min(lo, rate); hi = Math.max(hi, rate); }
   if (!isFinite(lo) || !isFinite(hi)) return null; // no priced hours anywhere this week
 
   if (lo === hi) { lo -= 1; hi += 1; } // degenerate flat week — still give the line room
@@ -439,10 +448,12 @@ export const CHART_CSS = `
 .dc-orderline { stroke-width:2; stroke-dasharray:6 3; vector-effect:non-scaling-stroke; }
 .dc-orderline-good { stroke:var(--good); }
 .dc-orderline-bad { stroke:var(--bad); }
+.dc-orderline-rate { stroke:var(--yellow); stroke-width:1.25; stroke-dasharray:2 3; opacity:0.75; }
 .dc-labelchip { fill:var(--inset2); }
 .dc-orderlabel { font-family:var(--mono); font-size:10.5px; }
 .dc-orderlabel-good { fill:var(--good); }
 .dc-orderlabel-bad { fill:var(--bad); }
+.dc-orderlabel-rate { fill:var(--yellow); }
 
 .dc-fillmark { fill:var(--inset2); stroke:var(--dark-tan); stroke-width:1; }
 .dc-fillmark-good.on { fill:var(--good); stroke:var(--good); }
