@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Board — Skill Guide</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Silkscreen:wght@400;700&display=swap');
+
+/*
+DESIGN PLAN — Prototype B: Skill Guide (two-pane)
+
+Palette (tokens, lifted verbatim from flip-desk.jsx .ge-root):
+  stone #3e3529 (hi #554a38, lo #241f18), edge #0d0b08, inset #2b2620/#211d17,
+  page #1b1712; orange #ff981f, yellow #ffe93f, white #f3ecdc, tan #b3a284,
+  dark-tan #8a7a5f; good #57d957, warn #e8b13c, bad #f26060; members purple #d0a0e8.
+
+Type roles:
+  display — Cinzel 600/700: masthead + job title, 2px hard black shadow, no blur.
+  body    — 'Segoe UI'/system-ui: controls, examine text, requirement lines,
+            1px hard black shadow on every coloured line.
+  numbers — a monospace stack with tabular-nums: every gp/xp/qty/time figure,
+            so columns of numbers line up.
+  pixel   — Silkscreen: ONLY the masthead sub-line and the three tab-strip
+            labels (short, uppercase, tiny) — nowhere longer, per the brief.
+
+Layout concept: one fixed-height stone frame under a one-line masthead — a
+Quest-List-style tri-tab list pane (Jobs / Skills / Quests, ~360px) glued to
+a scrolling journal pane on the right; each pane owns its own scrollbar so
+the page itself never scrolls, and under 760px the journal becomes a
+full-screen slide-over while the list rules the screen on its own.
+*/
+
+:root {
+  --stone:#3e3529; --stone-hi:#554a38; --stone-lo:#241f18; --edge:#0d0b08;
+  --inset:#2b2620; --inset2:#211d17; --page:#1b1712;
+  --orange:#ff981f; --yellow:#ffe93f; --white:#f3ecdc; --tan:#b3a284; --dark-tan:#8a7a5f;
+  --good:#57d957; --warn:#e8b13c; --bad:#f26060; --members:#d0a0e8;
+  --mono: ui-monospace,'Cascadia Code','SF Mono',Menlo,Consolas,monospace;
+  --disp: 'Cinzel',Georgia,'Times New Roman',serif;
+  --pixel: 'Silkscreen',var(--mono);
+  --body: 'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+}
+* , *::before, *::after { box-sizing:border-box; }
+html, body { height:100%; margin:0; }
+body {
+  background:var(--page); color:var(--white); font-family:var(--body);
+  font-size:14px; line-height:1.45; font-variant-numeric:tabular-nums;
+}
+button, input { font:inherit; color:inherit; }
+[hidden] { display:none !important; }
+
+/* ---------- app shell ---------- */
+.jb-app { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+.mast {
+  flex:none; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+  padding:10px 16px; background:var(--page); border-bottom:2px solid var(--edge);
+  box-shadow:0 1px 0 #000;
+}
+.mast-title {
+  font-family:var(--disp); font-weight:700; font-size:22px; letter-spacing:.03em;
+  color:var(--orange); text-shadow:2px 2px 0 #000; margin:0;
+}
+.mast-sub {
+  font-family:var(--pixel); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--tan); text-shadow:1px 1px 0 #000;
+}
+
+.frame { flex:1; min-height:0; display:flex; gap:10px; padding:10px; position:relative; }
+
+.pane {
+  background:var(--stone); border:1px solid var(--edge); border-radius:2px;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+  display:flex; flex-direction:column; min-height:0; overflow:hidden; position:relative;
+}
+.pane-list { width:360px; flex:none; }
+.pane-journal { flex:1; min-width:0; }
+
+/* ---------- shared bits ---------- */
+.inset-panel {
+  background:var(--inset); border:1px solid var(--edge); border-radius:2px;
+  box-shadow:inset 1px 1px 0 #1a1712, inset -1px -1px 0 #38322a;
+}
+.stone-input {
+  width:100%; font-family:var(--body); font-size:13px; color:var(--white);
+  background:var(--inset); border:1px solid var(--edge); border-radius:2px; padding:6px 9px;
+  box-shadow:inset 1px 1px 0 #1a1712;
+}
+.stone-input::placeholder { color:var(--dark-tan); }
+.stone-btn {
+  font-family:var(--body); font-size:12.5px; color:var(--white); text-shadow:1px 1px 0 #000;
+  background:var(--stone); border:1px solid var(--edge); border-radius:2px; padding:5px 12px; cursor:pointer;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+}
+.stone-btn:hover { color:var(--yellow); }
+.stone-btn:active { box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
+.stone-btn:disabled { opacity:.45; cursor:default; }
+
+button:focus-visible, input:focus-visible, [role="option"]:focus-visible, [tabindex]:focus-visible {
+  outline:2px solid var(--yellow); outline-offset:1px;
+}
+
+.osrs-scroll::-webkit-scrollbar { width:12px; }
+.osrs-scroll::-webkit-scrollbar-track { background:var(--inset2); }
+.osrs-scroll::-webkit-scrollbar-thumb { background:var(--stone); border:1px solid var(--edge); }
+.osrs-scroll::-webkit-scrollbar-thumb:hover { background:var(--stone-hi); }
+
+/* ---------- tab strip ---------- */
+.tabstrip { flex:none; display:flex; border-bottom:2px solid var(--edge); }
+.tabbtn {
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  padding:8px 4px 7px; background:var(--inset2); color:var(--tan); border:1px solid var(--edge);
+  border-top:none; border-bottom:none; cursor:pointer;
+  box-shadow:inset 1px 1px 0 #17140f, inset -1px -1px 0 #000;
+}
+.tabbtn + .tabbtn { border-left:none; }
+.tabbtn .tab-label {
+  font-family:var(--pixel); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+  text-shadow:1px 1px 0 #000;
+}
+.tabbtn svg { width:15px; height:15px; }
+.tabbtn.active {
+  background:var(--stone); color:var(--orange);
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+}
+.tabbtn:hover:not(.active) { color:var(--yellow); }
+
+.tabpanel { flex:1; min-height:0; }
+#panel-jobs { display:flex; flex-direction:column; padding:10px 10px 8px; overflow:hidden; }
+#panel-skills, #panel-quests { overflow-y:auto; padding:12px; }
+
+/* ---------- jobs tab controls ---------- */
+.jobs-controls { flex:none; }
+.check-row {
+  display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--white);
+  cursor:pointer; user-select:none; text-shadow:1px 1px 0 #000; margin-top:8px;
+}
+.check-row input { accent-color:var(--orange); width:14px; height:14px; }
+
+.seg { display:flex; margin-top:8px; }
+.seg-btn {
+  flex:1; font-family:var(--body); font-size:12px; color:var(--white); text-shadow:1px 1px 0 #000;
+  background:var(--stone); border:1px solid var(--edge); padding:6px 4px; cursor:pointer;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+}
+.seg-btn + .seg-btn { border-left:none; }
+.seg-btn.active { color:var(--yellow); background:var(--stone-hi); box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
+.seg-btn:hover:not(.active) { color:var(--yellow); }
+
+.skillpicker { display:flex; gap:3px; margin-top:8px; }
+.skbtn {
+  flex:1; aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+  background:var(--stone); border:1px solid var(--edge); border-radius:2px; color:var(--tan);
+  cursor:pointer; box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+  font-size:14px; padding:0;
+}
+.skbtn.active { color:#1b1712; background:var(--yellow); box-shadow:inset 1px 1px 0 #fff6b0, inset -1px -1px 0 #b8a412; }
+.skbtn:hover:not(.active) { color:var(--yellow); }
+.skbtn svg { width:13px; height:13px; }
+
+/* ---------- job list ---------- */
+.joblist-wrap { flex:1; min-height:0; margin-top:9px; }
+.joblist { height:100%; overflow-y:auto; background:var(--inset); border:1px solid var(--edge); border-radius:2px; }
+.job-row {
+  display:flex; align-items:center; gap:8px; padding:6px 8px; cursor:pointer;
+  border-left:2px solid transparent; font-size:13px;
+}
+.job-row .glyph { width:15px; text-align:center; flex:none; color:var(--dark-tan); font-size:13px; }
+.job-row .name {
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  text-shadow:1px 1px 0 #000;
+}
+.job-row .name.ok { color:var(--good); }
+.job-row .name.no { color:var(--bad); }
+.job-row .name.flag { color:var(--yellow); }
+.job-row .name.na { color:var(--dark-tan); }
+.job-row .pay { flex:none; font-family:var(--mono); font-size:12px; color:var(--white); }
+.job-row .pay.good { color:var(--good); }
+.job-row .pay.warn { color:var(--warn); }
+.job-row:hover:not(.selected) { background:var(--stone); }
+.job-row:hover:not(.selected) .name { color:var(--white); }
+.job-row.selected { background:var(--stone-hi); border-left-color:var(--orange); }
+.job-empty { padding:16px 10px; color:var(--tan); font-size:12.5px; text-shadow:1px 1px 0 #000; line-height:1.5; }
+
+.list-count { flex:none; padding:7px 4px 2px; font-size:11.5px; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.list-count b { color:var(--orange); font-family:var(--mono); }
+
+/* ---------- skills tab ---------- */
+.skills-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.tile {
+  display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--stone);
+  border:1px solid var(--edge); border-radius:2px; cursor:pointer; color:var(--white);
+  font-size:13px; text-shadow:1px 1px 0 #000; text-align:left;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+}
+.tile:hover { color:var(--yellow); }
+.tile .glyph { font-size:16px; color:var(--orange); flex:none; width:18px; text-align:center; }
+.tile .sname { flex:1; }
+.tile .slevel { font-family:var(--mono); font-weight:600; color:var(--yellow); font-size:14px; }
+.tile input.level-input {
+  width:42px; font-family:var(--mono); font-size:14px; text-align:center; color:var(--white);
+  background:var(--inset); border:1px solid var(--edge); border-radius:2px; padding:2px;
+}
+.members-tile { margin-top:10px; width:100%; justify-content:space-between; }
+.members-tile .check { font-family:var(--mono); font-weight:700; }
+.members-tile.on .check { color:var(--good); }
+.members-tile:not(.on) .check { color:var(--bad); }
+
+.rsn-row { display:flex; gap:6px; margin-top:14px; }
+.rsn-row .stone-input { flex:1; }
+.rsn-msg { font-size:11.5px; color:var(--tan); margin-top:6px; min-height:14px; text-shadow:1px 1px 0 #000; }
+
+/* ---------- quests tab ---------- */
+.quest-row { display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px solid #241f18; font-size:13px; cursor:pointer; }
+.quest-row input { width:15px; height:15px; accent-color:var(--orange); flex:none; }
+.quest-row .qname { cursor:help; text-shadow:1px 1px 0 #000; }
+.quest-row .qname.done { color:var(--good); }
+.quest-row .qname.todo { color:var(--bad); }
+.quest-count { margin-top:10px; font-size:12px; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.quest-count b { color:var(--orange); font-family:var(--mono); }
+
+/* ---------- journal ---------- */
+.back-btn { display:none; position:absolute; top:8px; left:8px; z-index:5; }
+.journal-body { height:100%; overflow-y:auto; padding:16px 18px 24px; }
+.journal-empty { color:var(--tan); font-size:13.5px; padding:20px 4px; text-shadow:1px 1px 0 #000; }
+
+.job-title { font-family:var(--disp); font-weight:700; color:var(--orange); font-size:21px; margin:0 0 5px; text-shadow:2px 2px 0 #000; letter-spacing:.02em; }
+.p2p-badge {
+  display:inline-block; color:var(--members); font-size:10px; border:1px solid #5a4470; border-radius:2px;
+  padding:1px 5px; font-family:var(--mono); margin-left:8px; vertical-align:2px;
+}
+.examine { font-style:italic; color:var(--tan); font-size:13px; margin:0 0 12px; text-shadow:1px 1px 0 #000; }
+
+.reqs { display:flex; flex-direction:column; gap:3px; margin:0 0 16px; font-size:13px; }
+.req-line { display:flex; gap:7px; text-shadow:1px 1px 0 #000; }
+.req-line .mark { width:14px; flex:none; font-family:var(--mono); font-weight:700; }
+.req-line.good { color:var(--good); }
+.req-line.bad { color:var(--bad); }
+.req-line.info { color:var(--tan); cursor:help; }
+.req-line .have { color:var(--dark-tan); font-family:var(--mono); }
+
+.batch-row { display:flex; align-items:center; gap:9px; margin:0 0 6px; flex-wrap:wrap; }
+.batch-row .label { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.batch-row .val { font-family:var(--mono); font-size:16px; font-weight:600; color:var(--yellow); min-width:60px; text-align:center; }
+.cap-badge { font-size:10.5px; color:var(--warn); text-shadow:1px 1px 0 #000; }
+
+.ledger { font-family:var(--mono); font-size:12.5px; line-height:1.8; padding:10px 12px; margin:10px 0 14px; }
+.ledger .op { display:inline-block; width:56px; font-weight:700; letter-spacing:.04em; font-size:11px; }
+.op.buy { color:var(--good); }
+.op.pay { color:var(--warn); }
+.op.work { color:var(--orange); }
+.op.sell { color:var(--bad); }
+.op.take { color:var(--bad); }
+.ledger .clock { color:var(--dark-tan); font-size:11.5px; }
+
+.facts { display:flex; flex-wrap:wrap; gap:11px 22px; margin:0 0 14px; }
+.fact { display:flex; flex-direction:column; gap:2px; }
+.fact span { font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.fact b { font-family:var(--mono); font-size:14px; color:var(--white); font-weight:600; }
+.fact b.good { color:var(--good); }
+.fact b.bad { color:var(--bad); }
+.fact b.gold { color:var(--orange); }
+.fact b.warn { color:var(--warn); }
+
+.warn-p {
+  font-size:12px; color:#f1d08a; background:#33270f; border:1px solid #6e5426; border-radius:2px;
+  padding:9px 11px; text-shadow:1px 1px 0 #000; margin:0; line-height:1.5;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:760px) {
+  .frame { padding:8px; }
+  .pane-list { width:100%; }
+  .pane-journal {
+    position:fixed; inset:0; z-index:30; border-radius:0;
+    transform:translateX(100%); transition:transform .22s ease; padding-top:46px;
+  }
+  .pane-journal.open { transform:translateX(0); }
+  .back-btn { display:block; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pane-journal { transition:none; }
+}
+</style>
+</head>
+<body>
+<div class="jb-app" id="app">
+  <header class="mast">
+    <h1 class="mast-title">Job Board</h1>
+    <span class="mast-sub">Prototype B · Skill Guide</span>
+  </header>
+
+  <main class="frame">
+    <section class="pane pane-list" aria-label="Job list">
+      <div class="tabstrip" role="tablist" aria-label="Panel">
+        <button role="tab" id="tab-jobs" aria-selected="true" aria-controls="panel-jobs" class="tabbtn active" data-tab="jobs">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="2" height="2" fill="currentColor"/><rect x="6" y="3" width="8" height="2" fill="currentColor"/><rect x="2" y="7" width="2" height="2" fill="currentColor"/><rect x="6" y="7" width="8" height="2" fill="currentColor"/><rect x="2" y="11" width="2" height="2" fill="currentColor"/><rect x="6" y="11" width="8" height="2" fill="currentColor"/></svg>
+          <span class="tab-label">Jobs</span>
+        </button>
+        <button role="tab" id="tab-skills" aria-selected="false" aria-controls="panel-skills" class="tabbtn" data-tab="skills" tabindex="-1">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="9" width="3" height="5" fill="currentColor"/><rect x="6.5" y="5" width="3" height="9" fill="currentColor"/><rect x="11" y="2" width="3" height="12" fill="currentColor"/></svg>
+          <span class="tab-label">Skills</span>
+        </button>
+        <button role="tab" id="tab-quests" aria-selected="false" aria-controls="panel-quests" class="tabbtn" data-tab="quests" tabindex="-1">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="10" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span class="tab-label">Quests</span>
+        </button>
+      </div>
+
+      <div class="tabpanel" id="panel-jobs" role="tabpanel" aria-labelledby="tab-jobs">
+        <div class="jobs-controls">
+          <input type="search" id="searchInput" class="stone-input" placeholder="Search jobs…" aria-label="Search jobs">
+          <label class="check-row"><input type="checkbox" id="onlyCanStart"><span>Only what I can start</span></label>
+          <div class="seg" role="group" aria-label="Pricing mode">
+            <button class="seg-btn active" id="modeExpress" title="Insta-buy the inputs, insta-sell the product — thinner pay, done today.">Start now</button>
+            <button class="seg-btn" id="modePatient" title="Offers at the week's going rates — the whole margin, about a day per leg.">Full margin</button>
+          </div>
+          <div class="skillpicker" role="group" aria-label="Train a skill" id="skillPicker"></div>
+        </div>
+        <div class="joblist-wrap">
+          <div class="joblist osrs-scroll" id="jobList" role="listbox" aria-label="Jobs" tabindex="0"></div>
+        </div>
+        <p class="list-count" id="listCount"></p>
+      </div>
+
+      <div class="tabpanel osrs-scroll" id="panel-skills" role="tabpanel" aria-labelledby="tab-skills" hidden>
+        <div class="skills-grid" id="skillsGrid"></div>
+        <button type="button" class="tile members-tile" id="membersTile"></button>
+        <div class="rsn-row">
+          <input type="text" id="rsnInput" class="stone-input" placeholder="RuneScape name" maxlength="12">
+          <button type="button" class="stone-btn" id="hiscoresBtn">Hiscores</button>
+        </div>
+        <p class="rsn-msg" id="rsnMsg" aria-live="polite"></p>
+      </div>
+
+      <div class="tabpanel osrs-scroll" id="panel-quests" role="tabpanel" aria-labelledby="tab-quests" hidden>
+        <div id="questList"></div>
+        <p class="quest-count" id="questCount"></p>
+      </div>
+    </section>
+
+    <section class="pane pane-journal" id="journalPane" aria-label="Job journal">
+      <button type="button" class="stone-btn back-btn" id="backBtn" aria-label="Back to board">‹ Board</button>
+      <div class="journal-body osrs-scroll" id="journalBody"></div>
+    </section>
+  </main>
+</div>
+
+<script src="./jobs-mock.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var mode = "express";        // "express" | "patient"
+  var focus = "";               // "" = best pay, else a skill name
+  var search = "";
+  var onlyCanStart = false;
+  var selectedKey = null;
+  var batches = {};             // job key -> chosen batch size
+  var sheet = loadSheet();
+
+  /* ---------- sheet persistence ---------- */
+  function loadSheet() {
+    try {
+      var raw = localStorage.getItem("jb-proto-sheet");
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        return {
+          rsn: parsed.rsn != null ? parsed.rsn : JB.SHEET.rsn,
+          members: parsed.members != null ? parsed.members : JB.SHEET.members,
+          skills: Object.assign({}, JB.SHEET.skills, parsed.skills || {}),
+          quests: Object.assign({}, JB.SHEET.quests, parsed.quests || {}),
+        };
+      }
+    } catch (e) { /* fall through to the mock sheet */ }
+    return JSON.parse(JSON.stringify(JB.SHEET));
+  }
+  function saveSheet() {
+    try { localStorage.setItem("jb-proto-sheet", JSON.stringify(sheet)); } catch (e) { /* private mode etc */ }
+  }
+
+  /* ---------- small helpers ---------- */
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function article(word) { return /^[aeiou]/i.test(word) ? "an" : "a"; }
+  function el(html) { var d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; }
+
+  function hasFlag(job) {
+    return job.flags.crush > 0 || job.flags.rich || job.flags.stale.length > 0 || job.flags.moving.length > 0;
+  }
+  // green / red / yellow / grey — exactly the quest-list rule from the brief
+  function rowStatus(job) {
+    if (job.members && !sheet.members) return "na";
+    if (!JB.canDo(job, sheet)) return "no";
+    if (hasFlag(job)) return "flag";
+    return "ok";
+  }
+  function rowTooltip(job) {
+    if (job.members && !sheet.members) return "Members-only — not on this account.";
+    var b = JB.blocker(job, sheet);
+    if (b) return "Needs " + b + ".";
+    if (hasFlag(job)) return "You can start it — but it's flagged, check the journal.";
+    return "You can start this now.";
+  }
+
+  function getFilteredJobs() {
+    var arr = JB.rank(JB.JOBS, mode, focus);
+    if (onlyCanStart) arr = arr.filter(function (j) { return JB.canDo(j, sheet); });
+    var q = search.trim().toLowerCase();
+    if (q) arr = arr.filter(function (j) { return (j.verb + " " + j.out).toLowerCase().indexOf(q) !== -1; });
+    return arr;
+  }
+
+  function payLabel(job) {
+    if (focus) {
+      var m = JB.math(job, mode, 1);
+      var v = m.gpPerXp(focus);
+      if (v == null) return "–";
+      return (v < 0 ? "−" : "") + JB.fmtGpx(v) + " gp/xp";
+    }
+    var m2 = JB.math(job, mode, job.defaultN);
+    return (m2.profit >= 0 ? "+" : "−") + JB.fmtGp(Math.abs(m2.profit));
+  }
+  function payClass(job) {
+    if (!focus) return "";
+    var m = JB.math(job, mode, 1);
+    var v = m.gpPerXp(focus);
+    return v != null && v >= 0 ? "good" : "warn";
+  }
+
+  function examineLine(job) {
+    var bits = [];
+    if (job.facilities.length) {
+      bits.push("at " + job.facilities.map(function (f) { return article(f) + " " + f.toLowerCase(); }).join(" and "));
+    }
+    if (job.gear.length) {
+      bits.push("with " + job.gear.map(function (g) { return article(g) + " " + g.toLowerCase(); }).join(" and "));
+    }
+    var tail = bits.length ? " " + bits.join(" ") : "";
+    return job.verb + " " + job.out.toLowerCase() + tail + ".";
+  }
+
+  function emptyMessage() {
+    if (focus) return "Nothing trains " + focus + " within your filters — loosen the search, or untick “Only what I can start”.";
+    return mode === "express"
+      ? "No paying jobs match. Taking the market eats both spreads — try Full margin for the whole margin."
+      : "No paying jobs match. Loosen the search, or check back when the books move.";
+  }
+
+  /* ---------- skill picker ---------- */
+  var BEST_PAY_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="6" width="12" height="7" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="3" width="6" height="4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+  function initSkillPicker() {
+    var wrap = document.getElementById("skillPicker");
+    wrap.innerHTML = "";
+    wrap.appendChild(makeSkillBtn("", BEST_PAY_SVG, "Best pay — rank every job by total profit"));
+    JB.SKILLS.forEach(function (s) {
+      wrap.appendChild(makeSkillBtn(s, '<span aria-hidden="true">' + JB.SKILL_GLYPH[s] + '</span>', "Train " + s));
+    });
+  }
+  function makeSkillBtn(val, inner, title) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "skbtn" + (focus === val ? " active" : "");
+    b.dataset.focus = val;
+    b.title = title;
+    b.setAttribute("aria-pressed", focus === val ? "true" : "false");
+    b.innerHTML = inner;
+    b.addEventListener("click", function () { focus = val; onFocusChange(); });
+    return b;
+  }
+  function onFocusChange() {
+    document.querySelectorAll("#skillPicker .skbtn").forEach(function (b) {
+      var on = b.dataset.focus === focus;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    renderJobList();
+    renderJournal();
+  }
+
+  /* ---------- job list ---------- */
+  function renderJobList() {
+    var list = document.getElementById("jobList");
+    var jobs = getFilteredJobs();
+    list.innerHTML = "";
+    if (jobs.length === 0) {
+      list.appendChild(el('<div class="job-empty"></div>'));
+      list.firstChild.textContent = emptyMessage();
+    } else {
+      jobs.forEach(function (job) { list.appendChild(buildRow(job)); });
+    }
+    updateSelectedRowClasses();
+    updateListCount();
+  }
+  function buildRow(job) {
+    var row = document.createElement("div");
+    row.className = "job-row";
+    row.id = "row-" + job.key;
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", job.key === selectedKey ? "true" : "false");
+    row.title = rowTooltip(job);
+    var glyph = job.skill ? JB.SKILL_GLYPH[job.skill] : "•";
+    var status = rowStatus(job);
+    row.innerHTML =
+      '<span class="glyph" aria-hidden="true">' + glyph + "</span>" +
+      '<span class="name ' + status + '">' + job.verb + " " + job.out + "</span>" +
+      '<span class="pay ' + payClass(job) + '">' + payLabel(job) + "</span>";
+    row.addEventListener("click", function () { selectJob(job.key); });
+    if (job.key === selectedKey) row.classList.add("selected");
+    return row;
+  }
+  function updateSelectedRowClasses() {
+    document.querySelectorAll(".job-row").forEach(function (r) {
+      var on = r.id === "row-" + selectedKey;
+      r.classList.toggle("selected", on);
+      r.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    var list = document.getElementById("jobList");
+    list.setAttribute("aria-activedescendant", selectedKey ? "row-" + selectedKey : "");
+  }
+  function updateListCount() {
+    var base = JB.rank(JB.JOBS, mode, focus);
+    var can = base.filter(function (j) { return JB.canDo(j, sheet); }).length;
+    var verb = focus ? "jobs train " + focus : "jobs pay";
+    document.getElementById("listCount").innerHTML =
+      "<b>" + base.length + "</b> " + verb + " · <b>" + can + "</b> you can start";
+  }
+  function scrollRowIntoView(key) {
+    var r = document.getElementById("row-" + key);
+    if (r) r.scrollIntoView({ block: "nearest" });
+  }
+
+  /* ---------- selection ---------- */
+  function isMobile() { return window.matchMedia("(max-width:760px)").matches; }
+  function openJournal() { document.getElementById("journalPane").classList.add("open"); }
+  function closeJournal() { document.getElementById("journalPane").classList.remove("open"); }
+  function selectJob(key) {
+    selectedKey = key;
+    updateSelectedRowClasses();
+    renderJournal();
+    if (isMobile()) openJournal();
+  }
+  function currentJob() { return JB.JOBS.filter(function (j) { return j.key === selectedKey; })[0] || null; }
+
+  /* ---------- journal: requirements ---------- */
+  function renderReqLines(job) {
+    var html = "";
+    job.levels.forEach(function (lv) {
+      var have = +sheet.skills[lv.s] || 1;
+      var ok = have >= lv.l;
+      html += '<div class="req-line ' + (ok ? "good" : "bad") + '"><span class="mark">' + (ok ? "✓" : "✗") + "</span><span>" +
+        lv.s + " " + lv.l + " — <span class=\"have\">you have " + have + "</span></span></div>";
+    });
+    job.unlocks.forEach(function (u) {
+      var done = !!sheet.quests[u];
+      html += '<div class="req-line ' + (done ? "good" : "bad") + '" title="' + JB.unlockNote(u) + '"><span class="mark">' +
+        (done ? "✓" : "✗") + "</span><span>" + u + " — " + (done ? "done" : "not done") + "</span></div>";
+    });
+    if (job.members) {
+      var ok2 = !!sheet.members;
+      html += '<div class="req-line ' + (ok2 ? "good" : "bad") + '"><span class="mark">' + (ok2 ? "✓" : "✗") +
+        "</span><span>Members — " + (ok2 ? "you are a member" : "members only") + "</span></div>";
+    }
+    job.facilities.concat(job.gear).forEach(function (thing) {
+      html += '<div class="req-line info" title="' + JB.gearNote(thing) + '"><span class="mark"></span><span>' + thing + "</span></div>";
+    });
+    return html;
+  }
+
+  /* ---------- journal: ledger ---------- */
+  function renderLedger(job, m) {
+    var html = "";
+    m.lines.buys.forEach(function (b) {
+      html += '<div><span class="op buy">BUY</span>' + JB.fmtFull(b.qty) + "× " + b.name + " @ " + JB.fmtFull(b.unitPx) +
+        " — " + JB.fmtGp(b.total) + " gp";
+      if (mode === "patient") html += ' <span class="clock">· fills ≈ ' + JB.fmtDur(b.fillH) + "</span>";
+      html += "</div>";
+    });
+    if (m.lines.fees > 0) {
+      html += '<div><span class="op pay">PAY</span>' + JB.fmtGp(m.lines.fees) + " gp in fees</div>";
+    }
+    var sellTotal = m.profit + m.cost;
+    if (job.alch) {
+      var step = m.lines.steps[0];
+      html += '<div><span class="op work">ALCH</span>' + JB.fmtFull(m.n) + "× " + job.out + " at " + JB.fmtFull(m.sellUnit) +
+        ' gp apiece <span class="clock">· ≈ ' + JB.fmtDur(step.hours) + "</span></div>";
+      html += '<div><span class="op take">TAKE</span>' + JB.fmtGp(sellTotal) +
+        " gp straight to your pouch — no sell offer, no GE tax</div>";
+    } else {
+      m.lines.steps.forEach(function (s) {
+        var qtyNote = s.qtyPer && s.qtyPer > 1 ? " (" + s.qtyPer + " per " + s.verb.toLowerCase() + ")" : "";
+        var atNote = s.at ? " at " + s.at : "";
+        html += '<div><span class="op work">' + s.verb.toUpperCase() + "</span>" + JB.fmtFull(s.count) + "× " + s.out +
+          qtyNote + atNote + ' <span class="clock">· ≈ ' + JB.fmtDur(s.hours) + "</span></div>";
+      });
+      html += '<div><span class="op sell">SELL</span>' + JB.fmtFull(m.n) + "× " + job.out + " @ " + JB.fmtFull(m.sellRaw) +
+        (m.tax > 0 ? " less tax" : "") + " — " + JB.fmtGp(sellTotal) + " gp";
+      if (mode === "patient") html += ' <span class="clock">· fills ≈ ' + JB.fmtDur(m.sellClock) + "</span>";
+      html += "</div>";
+    }
+    return html;
+  }
+
+  /* ---------- journal: facts ---------- */
+  function fact(label, value, cls) {
+    return '<div class="fact"><span>' + label + '</span><b class="' + (cls || "") + '">' + value + "</b></div>";
+  }
+  function renderFacts(job, m) {
+    var html = "";
+    html += fact("Costs", JB.fmtGp(m.cost) + " gp");
+    html += fact("Pays", (m.profit >= 0 ? "+" : "") + JB.fmtGp(m.profit) + " gp", m.profit >= 0 ? "good" : "bad");
+    if (m.xp.length) {
+      html += fact("Xp", m.xp.map(function (pair) { return JB.fmtXp(pair[1]) + " " + pair[0]; }).join(" · "), "gold");
+    }
+    if (focus) {
+      var gpx = m.gpPerXp(focus);
+      if (gpx != null) {
+        var label = gpx >= 0 ? "Pays per xp" : "Costs per xp";
+        html += fact(label, (gpx < 0 ? "−" : "") + JB.fmtGpx(gpx) + " gp", gpx >= 0 ? "good" : "warn");
+      }
+    }
+    html += fact("Return", m.cost > 0 ? m.roi.toFixed(1) + "%" : "–");
+    html += fact("Takes about", JB.fmtDur(m.totalH), "gold");
+    return html;
+  }
+
+  /* ---------- journal: one combined warning, never twice ---------- */
+  function renderWarning(job, m) {
+    var parts = [];
+    if (job.flags.crush > 0) parts.push("≈" + Math.round(job.flags.crush * 100) + "% of attempts crush — the buy list already covers it");
+    if (job.flags.rich) parts.push("pays unusually well for the work — too good? verify each leg before committing");
+    if (job.flags.stale.length || job.flags.moving.length) {
+      var bits = [];
+      if (job.flags.stale.length) bits.push("thin data on " + job.flags.stale.join(", "));
+      if (job.flags.moving.length) bits.push("price moving on " + job.flags.moving.join(", "));
+      parts.push(bits.join("; "));
+    }
+    if (m.capped) parts.push(mode === "express" ? "capped — a bigger batch would move these books" : "capped — the books can't fill more inside a day");
+    if (!parts.length) return "";
+    return '<p class="warn-p">⚠ ' + parts.join("; ") + ".</p>";
+  }
+
+  /* ---------- journal: assemble ---------- */
+  function renderJournal() {
+    var body = document.getElementById("journalBody");
+    var filtered = getFilteredJobs();
+    var job = selectedKey ? currentJob() : null;
+    var visible = job && filtered.some(function (j) { return j.key === job.key; });
+    if (!job || !visible) {
+      body.innerHTML = '<p class="journal-empty">Pick a job from the board.</p>';
+      return;
+    }
+    var maxN = job.maxN[mode];
+    var n = clamp(batches[job.key] != null ? batches[job.key] : job.defaultN, 1, maxN);
+    batches[job.key] = n;
+    var m = JB.math(job, mode, n);
+    body.innerHTML =
+      '<h2 class="job-title">' + job.verb + " " + job.out + (job.members ? '<span class="p2p-badge">P2P</span>' : "") + "</h2>" +
+      '<p class="examine">' + examineLine(job) + "</p>" +
+      '<div class="reqs">' + renderReqLines(job) + "</div>" +
+      '<div class="batch-row">' +
+        '<span class="label">Batch</span>' +
+        '<button type="button" class="stone-btn" id="batchMinus" aria-label="Halve batch">−</button>' +
+        '<span class="val">' + JB.fmtFull(n) + "</span>" +
+        '<button type="button" class="stone-btn" id="batchPlus" aria-label="Double batch">+</button>' +
+        '<button type="button" class="stone-btn" id="batchMax">Max</button>' +
+        (m.capped ? '<span class="cap-badge">capped</span>' : "") +
+      "</div>" +
+      '<div class="ledger inset-panel">' + renderLedger(job, m) + "</div>" +
+      '<div class="facts">' + renderFacts(job, m) + "</div>" +
+      renderWarning(job, m);
+  }
+
+  function onSheetChange() {
+    saveSheet();
+    renderJobList();
+    renderJournal();
+  }
+
+  /* ---------- skills tab ---------- */
+  function renderSkillsTab() {
+    var grid = document.getElementById("skillsGrid");
+    grid.innerHTML = "";
+    JB.SKILLS.forEach(function (s) {
+      var tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = "tile skill-tile";
+      tile.dataset.skill = s;
+      tile.innerHTML =
+        '<span class="glyph" aria-hidden="true">' + JB.SKILL_GLYPH[s] + "</span>" +
+        '<span class="sname">' + s + "</span>" +
+        '<span class="slevel">' + (sheet.skills[s] != null ? sheet.skills[s] : 1) + "</span>";
+      tile.addEventListener("click", function () { editSkillTile(tile, s); });
+      grid.appendChild(tile);
+    });
+    var mTile = document.getElementById("membersTile");
+    mTile.classList.toggle("on", !!sheet.members);
+    mTile.innerHTML = '<span class="sname">Members</span><span class="check">' + (sheet.members ? "✓" : "✗") + "</span>";
+    document.getElementById("rsnInput").value = sheet.rsn || "";
+  }
+  function editSkillTile(tile, skill) {
+    if (tile.querySelector("input")) return;
+    var levelSpan = tile.querySelector(".slevel");
+    var current = sheet.skills[skill] != null ? sheet.skills[skill] : 1;
+    var input = document.createElement("input");
+    input.type = "number"; input.min = "1"; input.max = "99"; input.value = current;
+    input.className = "level-input";
+    input.addEventListener("click", function (e) { e.stopPropagation(); });
+    function commit() {
+      var v = parseInt(input.value, 10);
+      if (isNaN(v)) v = current;
+      v = clamp(v, 1, 99);
+      sheet.skills[skill] = v;
+      renderSkillsTab();
+      onSheetChange();
+    }
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); commit(); }
+      else if (e.key === "Escape") { renderSkillsTab(); }
+    });
+    input.addEventListener("blur", commit);
+    levelSpan.replaceWith(input);
+    input.focus(); input.select();
+  }
+
+  /* ---------- quests tab ---------- */
+  function renderQuestsTab() {
+    var wrap = document.getElementById("questList");
+    wrap.innerHTML = "";
+    var keys = Object.keys(sheet.quests);
+    keys.forEach(function (qk) {
+      var done = !!sheet.quests[qk];
+      var row = document.createElement("label");
+      row.className = "quest-row";
+      row.title = JB.unlockNote(qk);
+      row.innerHTML = '<input type="checkbox" ' + (done ? "checked" : "") + '><span class="qname ' + (done ? "done" : "todo") + '">' + qk + "</span>";
+      row.querySelector("input").addEventListener("change", function (e) {
+        sheet.quests[qk] = e.target.checked;
+        renderQuestsTab();
+        onSheetChange();
+      });
+      wrap.appendChild(row);
+    });
+    var doneCount = keys.filter(function (k) { return sheet.quests[k]; }).length;
+    document.getElementById("questCount").innerHTML = "<b>" + doneCount + "</b> of <b>" + keys.length + "</b> done";
+  }
+
+  /* ---------- tab strip ---------- */
+  function switchTab(tab) {
+    ["jobs", "skills", "quests"].forEach(function (t) {
+      var tabBtn = document.getElementById("tab-" + t);
+      var on = t === tab;
+      tabBtn.classList.toggle("active", on);
+      tabBtn.setAttribute("aria-selected", on ? "true" : "false");
+      tabBtn.tabIndex = on ? 0 : -1;
+      document.getElementById("panel-" + t).hidden = !on;
+    });
+  }
+  document.getElementById("tab-jobs").addEventListener("click", function () { switchTab("jobs"); });
+  document.getElementById("tab-skills").addEventListener("click", function () { switchTab("skills"); });
+  document.getElementById("tab-quests").addEventListener("click", function () { switchTab("quests"); });
+  document.querySelector(".tabstrip").addEventListener("keydown", function (e) {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    var order = ["jobs", "skills", "quests"];
+    var current = order.indexOf(document.querySelector(".tabbtn.active").dataset.tab);
+    var next = e.key === "ArrowRight" ? (current + 1) % order.length : (current - 1 + order.length) % order.length;
+    switchTab(order[next]);
+    document.getElementById("tab-" + order[next]).focus();
+  });
+
+  /* ---------- mode + search + toggle ---------- */
+  function setMode(m) {
+    mode = m;
+    document.getElementById("modeExpress").classList.toggle("active", m === "express");
+    document.getElementById("modePatient").classList.toggle("active", m === "patient");
+    renderJobList();
+    renderJournal();
+  }
+  document.getElementById("modeExpress").addEventListener("click", function () { setMode("express"); });
+  document.getElementById("modePatient").addEventListener("click", function () { setMode("patient"); });
+  document.getElementById("searchInput").addEventListener("input", function (e) {
+    search = e.target.value; renderJobList(); renderJournal();
+  });
+  document.getElementById("onlyCanStart").addEventListener("change", function (e) {
+    onlyCanStart = e.target.checked; renderJobList(); renderJournal();
+  });
+
+  /* ---------- job list keyboard nav ---------- */
+  document.getElementById("jobList").addEventListener("keydown", function (e) {
+    var jobs = getFilteredJobs();
+    if (!jobs.length) return;
+    var idx = jobs.findIndex(function (j) { return j.key === selectedKey; });
+    if (e.key === "ArrowDown") { e.preventDefault(); idx = Math.min(jobs.length - 1, idx + 1); selectJob(jobs[idx].key); scrollRowIntoView(jobs[idx].key); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); idx = idx <= 0 ? 0 : idx - 1; selectJob(jobs[idx].key); scrollRowIntoView(jobs[idx].key); }
+    else if (e.key === "Home") { e.preventDefault(); selectJob(jobs[0].key); scrollRowIntoView(jobs[0].key); }
+    else if (e.key === "End") { e.preventDefault(); selectJob(jobs[jobs.length - 1].key); scrollRowIntoView(jobs[jobs.length - 1].key); }
+    else if (e.key === "Enter") { e.preventDefault(); if (isMobile()) openJournal(); }
+  });
+
+  /* ---------- journal interactions (delegated — journalBody node is stable) ---------- */
+  document.getElementById("journalBody").addEventListener("click", function (e) {
+    var job = currentJob();
+    if (!job) return;
+    var maxN = job.maxN[mode];
+    var n = clamp(batches[job.key] != null ? batches[job.key] : job.defaultN, 1, maxN);
+    if (e.target.closest("#batchMinus")) { batches[job.key] = clamp(Math.max(1, JB.niceRound(n / 2)), 1, maxN); renderJournal(); }
+    else if (e.target.closest("#batchPlus")) { batches[job.key] = clamp(Math.min(maxN, JB.niceRound(n * 2)), 1, maxN); renderJournal(); }
+    else if (e.target.closest("#batchMax")) { batches[job.key] = maxN; renderJournal(); }
+  });
+  document.getElementById("backBtn").addEventListener("click", closeJournal);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && document.getElementById("journalPane").classList.contains("open")) closeJournal();
+  });
+
+  /* ---------- skills tab: members + hiscores ---------- */
+  document.getElementById("membersTile").addEventListener("click", function () {
+    sheet.members = !sheet.members;
+    renderSkillsTab();
+    onSheetChange();
+  });
+  document.getElementById("rsnInput").addEventListener("input", function (e) { sheet.rsn = e.target.value; saveSheet(); });
+  document.getElementById("hiscoresBtn").addEventListener("click", function () {
+    sheet.skills = Object.assign({}, JB.SHEET.skills);
+    sheet.members = JB.SHEET.members;
+    if (!sheet.rsn) sheet.rsn = JB.SHEET.rsn;
+    renderSkillsTab();
+    onSheetChange();
+    var msg = document.getElementById("rsnMsg");
+    msg.textContent = "✓ levels loaded from the hiscores";
+    setTimeout(function () { if (msg.textContent === "✓ levels loaded from the hiscores") msg.textContent = ""; }, 3000);
+  });
+
+  /* ---------- boot ---------- */
+  initSkillPicker();
+  renderSkillsTab();
+  renderQuestsTab();
+  renderJobList();
+  renderJournal();
+  switchTab("jobs");
+})();
+</script>
+</body>
+</html>
+
+
