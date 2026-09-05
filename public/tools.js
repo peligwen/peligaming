@@ -30,7 +30,7 @@ window.PELIGAMING = {
       tools: [
         {
           name: "Job Board",
-          description: "Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now, or the cheapest xp in any skill, each with a contract to buy, work and sell — plus a Market Board of the week's going rates and standing orders priced to fill within a day, and an econ primer.",
+          description: "Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now, or the cheapest xp in any skill, each with a contract to buy, work and sell — plus a Market Board of the week's going rates and standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer.",
           path: "tools/runescape/job-board.html",
         },
         {
