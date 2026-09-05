@@ -660,10 +660,10 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 .ge-notice .line2 .eq { white-space:nowrap; }
 .ge-notice .line2 b { font-weight:700; } .ge-notice .line2 b.good { color:var(--paper-good); } .ge-notice .line2 b.bad { color:var(--paper-bad); }
 .ge-notice .reqs { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
-.ge-chip { font-family:var(--mono); font-size:10px; border-radius:2px; padding:1px 5px; border:1px solid; white-space:nowrap; }
-.ge-chip.ok { color:var(--paper-good); border-color:var(--paper-good); background:rgba(31,107,31,.08); }
-.ge-chip.no { color:var(--paper-bad); border-color:var(--paper-bad); background:rgba(139,29,29,.08); }
-.ge-chip.unk { color:var(--ink-soft); border-color:var(--ink-soft); background:rgba(42,32,20,.06); }
+.ge-nchip { font-family:var(--mono); font-size:10px; border-radius:2px; padding:1px 5px; border:1px solid; white-space:nowrap; }
+.ge-nchip.ok { color:var(--paper-good); border-color:var(--paper-good); background:rgba(31,107,31,.08); }
+.ge-nchip.no { color:var(--paper-bad); border-color:var(--paper-bad); background:rgba(139,29,29,.08); }
+.ge-nchip.unk { color:var(--ink-soft); border-color:var(--ink-soft); background:rgba(42,32,20,.06); }
 .ge-notice.empty { grid-column:1/-1; max-width:420px; margin:0 auto; cursor:default; transform:none; }
 .ge-notice.empty h3 { padding-right:0; }
 .ge-notice.empty p { margin:2px 0 0; font-size:12.5px; color:var(--ink-soft); line-height:1.5; }
@@ -1422,7 +1422,7 @@ function Notice({ job, n, sheet, focus, onOpen }) {
           <div className="line2">{fmtFull(n)}× · {fmtDurShort(m.totalH)} · costs {fmtGp(m.cost)}</div>
         </>
       )}
-      <div className="reqs">{chips.map((c) => <span key={c.k} className={"ge-chip " + c.cls} title={c.title}>{c.chip}</span>)}</div>
+      <div className="reqs">{chips.map((c) => <span key={c.k} className={"ge-nchip " + c.cls} title={c.title}>{c.chip}</span>)}</div>
     </button>
   );
 }
@@ -1553,6 +1553,8 @@ function JobBoard({ items, status }) {
   const [search, setSearch] = useState("");
   const [batches, setBatches] = useState({}); // job key -> chosen n
   const [openKey, setOpenKey] = useState(null); // the contract on the table, if any
+  // a job's key carries its mode, so switching modes takes any open contract off the table
+  const pickMode = (m) => { setMode(m); setOpenKey(null); };
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheet, setSheet] = useState(loadSheet);
   // a blank sheet shows the whole board, faded where it's out of reach — the
@@ -1613,8 +1615,8 @@ function JobBoard({ items, status }) {
     <>
       <section className="ge-panel ge-toolbar">
         <div className="ge-moderow" role="group" aria-label="Pricing">
-          <button className={"ge-btn" + (mode === "express" ? " on" : "")} aria-pressed={mode === "express"} onClick={() => setMode("express")}>Start now</button>
-          <button className={"ge-btn" + (mode === "patient" ? " on" : "")} aria-pressed={mode === "patient"} onClick={() => setMode("patient")}>Full margin</button>
+          <button className={"ge-btn" + (mode === "express" ? " on" : "")} aria-pressed={mode === "express"} onClick={() => pickMode("express")}>Start now</button>
+          <button className={"ge-btn" + (mode === "patient" ? " on" : "")} aria-pressed={mode === "patient"} onClick={() => pickMode("patient")}>Full margin</button>
         </div>
         <p className="ge-modehint">{MODE_HINT[mode]}</p>
         <div className="ge-skillrow" role="group" aria-label="Training focus">
