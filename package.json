@@ -8,7 +8,8 @@
     "data:courier": "node scripts/fetch-courier-tasks.mjs",
     "data:snapshot": "node scripts/capture-snapshot.mjs",
     "data:ship": "node scripts/fetch-ship-data.mjs",
-    "check:model": "node scripts/day-model-check.mjs"
+    "check:model": "node scripts/day-model-check.mjs",
+    "check:baskets": "node scripts/basket-check.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",

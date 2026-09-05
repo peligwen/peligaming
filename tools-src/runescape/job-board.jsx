@@ -3,6 +3,9 @@ import RECIPES from "./recipes.json";
 import SNAPSHOT from "./job-board-snapshot.json";
 import { DAY, weekStats, completeDays, dayFills, cycleOrders, hourProfile, holdout } from "./day-model.js";
 import { CHART_CSS, Sparkline, RangeBar, CycleChart, HourProfile } from "./day-charts.jsx";
+import { FAMILIES, STAGES, PAIRS, SLOT_COLORS, ALL_COLOR, basketNames } from "./baskets.js";
+import { buildCommodities, BAND_DAYS, MAX_GAP } from "./basket-model.js";
+import { LevelChart, BASKET_CSS } from "./basket-charts.jsx";
 
 /* baked snapshot lives in job-board-snapshot.json — v3 rows (scripts/capture-snapshot.mjs)
    carry tape-averaged pricing plus a week of daily rows; v2 rows carry the tape alone */
@@ -70,7 +73,7 @@ const fmtXp = (n) => {
 };
 // gp per xp: sign carried by the caller's label
 const fmtGpx = (g) => (Math.abs(g) >= 100 ? Math.round(Math.abs(g)).toLocaleString() : Math.abs(g).toFixed(Math.abs(g) >= 10 ? 1 : 2));
-// signed % — the week's trend, today against the week, real trades against the guide index
+// signed % — the week's trend, today against the week, real trades against the GE price
 const fmtDev = (d) => (d == null || !isFinite(d) ? "–" : (d > 0 ? "+" : "") + d.toFixed(Math.abs(d) >= 10 ? 0 : 1) + "%");
 const devClass = (d) => (d == null ? "mut" : Math.abs(d) < 2 ? "mut" : Math.abs(d) < 10 ? "" : "warn");
 const trendClass = (t) => (t == null ? "mut" : t > 1 ? "good" : t < -1 ? "bad" : "mut");
@@ -135,9 +138,9 @@ function assess(it) {
   const units = it.dv7 > 0 ? it.dv7 : it.dv;
   const turnover = units * px;
   const rangePos = it.rangeHi > it.rangeLo ? (mid - it.rangeLo) / (it.rangeHi - it.rangeLo) : null;
-  // the index screen needs a real gap to judge: rows the guide doesn't cover carry null
-  const indexDev = it.official != null ? it.dev ?? 0 : null;
-  return { ...it, tax, margin, roi, mid, px, units, turnover, rangePos, indexDev, dev: it.dev ?? 0 };
+  // the GE-price screen needs a real gap to judge: rows the GE price doesn't cover carry null
+  const guideDev = it.official != null ? it.dev ?? 0 : null;
+  return { ...it, tax, margin, roi, mid, px, units, turnover, rangePos, guideDev, dev: it.dev ?? 0 };
 }
 
 /* ================= api citizenship =================
@@ -283,13 +286,17 @@ async function pullLive() {
   ]);
   let m5 = null;
   try { m5 = await apiGet("5m", "/5m"); } catch (e) { /* 1h pricing covers */ }
-  // the official in-game guide index — Jagex's own lagged daily average of
+  // the official in-game GE price — Jagex's own lagged daily average of
   // EVERY trade, an independent sample the board tracks but never prices from
   let official = null;
-  try { official = await apiGet("official", "/official"); } catch (e) { /* index optional */ }
+  try { official = await apiGet("official", "/official"); } catch (e) { /* GE price optional */ }
   const meta = uni || BASE_ITEMS;      // no mapping? fall back to the baked classics
   const now = Math.floor(Date.now() / 1000);
   const items = [];
+  // books the board can't price honestly, kept whole: a crossed or
+  // dislocated tape can't head the Market Board, but the item still has a
+  // week and a midpoint, and the Commodities grid keeps its place for it
+  const aside = [];
   const hidden = { oneSided: 0, crossedAvg: 0, dislocated: 0 };
   for (const base of meta) {
     const p = latest.data?.[base.id];
@@ -318,10 +325,10 @@ async function pullLive() {
     } else {
       low = Math.round(lastDay[0]); high = Math.round(lastDay[1]); src = "day";
     }
-    if (high < low) { hidden.crossedAvg++; continue; }
     const dv = vols.data?.[base.id] ?? 0;
     const spreadPct = low > 0 ? ((high - low) / low) * 100 : 0;
-    if (tapeOk && high >= 50 && spreadPct > 10 && dv > 20_000) { hidden.dislocated++; continue; }
+    const setAside = high < low ? "crossed" : tapeOk && high >= 50 && spreadPct > 10 && dv > 20_000 ? "dislocated" : null;
+    if (setAside === "crossed") hidden.crossedAvg++; else if (setAside) hidden.dislocated++;
     // raw prints date the row and flag disagreement — they never price it
     const staleHi = p?.highTime ? Math.round((now - p.highTime) / 60) : 999;
     const staleLo = p?.lowTime ? Math.round((now - p.lowTime) / 60) : 999;
@@ -343,18 +350,79 @@ async function pullLive() {
       low1h: ok1 ? Math.round(h.avgLowPrice) : null,
       high1h: ok1 ? Math.round(h.avgHighPrice) : null,
       lastLow: p?.low ?? null, lastHigh: p?.high ?? null, crossed,
-      dv, staleHi, staleLo, tier, src, snap: false, moving, movePct,
-      ha: base.ha || 0, la: base.la || 0,
+      dv, staleHi, staleLo, tier: setAside ? "C" : tier, src, snap: false, moving, movePct,
+      ha: base.ha || 0, la: base.la || 0, aside: setAside,
     }, week);
-    // deviance from the official index: the week's real traded rate vs the guide price
+    // deviance from the official GE price: the week's real traded rate vs the guide
     const guide = official?.[base.name];
     it.official = guide > 0 ? guide : null;
     it.dev = guide > 0 ? (((it.rate ?? (low + high) / 2) - guide) / guide) * 100 : 0;
-    items.push(it);
+    (setAside ? aside : items).push(it);
   }
   if (items.length < 20) throw new Error("thin response");
-  return { items, universe: !!uni, hidden, days: days.map((d) => d.ts) };
+  return { items, aside, universe: !!uni, hidden, days: days.map((d) => d.ts) };
 }
+
+/* ================= commodities =================
+   The goods everyone trades, as families by stage: a strip of basket tiles,
+   the chart, one stone panel per family with its three stage lists, and the
+   linked pairs. Dense rows, the game's list style. */
+const CM_CSS = `
+.cm-controls { display:flex; gap:8px 18px; flex-wrap:wrap; align-items:center; padding:9px 13px; }
+.cm-controls .grp { display:inline-flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.cm-controls .grp.right { margin-left:auto; }
+.cm-strip { display:grid; grid-template-columns:repeat(auto-fill,minmax(136px,1fr)); gap:8px; margin-bottom:12px; }
+.cm-tile { font:inherit; color:var(--white); text-align:left; padding:8px 10px; cursor:pointer; display:flex; flex-direction:column; gap:4px; }
+.cm-tile:hover { background:#332c22; }
+.cm-tile.off { opacity:.5; }
+.cm-tile .hd { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.cm-tile .hd .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--white); }
+.cm-tile .hd .n { font-family:var(--mono); font-size:10.5px; color:var(--dark-tan); }
+.cm-tile .lv { display:flex; align-items:baseline; gap:8px; font-family:var(--mono); }
+.cm-tile .lv b { font-size:19px; font-weight:600; color:var(--yellow); text-shadow:1px 1px 0 #000; }
+.cm-tile .lv span { font-size:12px; }
+.cm-tile .br { display:flex; align-items:center; gap:4px 8px; flex-wrap:wrap; }
+.cm-tile .br small { font-size:10.5px; color:var(--dark-tan); white-space:nowrap; }
+.cm-tile .good, .cm-famhead .good, .cm-row .good, .cm-t .good { color:var(--good); }
+.cm-tile .bad, .cm-famhead .bad, .cm-row .bad, .cm-t .bad { color:var(--bad); }
+.cm-tile .mut, .cm-famhead .mut, .cm-row .mut, .cm-t .mut { color:var(--tan); }
+.cm-chart { padding:12px 13px; }
+.cm-chart .ge-hint { margin-top:8px; }
+.cm-tablewrap { margin-bottom:12px; max-height:none; }
+.cm-family { padding:10px 13px 12px; }
+.cm-famhead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.cm-famhead h3 { margin:0; font-family:var(--disp); font-weight:700; font-size:16px; color:var(--orange); letter-spacing:.02em; text-shadow:2px 2px 0 #000; }
+.cm-famhead .lv { font-family:var(--mono); font-size:15px; color:var(--yellow); font-weight:600; text-shadow:1px 1px 0 #000; }
+.cm-famhead .mv { font-family:var(--mono); font-size:12.5px; }
+.cm-famhead small { font-size:11.5px; color:var(--dark-tan); }
+.cm-famhead .bc-lgkey { align-self:center; }
+.cm-stages { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px 14px; }
+@media (max-width:760px){ .cm-stages { grid-template-columns:1fr; } }
+.cm-stage h4 { margin:0 0 4px; font-family:var(--pixel); font-size:10.5px; color:var(--tan); text-transform:uppercase; letter-spacing:.12em; text-shadow:1px 1px 0 #000; cursor:help; }
+.cm-rows { display:flex; flex-direction:column; }
+.cm-none { color:var(--dark-tan); font-size:12px; padding:4px 6px; }
+.cm-row { display:flex; align-items:center; gap:6px; width:100%; font:inherit; font-size:12.5px; color:var(--white); text-align:left;
+  background:var(--inset); border:none; border-bottom:1px solid #221d16; padding:3px 6px; cursor:pointer; text-shadow:1px 1px 0 #000; }
+.cm-row:hover { background:#332c22; } .cm-row:hover .nm { color:var(--yellow); }
+.cm-row .nm { flex:1 1 70px; min-width:56px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cm-row .nm .ge-mem { margin-left:5px; }
+.cm-row .px { font-family:var(--mono); color:var(--orange); min-width:40px; text-align:right; }
+.cm-row .mv { font-family:var(--mono); min-width:46px; text-align:right; }
+.cm-row .vs { font-family:var(--mono); min-width:44px; text-align:right; color:var(--dark-tan); font-size:11px; }
+.cm-row .vs.warn { color:var(--warn); }
+.cm-row .fl { display:inline-flex; gap:3px; flex:none; }
+.cm-row .fl:empty { display:none; }
+.cm-row .fl .ge-flag { margin-left:0; white-space:nowrap; font-size:9.5px; padding:0 3px; }
+.cm-row .ge-spark { flex:none; }
+@media (max-width:1000px){ .cm-row .ge-spark { display:none; } }
+@media (max-width:480px){ .cm-row .vs { display:none; } }
+.cm-spreads h3 { margin:0 0 6px; font-family:var(--disp); font-weight:700; font-size:16px; color:var(--orange); letter-spacing:.02em; text-shadow:2px 2px 0 #000; }
+.cm-spreads .ge-hint { margin:0 0 10px; }
+.cm-t tbody td:first-child { white-space:normal; min-width:210px; }
+.cm-t td .via { display:block; font-family:'Segoe UI',system-ui,sans-serif; font-size:10.5px; color:var(--dark-tan); white-space:normal; }
+.cm-t td .ge-spark { margin:0; }
+.cm-t td small { font-size:10.5px; color:var(--dark-tan); }
+`;
 
 /* ================= styles — old-school interface ================= */
 const CSS = `
@@ -730,6 +798,8 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 .ge-order .fill b.good { color:var(--good); } .ge-order .fill b.warn { color:var(--warn); } .ge-order .fill b.bad { color:var(--bad); }
 .ge-note b.good { color:var(--good); } .ge-note b.warn { color:var(--warn); } .ge-note b.bad { color:var(--bad); }
 ${CHART_CSS}
+${BASKET_CSS}
+${CM_CSS}
 `;
 
 /* ================= item popup =================
@@ -811,7 +881,7 @@ function ItemPopup({ it, status, onClose }) {
             <span>{it.members ? "Members" : "Free-to-play"}</span>
             <span>Buy limit <b>{it.limit.toLocaleString()}</b> / 4h</span>
             <span>Traded <b>{fmtQty(units)}</b> / day ≈ <b>{fmtGp(it.turnover)}</b> gp</span>
-            {it.official != null && <span>Guide index <b>{fmtGp(it.official)}</b> · the week sits {fmtDev(it.dev)}</span>}
+            {it.official != null && <span>GE price <b>{fmtGp(it.official)}</b> · the week sits {fmtDev(it.dev)}</span>}
             {taxOf(it.high) === 0 && <span style={{ color: "var(--good)" }}>No GE tax</span>}
           </div>
 
@@ -963,11 +1033,11 @@ function ItemPopup({ it, status, onClose }) {
           {it.official != null && Math.abs(it.dev) >= 10 && (
             <p className="ge-note caution">
               ⚠ The week's real trades sit {Math.abs(it.dev).toFixed(0)}% {it.dev > 0 ? "above" : "below"} the official
-              guide index — Jagex's lagged daily average of every trade in the game. Either the market genuinely moved
-              and the index hasn't caught up, or someone is painting one of the two.{" "}
+              GE price — Jagex's lagged daily average of every trade in the game. Either the market genuinely moved
+              and the GE price hasn't caught up, or someone is painting one of the two.{" "}
               {it.dev > 0
-                ? "While the gap holds, sellers still anchored to the guide keep feeding the book below the market — standing buy offers eat well."
-                : "While the gap holds, buyers still anchored to the guide keep paying over the market — standing sell offers eat well."}{" "}
+                ? "While the gap holds, sellers still anchored to the GE price keep feeding the book below the market — standing buy offers eat well."
+                : "While the gap holds, buyers still anchored to the GE price keep paying over the market — standing sell offers eat well."}{" "}
               On thin volume, assume the worst.
             </p>
           )}
@@ -1764,10 +1834,10 @@ function Econ101() {
       <section className="ge-panel">
         <h3>Where prices come from</h3>
         <ul>
-          <li>The in-game <b>guide price</b> is Jagex's own average, updated roughly once a day by an opaque
+          <li>The in-game <b>GE price</b> is Jagex's own average, updated roughly once a day by an opaque
             formula. It lags the real market by hours to days, and manipulators lean on that lag. This board
-            never <i>prices</i> from it — but it does <b>track it as an index</b>: it's computed from every
-            trade in the game (not just the plugin's sample), so the gap between real trades and the index is
+            never <i>prices</i> from it — but it does <b>track it</b>: it's computed from every
+            trade in the game (not just the plugin's sample), so the gap between real trades and the GE price is
             a signal in its own right.</li>
           <li>This board runs on the{" "}
             <a className="ge-link" href="https://prices.runescape.wiki" target="_blank" rel="noreferrer">
@@ -1870,11 +1940,17 @@ function Econ101() {
             standing sell could have; the orders are the prices that would have filled on all but one of those
             days (or every day, or all but two — your call). The chart draws both lines across the week so you
             can see the cycle touch them. A day to buy, a day to sell.</li>
-          <li><b>Vs index</b> compares the week's real trades to the official guide price — two independent
+          <li><b>Vs GE price</b> compares the week's real trades to the official GE price — two independent
             samples of the same market (the plugin's tape vs Jagex's lagged census of every trade). Near zero
-            means the feed is telling the truth. A wide gap is momentum the index hasn't caught up with — and
-            while it holds, casual players still anchored to the guide keep handing the informed side cheap
+            means the feed is telling the truth. A wide gap is momentum the GE price hasn't caught up with — and
+            while it holds, casual players still anchored to the GE price keep handing the informed side cheap
             fills — or it's one of the two prices being painted. Thin volume plus a wide gap: assume painted.</li>
+          <li>The <b>Commodities</b> tab sorts the goods everyone trades into families by processing stage and puts a{" "}
+            <b>GEB</b> — a Grand Exchange Basket — on each: a fixed load of goods priced at each day's going rates, set to 100
+            where the window starts, so 104 reads "the same load costs 4% more than it did". Weighted by flow it is the cost of a
+            typical day's trade through the family; weighted equally it is what the typical good is doing. A good's move against
+            its family's, a family's against the whole grid, and a recipe-linked pair's ratio against its usual band are how
+            something stands out from the trend around it.</li>
           <li>The <b>Job Board</b> prices whole production chains from the same numbers — buy the inputs, work
             them, sell the output, tax and buy limits included — with the wiki's own tick counts and xp per
             action on every step. Set a training focus and the same chains rank by <b>gp per xp</b> instead:
@@ -1931,8 +2007,8 @@ const SCREENS = [
     title: "Change across the week, from a line fitted through the daily averages. Keep it within a few percent either side for steady prices." },
   { k: "today", label: "Today vs week", unit: "%", scale: "lin", lo: -20, hi: 20, step: 0.5, fmt: fmtSigned, get: (it) => it.todayVs,
     title: "How far today's price sits from the week's going rate. Cap it below zero for items on a cheap day, floor it above zero for a dear one." },
-  { k: "dev", label: "Vs index", unit: "%", scale: "lin", lo: -30, hi: 30, step: 1, fmt: fmtSigned, get: (it) => it.indexDev,
-    title: "How far the week's real trades sit from the official guide index. Bounding this also hides items the index doesn't cover." },
+  { k: "dev", label: "Vs GE price", unit: "%", scale: "lin", lo: -30, hi: 30, step: 1, fmt: fmtSigned, get: (it) => it.guideDev,
+    title: "How far the week's real trades sit from the official GE price — the in-game guide. Bounding this also hides items the GE price doesn't cover." },
   { k: "limit", label: "Limit/4h", unit: "", scale: "log", lo: 1, hi: 1e5, fmt: fmtRoundQty, get: (it) => it.limit,
     title: "The 4-hour buy limit — the most of the item one account can buy per window." },
 ];
@@ -1944,7 +2020,7 @@ const PRESETS = [
   { k: "cheap", label: "Cheap today", hint: "Today sits 2% or more below the week's going rate.", set: { today: { max: -2 } } },
   { k: "penny", label: "Penny stocks", hint: "Under 50 gp — no GE tax on the sale.", set: { price: { max: 49 } } },
   { k: "big", label: "Big tickets", hint: "1m gp and up.", set: { price: { min: 1e6 } } },
-  { k: "honest", label: "Tracks the index", hint: "The week's trades within ±5% of the official guide price — a feed the index agrees with.", set: { dev: { min: -5, max: 5 } } },
+  { k: "honest", label: "Tracks the GE price", hint: "The week's trades within ±5% of the official GE price — a feed the GE price agrees with.", set: { dev: { min: -5, max: 5 } } },
 ];
 const normBounds = (b) => ({ min: b?.min ?? null, max: b?.max ?? null });
 const presetOn = (pr, screens) => Object.entries(pr.set).every(([k, b]) => {
@@ -2026,6 +2102,299 @@ function ScreenRange({ def, val, onChange }) {
   );
 }
 
+/* ================= commodities =================
+   The goods everyone trades — ores, bars, logs, planks, hides, fish, herbs,
+   runes and ammo — laid out as material families by processing stage, with
+   a GEB (Grand Exchange Basket) on every family, every stage and the whole
+   grid: a fixed load of goods priced at each day's going rates, set to 100
+   where the window starts. The week already in memory draws the grid at
+   once; a year of daily history per good streams in behind it (one wiki
+   request each, a few at a time, cached a quarter hour at the edge) and the
+   chart, the moves and the "unusual" flags fill in as it lands. */
+const WINDOWS = [{ d: 30, label: "30 days" }, { d: 90, label: "90 days" }, { d: 365, label: "A year" }];
+const WEIGHTINGS = [
+  { k: "flow", label: "By flow", hint: "Each good weighs what it trades on a typical day — the basket is the cost of a day's flow through the family" },
+  { k: "equal", label: "Equal", hint: "Every good counts the same — the geometric mean of each good's move" },
+];
+const LINE_SETS = [
+  { k: "families", label: "Families", hint: "One line per material family" },
+  { k: "stages", label: "Stages", hint: "One line per processing stage: raw, refined, product, across every family" },
+];
+const HIST_POOL = 6;
+const cmStore = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } };
+const lastOf = (arr) => { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return arr[i]; return null; };
+const lvlStr = (v) => (v == null ? "–" : v.toFixed(1));
+const moveClass = (v) => (v == null ? "mut" : v > 0.5 ? "good" : v < -0.5 ? "bad" : "mut");
+const breadthStr = (b) => (b.n === 0 ? "no moves yet" : `${b.up} up · ${b.down} down${b.flat ? ` · ${b.flat} flat` : ""}`);
+
+// a year of daily history per item, fetched a few at a time; the map fills
+// as they land and `version` ticks every few items so the tab repaints in
+// steps rather than once per good
+function useHistories(items, enabled) {
+  const histRef = useRef(new Map());
+  const [version, setVersion] = useState(0);
+  const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 });
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const todo = items.filter((it) => !histRef.current.has(it.id));
+    if (todo.length === 0) return undefined;
+    let gone = false, next = 0, done = 0, failed = 0;
+    setProgress({ done: 0, total: todo.length, failed: 0 });
+    const worker = async () => {
+      while (!gone && next < todo.length) {
+        const it = todo[next++];
+        try {
+          const j = await apiGet("timeseries", `/timeseries?timestep=24h&id=${it.id}`);
+          if (gone) return;
+          histRef.current.set(it.id, Array.isArray(j?.data) ? j.data : []);
+        } catch (e) { failed++; }
+        done++;
+        if (!gone && (done === todo.length || done % 8 === 0)) {
+          setProgress({ done, total: todo.length, failed });
+          setVersion((v) => v + 1);
+        }
+      }
+    };
+    Promise.all(Array.from({ length: HIST_POOL }, worker));
+    return () => { gone = true; };
+  }, [items, enabled]);
+  return { hist: histRef.current, version, progress };
+}
+
+const unusual = (e) => {
+  const out = [];
+  const { pz, vz, n } = e.z || {};
+  if (pz != null && Math.abs(pz) >= 2) out.push({
+    cls: Math.abs(pz) >= 3 ? "tC" : "", text: `⚑ ${pz > 0 ? "high" : "low"}`,
+    title: `Today's price sits ${Math.abs(pz).toFixed(1)} standard deviations ${pz > 0 ? "above" : "below"} its last ${n} days — unusual for this book.`,
+  });
+  if (vz != null && vz >= 2) out.push({
+    cls: "", text: "⚑ vol",
+    title: `This week's daily volume runs ${vz.toFixed(1)} standard deviations above the quarter before it — someone is moving size.`,
+  });
+  return out;
+};
+
+function GoodRow({ e, windowStart, onOpen }) {
+  const it = e.it;
+  const flags = unusual(e);
+  const young = e.hasHistory && e.since != null && e.since > windowStart + 2 * DAY;
+  return (
+    <button type="button" className="cm-row" onClick={() => onOpen(it.id)}
+      title={`${it.name}: going rate ${fmtGp(it.rate ?? it.mid)} gp · ${fmtDev(e.ret)} across the window · ${fmtDev(e.vsFamily)} against its family — tap for the day orders`}>
+      <span className="nm">{it.name}{it.members && <span className="ge-mem">P2P</span>}</span>
+      <span className="fl">
+        {it.aside && <span className="ge-flag" title={it.aside === "crossed"
+          ? "The tape's buy average sits above its sell average right now — the price is in motion, so the Market Board sets this book aside; here it's priced at the midpoint."
+          : "A wide spread on a busy book — a data artifact or a knife, so the Market Board sets this book aside; here it's priced at the midpoint."}>{it.aside}</span>}
+        {!e.hasHistory && <span className="ge-flag" title="No year of history yet — the move covers the week the board already knows.">week</span>}
+        {young && <span className="ge-flag" title={`Priced only since ${fmtDay(e.since)} — the move covers less than the window.`}>young</span>}
+        {flags.map((f) => <span key={f.text} className={"ge-flag " + f.cls} title={f.title}>{f.text}</span>)}
+      </span>
+      <span className="px">{fmtGp(it.rate ?? it.mid)}</span>
+      <Sparkline points={e.spark} w={40} h={14} className={"ge-spark " + moveClass(e.ret)} />
+      <span className={"mv " + moveClass(e.ret)}>{fmtDev(e.ret)}</span>
+      <span className={"vs" + (e.vsFamily != null && Math.abs(e.vsFamily) >= 10 ? " warn" : "")} title="Against its family's basket">{fmtDev(e.vsFamily)}</span>
+    </button>
+  );
+}
+
+function SpreadRow({ s, onOpen }) {
+  const y = s.yield || 1;
+  const last = s.last;
+  const makes = last ? last.margin + last.cost : null;
+  const chain = s.ins.map((x) => `${x.qty > 1 ? x.qty + " " : ""}${x.name}`).join(" + ") + (s.fee ? ` + ${s.fee} gp` : "");
+  const z = s.z;
+  const word = z == null ? "no band yet" : z >= 2 ? "fatter than usual" : z <= -2 ? "thinner than usual" : "about usual";
+  const cls = z == null ? "mut" : z >= 2 ? "good" : z <= -2 ? "bad" : "";
+  const open = () => { if (s.outItem) onOpen(s.outItem.id); };
+  return (
+    <tr tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}>
+      <td>
+        <span className="nm">{y > 1 ? `${y} × ` : ""}{s.out}</span>
+        <small className="via">from {chain}{s.via ? ` · ${s.via}` : ""}</small>
+      </td>
+      <td className="gold">{makes != null ? fmtGp(makes) : "–"}</td>
+      <td className="mut">{last ? fmtGp(last.cost) : "–"}</td>
+      <td className={last ? (last.margin > 0 ? "good" : "bad") : "mut"}>{last ? (last.margin > 0 ? "+" : "") + fmtGp(last.margin) : "–"}</td>
+      <td>{last && last.ratio != null ? last.ratio.toFixed(2) + "×" : "–"}</td>
+      <td className="mut">{s.band ? `${s.band.mean.toFixed(2)} ± ${s.band.sd.toFixed(2)}` : "–"}</td>
+      <td className={cls}>{word}{z != null && <small> ({(z > 0 ? "+" : "") + z.toFixed(1)}σ)</small>}</td>
+      <td><Sparkline points={s.spark} w={48} h={16} className={"ge-spark " + (z == null ? "mut" : z >= 2 ? "good" : z <= -2 ? "bad" : "mut")} /></td>
+    </tr>
+  );
+}
+
+function Commodities({ items, aside, status, weekDays, onOpen }) {
+  const [W, setW] = useState(() => { const v = +cmStore("fd:cm-window", "90"); return WINDOWS.some((w) => w.d === v) ? v : 90; });
+  const [weighting, setWeighting] = useState(() => (cmStore("fd:cm-weighting", "flow") === "equal" ? "equal" : "flow"));
+  const [lines, setLines] = useState("families");
+  const [hidden, setHidden] = useState(() => new Set());
+  const [tableOpen, setTableOpen] = useState(false);
+  useEffect(() => { try { localStorage.setItem("fd:cm-window", String(W)); localStorage.setItem("fd:cm-weighting", weighting); } catch (e) {} }, [W, weighting]);
+
+  const byName = useMemo(() => {
+    const m = new Map();
+    for (const it of aside || []) m.set(it.name, it);
+    for (const it of items) m.set(it.name, it);
+    return m;
+  }, [items, aside]);
+  const wanted = useMemo(() => basketNames().map((n) => byName.get(n)).filter(Boolean), [byName]);
+  const { hist, version, progress } = useHistories(wanted, status === "live");
+  const view = useMemo(
+    () => buildCommodities({ families: FAMILIES, stages: STAGES, pairs: PAIRS, resolve: (n) => byName.get(n) || null, hist, weekDays, now: Date.now() / 1000, window: W, weighting }),
+    [byName, hist, version, weekDays, W, weighting],
+  );
+
+  const series = useMemo(() => {
+    const all = { key: "all", name: "All goods", color: ALL_COLOR, dashed: true, levels: view.all.levels, level: view.all, n: view.all.n };
+    const fams = view.families.map((f) => ({ key: f.key, name: f.name, color: SLOT_COLORS[f.slot], levels: f.level.levels, level: f.level, n: f.members.length }));
+    const stages = view.stages.map((s, i) => ({ key: "stage:" + s.key, name: s.name, color: SLOT_COLORS[i], levels: s.level.levels, level: s.level, n: s.n }));
+    return lines === "stages" ? [all, ...stages] : [all, ...fams];
+  }, [view, lines]);
+  const toggle = useCallback((k) => setHidden((h) => { const n = new Set(h); if (n.has(k)) n.delete(k); else n.add(k); return n; }), []);
+
+  const loading = status === "live" && progress.total > 0 && progress.done < progress.total;
+  const winLabel = WINDOWS.find((w) => w.d === W)?.label || `${W} days`;
+  const since = view.days[0];
+  const failed = progress.total > 0 && progress.done === progress.total ? progress.failed : 0;
+
+  return <>
+    <p className="ge-read">
+      <b>{view.all.n}</b> goods in <b>{view.families.length}</b> families · since <b>{fmtDay(since)}</b> ({winLabel.toLowerCase()})
+      {status === "live" && <> · a year of history for <b>{view.coverage.withHistory}</b> of {view.coverage.resolved}{loading && <> — reading the year's trades…</>}{failed > 0 && <>, {failed} unreachable</>}</>}
+      {status === "snapshot" && <> · offline: the week alone, no year behind it</>}
+      {" "}· a <b>GEB</b> (Grand Exchange Basket) is a fixed load of goods priced at each day's going rates, set to 100 where the window starts. Tap a basket to hide or show its line; tap a good for its day orders.
+    </p>
+
+    <section className="ge-panel cm-controls">
+      <div className="grp"><span className="ge-pixlbl">Window</span>
+        {WINDOWS.map((w) => <button key={w.d} className={"ge-btn small" + (W === w.d ? " on" : "")} aria-pressed={W === w.d} onClick={() => setW(w.d)}>{w.label}</button>)}
+      </div>
+      <div className="grp"><span className="ge-pixlbl">Weighting</span>
+        {WEIGHTINGS.map((w) => <button key={w.k} className={"ge-btn small" + (weighting === w.k ? " on" : "")} aria-pressed={weighting === w.k} title={w.hint} onClick={() => setWeighting(w.k)}>{w.label}</button>)}
+      </div>
+      <div className="grp"><span className="ge-pixlbl">Lines</span>
+        {LINE_SETS.map((l) => <button key={l.k} className={"ge-btn small" + (lines === l.k ? " on" : "")} aria-pressed={lines === l.k} title={l.hint} onClick={() => { setLines(l.k); setHidden(new Set()); }}>{l.label}</button>)}
+      </div>
+      <div className="grp right">
+        <button className={"ge-btn small" + (tableOpen ? " on" : "")} aria-expanded={tableOpen} onClick={() => setTableOpen((o) => !o)}>{tableOpen ? "Hide the table" : "As a table"}</button>
+      </div>
+    </section>
+
+    <div className="cm-strip" role="group" aria-label="Baskets">
+      {series.map((s) => {
+        const on = !hidden.has(s.key);
+        return (
+          <button key={s.key} type="button" className={"cm-tile ge-inset" + (on ? "" : " off")} aria-pressed={on} onClick={() => toggle(s.key)}
+            title={`${on ? "Hide" : "Show"} ${s.name} on the chart`}>
+            <div className="hd"><span className={"bc-lgkey on" + (s.dashed ? " dashed" : "")} style={{ borderColor: s.color }} /><span className="nm">{s.name}</span><span className="n">{s.n}</span></div>
+            <div className="lv"><b>{lvlStr(lastOf(s.levels))}</b><span className={moveClass(s.level.ret)}>{fmtDev(s.level.ret)}</span></div>
+            <div className="br"><Sparkline points={s.level.spark} w={56} h={16} className={"ge-spark " + moveClass(s.level.ret)} /><small>{breadthStr(s.level.breadth)}</small></div>
+          </button>
+        );
+      })}
+    </div>
+
+    <section className="ge-panel cm-chart">
+      <LevelChart days={view.days} series={series} events={W <= 100 ? view.events : []} hidden={hidden} onToggle={toggle} height={280}
+        note={loading ? `reading the year's trades — ${progress.done} of ${progress.total}` : status === "snapshot" ? "offline: the week alone" : null}
+        ariaLabel={`${lines === "stages" ? "Stage" : "Family"} baskets, rebased to 100 at ${fmtDay(since)}`} />
+      <p className="ge-hint">
+        Every line starts at 100 on {fmtDay(since)} — {weighting === "flow" ? "the cost of a typical day's flow through that basket" : "the typical good's move in that basket"}, day by day since.
+        {W <= 100 && " The faint uprights are Wednesday game updates."} The last point is today's tape; the wiki aggregates a finished day a day or two later, so the line's last step is provisional.
+        Hover or use the arrow keys to read every line at a date.
+      </p>
+    </section>
+
+    {tableOpen && (
+      <div className="ge-tablewrap ge-inset cm-tablewrap">
+        <table className="ge-t cm-t">
+          <thead><tr><th style={{ textAlign: "left" }}>Basket</th><th>Goods</th><th>Low</th><th>High</th><th>Now</th><th>Move</th><th>Up · down · flat</th></tr></thead>
+          <tbody>
+            {series.map((s) => {
+              const vals = s.levels.filter((v) => v != null);
+              const lo = vals.length ? Math.min(...vals) : null, hi = vals.length ? Math.max(...vals) : null;
+              return (
+                <tr key={s.key} style={{ cursor: "default" }}>
+                  <td><span className="nm">{s.name}</span></td>
+                  <td className="mut">{s.n}</td>
+                  <td>{lvlStr(lo)}</td><td>{lvlStr(hi)}</td>
+                  <td className="gold">{lvlStr(lastOf(s.levels))}</td>
+                  <td className={moveClass(s.level.ret)}>{fmtDev(s.level.ret)}</td>
+                  <td className="mut">{s.level.breadth.up} · {s.level.breadth.down} · {s.level.breadth.flat}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+
+    {view.families.map((f) => (
+      <section key={f.key} className="ge-panel cm-family">
+        <header className="cm-famhead">
+          <span className="bc-lgkey on" style={{ borderColor: SLOT_COLORS[f.slot] }} />
+          <h3>{f.name}</h3>
+          <b className="lv">{lvlStr(lastOf(f.level.levels))}</b>
+          <span className={"mv " + moveClass(f.level.ret)}>{fmtDev(f.level.ret)}</span>
+          <small>{breadthStr(f.level.breadth)} · {f.members.length} goods</small>
+        </header>
+        <div className="cm-stages">
+          {f.cells.map((c) => (
+            <div key={c.stage} className="cm-stage">
+              <h4 title={STAGES.find((s) => s.key === c.stage)?.hint}>{c.name}</h4>
+              {c.items.length === 0
+                ? <div className="cm-none">– nothing at this stage</div>
+                : <div className="cm-rows">{c.items.map((e) => <GoodRow key={e.it.id} e={e} windowStart={since} onOpen={onOpen} />)}</div>}
+            </div>
+          ))}
+        </div>
+      </section>
+    ))}
+
+    <section className="ge-panel cm-spreads">
+      <h3>Linked pairs</h3>
+      <p className="ge-hint">
+        Goods the recipes tie together — logs to planks, ore to bars, a bar to four cannonballs. Each row is one action at today's going
+        rates: what it makes, what its inputs and the NPC's fee cost, and the ratio of the two against its usual band over the last{" "}
+        {BAND_DAYS} days. A ratio well outside its band is either a job just opened on the Job Board or a market that has changed shape.
+        Before tax and labour — the Job Board prices those. Tap a row for the product's day orders.
+      </p>
+      <div className="ge-tablewrap ge-inset">
+        <table className="ge-t cm-t">
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left" }}>Chain</th>
+              <th title="Output × yield at the going rate">Makes</th>
+              <th title="Inputs at the going rate, plus any NPC fee">Costs</th>
+              <th title="Makes less costs, per action">Pays</th>
+              <th title="Makes over costs">Ratio</th>
+              <th title={`The ratio's mean ± one standard deviation over the last ${BAND_DAYS} complete days`}>Usual</th>
+              <th title="Today's ratio against its usual band, in standard deviations">Now</th>
+              <th title="The ratio across the window">Window</th>
+            </tr>
+          </thead>
+          <tbody>{view.spreads.map((s) => <SpreadRow key={s.key} s={s} onOpen={onOpen} />)}</tbody>
+        </table>
+      </div>
+    </section>
+
+    <p className="ge-foot">
+      A GEB (Grand Exchange Basket) prices a fixed load of goods at each day's volume-weighted going rate and sets it to 100 where the
+      window starts. By flow, each good weighs the units it trades on a typical day (fixed for the window, so a riser can't vote itself
+      heavier); equal, every good counts the same and the basket is the geometric mean of their moves. Both are chain-linked day by day
+      over whichever goods have a price on both days, so a thin day or a young book moves the level by its own move and never by its absence;
+      a price is carried across a gap of up to {MAX_GAP} days.<br />
+      Each good's move is its going rate today over its going rate where the window starts; "vs family" is that move less its family's.
+      ⚑ marks today's price more than two standard deviations from the good's last {BAND_DAYS} days, or a week whose daily
+      volume runs that far above the {BAND_DAYS} days before it.
+      History is one wiki request per good, a few at a time, only when this tab is open and shared through the site's edge cache.
+      Live prices courtesy of the <a className="ge-link" href="https://prices.runescape.wiki" target="_blank" rel="noreferrer">OSRS Wiki price API</a> — estimates, not promises.
+    </p>
+  </>;
+}
+
 /* ================= app ================= */
 export default function JobBoardApp() {
   const [status, setStatus] = useState("loading"); // loading | live | snapshot
@@ -2054,7 +2423,7 @@ export default function JobBoardApp() {
   const [sortKey, setSortKey] = useState("turnover");
   const [sortDir, setSortDir] = useState(-1);
   const [selId, setSelId] = useState(null);
-  const [view, setView] = useState("jobs"); // jobs | market | econ
+  const [view, setView] = useState("jobs"); // jobs | market | goods | econ
 
   const refresh = useCallback(async (auto = false) => {
     if (!auto) setStatus("loading");
@@ -2083,6 +2452,7 @@ export default function JobBoardApp() {
   }, [refresh]);
 
   const assessed = useMemo(() => (live?.items ?? BASE_ITEMS).map(assess), [live]);
+  const asideItems = useMemo(() => (live?.aside ?? []).map(assess), [live]);
 
   const activeScreens = useMemo(() => SCREENS.filter((d) => screens[d.k]), [screens]);
   const filtered = useMemo(() => {
@@ -2126,7 +2496,7 @@ export default function JobBoardApp() {
     </th>
   );
 
-  const sel = useMemo(() => assessed.find((p) => p.id === selId) || null, [assessed, selId]);
+  const sel = useMemo(() => assessed.find((p) => p.id === selId) || asideItems.find((p) => p.id === selId) || null, [assessed, asideItems, selId]);
   const hiddenN = live?.hidden ? live.hidden.oneSided + live.hidden.crossedAvg + live.hidden.dislocated : 0;
   const snapAgeH = Math.round((Date.now() / 1000 - SNAPSHOT.ts) / 3600);
   const snapAgeStr = snapAgeH > 48 ? `~${Math.round(snapAgeH / 24)} days old` : `~${snapAgeH}h old`;
@@ -2151,7 +2521,7 @@ export default function JobBoardApp() {
         <header className="ge-mast">
           <div>
             <h1 className="ge-title">Job Board</h1>
-            <p className="ge-sub">{view === "market" ? "What things are going for this week" : view === "econ" ? "How the exchange works" : "Skilling work priced by the Grand Exchange"}</p>
+            <p className="ge-sub">{view === "market" ? "What things are going for this week" : view === "goods" ? "The goods everyone trades, family by family" : view === "econ" ? "How the exchange works" : "Skilling work priced by the Grand Exchange"}</p>
           </div>
           <div className="ge-status">
             {status === "live" && (
@@ -2170,6 +2540,8 @@ export default function JobBoardApp() {
             aria-selected={view === "jobs"} onClick={() => setView("jobs")}>Job Board</button>
           <button className={"ge-tab" + (view === "market" ? " on" : "")} role="tab"
             aria-selected={view === "market"} onClick={() => setView("market")}>Market Board</button>
+          <button className={"ge-tab" + (view === "goods" ? " on" : "")} role="tab"
+            aria-selected={view === "goods"} onClick={() => setView("goods")}>Commodities</button>
           <button className={"ge-tab" + (view === "econ" ? " on" : "")} role="tab"
             aria-selected={view === "econ"} onClick={() => setView("econ")}>Econ 101</button>
         </div>
@@ -2184,6 +2556,7 @@ export default function JobBoardApp() {
 
         {view === "jobs" && <JobBoard items={assessed} status={status} />}
         {view === "econ" && <Econ101 />}
+        {view === "goods" && <Commodities items={assessed} aside={asideItems} status={status} weekDays={weekDays} onOpen={setSelId} />}
 
         {view === "market" && <>
         <p className="ge-read">

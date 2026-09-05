@@ -140,7 +140,7 @@ next-best pick at each call when those aren't there.
 
 | Game | Tool | What it does |
 | --- | --- | --- |
-| RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, and an econ primer |
+| RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer |
 | RuneScape | Gielinor Crafting Web | Every craftable item as an explorable 3D recipe web, with per-skill xp lenses |
 | Fortnite | Tactical Terrain | The island in 3D — sightlines, dead ground, cover |
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
@@ -212,6 +212,42 @@ The pure model lives in `tools-src/runescape/day-model.js`;
 `npm run check:model [itemId] [qty]` prints its read on one item against the
 live API. `npm run data:snapshot` re-bakes the offline snapshot with the
 week's daily rows.
+
+### The Commodities tab and its GEBs
+
+The goods everyone trades — ores, bars, logs, planks, hides, fish, herbs,
+runes and ammo — laid out as material families by processing stage (raw,
+refined, product), with a **GEB** on every family, every stage and the whole
+grid. A GEB, a Grand Exchange Basket, is a fixed load of goods priced at each
+day's volume-weighted going rate and set to 100 where the window starts, so
+104 reads "the same load costs 4% more than it did". *By flow* weights each
+good by the units it trades on a typical day, fixed for the window so a
+riser can't vote itself heavier: the basket is the cost of a typical day's
+flow through that family. *Equal* is the geometric mean of every good's
+move: what the typical good is doing. Both are chain-linked day by day over
+whichever goods have a price on both days, so a thin day or a young book
+shifts the level by its own move and never by its absence; a price is
+carried across a gap of up to seven days.
+
+The week the board already holds draws the grid at once; a year of daily
+history per good streams in behind it (one wiki `timeseries` request each,
+six at a time, only while the tab is open, cached a quarter hour at the
+edge) and fills in the chart, the moves and the flags. The chart draws every
+basket on one axis, rebased to 100, with Wednesday game updates marked, a
+crosshair that reads every line at a date, and a table twin. Each good's row
+carries its going rate, its move across the window, that move less its
+family's ("vs family"), a sparkline, and a ⚑ when today's price or volume
+sits more than two standard deviations from its last ninety days. A
+**Linked pairs** table prices the recipes that tie goods together — logs to
+planks with the sawmill's fee, ore and coal to bars, a steel bar to four
+cannonballs, hides to leather, raw fish to cooked, grimy herbs to clean to
+potions — as what one action makes over what it costs, against the ratio's
+usual band: a ratio well outside it is either a job just opened on the Job
+Board or a market that has changed shape.
+
+The curated grid and pairs live in `tools-src/runescape/baskets.js`, the
+maths in `tools-src/runescape/basket-model.js`, and
+`npm run check:baskets [family] [days]` reads one family's GEB live.
 
 ## Repository structure
 

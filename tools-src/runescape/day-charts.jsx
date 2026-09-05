@@ -16,7 +16,7 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 /* ---- shared scale helpers ---- */
 // linear scale, domain [d0,d1] -> range [r0,r1]; guards a flat/degenerate domain
-function scaleLinear(d0, d1, r0, r1) {
+export function scaleLinear(d0, d1, r0, r1) {
   const span = d1 - d0;
   if (!isFinite(span) || span === 0) return () => (r0 + r1) / 2;
   return (v) => r0 + ((v - d0) / span) * (r1 - r0);
@@ -32,7 +32,7 @@ function niceStep(range, targetTicks) {
   const step = norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10;
   return step * mag;
 }
-function niceTicks(lo, hi, targetTicks) {
+export function niceTicks(lo, hi, targetTicks) {
   if (!(hi > lo)) return [lo];
   const step = niceStep(hi - lo, targetTicks);
   const start = Math.ceil(lo / step) * step;
