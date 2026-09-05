@@ -13,9 +13,9 @@ import { dirname } from 'node:path';
 
 const TOOLS = [
   {
-    entry: 'tools-src/runescape/flip-desk.jsx',
-    out: 'public/tools/runescape/flip-desk.html',
-    title: 'OSRS Flip Desk',
+    entry: 'tools-src/runescape/job-board.jsx',
+    out: 'public/tools/runescape/job-board.html',
+    title: 'OSRS Job Board',
   },
   {
     entry: 'tools-src/skyrim/enchanting-simulator.jsx',

@@ -1,5 +1,5 @@
 // Day-model: turns hourly GE price/volume history into "what standing order
-// would have filled" numbers for the Flip Desk's day-to-day view.
+// would have filled" numbers for the Job Board's Market Board tab.
 //
 // The GE is price-time priority. In the wiki's data, a "low" trade is an
 // insta-sell (someone hit a standing BUY), a "high" trade is an insta-buy

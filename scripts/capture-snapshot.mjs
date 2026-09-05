@@ -1,4 +1,4 @@
-// Re-bakes the Flip Desk's offline snapshot (tools-src/runescape/flip-desk-snapshot.json)
+// Re-bakes the Job Board's offline snapshot (tools-src/runescape/job-board-snapshot.json)
 // with tape-averaged v2 pricing plus a seven-day daily history, so offline mode uses
 // the same verified numbers as the live board instead of raw prints.
 //
@@ -14,7 +14,7 @@
 import { writeFileSync } from 'node:fs';
 
 const BASE = process.env.OSRS_API || 'https://gaming.peliglot.com/api/osrs';
-const UA = 'flip-desk snapshot capture (gaming.peliglot.com; one-off, 13 requests)';
+const UA = 'job-board snapshot capture (gaming.peliglot.com; one-off, 13 requests)';
 const KEEP = 400; // most-traded rows to bake
 const DAY = 86400;
 
@@ -116,7 +116,7 @@ for (const m of mapping) {
 
 rows.sort((a, b) => b.rank - a.rank);
 const items = rows.slice(0, KEEP).map((r) => r.row);
-writeFileSync('tools-src/runescape/flip-desk-snapshot.json',
+writeFileSync('tools-src/runescape/job-board-snapshot.json',
   JSON.stringify({ version: 3, ts: now, days, items }));
 console.log(`baked v3 snapshot: ${items.length} items (of ${rows.length} priceable) from ${BASE}`);
 console.log(`  ${days.length} daily blocks: ${days.map((t) => new Date(t * 1000).toISOString().slice(0, 10)).join(', ')}`);

@@ -14,7 +14,7 @@ const UPSTREAM = "https://prices.runescape.wiki/api/v1/osrs";
 const OFFICIAL = "https://oldschool.runescape.wiki/w/Module:GEPrices/data.json?action=raw";
 // Jagex's public hiscores (per-player level and xp by skill; no auth exists).
 const HISCORES = "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json";
-const UA = "flip-desk edge proxy @ gaming.peliglot.com (shared cache for all site visitors)";
+const UA = "job-board edge proxy @ gaming.peliglot.com (shared cache for all site visitors)";
 
 // per-endpoint edge-cache TTLs (seconds), matched to how often the data moves
 const ENDPOINTS = new Map([

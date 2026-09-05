@@ -1,5 +1,9 @@
 # Job Board UX prototypes
 
+**Outcome: A, the Notice Board, was chosen and ported into the tool**
+(`tools-src/runescape/job-board.jsx`). B and C stay here as the record of
+the directions considered.
+
 Three click-through prototypes for revamping the Flip Desk's Job Board, built
 against one shared mock dataset so the comparison is about layout and
 interaction rather than content. `BRIEF.md` carries the diagnosis of the
