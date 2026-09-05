@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import RECIPES from "./recipes.json";
-import SNAPSHOT from "./flip-desk-snapshot.json";
+import SNAPSHOT from "./job-board-snapshot.json";
 import { DAY, weekStats, completeDays, dayFills, cycleOrders, hourProfile, holdout } from "./day-model.js";
 import { CHART_CSS, Sparkline, RangeBar, CycleChart, HourProfile } from "./day-charts.jsx";
 
-/* baked snapshot lives in flip-desk-snapshot.json — v3 rows (scripts/capture-snapshot.mjs)
+/* baked snapshot lives in job-board-snapshot.json — v3 rows (scripts/capture-snapshot.mjs)
    carry tape-averaged pricing plus a week of daily rows; v2 rows carry the tape alone */
 
 const API = "https://prices.runescape.wiki/api/v1/osrs";
@@ -358,14 +358,18 @@ async function pullLive() {
 
 /* ================= styles — old-school interface ================= */
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Pixelify+Sans:wght@500;600&display=swap');
 .ge-root {
   --stone:#3e3529; --stone-hi:#554a38; --stone-lo:#241f18; --edge:#0d0b08;
   --inset:#2b2620; --inset2:#211d17;
   --orange:#ff981f; --yellow:#ffe93f; --white:#f3ecdc; --tan:#b3a284; --dark-tan:#8a7a5f;
   --good:#57d957; --warn:#e8b13c; --bad:#f26060;
+  --wood:#2a1f14; --wood-seam:#1c140c;
+  --paper:#e8dcb5; --paper-edge:#c9b98c; --ink:#2a2014; --ink-soft:#4d4330; --pin:#5c5348; --pin-hi:#8a8072;
+  --paper-good:#1f6b1f; --paper-bad:#8b1d1d; --stamp:#7a2430; --stamp2:#5a3a7a;
   --mono:ui-monospace,'Cascadia Code','SF Mono',Menlo,Consolas,monospace;
   --disp:'Cinzel',Georgia,'Times New Roman',serif;
+  --pixel:'Pixelify Sans',var(--disp);
   background:#1b1712; color:var(--white); min-height:100vh;
   font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
   font-size:14px; line-height:1.45;
@@ -505,6 +509,7 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 .ge-t .good { color:var(--good); } .ge-t .bad { color:var(--bad); } .ge-t .warn { color:var(--warn); }
 .ge-t .mut { color:var(--tan); } .ge-t .gold { color:var(--orange); }
 .ge-mem { color:#d0a0e8; font-size:10px; margin-left:6px; border:1px solid #5a4470; border-radius:2px; padding:0 4px; font-family:var(--mono); }
+.ge-mem.off { color:var(--dark-tan); border-color:var(--dark-tan); }
 .ge-flag { color:var(--warn); font-size:10px; margin-left:6px; border:1px dashed #6e5426; border-radius:2px; padding:0 4px; font-family:var(--mono); cursor:help; }
 .ge-flag.tC { color:var(--bad); border-color:#6e2f26; }
 .ge-more { padding:9px 12px; font-size:12px; color:var(--tan); text-align:center; }
@@ -588,39 +593,104 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 }
 .ge-tab:hover { color:var(--yellow); }
 
-/* job board */
-.ge-modebar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-.ge-mode { font-size:12.5px; }
-.ge-mode.on { color:var(--yellow); box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
-.ge-sheet { display:flex; gap:8px 14px; align-items:center; flex-wrap:wrap; font-size:12.5px; text-shadow:1px 1px 0 #000; }
-.ge-sheet .sk { display:inline-flex; align-items:center; gap:5px; color:var(--tan); }
-.ge-sheet .sk input { width:52px; text-align:right; font-family:var(--mono); padding:4px 6px; }
-.ge-job { padding:0; overflow:hidden; }
-.ge-jobhead { display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap;
-  padding:9px 13px 7px; }
-.ge-jobhead h3 { margin:0; font-family:var(--disp); font-weight:700; font-size:16.5px; color:var(--orange);
-  letter-spacing:.02em; text-shadow:2px 2px 0 #000; }
-.ge-pay { font-family:var(--mono); font-size:17px; font-weight:600; text-shadow:1px 1px 0 #000; white-space:nowrap; }
-.ge-pay.good { color:var(--good); } .ge-pay.bad { color:var(--bad); }
-.ge-jobmeta { display:flex; gap:5px 14px; flex-wrap:wrap; font-size:11.5px; color:var(--tan);
-  padding:0 13px 8px; text-shadow:1px 1px 0 #000; }
-.ge-req { font-family:var(--mono); font-size:11px; border:1px solid var(--edge); border-radius:2px; padding:0 5px; }
-.ge-req.ok { color:var(--good); } .ge-req.no { color:var(--bad); } .ge-req.unk { color:var(--tan); }
-.ge-req.warn { color:var(--warn); border-color:#6e5426; cursor:help; }
-.ge-joblines { margin:0 13px 10px; padding:8px 11px; font-family:var(--mono); font-size:12.5px; line-height:1.75; }
-.ge-joblines .op { display:inline-block; width:52px; font-weight:700; letter-spacing:.06em; font-size:11px; }
-.ge-joblines .op.buy { color:var(--good); } .ge-joblines .op.work { color:var(--orange); } .ge-joblines .op.sell { color:var(--bad); }
-.ge-joblines .clock { color:var(--dark-tan); font-size:11.5px; }
-.ge-jobsum { display:flex; align-items:center; justify-content:space-between; gap:8px 18px; flex-wrap:wrap;
-  padding:8px 13px 11px; border-top:1px solid #221d16; }
-.ge-jobsum .facts { display:flex; gap:6px 20px; flex-wrap:wrap; font-family:var(--mono); font-size:12.5px; }
-.ge-jobsum .facts div span { display:block; font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; color:var(--tan);
-  letter-spacing:.1em; text-transform:uppercase; margin-bottom:1px; text-shadow:1px 1px 0 #000; }
-.ge-jobsum .facts div b { font-weight:600; color:var(--white); }
-.ge-jobsum .facts .good { color:var(--good); } .ge-jobsum .facts .bad { color:var(--bad); } .ge-jobsum .facts .gold { color:var(--orange); }
-.ge-batch { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:12.5px; }
-.ge-batch .ge-btn { padding:3px 9px; font-family:var(--mono); }
-.ge-batch b { min-width:52px; text-align:center; color:var(--yellow); }
+/* ================= job board — the notice board =================
+   A stone toolbar and a one-line character strip above a wooden board of
+   parchment notices; a notice carries only the essentials and lifts into a
+   stone contract on click. Paper on wood, not more stone. */
+.ge-toolbar { padding:11px 13px; margin-bottom:10px; }
+.ge-moderow { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.ge-modehint { font-size:12px; color:var(--tan); margin:6px 0 0; text-shadow:1px 1px 0 #000; }
+.ge-skillrow { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid #221d16; }
+.ge-pixlbl { font-family:var(--pixel); font-size:10.5px; color:var(--tan); text-transform:uppercase; letter-spacing:.1em; margin-right:2px; text-shadow:1px 1px 0 #000; }
+.ge-filterrow { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid #221d16; }
+.ge-filterrow .grow { flex:1 1 200px; min-width:140px; }
+.ge-btn.on { color:var(--yellow); background:var(--stone-hi); box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
+.ge-btn.small { padding:3px 9px; font-size:11.5px; }
+
+/* the character strip: the sheet in one line, the editor beneath on click */
+.ge-charstrip { display:flex; align-items:center; overflow-x:auto; margin-bottom:14px; padding:0; width:100%; text-align:left;
+  font:inherit; color:var(--white); cursor:pointer; }
+.ge-charstrip .cs-inner { display:flex; align-items:center; gap:14px; padding:8px 13px; white-space:nowrap; min-width:100%; }
+.ge-charstrip .rsn { font-family:var(--disp); font-weight:700; color:var(--orange); font-size:14px; text-shadow:1px 1px 0 #000; flex:none; }
+.ge-charstrip .cell { display:inline-flex; align-items:center; gap:5px; font-family:var(--mono); font-size:12.5px; text-shadow:1px 1px 0 #000; flex:none; }
+.ge-charstrip .ge-mem { margin-left:0; flex:none; }
+.ge-charstrip .cell .g { font-size:14px; }
+.ge-charstrip .cell b { font-weight:600; }
+.ge-charstrip .cell b.blank { color:var(--dark-tan); font-weight:400; }
+.ge-charstrip .quests { font-family:var(--mono); font-size:12px; color:var(--tan); flex:none; }
+.ge-charstrip .hint { margin-left:auto; font-size:11px; color:var(--dark-tan); flex:none; }
+.ge-charstrip:hover { background:#463b2c; }
+.ge-charstrip[aria-expanded="true"] { margin-bottom:0; border-bottom-left-radius:0; border-bottom-right-radius:0; }
+.ge-sheet-editor { padding:12px 13px 13px; margin-bottom:14px; border-top:none; }
+.ge-sheet-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px 14px; }
+.ge-sheet-grid label { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.ge-sheet-grid label .g { margin-right:4px; }
+.ge-sheet-grid input[type=number] { width:56px; text-align:right; font-family:var(--mono); font-size:13px; padding:5px 6px; }
+.ge-sheet-grid input[type=checkbox] { width:16px; height:16px; accent-color:var(--orange); }
+.ge-sheet-quests { display:flex; gap:8px 16px; flex-wrap:wrap; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid #221d16; }
+.ge-qlbl { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; text-shadow:1px 1px 0 #000; cursor:pointer; }
+.ge-qlbl.done { color:var(--good); } .ge-qlbl.todo { color:var(--bad); }
+.ge-qlbl input { accent-color:currentColor; width:14px; height:14px; }
+.ge-sheet-rsn { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid #221d16; }
+.ge-sheet-rsn input[type=text] { width:150px; }
+.ge-sheet-rsn .msg { font-size:12px; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.ge-sheet-note { font-size:11.5px; color:var(--dark-tan); margin:10px 0 0; line-height:1.45; }
+
+/* the board: a wooden ground, notices in a grid */
+.ge-board { background:var(--wood); background-image:repeating-linear-gradient(to bottom, transparent 0 89px, var(--wood-seam) 89px 90px);
+  border:1px solid var(--edge); border-radius:2px; padding:18px; margin-bottom:12px;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; }
+.ge-notice { position:relative; background:var(--paper); color:var(--ink); border:1px solid var(--paper-edge); border-radius:1px;
+  box-shadow:2px 3px 0 rgba(0,0,0,.45); padding:16px 12px 11px; text-align:left; cursor:pointer;
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif; font-size:14px; line-height:1.45;
+  display:flex; flex-direction:column; gap:6px; transform:rotate(var(--tilt,0deg)); }
+.ge-notice:hover { background:#efe4c2; }
+.ge-notice:focus-visible { outline:3px solid var(--yellow); outline-offset:2px; }
+.ge-notice .pin { position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:11px; height:11px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--pin-hi), var(--pin) 65%, #33302a); border:1px solid #16130f; box-shadow:0 1px 2px rgba(0,0,0,.6); }
+.ge-notice.faded { opacity:.55; filter:grayscale(65%); }
+.ge-notice .stamps { position:absolute; top:6px; right:6px; display:flex; flex-direction:column; align-items:flex-end; gap:2px; pointer-events:none; }
+.ge-stamp { font-family:var(--pixel); font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; border:1.5px solid var(--stamp); color:var(--stamp);
+  border-radius:2px; padding:1px 5px; transform:rotate(6deg); opacity:.82; background:rgba(232,220,181,.55); }
+.ge-stamp.purple { border-color:var(--stamp2); color:var(--stamp2); }
+.ge-notice h3 { margin:0; font-family:var(--disp); font-weight:700; font-size:15.5px; color:var(--ink); letter-spacing:.01em; line-height:1.2; padding-right:34px; }
+.ge-notice .pay { font-family:var(--mono); font-size:20px; font-weight:700; line-height:1.1; font-variant-numeric:tabular-nums; }
+.ge-notice .pay.good { color:var(--paper-good); } .ge-notice .pay.bad { color:var(--paper-bad); }
+.ge-notice .line2 { font-family:var(--mono); font-size:11.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums; }
+.ge-notice .line2 .eq { white-space:nowrap; }
+.ge-notice .line2 b { font-weight:700; } .ge-notice .line2 b.good { color:var(--paper-good); } .ge-notice .line2 b.bad { color:var(--paper-bad); }
+.ge-notice .reqs { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
+.ge-nchip { font-family:var(--mono); font-size:10px; border-radius:2px; padding:1px 5px; border:1px solid; white-space:nowrap; }
+.ge-nchip.ok { color:var(--paper-good); border-color:var(--paper-good); background:rgba(31,107,31,.08); }
+.ge-nchip.no { color:var(--paper-bad); border-color:var(--paper-bad); background:rgba(139,29,29,.08); }
+.ge-nchip.unk { color:var(--ink-soft); border-color:var(--ink-soft); background:rgba(42,32,20,.06); }
+.ge-notice.empty { grid-column:1/-1; max-width:420px; margin:0 auto; cursor:default; transform:none; }
+.ge-notice.empty h3 { padding-right:0; }
+.ge-notice.empty p { margin:2px 0 0; font-size:12.5px; color:var(--ink-soft); line-height:1.5; }
+
+/* the contract: what the notice leaves out */
+.ge-examine { margin:5px 0 0; font-size:12.5px; font-style:italic; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.ge-reqlist { display:flex; flex-direction:column; gap:4px; margin:0 0 12px; font-family:var(--mono); font-size:12.5px; }
+.ge-reqlist .r { display:flex; gap:8px; }
+.ge-reqlist .r.ok { color:var(--good); } .ge-reqlist .r.no { color:var(--bad); } .ge-reqlist .r.unk { color:var(--tan); cursor:help; }
+.ge-batchpanel { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.ge-batch { display:inline-flex; align-items:center; gap:8px; }
+.ge-batch .ge-btn { font-family:var(--mono); }
+.ge-batch b { font-family:var(--mono); font-size:17px; color:var(--yellow); min-width:64px; text-align:center; }
+.ge-capnote { font-size:11.5px; color:var(--dark-tan); }
+.ge-ledger { padding:9px 11px; font-family:var(--mono); font-size:12.5px; line-height:1.8; margin-bottom:12px; font-variant-numeric:tabular-nums; }
+.ge-ledger .op { display:inline-block; width:50px; font-weight:700; letter-spacing:.05em; font-size:11px; }
+.ge-ledger .op.buy { color:var(--good); } .ge-ledger .op.work { color:var(--orange); } .ge-ledger .op.sell { color:var(--bad); }
+.ge-ledger .clock { color:var(--dark-tan); font-size:11.5px; }
+.ge-facts { display:flex; gap:8px 20px; flex-wrap:wrap; font-family:var(--mono); font-size:12.5px; padding:9px 11px; margin-bottom:12px; }
+.ge-facts div span { display:block; font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; color:var(--tan); letter-spacing:.1em; text-transform:uppercase; margin-bottom:2px; text-shadow:1px 1px 0 #000; }
+.ge-facts div b { font-weight:600; color:var(--white); }
+.ge-facts .good { color:var(--good); } .ge-facts .bad { color:var(--bad); } .ge-facts .warn { color:var(--warn); } .ge-facts .gold { color:var(--orange); }
+.ge-warnnote { font-size:12px; color:#f1d08a; line-height:1.5; margin:0; padding:9px 11px; border:1px solid #6e5426; background:#33270f; border-radius:2px; }
+@media (max-width:600px){
+  .ge-board { grid-template-columns:1fr; padding:12px; }
+  .ge-moderow .ge-btn { flex:1 1 0; text-align:center; }
+}
 
 /* econ 101 */
 .ge-econ h3 { margin:0 0 7px; font-family:var(--disp); font-weight:700; font-size:16.5px; color:var(--orange);
@@ -917,16 +987,16 @@ function ItemPopup({ it, status, onClose }) {
   );
 }
 
-/* ================= the job board =================
+/* ================= the job board's arithmetic =================
    Resource-processing work priced by the market itself: buy the inputs, do the
    skilling, sell the product. Focus is the whole job — what it pays, what it
    costs to start, how long it takes, and whether you have the levels — never
    gp/hr: it's low-intensity work and your GE slots run concurrently anyway.
 
-   "Take the market" crosses the spread on both ends (insta-buy the inputs,
+   "Start now" (express) crosses the spread on both ends (insta-buy the inputs,
    insta-sell the product): thinner pay, but the job starts and ends NOW.
-   "Quote and wait" prices at the week's going rates on both ends for the
-   full margin, with a day-scale clock on each leg. */
+   "Full margin" (patient) prices at the week's going rates on both ends for
+   the whole margin, with a day-scale clock on each leg. */
 const SKILL_LIST = ["Smithing", "Crafting", "Fletching", "Cooking", "Herblore", "Magic"];
 // almost every unlock is a quest; the exceptions get their own tooltip
 const UNLOCK_NOTE = {
@@ -1216,159 +1286,264 @@ function buildJobs(items, mode, skills, focus) {
   return jobs;
 }
 
-/* one job posting */
-function JobCard({ job, n, setN, sheet, focus }) {
+/* ================= the notice board =================
+   The board itself: a stone toolbar, the sheet folded into one line, and a
+   wooden board of parchment notices. A notice carries only the essentials —
+   the job, its pay, one line of batch · time · costs, the requirements as
+   green/red chips and any stamps — and lifts into a stone contract on click,
+   where the full ledger lives. Paper on wood, not more stone. */
+const MODE_HINT = {
+  express: "Insta-buy the inputs, insta-sell the product — thinner pay, done today.",
+  patient: "Offers at the week's going rates — the whole margin, about a day per leg.",
+};
+const SKILL_GLYPH = { Smithing: "⚒", Crafting: "✂", Fletching: "➶", Cooking: "♨", Herblore: "⚗", Magic: "✦" };
+const SHEET_KEY = "fd-sheet-v1"; // kept across the redesign so nobody's levels vanish
+const loadSheet = () => {
+  try { return { members: true, skills: {}, quests: {}, ...(JSON.parse(localStorage.getItem(SHEET_KEY)) || {}) }; }
+  catch (e) { return { members: true, skills: {}, quests: {} }; }
+};
+const hasLevels = (sheet) => Object.values(sheet.skills || {}).some((v) => v !== "" && v != null);
+// a blank skill counts as level 1 — the board never assumes training you haven't claimed
+const lvlOf = (sheet, s) => { const have = sheet.skills?.[s]; return have === "" || have == null ? 1 : +have; };
+// the first thing standing between the player and the job, in the game's words
+function blockerOf(job, sheet) {
+  if (job.members && !sheet.members) return "Members";
+  for (const q of job.levels) if (lvlOf(sheet, q.s) < q.l) return `${q.s} ${q.l}`;
+  for (const u of job.unlocks) if (!sheet.quests?.[u]) return u;
+  return null;
+}
+const canDo = (job, sheet) => !blockerOf(job, sheet);
+const focusXpOf = (job, focus) => (focus ? job.xp.find(([s]) => s === focus)?.[1] || 0 : 0);
+// a patient leg's clock, in hours: the units over the share of a day's flow a standing offer catches
+const clockH = (units, flowPerDay) => (flowPerDay > 0 ? Math.max((units / (flowPerDay * CAPTURE)) * 24, 1) : Infinity);
+/* the whole batch's numbers — the notice and the contract read the same sums */
+function jobMath(job, n) {
   const { out, mode } = job;
-  // a patient leg's clock, in hours: the units over the share of a day's flow a standing offer catches
-  const clockH = (units, flowPerDay) => (flowPerDay > 0 ? Math.max((units / (flowPerDay * CAPTURE)) * 24, 1) : Infinity);
   const workH = (n * job.secs) / 3600;
-  const buyClock = mode === "patient" ? Math.max(0, ...job.buyList.map((b) => clockH(b.perUnit * n, dayFlow(b.it, "lo")))) : 0;
+  const buyClocks = job.buyList.map((b) => (mode === "patient" ? clockH(Math.ceil(b.perUnit * n), dayFlow(b.it, "lo")) : 0));
+  const buyClock = Math.max(0, ...buyClocks);
   const sellClock = mode === "patient" && !job.alch ? clockH(n, dayFlow(out, "hi")) : 0; // alching pays in coins — nothing to sell
-  const totalH = workH + buyClock + sellClock + 2 / 60;
-  const cost = Math.round(n * job.cost);
-  const profit = Math.round(n * job.profitUnit);
-  const lvlChip = (q) => {
-    // a blank skill counts as level 1 — the board never assumes training you haven't claimed
-    const have = sheet.skills[q.s];
-    const lvl = have === "" || have == null ? 1 : +have;
-    const cls = lvl >= q.l ? "ok" : "no";
-    return <span key={q.s} className={"ge-req " + cls}>{q.s} {q.l}{cls === "ok" ? " ✓" : " ✗"}</span>;
+  return {
+    n, workH, buyClocks, buyClock, sellClock,
+    totalH: workH + buyClock + sellClock + 2 / 60,
+    cost: Math.round(n * job.cost),
+    sale: Math.round(n * job.sellUnit),
+    profit: Math.round(n * job.profitUnit),
+    capped: n >= job.maxN,
   };
-  const capNote = n >= job.maxN
-    ? (mode === "express" ? "capped — a bigger batch would move these books" : "capped — the books can't fill more inside a day")
-    : null;
-  const focusXp = focus ? (job.xp.find(([s]) => s === focus)?.[1] || 0) : 0;
+}
+const an = (s) => (/^[aeiou]/i.test(s) ? "an " : "a ") + s;
+const gearOf = (job) => [...new Set(job.stepList.map((s) => s.r.g).filter(Boolean))];
+// a deterministic small tilt per notice, so the board doesn't line up too perfectly
+function tiltFor(key) {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return ((h % 7) - 3) * 0.4;
+}
+const capNote = (job) => (job.mode === "express" ? "capped — a bigger batch would move these books" : "capped — the books can't fill more inside a day");
+/* everything a job asks of the player, in one list: a chip for the notice, a
+   line for the contract. Levels and quests are green or red; facilities and
+   tools are neither — the game doesn't track whether you own a chisel, and
+   neither does the board, so they read as reminders, not gates */
+function requirementsOf(job, sheet) {
+  const reqs = [];
+  if (job.members && !sheet.members) reqs.push({ k: "Members", cls: "no", chip: "Members ✗", line: "✗ Members — this job needs P2P" });
+  for (const q of job.levels) {
+    const have = lvlOf(sheet, q.s), ok = have >= q.l;
+    reqs.push({ k: `${q.s} ${q.l}`, cls: ok ? "ok" : "no", chip: `${q.s} ${q.l} ${ok ? "✓" : "✗"}`, line: `${ok ? "✓" : "✗"} ${q.s} ${q.l} — you have ${have}` });
+  }
+  for (const u of job.unlocks) {
+    const ok = !!sheet.quests?.[u];
+    reqs.push({ k: u, cls: ok ? "ok" : "no", chip: `${u} ${ok ? "✓" : "✗"}`, line: `${ok ? "✓" : "✗"} ${u} — ${ok ? "done" : "not done"}`, title: unlockNote(u) });
+  }
+  for (const f of job.facilities) reqs.push({ k: f, cls: "unk", chip: f, line: `◦ At ${an(f.toLowerCase())}` });
+  for (const g of gearOf(job)) reqs.push({ k: g, cls: "unk", chip: g, line: `◦ Bring ${an(g.toLowerCase())}`, title: gearNote(g) });
+  if (job.alch) reqs.push({
+    k: "staff", cls: "unk", chip: "fire staff optional", line: "◦ Fire staff optional — wield one and the fire runes below are free",
+    title: "The buy list prices every fire rune per cast to stay honest — wielding any fire staff supplies them for free and fattens the pay by that much.",
+  });
+  return reqs;
+}
+// the stamps a notice wears: what its chips can't say
+function stampsOf(job) {
+  const s = [];
+  if (job.crush > 0) s.push({ cls: "", text: `≈${Math.round(job.crush * 100)}% crush` });
+  if (job.staleLegs.length > 0 || job.movingLegs.length > 0) s.push({ cls: "", text: "thin data" });
+  if (job.rich) s.push({ cls: "purple", text: "too good?" });
+  if (job.members) s.push({ cls: "purple", text: "P2P" });
+  return s;
+}
+// the one warning paragraph a contract may carry — never the same thing twice
+function warningOf(job) {
+  const parts = [];
+  if (job.crush > 0) parts.push(`semi-precious gems crush on a failed cut — at your Crafting level ≈${Math.round(job.crush * 100)}% of attempts fail, and the buy list already covers the extra uncut gems`);
+  if (job.rich) parts.push(`pays ≈${fmtGp(job.wage)} gp per hour of hands-on work, beyond any honest skilling wage — more often thin or stale data than free money, so probe every leg with 1 before committing`);
+  if (job.staleLegs.length > 0 || job.movingLegs.length > 0) {
+    const names = [...job.staleLegs, ...job.movingLegs];
+    parts.push(`weak or fast-moving data on ${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2} more` : ""} — the pay is only as good as its weakest leg, so check each on the Market Board first`);
+  }
+  return parts.length ? "⚠ " + parts.join("; ") + "." : null;
+}
+// the examine line: the job in a sentence
+function examineOf(job) {
+  if (job.alch) return `Cast ${job.r.l >= 55 ? "High" : "Low"} Level Alchemy on ${an(job.out.name)} for its fixed coin value — no sell offer, no GE tax.`;
+  const inputs = job.buyList.map((b) => b.it.name);
+  const from = inputs.length ? ` from ${inputs.slice(0, 3).join(", ")}${inputs.length > 3 ? ` and ${inputs.length - 3} more` : ""}` : "";
+  const at = job.facilities.length ? ` at ${an(job.facilities[0].toLowerCase())}` : "";
+  const gear = gearOf(job);
+  return `${verbOf(job.r)} ${job.out.name}${from}${at}${gear.length ? `, with ${an(gear[0].toLowerCase())}` : ""}.`;
+}
+
+/* one notice on the board */
+function Notice({ job, n, sheet, focus, onOpen }) {
+  const m = jobMath(job, n);
+  const reqs = requirementsOf(job, sheet);
+  const blocked = reqs.some((x) => x.cls === "no");
+  const chips = [...reqs.filter((x) => x.cls === "no"), ...reqs.filter((x) => x.cls !== "no")];
+  const stamps = stampsOf(job);
+  const fx = focusXpOf(job, focus);
+  const gpx = fx > 0 ? job.profitUnit / fx : null;
+  const sign = m.profit >= 0 ? "+" : "";
   return (
-    <section className="ge-panel ge-job">
-      <div className="ge-jobhead">
-        <h3>{verbOf(job.r)} {fmtFull(n)}× {out.name}</h3>
-        <span className={"ge-pay " + (profit > 0 ? "good" : "bad")}>{profit > 0 ? "+" : ""}{fmtGp(profit)} gp</span>
-      </div>
-      <div className="ge-jobmeta">
-        {job.levels.map(lvlChip)}
-        {job.unlocks.map((u) => {
-          const done = !!sheet.quests?.[u];
-          return (
-            <span key={u} className={"ge-req " + (done ? "ok" : "no")} title={unlockNote(u)}>
-              {u}{done ? " ✓" : " ✗"}
-            </span>
-          );
-        })}
-        {job.facilities.map((f) => <span key={f} className="ge-req unk">{f}</span>)}
-        {job.alch && (
-          <span className="ge-req unk" title="The buy list prices every fire rune per cast to stay honest — wielding any fire staff supplies them for free and fattens the pay by that much.">
-            fire staff optional
-          </span>
-        )}
-        {[...new Set(job.stepList.map((s) => s.r.g).filter(Boolean))].map((g) => (
-          <span key={g} className="ge-req unk" title={gearNote(g)}>{g}</span>
-        ))}
-        {job.crush > 0 && (
-          <span className="ge-req warn" title={`Semi-precious gems crush on a failed cut — at your Crafting level ≈${Math.round(job.crush * 100)}% of attempts fail. The buy list below already includes the extra uncut gems.`}>
-            ≈{Math.round(job.crush * 100)}% crush
-          </span>
-        )}
-        {job.rich && (
-          <span className="ge-req warn" title={`This chain pays ≈${fmtGp(job.wage)} gp per hour of hands-on work — beyond what honest skilling labor earns anywhere. A big margin on labor-heavy work is just a wage, but pay the labor can't explain usually means thin or stale data somewhere in the chain. Probe every leg with 1 before committing.`}>
-            unusually rich ⚠
-          </span>
-        )}
-        {(job.staleLegs.length > 0 || job.movingLegs.length > 0) && (
-          <span className="ge-req warn" title={[
-            job.staleLegs.length > 0 ? `Low-confidence pricing on: ${job.staleLegs.join(", ")}.` : "",
-            job.movingLegs.length > 0 ? `Price in motion on: ${job.movingLegs.join(", ")}.` : "",
-            "The pay is only as good as its weakest leg — check each on the Market Board first.",
-          ].filter(Boolean).join(" ")}>
-            check the tape ⚠
-          </span>
-        )}
-        {job.members && <span className="ge-mem">P2P</span>}
-        <span>margin {fmtFull(Math.round(job.profitUnit))} gp per item</span>
-      </div>
-      <div className="ge-joblines ge-inset">
-        {job.buyList.map((b) => {
-          const q = Math.ceil(b.perUnit * n);
-          const unit = jobBuyPx(b.it, mode);
-          return (
-            <div key={b.it.id}>
-              <span className="op buy">BUY</span>
-              {fmtFull(q)}× {b.it.name} @ {fmtFull(unit)} — {fmtGp(q * unit)} gp
-              {mode === "patient" && <span className="clock"> · fills ≈ {fmtDurShort(clockH(q, dayFlow(b.it, "lo")))}</span>}
-            </div>
-          );
-        })}
-        {job.coins > 0 && (
-          <div><span className="op buy">PAY</span>{fmtGp(Math.round(job.coins * n))} gp in fees</div>
-        )}
-        {job.stepList.map((s, i) => {
-          const count = Math.ceil(s.perUnit * n);
-          return (
-            <div key={i}>
-              <span className="op work">{verbOf(s.r).toUpperCase()}</span>
-              {fmtFull(count)}× {RECIPES.names[s.r.o]}
-              {s.r.q > 1 ? <span className="clock"> ({fmtFull(s.r.q)} per {verbOf(s.r).toLowerCase()})</span> : null}
-              {s.r.f ? ` at ${s.r.f.toLowerCase()}` : ""}
-              <span className="clock"> · ≈ {fmtDurShort((count * secsOf(s.r) * OVERHEAD) / 3600)}</span>
-            </div>
-          );
-        })}
-        {job.alch ? (
-          <>
-            <div>
-              <span className="op work">ALCH</span>
-              {fmtFull(n)}× {out.name} at {fmtFull(job.sellUnit)} gp apiece
-              <span className="clock"> · ≈ {fmtDurShort(workH)}</span>
-            </div>
-            <div>
-              <span className="op sell">TAKE</span>
-              {fmtGp(Math.round(n * job.sellUnit))} gp straight to your pouch — no sell offer, no GE tax
-            </div>
-          </>
-        ) : (
-          <div>
-            <span className="op sell">SELL</span>
-            {fmtFull(n)}× {out.name} @ {fmtFull(jobSellPx(out, mode))}
-            {geTax(jobSellPx(out, mode), out.id) > 0 ? " less tax" : ""} — {fmtGp(Math.round(n * job.sellUnit))} gp
-            {mode === "patient" && <span className="clock"> · fills ≈ {fmtDurShort(sellClock)}</span>}
-          </div>
-        )}
-      </div>
-      <div className="ge-jobsum">
-        <div className="facts">
-          <div><span>You lay out</span><b>{fmtGp(cost)} gp</b></div>
-          <div><span>The job pays</span><b className={profit > 0 ? "good" : "bad"}>{profit > 0 ? "+" : ""}{fmtGp(profit)} gp</b></div>
-          {job.xp.length > 0 && (
-            <div><span>Xp earned</span><b className="gold">
-              {job.xp.map(([s, v]) => `${fmtXp(v * n)} ${s}`).join(" · ")}
-            </b></div>
-          )}
-          {focus && focusXp > 0 && (
-            <div><span>{job.profitUnit >= 0 ? "Pays per xp" : "Costs per xp"}</span>
-              <b className={job.profitUnit >= 0 ? "good" : "warn"}>{fmtGpx(job.profitUnit / focusXp)} gp</b></div>
-          )}
-          <div><span>Return</span><b>{cost > 0 ? ((profit / cost) * 100).toFixed(1) : "–"}%</b></div>
-          <div><span>Takes about</span><b className="gold">{fmtDurShort(totalH)}</b></div>
-        </div>
-        <div className="ge-batch">
-          <button className="ge-btn" onClick={() => setN(Math.max(1, niceRound(n / 2)))} aria-label="Halve batch">−</button>
-          <b>{fmtFull(n)}</b>
-          <button className="ge-btn" onClick={() => setN(Math.min(job.maxN, niceRound(n * 2)))} aria-label="Double batch">+</button>
-          <button className="ge-btn" onClick={() => setN(job.maxN)}
-            title={mode === "express"
-              ? "The biggest batch these books can absorb without moving them (≈10% of daily volume), inside the 4-hour buy limits."
-              : "The most the books can patiently fill in ≈4 hours, inside the 4-hour buy limits."}>Max</button>
-        </div>
-      </div>
-      {capNote && <p className="ge-note caution" style={{ padding: "0 13px 10px", margin: 0 }}>⚠ {capNote}.</p>}
-      {(job.rich || job.staleLegs.length > 0) && (
-        <p className="ge-note caution" style={{ padding: "0 13px 10px", margin: 0 }}>
-          ⚠ {[
-            job.rich && "pays suspiciously well for the work involved — verify each leg with a 1-unit probe before committing",
-            job.staleLegs.length > 0 && `weak data on ${job.staleLegs.slice(0, 2).join(", ")}${job.staleLegs.length > 2 ? ` +${job.staleLegs.length - 2} more` : ""}`,
-          ].filter(Boolean).join("; ")}.
-        </p>
+    <button type="button" className={"ge-notice" + (blocked ? " faded" : "")} style={{ "--tilt": `${tiltFor(job.key)}deg` }}
+      onClick={onOpen} aria-label={`${verbOf(job.r)} ${job.out.name}${blocked ? ` — needs ${blockerOf(job, sheet)}` : ""}`}>
+      <span className="pin" aria-hidden="true" />
+      {stamps.length > 0 && <span className="stamps">{stamps.map((s) => <span key={s.text} className={"ge-stamp " + s.cls}>{s.text}</span>)}</span>}
+      <h3>{verbOf(job.r)} {job.out.name}</h3>
+      {focus ? (
+        <>
+          <div className={"pay " + (gpx != null && gpx >= 0 ? "good" : "bad")}>{gpx == null ? "–" : `${gpx >= 0 ? "pays" : "costs"} ${fmtGpx(gpx)} gp/xp`}</div>
+          <div className="line2">{fmtFull(n)}× · {fmtDurShort(m.totalH)} · {fmtXp(fx * n)} xp</div>
+          <div className="line2">{job.alch ? "alchs" : "sells"} {fmtGp(m.sale)} − costs {fmtGp(m.cost)} <span className="eq">= <b className={m.profit >= 0 ? "good" : "bad"}>{sign}{fmtGp(m.profit)}</b></span></div>
+        </>
+      ) : (
+        <>
+          <div className={"pay " + (m.profit >= 0 ? "good" : "bad")}>{sign}{fmtGp(m.profit)} gp</div>
+          <div className="line2">{fmtFull(n)}× · {fmtDurShort(m.totalH)} · costs {fmtGp(m.cost)}</div>
+        </>
       )}
-    </section>
+      <div className="reqs">{chips.map((c) => <span key={c.k} className={"ge-nchip " + c.cls} title={c.title}>{c.chip}</span>)}</div>
+    </button>
+  );
+}
+
+/* the contract: the notice lifted off the board, with everything it left out */
+function JobContract({ job, n, setN, sheet, focus, onClose }) {
+  const m = jobMath(job, n);
+  const closeRef = useRef(null);
+  const modalRef = useRef(null);
+  useEffect(() => {
+    const prev = document.activeElement;
+    closeRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key === "Tab" && modalRef.current) {
+        const list = [...modalRef.current.querySelectorAll('button:not(:disabled), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')];
+        if (!list.length) return;
+        const first = list[0], last = list[list.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+      if (prev && typeof prev.focus === "function") prev.focus();
+    };
+  }, [onClose]);
+  const { out, mode } = job;
+  const reqs = requirementsOf(job, sheet);
+  const fx = focusXpOf(job, focus);
+  const warn = warningOf(job);
+  const sellPx = jobSellPx(out, mode);
+  return (
+    <div className="ge-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="ge-modal" role="dialog" aria-modal="true" aria-labelledby="ge-contract-title" ref={modalRef}>
+        <div className="ge-mhead">
+          <div>
+            <h2 id="ge-contract-title">{verbOf(job.r)} {out.name}</h2>
+            <p className="ge-examine">{examineOf(job)}</p>
+          </div>
+          <button className="ge-x" onClick={onClose} aria-label="Close" ref={closeRef}>✕</button>
+        </div>
+        <div className="ge-mbody">
+          <div className="ge-reqlist">
+            {reqs.map((r) => <div key={r.k} className={"r " + r.cls} title={r.title}>{r.line}</div>)}
+          </div>
+          <div className="ge-batchpanel">
+            <span className="ge-pixlbl">Batch</span>
+            <div className="ge-batch">
+              <button className="ge-btn" onClick={() => setN(Math.max(1, niceRound(n / 2)))} aria-label="Halve batch">−</button>
+              <b>{fmtFull(n)}</b>
+              <button className="ge-btn" onClick={() => setN(Math.min(job.maxN, niceRound(n * 2)))} aria-label="Double batch">+</button>
+              <button className="ge-btn" onClick={() => setN(job.maxN)}
+                title={mode === "express"
+                  ? "The biggest batch these books can absorb without moving them (≈10% of daily volume), inside the 4-hour buy limits."
+                  : "The most the books can patiently fill in ≈4 hours, inside the 4-hour buy limits."}>Max</button>
+            </div>
+            {m.capped && <span className="ge-capnote">{capNote(job)}</span>}
+          </div>
+          <div className="ge-ledger ge-inset">
+            {job.buyList.map((b, i) => {
+              const q = Math.ceil(b.perUnit * n);
+              const unit = jobBuyPx(b.it, mode);
+              return (
+                <div key={b.it.id}>
+                  <span className="op buy">BUY</span>
+                  {fmtFull(q)}× {b.it.name} @ {fmtFull(unit)} — {fmtGp(q * unit)} gp
+                  {mode === "patient" && <span className="clock"> · fills ≈ {fmtDurShort(m.buyClocks[i])}</span>}
+                </div>
+              );
+            })}
+            {job.coins > 0 && <div><span className="op buy">PAY</span>{fmtGp(Math.round(job.coins * n))} gp in fees</div>}
+            {job.alch ? (
+              <>
+                <div>
+                  <span className="op work">ALCH</span>
+                  {fmtFull(n)}× {out.name} at {fmtFull(job.sellUnit)} gp apiece
+                  <span className="clock"> · ≈ {fmtDurShort(m.workH)}</span>
+                </div>
+                <div><span className="op sell">TAKE</span>{fmtGp(m.sale)} gp straight to your pouch — no sell offer, no GE tax</div>
+              </>
+            ) : (
+              <>
+                {job.stepList.map((s, i) => {
+                  const count = Math.ceil(s.perUnit * n);
+                  return (
+                    <div key={i}>
+                      <span className="op work">{verbOf(s.r).toUpperCase()}</span>
+                      {fmtFull(count)}× {RECIPES.names[s.r.o]}
+                      {s.r.q > 1 ? <span className="clock"> ({fmtFull(s.r.q)} per {verbOf(s.r).toLowerCase()})</span> : null}
+                      {s.r.f ? ` at ${s.r.f.toLowerCase()}` : ""}
+                      <span className="clock"> · ≈ {fmtDurShort((count * secsOf(s.r) * OVERHEAD) / 3600)}</span>
+                    </div>
+                  );
+                })}
+                <div>
+                  <span className="op sell">SELL</span>
+                  {fmtFull(n)}× {out.name} @ {fmtFull(sellPx)}{geTax(sellPx, out.id) > 0 ? " less tax" : ""} — {fmtGp(m.sale)} gp
+                  {mode === "patient" && <span className="clock"> · fills ≈ {fmtDurShort(m.sellClock)}</span>}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="ge-facts ge-inset">
+            <div><span>Costs</span><b>{fmtGp(m.cost)} gp</b></div>
+            <div><span>Pays</span><b className={m.profit >= 0 ? "good" : "bad"}>{m.profit >= 0 ? "+" : ""}{fmtGp(m.profit)} gp</b></div>
+            {job.xp.length > 0 && <div><span>Xp</span><b className="gold">{job.xp.map(([s, v]) => `${fmtXp(v * n)} ${s}`).join(" · ")}</b></div>}
+            {fx > 0 && (
+              <div><span>{job.profitUnit >= 0 ? "Pays per xp" : "Costs per xp"}</span>
+                <b className={job.profitUnit >= 0 ? "good" : "warn"}>{fmtGpx(job.profitUnit / fx)} gp</b></div>
+            )}
+            <div><span>Return</span><b>{m.cost > 0 ? ((m.profit / m.cost) * 100).toFixed(1) : "–"}%</b></div>
+            <div><span>Takes about</span><b className="gold">{fmtDurShort(m.totalH)}</b></div>
+          </div>
+          {warn && <p className="ge-warnnote">{warn}</p>}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1376,13 +1551,16 @@ function JobBoard({ items, status }) {
   const [mode, setMode] = useState("express");
   const [focus, setFocus] = useState(""); // "" = best pay; a skill name = train it
   const [search, setSearch] = useState("");
-  const [hideCant, setHideCant] = useState(true);
   const [batches, setBatches] = useState({}); // job key -> chosen n
-  const [sheet, setSheet] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("fd-sheet-v1")) || { members: true, skills: {}, quests: {} }; }
-    catch (e) { return { members: true, skills: {}, quests: {} }; }
-  });
-  useEffect(() => { try { localStorage.setItem("fd-sheet-v1", JSON.stringify(sheet)); } catch (e) {} }, [sheet]);
+  const [openKey, setOpenKey] = useState(null); // the contract on the table, if any
+  // a job's key carries its mode, so switching modes takes any open contract off the table
+  const pickMode = (m) => { setMode(m); setOpenKey(null); };
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheet, setSheet] = useState(loadSheet);
+  // a blank sheet shows the whole board, faded where it's out of reach — the
+  // first visit should look like a board, not an empty wall
+  const [onlyCan, setOnlyCan] = useState(() => hasLevels(loadSheet()));
+  useEffect(() => { try { localStorage.setItem(SHEET_KEY, JSON.stringify(sheet)); } catch (e) {} }, [sheet]);
 
   // pull real levels off the hiscores by RuneScape name — one click, no login
   const [rsnBusy, setRsnBusy] = useState(false);
@@ -1408,137 +1586,154 @@ function JobBoard({ items, status }) {
   // training focus: only work that pays xp in the chosen skill, cheapest xp first
   const ranked = useMemo(() => {
     if (!focus) return jobs;
-    const xpOf = (j) => j.xp.find(([s]) => s === focus)?.[1] || 0;
+    const xpOf = (j) => focusXpOf(j, focus);
     return jobs.filter((j) => xpOf(j) > 0)
       .sort((a, b) => (-a.profitUnit / xpOf(a)) - (-b.profitUnit / xpOf(b)));
   }, [jobs, focus]);
   // only the quests that actually gate a job on today's board make the sheet
   const questList = useMemo(() => [...new Set(jobs.flatMap((j) => j.unlocks))].sort(), [jobs]);
+  const questsDone = questList.filter((u) => sheet.quests?.[u]).length;
 
-  const canDo = (job) => {
-    if (job.members && !sheet.members) return false;
-    for (const q of job.levels) {
-      const have = sheet.skills[q.s];
-      const lvl = have === "" || have == null ? 1 : +have; // blank = level 1
-      if (lvl < q.l) return false;
-    }
-    for (const u of job.unlocks) if (!sheet.quests?.[u]) return false; // unticked = not done
-    return true;
-  };
   const q = search.trim().toLowerCase();
-  const shown = ranked
-    .filter((j) => (!hideCant || canDo(j)) && (!q || j.out.name.toLowerCase().includes(q)))
-    .slice(0, 30);
+  const matches = (j) => !q || j.out.name.toLowerCase().includes(q) || verbOf(j.r).toLowerCase().includes(q);
+  const canN = ranked.filter((j) => canDo(j, sheet)).length;
+  const shown = ranked.filter((j) => (!onlyCan || canDo(j, sheet)) && matches(j)).slice(0, 30);
+  const open = openKey ? jobs.find((j) => j.key === openKey) : null;
+  const closeContract = useCallback(() => setOpenKey(null), []);
+  const nOf = (job) => clamp(batches[job.key] ?? job.defaultN, 1, job.maxN);
+  const setNOf = (job) => (v) => setBatches((b) => ({ ...b, [job.key]: clamp(v, 1, job.maxN) }));
+  const setSkill = (s, v) => setSheet((sh) => ({ ...sh, skills: { ...sh.skills, [s]: v } }));
+
+  const emptyLine = focus
+    ? `Nothing trains ${focus} within your filters — loosen the search, or untick “Only what I can start”.`
+    : q ? `No paying jobs match “${search.trim()}”. Try another search, or untick “Only what I can start”.`
+    : ranked.length > 0 && onlyCan ? "Nothing here is within your reach yet — fill in your levels above, or untick “Only what I can start” to see the whole board."
+    : mode === "express" ? "No paying jobs right now. Starting now eats both spreads — try Full margin for the whole pay."
+    : "No paying jobs right now. Check back when the books move.";
 
   return (
     <>
-      <section className="ge-panel">
-        <div className="ge-modebar" style={{ marginBottom: 10 }}>
-          <button className={"ge-btn ge-mode" + (mode === "express" ? " on" : "")} onClick={() => setMode("express")}>
-            Take the market — start now
-          </button>
-          <button className={"ge-btn ge-mode" + (mode === "patient" ? " on" : "")} onClick={() => setMode("patient")}>
-            Quote &amp; wait — full margin
-          </button>
-          <span className="ge-read" style={{ margin: 0 }}>
-            {mode === "express"
-              ? "Prices cross the spread on both ends: thinner pay, but every leg fills at once."
-              : "Quotes at the week's going rates on both ends: the full margin, with about a day's wait on each leg."}
-          </span>
+      <section className="ge-panel ge-toolbar">
+        <div className="ge-moderow" role="group" aria-label="Pricing">
+          <button className={"ge-btn" + (mode === "express" ? " on" : "")} aria-pressed={mode === "express"} onClick={() => pickMode("express")}>Start now</button>
+          <button className={"ge-btn" + (mode === "patient" ? " on" : "")} aria-pressed={mode === "patient"} onClick={() => pickMode("patient")}>Full margin</button>
         </div>
-        <div className="ge-filters">
-          <select className="ge-sel" value={focus} onChange={(e) => setFocus(e.target.value)} aria-label="Board focus">
-            <option value="">Best pay</option>
-            {SKILL_LIST.map((s) => <option key={s} value={s}>Train {s}</option>)}
-          </select>
+        <p className="ge-modehint">{MODE_HINT[mode]}</p>
+        <div className="ge-skillrow" role="group" aria-label="Training focus">
+          <span className="ge-pixlbl">Train:</span>
+          <button className={"ge-btn small" + (focus === "" ? " on" : "")} aria-pressed={focus === ""} onClick={() => setFocus("")}>Best pay</button>
+          {SKILL_LIST.map((s) => (
+            <button key={s} className={"ge-btn small" + (focus === s ? " on" : "")} aria-pressed={focus === s} onClick={() => setFocus(s)}>
+              {SKILL_GLYPH[s]} {s}
+            </button>
+          ))}
+        </div>
+        <div className="ge-filterrow">
           <div className="grow">
-            <input className="ge-in" placeholder="Search the job board… e.g. keel, glory, pie" value={search}
+            <input className="ge-in" placeholder="Search the job board… e.g. cannonball, glory, shark" value={search}
               onChange={(e) => setSearch(e.target.value)} aria-label="Search jobs" />
           </div>
-          <label className="ge-tog"><input type="checkbox" checked={hideCant} onChange={(e) => setHideCant(e.target.checked)} />only jobs I can start</label>
+          <label className="ge-tog"><input type="checkbox" checked={onlyCan} onChange={(e) => setOnlyCan(e.target.checked)} />Only what I can start</label>
         </div>
-        <div className="ge-sheet" style={{ marginTop: 10 }}>
-          <span style={{ color: "var(--orange)", textShadow: "1px 1px 0 #000" }}>Your levels:</span>
-          {SKILL_LIST.map((s) => (
-            <label key={s} className="sk">{s}
-              <input className="ge-in" type="number" min={1} max={99} placeholder="–"
-                value={sheet.skills[s] ?? ""}
-                onChange={(e) => setSheet((sh) => ({ ...sh, skills: { ...sh.skills, [s]: e.target.value } }))} />
-            </label>
-          ))}
-          <label className="ge-tog"><input type="checkbox" checked={sheet.members}
-            onChange={(e) => setSheet((sh) => ({ ...sh, members: e.target.checked }))} />members</label>
+      </section>
+
+      {/* the sheet, folded into one line */}
+      <button type="button" className="ge-panel ge-charstrip" aria-expanded={sheetOpen} aria-controls="ge-sheet-editor" onClick={() => setSheetOpen((o) => !o)}>
+        <span className="cs-inner">
+          <span className="rsn">{(sheet.rsn || "").trim() || "Your sheet"}</span>
+          {SKILL_LIST.map((s) => {
+            const v = sheet.skills[s];
+            const blank = v === "" || v == null;
+            return <span key={s} className="cell"><span className="g" aria-hidden="true">{SKILL_GLYPH[s]}</span>{s} <b className={blank ? "blank" : ""}>{blank ? "–" : v}</b></span>;
+          })}
+          <span className={"ge-mem" + (sheet.members ? "" : " off")}>{sheet.members ? "P2P" : "F2P"}</span>
+          {questList.length > 0 && <span className="quests">Quests {questsDone}/{questList.length}</span>}
+          <span className="hint">{sheetOpen ? "click to close ▴" : "click to edit ▾"}</span>
+        </span>
+      </button>
+      {sheetOpen && (
+        <section className="ge-panel ge-sheet-editor" id="ge-sheet-editor">
+          <div className="ge-sheet-grid">
+            {SKILL_LIST.map((s) => (
+              <label key={s}>
+                <span><span className="g" aria-hidden="true">{SKILL_GLYPH[s]}</span> {s}</span>
+                <input className="ge-in" type="number" min={1} max={99} placeholder="–" value={sheet.skills[s] ?? ""}
+                  onChange={(e) => setSkill(s, e.target.value)} />
+              </label>
+            ))}
+            <label><span>Members</span><input type="checkbox" checked={sheet.members}
+              onChange={(e) => setSheet((sh) => ({ ...sh, members: e.target.checked }))} /></label>
+          </div>
+          {questList.length > 0 && (
+            <div className="ge-sheet-quests">
+              <span className="ge-pixlbl">Quests:</span>
+              {questList.map((u) => {
+                const done = !!sheet.quests?.[u];
+                return (
+                  <label key={u} className={"ge-qlbl " + (done ? "done" : "todo")} title={unlockNote(u)}>
+                    <input type="checkbox" checked={done}
+                      onChange={(e) => setSheet((sh) => ({ ...sh, quests: { ...sh.quests, [u]: e.target.checked } }))} />
+                    {done ? "✓" : "✗"} {u}
+                  </label>
+                );
+              })}
+            </div>
+          )}
           {PROXIED && (
-            <>
-              <label className="sk">or fetch them —
-                <input className="ge-in" style={{ width: 120, textAlign: "left" }} placeholder="RuneScape name"
-                  value={sheet.rsn ?? ""} maxLength={12}
+            <div className="ge-sheet-rsn">
+              <label className="ge-tog">RuneScape name
+                <input className="ge-in" type="text" placeholder="fetch your levels" value={sheet.rsn ?? ""} maxLength={12}
                   onChange={(e) => setSheet((sh) => ({ ...sh, rsn: e.target.value }))}
                   onKeyDown={(e) => { if (e.key === "Enter") importRsn(); }} />
               </label>
-              <button className="ge-btn" onClick={importRsn} disabled={rsnBusy || !(sheet.rsn || "").trim()}>
-                {rsnBusy ? "…" : "Hiscores"}
-              </button>
-              {rsnMsg && <span style={{ color: "var(--tan)" }}>{rsnMsg}</span>}
-            </>
+              <button className="ge-btn" onClick={importRsn} disabled={rsnBusy || !(sheet.rsn || "").trim()}>{rsnBusy ? "…" : "Hiscores"}</button>
+              {rsnMsg && <span className="msg">{rsnMsg}</span>}
+            </div>
           )}
-        </div>
-        {questList.length > 0 && (
-          <div className="ge-sheet" style={{ marginTop: 8 }}>
-            <span style={{ color: "var(--orange)", textShadow: "1px 1px 0 #000" }}>Quests done:</span>
-            {questList.map((u) => (
-              <label key={u} className="ge-tog" title={unlockNote(u)}>
-                <input type="checkbox" checked={!!sheet.quests?.[u]}
-                  onChange={(e) => setSheet((sh) => ({ ...sh, quests: { ...sh.quests, [u]: e.target.checked } }))} />
-                {u}
-              </label>
-            ))}
+          <p className="ge-sheet-note">
+            Blank skills count as level 1 and unticked quests as not done — the board never assumes training you haven't claimed.
+            Only the quests that gate a job on today's board are listed.
+          </p>
+        </section>
+      )}
+
+      {status === "snapshot" && (
+        <p className="ge-read">Offline snapshot — the board only sees the {items.length} baked items, so most work is hidden until the live feed returns.</p>
+      )}
+      <p className="ge-read">
+        {focus
+          ? <><b>{ranked.length}</b> jobs train {focus} on today's market, cheapest xp first — the market pays for the ones in green</>
+          : <><b>{ranked.length}</b> jobs pay on the exchange right now</>}
+        {" "}· <b>{canN}</b> you can start
+        {q && <> · <b>{shown.length}</b> match “{search.trim()}”</>}
+        . Tap a notice for its contract.
+      </p>
+
+      <section className="ge-board" aria-label="Job notices">
+        {shown.map((job) => (
+          <Notice key={job.key} job={job} n={nOf(job)} sheet={sheet} focus={focus} onOpen={() => setOpenKey(job.key)} />
+        ))}
+        {shown.length === 0 && (
+          <div className="ge-notice empty">
+            <span className="pin" aria-hidden="true" />
+            <h3>Nothing posted</h3>
+            <p>{emptyLine}</p>
           </div>
         )}
       </section>
 
-      {status === "snapshot" && (
-        <p className="ge-read">Offline snapshot — the job board only sees the {items.length} baked items, so most work is hidden until the live feed returns.</p>
-      )}
-      <p className="ge-read">
-        {focus
-          ? <><b>{ranked.length}</b> jobs train {focus} on today's market, cheapest xp first — the market pays for the ones in green.</>
-          : <><b>{ranked.length}</b> jobs pay on the exchange right now{shown.length < ranked.length ? <> · showing {shown.length}</> : null}.</>}
-        {" "}Blank skills count as level 1 and unticked quests as not done — fill in your sheet (or fetch it off the hiscores) to unlock more of the board.
-      </p>
-
-      {shown.map((job) => (
-        <JobCard key={job.key} job={job} sheet={sheet} focus={focus}
-          n={clamp(batches[job.key] ?? job.defaultN, 1, job.maxN)}
-          setN={(v) => setBatches((b) => ({ ...b, [job.key]: clamp(v, 1, job.maxN) }))} />
-      ))}
-      {shown.length === 0 && (
-        <section className="ge-panel"><p className="ge-read" style={{ margin: 0 }}>
-          {focus
-            ? `Nothing trains ${focus} within your filters — loosen the search, or untick "only jobs I can start".`
-            : <>No paying jobs match. {mode === "express"
-              ? "Taking the market eats both spreads — try Quote & wait for the full margins."
-              : "Loosen the search, or check back when the books move."}</>}
-        </p></section>
-      )}
-
       <p className="ge-foot">
-        Default batches are sized to roughly 5–10 minutes of work and capped by 4-hour buy limits and what the
-        books can absorb (≈10% of daily volume when taking the market; about a day of patient fills when quoting).<br />
-        Action speeds and xp come from the wiki's own recipe data (real tick counts, +15% for banking); the few
-        recipes without tick data fall back to desk assumptions. Alch jobs (Low at Magic 21, High
-        at 55) price every rune off
-        the exchange (a fire staff makes the fire runes free) and pay the spell's fixed coin value on the spot —
-        no sell leg, no GE tax — so they light up exactly when an item dips below its alch floor.
-        Quote &amp; wait prices anchor to the
-        week's going rates — patient work should lean on slower data. A fat margin on labor-heavy work is just a
-        wage; chains whose pay outruns any honest wage for the hands-on work in them (≈2m gp/hr), or that lean
-        on weak or fast-moving legs, wear a ⚠ — verify before you trust them. The market moves while you work —
-        the pay is an estimate, not a contract.<br />
-        Training focus flips the board around: every job that grants xp in the chosen skill, ranked by gp per
-        xp — negative cost (green) means the market pays you to train. Cooking pay ignores burn chance, so
-        low-level cooks should budget for some losses the board can't see.
+        Batches default to roughly 5–10 minutes of work, capped by 4-hour buy limits and what the books can absorb
+        (≈10% of a day's volume when starting now; about a day of patient fills on full margin). Action speeds and xp
+        come from the wiki's own recipe data, +15% for banking. Alch jobs price every rune off the exchange and pay
+        the spell's fixed coin value on the spot — no sell leg, no GE tax — so they appear the moment an item dips
+        below its alch floor.<br />
+        Train a skill and the board re-ranks by gp per xp — a green notice means the market pays you to train. A fat
+        margin on labour-heavy work is just a wage; a notice stamped "too good?" or "thin data" wants a 1-unit probe
+        first. The market moves while you work — the pay is an estimate, not a contract.
       </p>
+
+      {open && <JobContract key={open.key} job={open} n={nOf(open)} setN={setNOf(open)} sheet={sheet} focus={focus} onClose={closeContract} />}
     </>
   );
 }
@@ -1832,7 +2027,7 @@ function ScreenRange({ def, val, onChange }) {
 }
 
 /* ================= app ================= */
-export default function FlipDesk() {
+export default function JobBoardApp() {
   const [status, setStatus] = useState("loading"); // loading | live | snapshot
   const [live, setLive] = useState(null);          // {items, universe, hidden, days} | null
   const [updatedAt, setUpdatedAt] = useState(null);
@@ -1859,7 +2054,7 @@ export default function FlipDesk() {
   const [sortKey, setSortKey] = useState("turnover");
   const [sortDir, setSortDir] = useState(-1);
   const [selId, setSelId] = useState(null);
-  const [view, setView] = useState("market"); // market | jobs | econ
+  const [view, setView] = useState("jobs"); // jobs | market | econ
 
   const refresh = useCallback(async (auto = false) => {
     if (!auto) setStatus("loading");
@@ -1955,8 +2150,8 @@ export default function FlipDesk() {
         {/* masthead */}
         <header className="ge-mast">
           <div>
-            <h1 className="ge-title">Grand Exchange</h1>
-            <p className="ge-sub">What things are going for this week</p>
+            <h1 className="ge-title">Job Board</h1>
+            <p className="ge-sub">{view === "market" ? "What things are going for this week" : view === "econ" ? "How the exchange works" : "Skilling work priced by the Grand Exchange"}</p>
           </div>
           <div className="ge-status">
             {status === "live" && (
@@ -1971,10 +2166,10 @@ export default function FlipDesk() {
 
         {/* tabs */}
         <div className="ge-tabs" role="tablist">
-          <button className={"ge-tab" + (view === "market" ? " on" : "")} role="tab"
-            aria-selected={view === "market"} onClick={() => setView("market")}>Market Board</button>
           <button className={"ge-tab" + (view === "jobs" ? " on" : "")} role="tab"
             aria-selected={view === "jobs"} onClick={() => setView("jobs")}>Job Board</button>
+          <button className={"ge-tab" + (view === "market" ? " on" : "")} role="tab"
+            aria-selected={view === "market"} onClick={() => setView("market")}>Market Board</button>
           <button className={"ge-tab" + (view === "econ" ? " on" : "")} role="tab"
             aria-selected={view === "econ"} onClick={() => setView("econ")}>Econ 101</button>
         </div>

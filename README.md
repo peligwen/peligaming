@@ -140,7 +140,7 @@ next-best pick at each call when those aren't there.
 
 | Game | Tool | What it does |
 | --- | --- | --- |
-| RuneScape | Flip Desk | The Grand Exchange as a day desk: weekly going rates and trends for every item, standing buy and sell orders priced to fill within a day of normal cycling, a job board (skilling work priced by the market, or ranked by gp/xp for training), econ primer |
+| RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, and an econ primer |
 | RuneScape | Gielinor Crafting Web | Every craftable item as an explorable 3D recipe web, with per-skill xp lenses |
 | Fortnite | Tactical Terrain | The island in 3D — sightlines, dead ground, cover |
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
@@ -154,7 +154,7 @@ cache:
 - `scripts/fetch-recipes.mjs` pulls every `{{Infobox Recipe}}` from the
   [OSRS Wiki's Bucket API](https://oldschool.runescape.wiki/w/RuneScape:Bucket)
   — materials, facilities, tools, real tick counts, and xp per action — and
-  writes `tools-src/runescape/recipes.json` (the Flip Desk Job Board's graph)
+  writes `tools-src/runescape/recipes.json` (the Job Board's recipe graph)
   while also joining xp onto the Crafting Web's embedded data. Run it after
   game updates, then `npm run build:tools` and commit all three files.
 - `src/worker.mjs` proxies the wiki price API **and** Jagex's public OSRS
@@ -164,7 +164,30 @@ cache:
   hiscores lookups are per-name and public. Finished daily blocks
   (`/24h?timestamp=`) never change, so the proxy holds each for a week.
 
-### The Flip Desk's day model
+### The Job Board
+
+The board prices resource-processing work off the exchange itself: buy the
+inputs, do the skilling, sell the product. It looks like the thing it is
+named after — parchment notices pinned to a board, each carrying only the
+job, its pay, one line of batch · time · costs, and the requirements as
+green or red chips in the game's own words ("Smithing 35", "Dwarf Cannon").
+Tap a notice and it lifts into a contract: the requirement checklist, a
+batch control, the plan as BUY / WORK / SELL lines with clocks, the facts,
+and at most one warning. "Start now" prices every leg off the freshest tape
+(insta-buy the inputs, insta-sell the product); "Full margin" quotes at the
+week's going rates for the whole margin with about a day's wait per leg.
+Train a skill and the board re-ranks by gp per xp, each notice also showing
+what it sells for less what it costs. The player's sheet (levels, members,
+the quests that gate today's jobs, a RuneScape name to pull levels off the
+hiscores) folds into a one-line character strip above the board, and a
+blank sheet shows the whole board faded where it is out of reach rather
+than an empty wall. Facilities and tools ("Furnace", "Ammo mould") are
+reminders, not gates: the game doesn't track whether you own a chisel, and
+neither does the board. Every recipe comes from the wiki's own data (real
+tick counts, xp per action); alch jobs price the runes off the exchange and
+pay the spell's fixed coin value with no sell leg and no tax.
+
+### The Market Board's day model
 
 The desk reads the week, not the minute. Every row's headline is the week's
 volume-weighted going rate over the last seven complete UTC days, from the

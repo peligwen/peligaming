@@ -2,7 +2,7 @@
 // (the wiki's structured-data store; https://oldschool.runescape.wiki/w/RuneScape:Bucket)
 // and feeds BOTH RuneScape economy tools from it:
 //
-//   tools-src/runescape/recipes.json          the Flip Desk Job Board's recipe
+//   tools-src/runescape/recipes.json          the Job Board's recipe
 //                                             graph — now with real tick counts
 //                                             and xp per action from the wiki
 //   public/tools/runescape/osrs-crafting-web-3d.html
@@ -13,7 +13,7 @@
 //
 // Run manually to refresh: `node scripts/fetch-recipes.mjs`. Bucket pages are
 // cached under .recipes-cache/ so re-runs are cheap; pass --fresh to refetch.
-// Then `npm run build:tools` and commit recipes.json, the built flip-desk.html
+// Then `npm run build:tools` and commit recipes.json, the built job-board.html
 // and the crafting web HTML together.
 //
 // Every recipe row is one wiki {{Infobox Recipe}}: output, materials with
@@ -168,7 +168,7 @@ function gearOf(name, facility, tools) {
 const CRUSH = { Opal: [129, 122], Jade: [91, 160], 'Red topaz': [99, 140] };
 
 // ---------------------------------------------------------------------------
-// the Flip Desk dataset: filter, dedup, index
+// the Job Board dataset: filter, dedup, index
 // ---------------------------------------------------------------------------
 
 const kept = [];
@@ -294,4 +294,4 @@ for (const [nodeIdx, variants] of Object.entries(gdata.recipes)) {
 }
 writeFileSync(WEB, html.slice(0, m.index) + m[1] + JSON.stringify(gdata) + m[3] + html.slice(m.index + m[0].length));
 console.log(`crafting web: xp joined onto ${joined}/${total} gdata recipe variants`);
-console.log('now run: npm run build:tools — then commit recipes.json, flip-desk.html and the crafting web');
+console.log('now run: npm run build:tools — then commit recipes.json, job-board.html and the crafting web');

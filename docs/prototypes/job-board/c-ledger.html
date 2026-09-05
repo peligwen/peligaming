@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Job Board — Ledger</title>
+<style>
+/* ==========================================================================
+   DESIGN PLAN
+
+   Palette (house tokens, lifted verbatim from .ge-root in flip-desk.jsx):
+     stone #3e3529 (hi #554a38, lo #241f18), edge #0d0b08, inset #2b2620,
+     inset2 #211d17, page #1b1712; orange #ff981f (titles/headers/gold
+     numbers), yellow #ffe93f (hover/selected/pressed/focus ring), white
+     #f3ecdc (body text), tan #b3a284 (meta/hints), dark-tan #8a7a5f
+     (disabled/placeholder); good #57d957, warn #e8b13c, bad #f26060,
+     members purple #d0a0e8; spell green #00ff00 reserved for the produced
+     item's name only on the four Magic "spell" verbs (High/Low alch,
+     Enchant, Cast) — the right-click-menu convention for spells, used once
+     and nowhere else so it stays a signal, not decoration.
+
+   Type roles: display = Cinzel (masthead only — modest, not a hero); body =
+     'Segoe UI'/system-ui (toolbar, labels, examine line); numbers = a
+     monospace stack with tabular-nums for every gp/xp/time figure so digits
+     stack in a column. Pixel faces (Silkscreen/Pixelify Sans) were tried
+     for the column headers and pill row and dropped: both broke down at
+     the 10.5–12px sizes this table needs, so the small-caps look comes from
+     Segoe UI + letter-spacing instead, matching the Market Board exactly.
+
+   Layout concept: one stone toolbar panel sits above one stone-inset
+   scrolling ledger table; a job's plan lives nowhere else on the page — it
+   opens as a full-width row directly beneath its own name and folds back
+   into the same row, so scanning the board and reading a plan never
+   compete for space or scroll position.
+   ========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap');
+
+:root {
+  --stone:#3e3529; --stone-hi:#554a38; --stone-lo:#241f18; --edge:#0d0b08;
+  --inset:#2b2620; --inset2:#211d17; --page:#1b1712;
+  --orange:#ff981f; --yellow:#ffe93f; --white:#f3ecdc; --tan:#b3a284; --dark-tan:#8a7a5f;
+  --good:#57d957; --warn:#e8b13c; --bad:#f26060; --members:#d0a0e8; --spell:#00ff00;
+  --mono: ui-monospace,'Cascadia Code','SF Mono',Menlo,Consolas,monospace;
+  --disp: 'Cinzel',Georgia,'Times New Roman',serif;
+}
+* , *::before, *::after { box-sizing:border-box; }
+html,body { margin:0; padding:0; }
+[hidden] { display:none !important; }
+body {
+  background:var(--page); color:var(--white); min-height:100vh;
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+  font-size:14px; line-height:1.45; overflow-x:hidden;
+}
+button, input { font-family:inherit; }
+button:focus-visible, input:focus-visible, [tabindex]:focus-visible, a:focus-visible {
+  outline:2px solid var(--yellow); outline-offset:2px;
+}
+
+.jb-root { max-width:1120px; margin:0 auto; padding:18px 14px 40px; }
+
+/* masthead — modest, no hero */
+.jb-mast { margin-bottom:14px; }
+.jb-title {
+  font-family:var(--disp); font-weight:700; font-size:clamp(22px,4vw,32px);
+  letter-spacing:.04em; color:var(--orange); margin:0; line-height:1.05;
+  text-shadow:2px 2px 0 #000;
+}
+.jb-sub {
+  font-size:11.5px; color:var(--tan); margin:5px 0 0; letter-spacing:.16em;
+  text-transform:uppercase; text-shadow:1px 1px 0 #000;
+}
+
+/* bevelled stone panel, the house style */
+.jb-panel {
+  background:var(--stone); border:1px solid var(--edge); border-radius:2px;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+  padding:12px 14px; margin-bottom:12px;
+}
+.jb-inset {
+  background:var(--inset); border:1px solid var(--edge); border-radius:2px;
+  box-shadow:inset 1px 1px 0 #1a1712, inset -1px -1px 0 #38322a;
+}
+
+/* generic stone button */
+.jb-btn {
+  font-size:12.5px; color:var(--white); text-shadow:1px 1px 0 #000;
+  background:var(--stone); border:1px solid var(--edge); border-radius:2px;
+  padding:5px 13px; cursor:pointer;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+}
+.jb-btn:hover { color:var(--yellow); }
+.jb-btn:active { box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
+
+.jb-in {
+  font-size:13px; color:var(--white); background:var(--inset);
+  border:1px solid var(--edge); border-radius:2px; padding:6px 9px;
+  box-shadow:inset 1px 1px 0 #1a1712;
+}
+.jb-in::placeholder { color:var(--dark-tan); }
+.jb-tog {
+  display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--white);
+  cursor:pointer; user-select:none; white-space:nowrap; text-shadow:1px 1px 0 #000;
+}
+.jb-tog input { accent-color:var(--orange); width:15px; height:15px; }
+
+/* toolbar */
+.jb-row1 { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+.jb-seg { display:flex; }
+.jb-segbtn {
+  font-size:13px; color:var(--white); text-shadow:1px 1px 0 #000; background:var(--stone);
+  border:1px solid var(--edge); padding:6px 16px; cursor:pointer;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+}
+.jb-segbtn:first-child { border-radius:2px 0 0 2px; }
+.jb-segbtn:last-child { border-radius:0 2px 2px 0; border-left:none; }
+.jb-segbtn:hover { color:var(--yellow); }
+.jb-segbtn.on { color:var(--yellow); background:var(--stone-hi); box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
+.jb-hint { margin:0; font-size:12.5px; color:var(--tan); text-shadow:1px 1px 0 #000; flex:1 1 260px; }
+
+.jb-row2 { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.jb-pills { display:flex; gap:6px; flex-wrap:wrap; }
+.jb-pill {
+  font-size:12px; color:var(--tan); background:var(--inset2); border:1px solid var(--edge);
+  border-radius:12px; padding:4px 12px; cursor:pointer; text-shadow:1px 1px 0 #000;
+  box-shadow:inset 1px 1px 0 #1a1712;
+}
+.jb-pill:hover { color:var(--yellow); }
+.jb-pill.on { color:var(--yellow); background:var(--stone-hi); border-color:#8a6f3d; box-shadow:inset 1px 1px 0 #6b5d45; }
+.jb-search { flex:1 1 180px; min-width:140px; }
+.jb-search .jb-in { width:100%; }
+.jb-sheetbtn { display:flex; flex-direction:column; align-items:flex-end; gap:2px; padding:5px 14px; margin-left:auto; text-align:right; }
+.jb-sheetbtn-label { font-weight:600; }
+.jb-sheetbtn-summary { font-family:var(--mono); font-size:10.5px; color:var(--tan); max-width:360px; white-space:normal; }
+@media (max-width:860px) { .jb-sheetbtn-summary { display:none; } }
+
+.jb-read { font-size:13px; color:var(--tan); margin:0 0 12px; text-shadow:1px 1px 0 #000; }
+.jb-read b { color:var(--orange); font-family:var(--mono); }
+
+/* the ledger table */
+.jb-tablewrap { overflow:auto; max-height:calc(100vh - 250px); min-height:240px; }
+.jb-tablewrap::-webkit-scrollbar { width:12px; height:12px; }
+.jb-tablewrap::-webkit-scrollbar-track { background:var(--inset2); }
+.jb-tablewrap::-webkit-scrollbar-thumb { background:var(--stone); border:1px solid var(--edge); }
+table.jb-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820px; }
+.jb-t thead th {
+  position:sticky; top:0; z-index:2; background:var(--stone); color:var(--orange);
+  font-weight:600; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+  text-align:right; padding:0; border-bottom:2px solid var(--edge);
+  text-shadow:1px 1px 0 #000; box-shadow:inset 0 1px 0 var(--stone-hi);
+  white-space:nowrap;
+}
+.jb-t thead th:first-child { text-align:left; left:0; z-index:3; }
+.th-btn {
+  width:100%; background:none; border:none; cursor:pointer; padding:8px 8px;
+  font:inherit; font-weight:600; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--orange); text-shadow:1px 1px 0 #000; text-align:right;
+}
+.jb-t thead th:first-child .th-btn { text-align:left; }
+.th-btn:hover { color:var(--yellow); }
+.th-btn.on { color:var(--yellow); }
+.th-btn .arr { font-size:9px; margin-left:3px; display:inline-block; width:8px; }
+
+.jb-t tbody td:first-child { position:sticky; left:0; z-index:1; background:var(--inset); }
+.jb-t tbody tr.jb-row:hover td:first-child { background:#332c22; }
+.jb-t tbody tr.jb-row:hover { background:#332c22; }
+.jb-t tbody tr.jb-row:hover td:first-child .jb-jobname { color:var(--yellow); }
+.jb-t tbody td {
+  padding:7px 8px; text-align:right; font-family:var(--mono); font-size:12.5px;
+  font-variant-numeric:tabular-nums; border-bottom:1px solid #221d16; white-space:nowrap;
+}
+.jb-t tbody td:first-child { text-align:left; font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; white-space:normal; }
+.jb-t tbody td:nth-child(2) { text-align:left; font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; white-space:normal; }
+.jb-t tbody tr.jb-row { cursor:pointer; }
+.jb-t tbody tr.jb-row.dim { opacity:.55; }
+.jb-t .good { color:var(--good); } .jb-t .bad { color:var(--bad); } .jb-t .warn { color:var(--warn); }
+.jb-t .mut { color:var(--tan); } .jb-t .gold { color:var(--orange); }
+
+.jb-jobname { color:var(--white); text-shadow:1px 1px 0 #000; font-weight:600; }
+.jb-jobname.spell { color:var(--spell); }
+.jb-badge.mem {
+  color:var(--members); font-size:10px; margin-left:6px; border:1px solid #5a4470;
+  border-radius:2px; padding:0 4px; font-family:var(--mono);
+}
+.jb-stamp {
+  color:var(--warn); font-size:10px; margin-left:6px; border:1px dashed #6e5426;
+  border-radius:2px; padding:0 4px; font-family:var(--mono); cursor:help;
+}
+
+.jb-chip {
+  display:inline-flex; align-items:center; font-family:var(--mono); font-size:11px;
+  border:1px solid var(--edge); border-radius:2px; padding:1px 5px; margin:0 4px 3px 0;
+}
+.jb-chip.good { color:var(--good); } .jb-chip.bad { color:var(--bad); border-color:#6e2f26; }
+.jb-chip.tan { color:var(--tan); }
+
+.jb-empty { color:var(--tan); text-align:center; padding:22px 10px; font-style:italic; font-family:'Segoe UI',system-ui,sans-serif; }
+
+/* the expanded plan row */
+tr.jb-plan-row td { padding:0; border-bottom:2px solid var(--edge); background:var(--inset); white-space:normal; }
+.jb-plan { padding:12px 16px 14px; }
+.jb-examine { font-style:italic; color:var(--tan); margin:0 0 10px; text-shadow:1px 1px 0 #000; font-size:13px; }
+.jb-reqlist {
+  list-style:none; margin:0 0 12px; padding:0; display:flex; flex-wrap:wrap;
+  gap:4px 18px; font-family:var(--mono); font-size:12px;
+}
+.jb-reqlist li.good { color:var(--good); } .jb-reqlist li.bad { color:var(--bad); }
+.jb-reqlist li.tan { color:var(--tan); cursor:help; }
+.jb-batchrow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 12px; font-family:var(--mono); font-size:13px; }
+.jb-batchlabel { font-family:'Segoe UI',system-ui,sans-serif; color:var(--tan); text-transform:uppercase; font-size:10.5px; letter-spacing:.1em; margin-right:2px; }
+.jb-batchn { font-weight:600; color:var(--yellow); min-width:4ch; text-align:center; }
+.jb-capnote { font-family:'Segoe UI',system-ui,sans-serif; color:var(--warn); font-size:11.5px; }
+.jb-lines {
+  font-family:var(--mono); font-size:12.5px; line-height:1.8; padding:9px 12px;
+  margin-bottom:12px; background:var(--inset2); border:1px solid var(--edge); border-radius:2px;
+  box-shadow:inset 1px 1px 0 #1a1712;
+}
+.jb-lines .op { display:inline-block; width:54px; font-weight:700; letter-spacing:.06em; font-size:11px; }
+.jb-lines .op.buy { color:var(--good); } .jb-lines .op.pay { color:var(--good); }
+.jb-lines .op.work { color:var(--orange); } .jb-lines .op.sell { color:var(--bad); }
+.jb-lines .clock { color:var(--dark-tan); font-size:11.5px; }
+.jb-facts { display:flex; gap:8px 22px; flex-wrap:wrap; font-family:var(--mono); font-size:13px; margin-bottom:6px; }
+.jb-facts div span {
+  display:block; font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; color:var(--tan);
+  letter-spacing:.1em; text-transform:uppercase; margin-bottom:1px; text-shadow:1px 1px 0 #000;
+}
+.jb-facts div b { font-weight:600; color:var(--white); }
+.jb-warn {
+  border:1px solid #6e5426; background:#33270f; color:#f1d08a; border-radius:2px;
+  padding:8px 11px; margin:6px 0 0; font-size:12.5px; text-shadow:1px 1px 0 #000;
+  font-family:'Segoe UI',system-ui,sans-serif;
+}
+
+/* overlay + drawer */
+.jb-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:55; opacity:0; pointer-events:none;
+}
+.jb-overlay.open { opacity:1; pointer-events:auto; }
+.jb-drawer {
+  position:fixed; top:0; right:0; bottom:0; width:360px; max-width:100%; z-index:60;
+  background:var(--stone); border-left:2px solid var(--edge);
+  box-shadow:inset 1px 1px 0 var(--stone-hi), -6px 0 24px rgba(0,0,0,.6);
+  display:flex; flex-direction:column; transform:translateX(105%);
+}
+.jb-drawer.open { transform:translateX(0); }
+@media (prefers-reduced-motion:no-preference) {
+  .jb-drawer { transition:transform .2s ease; }
+  .jb-overlay { transition:opacity .2s ease; }
+}
+.jb-drawerhead {
+  display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+  padding:12px 14px; border-bottom:2px solid var(--edge); flex:none;
+}
+.jb-drawer-name { margin:0; font-family:var(--disp); font-weight:700; font-size:20px; color:var(--orange); text-shadow:2px 2px 0 #000; }
+.jb-drawer-sub { margin:3px 0 0; font-size:11px; color:var(--tan); letter-spacing:.1em; text-transform:uppercase; text-shadow:1px 1px 0 #000; }
+.jb-x {
+  width:26px; height:26px; flex:none; display:flex; align-items:center; justify-content:center;
+  background:#7a1f1f; color:#fff; font-size:13px; font-weight:700; cursor:pointer;
+  border:1px solid var(--edge); border-radius:2px;
+  box-shadow:inset 1px 1px 0 #a34040, inset -1px -1px 0 #4d1010;
+}
+.jb-x:hover { background:#933030; }
+.jb-drawerbody { padding:14px; overflow-y:auto; flex:1 1 auto; }
+.jb-dsec {
+  font-family:var(--disp); font-weight:600; font-size:13px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--orange); margin:16px 0 8px; text-shadow:1px 1px 0 #000;
+}
+.jb-dsec:first-child { margin-top:0; }
+.jb-skillgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
+.jb-skillitem { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--tan); }
+.jb-skillitem .glyph { width:18px; text-align:center; color:var(--orange); font-size:15px; }
+.jb-skillitem .skname { flex:1; }
+.jb-skillitem input { width:52px; text-align:right; font-family:var(--mono); }
+.jb-memtog { margin:12px 0 0; }
+.jb-questlist { display:flex; flex-direction:column; gap:2px; }
+.jb-questrow { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:13px; cursor:help; }
+.jb-questrow input { accent-color:var(--orange); width:15px; height:15px; }
+.jb-questrow .qname.good { color:var(--good); }
+.jb-questrow .qname.bad { color:var(--bad); }
+.jb-rsnrow { display:flex; gap:8px; align-items:center; }
+.jb-rsnrow .jb-in { flex:1; }
+.jb-note { font-size:11.5px; color:var(--good); min-height:1.4em; margin:6px 0 0; }
+
+/* mobile: rows become labelled cards */
+@media (max-width:720px) {
+  table.jb-t, table.jb-t tbody, table.jb-t tr, table.jb-t td { display:block; width:100%; }
+  table.jb-t thead { display:none; }
+  table.jb-t { min-width:0; }
+  .jb-tablewrap { max-height:none; overflow:visible; }
+  table.jb-t tbody tr.jb-row {
+    border:1px solid var(--edge); border-radius:2px; margin-bottom:8px; padding:6px 10px;
+    background:var(--inset); box-shadow:inset 1px 1px 0 #1a1712;
+  }
+  table.jb-t tbody tr.jb-plan-row { border:1px solid var(--edge); border-top:none; margin:-8px 0 8px; border-radius:0 0 2px 2px; }
+  table.jb-t tbody td { border-bottom:none; padding:4px 0; white-space:normal; text-align:left !important; }
+  table.jb-t tbody td:first-child, table.jb-t tbody td:nth-child(2) { position:static; background:transparent; }
+  table.jb-t tbody td[data-label]::before {
+    content:attr(data-label); display:block; font-size:9.5px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--tan); margin-bottom:1px;
+  }
+  .jb-plan-cell { padding:6px 6px 2px !important; }
+  .jb-row1, .jb-row2 { gap:8px; }
+  .jb-sheetbtn { margin-left:0; width:100%; align-items:flex-start; text-align:left; }
+}
+</style>
+</head>
+<body>
+<div class="jb-root">
+  <header class="jb-mast">
+    <h1 class="jb-title">Job Board</h1>
+    <p class="jb-sub">Prototype C · Ledger</p>
+  </header>
+
+  <section class="jb-panel jb-toolbar">
+    <div class="jb-row1">
+      <div class="jb-seg" role="group" aria-label="Pricing mode">
+        <button type="button" class="jb-segbtn on" id="modeExpress" aria-pressed="true">Start now</button>
+        <button type="button" class="jb-segbtn" id="modePatient" aria-pressed="false">Full margin</button>
+      </div>
+      <p class="jb-hint" id="modeHint"></p>
+    </div>
+    <div class="jb-row2">
+      <div class="jb-pills" role="group" aria-label="Rank by">
+        <button type="button" class="jb-pill on" data-focus="" aria-pressed="true">Best pay</button>
+        <button type="button" class="jb-pill" data-focus="Smithing" aria-pressed="false">⚒ Smithing</button>
+        <button type="button" class="jb-pill" data-focus="Crafting" aria-pressed="false">✂ Crafting</button>
+        <button type="button" class="jb-pill" data-focus="Fletching" aria-pressed="false">➶ Fletching</button>
+        <button type="button" class="jb-pill" data-focus="Cooking" aria-pressed="false">♨ Cooking</button>
+        <button type="button" class="jb-pill" data-focus="Herblore" aria-pressed="false">⚗ Herblore</button>
+        <button type="button" class="jb-pill" data-focus="Magic" aria-pressed="false">✦ Magic</button>
+      </div>
+      <div class="jb-search">
+        <input class="jb-in" id="searchInput" placeholder="Search the job board… e.g. cannonball, glory, wine" aria-label="Search jobs">
+      </div>
+      <label class="jb-tog"><input type="checkbox" id="hideCantBox" checked> Only what I can start</label>
+      <button type="button" class="jb-btn jb-sheetbtn" id="sheetBtn" aria-haspopup="dialog" aria-expanded="false">
+        <span class="jb-sheetbtn-label">Sheet</span>
+        <span class="jb-sheetbtn-summary" id="sheetSummary"></span>
+      </button>
+    </div>
+  </section>
+
+  <p class="jb-read" id="readLine"></p>
+
+  <div class="jb-inset jb-tablewrap">
+    <table class="jb-t" id="jobTable">
+      <thead>
+        <tr>
+          <th><button type="button" class="th-btn" data-key="job">Job <span class="arr"></span></button></th>
+          <th><button type="button" class="th-btn" data-key="needs">Needs <span class="arr"></span></button></th>
+          <th><button type="button" class="th-btn" data-key="pays">Pays <span class="arr"></span></button></th>
+          <th><button type="button" class="th-btn" data-key="costs">Costs <span class="arr"></span></button></th>
+          <th><button type="button" class="th-btn" data-key="time">Time <span class="arr"></span></button></th>
+          <th><button type="button" class="th-btn" data-key="xp">Xp <span class="arr"></span></button></th>
+          <th id="gpxpHead" hidden><button type="button" class="th-btn" data-key="gpxp">Gp/xp <span class="arr"></span></button></th>
+        </tr>
+      </thead>
+      <tbody id="jobBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="jb-overlay" id="drawerOverlay"></div>
+<aside class="jb-drawer" id="sheetDrawer" role="dialog" aria-modal="true" aria-labelledby="drawerRsn">
+  <div class="jb-drawerhead">
+    <div>
+      <h2 class="jb-drawer-name" id="drawerRsn">Peli</h2>
+      <p class="jb-drawer-sub">Your sheet</p>
+    </div>
+    <button type="button" class="jb-x" id="drawerClose" aria-label="Close sheet">✕</button>
+  </div>
+  <div class="jb-drawerbody">
+    <h3 class="jb-dsec">Skills</h3>
+    <div class="jb-skillgrid" id="skillGrid"></div>
+    <label class="jb-tog jb-memtog"><input type="checkbox" id="membersBox"> Members</label>
+
+    <h3 class="jb-dsec">Quests</h3>
+    <div class="jb-questlist" id="questList"></div>
+
+    <h3 class="jb-dsec">RuneScape name</h3>
+    <div class="jb-rsnrow">
+      <input class="jb-in" id="rsnInput" placeholder="RuneScape name" maxlength="12">
+      <button type="button" class="jb-btn" id="hiscoresBtn">Hiscores</button>
+    </div>
+    <p class="jb-note" id="hiscoresMsg" aria-live="polite"></p>
+  </div>
+</aside>
+
+<script src="./jobs-mock.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  function article(word) { return /^[aeiou]/i.test(word) ? "an" : "a"; }
+  function withArticles(arr) { return arr.map(function (w) { return article(w) + " " + w.toLowerCase(); }).join(" and "); }
+  function lowerFirst(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
+
+  var QUEST_KEYS = Object.keys(JB.SHEET.quests);
+  var DEFAULT_DIR = { job: 1, needs: 1, pays: -1, costs: 1, time: 1, xp: -1, gpxp: -1 };
+  var SPELL_VERBS = ["High alch", "Low alch", "Enchant", "Cast"];
+
+  function normalizeSheet(s) {
+    var skills = {};
+    JB.SKILLS.forEach(function (k) {
+      var v = s && s.skills ? s.skills[k] : null;
+      skills[k] = v == null || v === "" ? 1 : clamp(Math.round(+v) || 1, 1, 99);
+    });
+    var quests = {};
+    QUEST_KEYS.forEach(function (k) { quests[k] = !!(s && s.quests && s.quests[k]); });
+    return { rsn: (s && s.rsn) || "", members: !!(s && s.members), skills: skills, quests: quests };
+  }
+
+  function loadSheet() {
+    try {
+      var raw = localStorage.getItem("jb-proto-sheet");
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.skills) return normalizeSheet(parsed);
+      }
+    } catch (e) { /* ignore */ }
+    return normalizeSheet(JSON.parse(JSON.stringify(JB.SHEET)));
+  }
+  function saveSheet() {
+    try { localStorage.setItem("jb-proto-sheet", JSON.stringify(state.sheet)); } catch (e) { /* ignore */ }
+  }
+
+  var state = {
+    mode: "express",
+    focus: "",
+    search: "",
+    hideCant: true,
+    sheet: loadSheet(),
+    batches: {},
+    expanded: new Set(),
+    sort: { key: null, dir: 1 },
+    drawerOpen: false
+  };
+
+  /* ---------------- DOM refs ---------------- */
+  var modeExpress = document.getElementById("modeExpress");
+  var modePatient = document.getElementById("modePatient");
+  var modeHint = document.getElementById("modeHint");
+  var pills = Array.prototype.slice.call(document.querySelectorAll(".jb-pill"));
+  var searchInput = document.getElementById("searchInput");
+  var hideCantBox = document.getElementById("hideCantBox");
+  var sheetBtn = document.getElementById("sheetBtn");
+  var sheetSummary = document.getElementById("sheetSummary");
+  var readLine = document.getElementById("readLine");
+  var jobTable = document.getElementById("jobTable");
+  var jobBody = document.getElementById("jobBody");
+  var gpxpHead = document.getElementById("gpxpHead");
+  var thBtns = Array.prototype.slice.call(document.querySelectorAll(".th-btn"));
+
+  var drawerOverlay = document.getElementById("drawerOverlay");
+  var sheetDrawer = document.getElementById("sheetDrawer");
+  var drawerClose = document.getElementById("drawerClose");
+  var drawerRsn = document.getElementById("drawerRsn");
+  var skillGrid = document.getElementById("skillGrid");
+  var membersBox = document.getElementById("membersBox");
+  var questList = document.getElementById("questList");
+  var rsnInput = document.getElementById("rsnInput");
+  var hiscoresBtn = document.getElementById("hiscoresBtn");
+  var hiscoresMsg = document.getElementById("hiscoresMsg");
+
+  /* ---------------- data pipeline ---------------- */
+  function computeRows() {
+    var rankedAll = JB.rank(JB.JOBS, state.mode, state.focus);
+    var q = state.search.trim().toLowerCase();
+    var searched = q ? rankedAll.filter(function (j) { return (j.verb + " " + j.out).toLowerCase().indexOf(q) !== -1; }) : rankedAll;
+    var withCan = searched.map(function (job) { return { job: job, can: JB.canDo(job, state.sheet) }; });
+    var canCount = withCan.filter(function (r) { return r.can; }).length;
+    var rows = state.hideCant ? withCan.filter(function (r) { return r.can; }) : withCan;
+    if (state.sort.key) {
+      rows = rows.slice().sort(function (a, b) { return state.sort.dir * cmp(a, b, state.sort.key); });
+    }
+    return { total: searched.length, canCount: canCount, rows: rows };
+  }
+
+  function batchFor(job) {
+    var maxN = job.maxN[state.mode];
+    return clamp(state.batches[job.key] != null ? state.batches[job.key] : job.defaultN, 1, maxN);
+  }
+
+  function rowValue(r, key) {
+    var job = r.job, n = batchFor(job), m = JB.math(job, state.mode, n);
+    switch (key) {
+      case "job": return (job.verb + " " + job.out).toLowerCase();
+      case "needs": return r.can ? 0 : 1;
+      case "pays": return m.profit;
+      case "costs": return m.cost;
+      case "time": return m.totalH;
+      case "xp": return m.xp.reduce(function (s, xv) { return s + xv[1]; }, 0);
+      case "gpxp": { var g = m.gpPerXp(state.focus); return g == null ? -Infinity : g; }
+    }
+    return 0;
+  }
+  function cmp(a, b, key) {
+    var va = rowValue(a, key), vb = rowValue(b, key);
+    if (typeof va === "string") return va.localeCompare(vb);
+    return va - vb;
+  }
+
+  /* ---------------- cell builders ---------------- */
+  function jobCellHtml(job) {
+    var isSpell = SPELL_VERBS.indexOf(job.verb) !== -1;
+    var stamps = "";
+    if (job.members) stamps += '<span class="jb-badge mem">P2P</span>';
+    if (job.flags.crush > 0) {
+      stamps += '<span class="jb-stamp" title="Semi-precious gems crush on a failed cut — the buy list already covers the extra uncut gems.">' +
+        Math.round(job.flags.crush * 100) + '% crush</span>';
+    }
+    if (job.flags.stale.length || job.flags.moving.length) {
+      stamps += '<span class="jb-stamp" title="Low-confidence or fast-moving pricing somewhere in this chain — check the tape before trusting it.">thin data</span>';
+    }
+    if (job.flags.rich) {
+      stamps += '<span class="jb-stamp" title="Pays more than honest hands-on labor can explain — probe every leg with a 1-unit batch first.">too good?</span>';
+    }
+    return '<span class="jb-jobname' + (isSpell ? " spell" : "") + '">' + esc(job.verb) + " " + esc(job.out) + "</span>" + stamps;
+  }
+
+  function needsCellHtml(job, can) {
+    if (!can) {
+      var b = JB.blocker(job, state.sheet);
+      return '<span class="jb-chip bad">' + esc(b) + " ✗</span>";
+    }
+    var chips = [];
+    job.levels.forEach(function (q) { chips.push('<span class="jb-chip good">' + esc(q.s) + " " + q.l + " ✓</span>"); });
+    job.unlocks.forEach(function (u) {
+      chips.push('<span class="jb-chip good" title="' + esc(JB.unlockNote(u)) + '">' + esc(u) + " ✓</span>");
+    });
+    job.facilities.forEach(function (f) { chips.push('<span class="jb-chip tan">' + esc(f) + "</span>"); });
+    job.gear.forEach(function (g) {
+      chips.push('<span class="jb-chip tan" title="' + esc(JB.gearNote(g)) + '">' + esc(g) + "</span>");
+    });
+    return chips.join("") || '<span class="jb-chip tan">—</span>';
+  }
+
+  function examineLine(job) {
+    if (job.alch) return job.verb + " the " + lowerFirst(job.out) + " for its fixed coin value — no sell offer, no GE tax.";
+    var loc = job.facilities.length ? " at " + withArticles(job.facilities) : "";
+    var gear = job.gear.length ? " with " + withArticles(job.gear) : "";
+    return job.verb + " " + lowerFirst(job.out) + loc + gear + ".";
+  }
+
+  function reqListHtml(job) {
+    var lines = [];
+    if (job.members) {
+      var ok = state.sheet.members;
+      lines.push('<li class="' + (ok ? "good" : "bad") + '">' + (ok ? "✓" : "✗") + " Members — you're " + (ok ? "a member" : "not a member") + "</li>");
+    }
+    job.levels.forEach(function (q) {
+      var have = state.sheet.skills[q.s] || 1;
+      var ok2 = have >= q.l;
+      lines.push('<li class="' + (ok2 ? "good" : "bad") + '">' + (ok2 ? "✓" : "✗") + " " + esc(q.s) + " " + q.l + " — you have " + have + "</li>");
+    });
+    job.unlocks.forEach(function (u) {
+      var done = !!state.sheet.quests[u];
+      lines.push('<li class="' + (done ? "good" : "bad") + '" title="' + esc(JB.unlockNote(u)) + '">' +
+        (done ? "✓" : "✗") + " " + esc(u) + " — " + (done ? "done" : "not done") + "</li>");
+    });
+    job.facilities.forEach(function (f) { lines.push('<li class="tan">' + esc(f) + "</li>"); });
+    job.gear.forEach(function (g) { lines.push('<li class="tan" title="' + esc(JB.gearNote(g)) + '">' + esc(g) + "</li>"); });
+    if (job.fireStaff) {
+      lines.push('<li class="tan" title="The buy list prices every fire rune per cast to stay honest — wielding any fire staff supplies them for free.">fire staff optional</li>');
+    }
+    return lines.join("");
+  }
+
+  function batchRowHtml(job, n, m) {
+    var capNote = m.capped
+      ? '<span class="jb-capnote">⚠ capped — ' + (state.mode === "express" ? "a bigger batch would move these books" : "the books can't fill more inside a day") + "</span>"
+      : "";
+    return '<div class="jb-batchrow">' +
+      '<span class="jb-batchlabel">Batch</span>' +
+      '<button type="button" class="jb-btn jb-batchbtn" data-act="half" data-key="' + esc(job.key) + '" aria-label="Halve batch">−</button>' +
+      '<span class="jb-batchn">' + JB.fmtFull(n) + "</span>" +
+      '<button type="button" class="jb-btn jb-batchbtn" data-act="double" data-key="' + esc(job.key) + '" aria-label="Double batch">+</button>' +
+      '<button type="button" class="jb-btn jb-batchbtn" data-act="max" data-key="' + esc(job.key) + '">Max</button>' +
+      capNote + "</div>";
+  }
+
+  function planLinesHtml(job, n, m) {
+    var out = [];
+    m.lines.buys.forEach(function (b) {
+      var s = '<div><span class="op buy">BUY</span>' + JB.fmtFull(b.qty) + "× " + esc(b.name) + " @ " + JB.fmtFull(b.unitPx) +
+        " — " + JB.fmtGp(b.total) + " gp";
+      if (state.mode === "patient") s += '<span class="clock"> · fills ≈ ' + JB.fmtDur(b.fillH) + "</span>";
+      out.push(s + "</div>");
+    });
+    if (m.lines.fees > 0) out.push('<div><span class="op pay">PAY</span>' + JB.fmtGp(m.lines.fees) + " gp in fees</div>");
+
+    var sellTotal = m.profit + m.cost;
+    if (job.alch) {
+      out.push('<div><span class="op work">ALCH</span>' + JB.fmtFull(n) + "× " + esc(job.out) + " at " + JB.fmtFull(m.sellRaw) +
+        ' gp apiece<span class="clock"> · ≈ ' + JB.fmtDur(m.workH) + "</span></div>");
+      out.push('<div><span class="op sell">TAKE</span>' + JB.fmtGp(sellTotal) + " gp straight to your pouch — no sell offer, no GE tax</div>");
+    } else {
+      m.lines.steps.forEach(function (s) {
+        var l = '<div><span class="op work">' + esc(s.verb.toUpperCase()) + "</span>" + JB.fmtFull(s.count) + "× " + esc(s.out);
+        if (s.qtyPer > 1) l += ' <span class="clock">(' + s.qtyPer + " per " + s.verb.toLowerCase() + ")</span>";
+        if (s.at) l += " at " + esc(s.at);
+        l += ' <span class="clock">· ≈ ' + JB.fmtDur(s.hours) + "</span></div>";
+        out.push(l);
+      });
+      var l2 = '<div><span class="op sell">SELL</span>' + JB.fmtFull(n) + "× " + esc(job.out) + " @ " + JB.fmtFull(m.sellRaw);
+      if (m.tax > 0) l2 += " less tax";
+      l2 += " — " + JB.fmtGp(sellTotal) + " gp";
+      if (state.mode === "patient") l2 += ' <span class="clock">· fills ≈ ' + JB.fmtDur(m.sellClock) + "</span>";
+      out.push(l2 + "</div>");
+    }
+    return out.join("");
+  }
+
+  function factsHtml(job, n, m) {
+    var facts = [];
+    facts.push('<div><span>Costs</span><b class="gold">' + JB.fmtGp(m.cost) + " gp</b></div>");
+    facts.push('<div><span>Pays</span><b class="' + (m.profit > 0 ? "good" : "bad") + '">' +
+      (m.profit > 0 ? "+" : "") + JB.fmtGp(m.profit) + " gp</b></div>");
+    if (m.xp.length) {
+      facts.push('<div><span>Xp</span><b class="gold">' + m.xp.map(function (xv) { return JB.fmtXp(xv[1]) + " " + xv[0]; }).join(" · ") + "</b></div>");
+    }
+    if (state.focus) {
+      var g = m.gpPerXp(state.focus);
+      if (g != null) {
+        facts.push('<div><span>' + (m.profitUnit >= 0 ? "Pays per xp" : "Costs per xp") + '</span><b class="' +
+          (m.profitUnit >= 0 ? "good" : "warn") + '">' + JB.fmtGpx(g) + " gp</b></div>");
+      }
+    }
+    facts.push('<div><span>Return</span><b>' + (m.cost > 0 ? m.roi.toFixed(1) + "%" : "–") + "</b></div>");
+    facts.push('<div><span>Takes about</span><b class="gold">' + JB.fmtDur(m.totalH) + "</b></div>");
+    return '<div class="jb-facts">' + facts.join("") + "</div>";
+  }
+
+  function warningHtml(job, m) {
+    var parts = [];
+    if (job.flags.crush > 0) parts.push("≈" + Math.round(job.flags.crush * 100) + "% of attempts crush — the buy list already covers the extra uncut gems");
+    if (job.flags.rich) parts.push("pays more than honest hands-on labor can explain — probe every leg with a 1-unit batch before committing");
+    if (job.flags.stale.length || job.flags.moving.length) {
+      var names = Array.from(new Set(job.flags.stale.concat(job.flags.moving)));
+      parts.push("thin or fast-moving data on " + names.join(", ") + " — check the tape before trusting it");
+    }
+    if (!parts.length) return "";
+    return '<p class="jb-warn">⚠ ' + parts.join("; ") + ".</p>";
+  }
+
+  function planHtml(job, n, m) {
+    return '<div class="jb-plan">' +
+      '<p class="jb-examine">' + esc(examineLine(job)) + "</p>" +
+      '<ul class="jb-reqlist">' + reqListHtml(job) + "</ul>" +
+      batchRowHtml(job, n, m) +
+      '<div class="jb-lines">' + planLinesHtml(job, n, m) + "</div>" +
+      factsHtml(job, n, m) +
+      warningHtml(job, m) +
+      "</div>";
+  }
+
+  /* ---------------- render ---------------- */
+  function emptyMessage() {
+    if (state.focus) return 'Nothing trains ' + state.focus + ' within your filters — loosen the search, or untick "Only what I can start".';
+    return state.mode === "express"
+      ? "No paying jobs match. Starting now eats both spreads — try Full margin for the bigger cut."
+      : "No paying jobs match. Loosen the search, or check back when the books move.";
+  }
+
+  function renderHeaderArrows() {
+    thBtns.forEach(function (btn) {
+      var key = btn.getAttribute("data-key");
+      var arr = btn.querySelector(".arr");
+      var th = btn.closest("th");
+      if (state.sort.key === key) {
+        btn.classList.add("on");
+        arr.textContent = state.sort.dir === 1 ? "▲" : "▼";
+        th.setAttribute("aria-sort", state.sort.dir === 1 ? "ascending" : "descending");
+      } else {
+        btn.classList.remove("on");
+        arr.textContent = "";
+        th.setAttribute("aria-sort", "none");
+      }
+    });
+  }
+
+  function renderTableBody(rows) {
+    var cols = 6 + (state.focus ? 1 : 0);
+    if (!rows.length) {
+      jobBody.innerHTML = '<tr><td colspan="' + cols + '" class="jb-empty">' + esc(emptyMessage()) + "</td></tr>";
+      return;
+    }
+    var html = "";
+    rows.forEach(function (r) {
+      var job = r.job, can = r.can, n = batchFor(job), m = JB.math(job, state.mode, n);
+      var expanded = state.expanded.has(job.key);
+      var xpText = m.xp.length ? m.xp.map(function (xv) { return JB.fmtXp(xv[1]) + " " + xv[0]; }).join(" · ") : "–";
+      var xpClass = m.xp.length ? "gold" : "mut";
+      html += '<tr class="jb-row' + (can ? "" : " dim") + '" tabindex="0" role="button" aria-expanded="' + expanded +
+        '" data-key="' + esc(job.key) + '">' +
+        '<td data-label="Job">' + jobCellHtml(job) + "</td>" +
+        '<td data-label="Needs">' + needsCellHtml(job, can) + "</td>" +
+        '<td data-label="Pays" class="' + (m.profit > 0 ? "good" : "bad") + '">' + (m.profit > 0 ? "+" : "") + JB.fmtGp(m.profit) + "</td>" +
+        '<td data-label="Costs" class="gold">' + JB.fmtGp(m.cost) + "</td>" +
+        '<td data-label="Time" class="mut">' + JB.fmtDur(m.totalH) + "</td>" +
+        '<td data-label="Xp" class="' + xpClass + '">' + xpText + "</td>";
+      if (state.focus) {
+        var g = m.gpPerXp(state.focus);
+        var gpxpText = g == null ? "–" : (g >= 0 ? JB.fmtGpx(g) : "costs " + JB.fmtGpx(g));
+        var gpxpClass = g == null ? "mut" : (g >= 0 ? "good" : "warn");
+        html += '<td data-label="Gp/xp" class="' + gpxpClass + '">' + gpxpText + "</td>";
+      }
+      html += "</tr>";
+      if (expanded) {
+        html += '<tr class="jb-plan-row"><td class="jb-plan-cell" colspan="' + cols + '">' + planHtml(job, n, m) + "</td></tr>";
+      }
+    });
+    jobBody.innerHTML = html;
+  }
+
+  function sheetSummaryText() {
+    var skillsTxt = JB.SKILLS.map(function (s) { return s + " " + state.sheet.skills[s]; }).join(" · ");
+    var doneN = QUEST_KEYS.filter(function (q) { return state.sheet.quests[q]; }).length;
+    return skillsTxt + " · " + (state.sheet.members ? "P2P" : "F2P") + " · quests " + doneN + "/" + QUEST_KEYS.length;
+  }
+
+  function renderAll() {
+    modeExpress.classList.toggle("on", state.mode === "express");
+    modeExpress.setAttribute("aria-pressed", state.mode === "express");
+    modePatient.classList.toggle("on", state.mode === "patient");
+    modePatient.setAttribute("aria-pressed", state.mode === "patient");
+    modeHint.textContent = state.mode === "express"
+      ? "Insta-buy the inputs, insta-sell the product — thinner pay, done today."
+      : "Offers at the week's going rates — the whole margin, about a day per leg.";
+
+    pills.forEach(function (p) {
+      var on = p.getAttribute("data-focus") === state.focus;
+      p.classList.toggle("on", on);
+      p.setAttribute("aria-pressed", on);
+    });
+    gpxpHead.hidden = !state.focus;
+    sheetSummary.textContent = sheetSummaryText();
+
+    var res = computeRows();
+    readLine.innerHTML = state.focus
+      ? "<b>" + res.total + "</b> jobs train " + esc(state.focus) + ", cheapest xp first — the market pays for the ones in green."
+      : "<b>" + res.total + "</b> jobs pay on the exchange · <b>" + res.canCount + "</b> you can start · click a job for its plan";
+
+    renderHeaderArrows();
+    renderTableBody(res.rows);
+  }
+
+  /* ---------------- interactions: toolbar ---------------- */
+  modeExpress.addEventListener("click", function () { state.mode = "express"; renderAll(); });
+  modePatient.addEventListener("click", function () { state.mode = "patient"; renderAll(); });
+  pills.forEach(function (p) {
+    p.addEventListener("click", function () {
+      var f = p.getAttribute("data-focus");
+      if (f !== state.focus && f === "" && state.sort.key === "gpxp") state.sort = { key: null, dir: 1 };
+      state.focus = f;
+      renderAll();
+    });
+  });
+  searchInput.addEventListener("input", function () { state.search = searchInput.value; renderAll(); });
+  hideCantBox.addEventListener("change", function () { state.hideCant = hideCantBox.checked; renderAll(); });
+
+  thBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var key = btn.getAttribute("data-key");
+      if (state.sort.key === key) state.sort.dir *= -1;
+      else state.sort = { key: key, dir: DEFAULT_DIR[key] || 1 };
+      renderAll();
+    });
+  });
+
+  /* ---------------- interactions: table rows ---------------- */
+  function toggleExpand(key) {
+    if (state.expanded.has(key)) state.expanded.delete(key); else state.expanded.add(key);
+    renderAll();
+    var row = jobTable.querySelector('tr.jb-row[data-key="' + key + '"]');
+    if (row) row.focus();
+  }
+  function handleBatchClick(btn) {
+    var key = btn.getAttribute("data-key"), act = btn.getAttribute("data-act");
+    var job = JB.JOBS.filter(function (j) { return j.key === key; })[0];
+    if (!job) return;
+    var maxN = job.maxN[state.mode];
+    var n = clamp(state.batches[key] != null ? state.batches[key] : job.defaultN, 1, maxN);
+    if (act === "half") n = clamp(JB.niceRound(n / 2), 1, maxN);
+    else if (act === "double") n = clamp(JB.niceRound(n * 2), 1, maxN);
+    else if (act === "max") n = maxN;
+    state.batches[key] = n;
+    renderAll();
+    var again = jobTable.querySelector('.jb-batchbtn[data-key="' + key + '"][data-act="' + act + '"]');
+    if (again) again.focus();
+  }
+  jobTable.addEventListener("click", function (e) {
+    var batchBtn = e.target.closest(".jb-batchbtn");
+    if (batchBtn) { handleBatchClick(batchBtn); return; }
+    var row = e.target.closest("tr.jb-row");
+    if (row) toggleExpand(row.getAttribute("data-key"));
+  });
+  jobTable.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var row = e.target.closest("tr.jb-row");
+    if (row) { e.preventDefault(); toggleExpand(row.getAttribute("data-key")); }
+  });
+
+  /* ---------------- drawer ---------------- */
+  function buildSkillGrid() {
+    skillGrid.innerHTML = JB.SKILLS.map(function (s) {
+      return '<label class="jb-skillitem"><span class="glyph">' + JB.SKILL_GLYPH[s] + '</span>' +
+        '<span class="skname">' + s + '</span>' +
+        '<input class="jb-in" type="number" min="1" max="99" data-skill="' + s + '"></label>';
+    }).join("");
+    skillGrid.querySelectorAll("input").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        var skill = inp.getAttribute("data-skill");
+        var raw = inp.value;
+        state.sheet.skills[skill] = raw === "" ? 1 : clamp(Math.round(+raw) || 1, 1, 99);
+        saveSheet();
+        renderAll();
+      });
+    });
+  }
+  function buildQuestList() {
+    questList.innerHTML = QUEST_KEYS.map(function (q) {
+      return '<label class="jb-questrow" data-quest="' + esc(q) + '" title="' + esc(JB.unlockNote(q)) + '">' +
+        '<input type="checkbox" data-quest="' + esc(q) + '"><span class="qname">' + esc(q) + "</span></label>";
+    }).join("");
+    questList.querySelectorAll("input").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        var q = inp.getAttribute("data-quest");
+        state.sheet.quests[q] = inp.checked;
+        saveSheet();
+        syncQuestRowClasses();
+        renderAll();
+      });
+    });
+  }
+  function syncQuestRowClasses() {
+    questList.querySelectorAll(".jb-questrow").forEach(function (row) {
+      var q = row.getAttribute("data-quest");
+      var done = !!state.sheet.quests[q];
+      var name = row.querySelector(".qname");
+      name.classList.toggle("good", done);
+      name.classList.toggle("bad", !done);
+      row.querySelector("input").checked = done;
+    });
+  }
+  function syncDrawerFromState() {
+    skillGrid.querySelectorAll("input").forEach(function (inp) {
+      inp.value = state.sheet.skills[inp.getAttribute("data-skill")];
+    });
+    membersBox.checked = state.sheet.members;
+    syncQuestRowClasses();
+    rsnInput.value = state.sheet.rsn;
+    drawerRsn.textContent = state.sheet.rsn || "Unnamed";
+  }
+
+  membersBox.addEventListener("change", function () {
+    state.sheet.members = membersBox.checked;
+    saveSheet();
+    renderAll();
+  });
+  rsnInput.addEventListener("input", function () {
+    state.sheet.rsn = rsnInput.value;
+    saveSheet();
+    drawerRsn.textContent = state.sheet.rsn || "Unnamed";
+  });
+  hiscoresBtn.addEventListener("click", function () {
+    var fresh = normalizeSheet(JSON.parse(JSON.stringify(JB.SHEET)));
+    fresh.rsn = state.sheet.rsn || JB.SHEET.rsn;
+    state.sheet = fresh;
+    saveSheet();
+    syncDrawerFromState();
+    renderAll();
+    hiscoresMsg.textContent = "✓ levels loaded";
+  });
+
+  function openDrawer() {
+    state.drawerOpen = true;
+    syncDrawerFromState();
+    drawerOverlay.classList.add("open");
+    sheetDrawer.classList.add("open");
+    sheetDrawer.removeAttribute("inert");
+    sheetBtn.setAttribute("aria-expanded", "true");
+    requestAnimationFrame(function () { drawerClose.focus(); });
+  }
+  function closeDrawer() {
+    state.drawerOpen = false;
+    drawerOverlay.classList.remove("open");
+    sheetDrawer.classList.remove("open");
+    sheetDrawer.setAttribute("inert", "");
+    sheetBtn.setAttribute("aria-expanded", "false");
+    sheetBtn.focus();
+  }
+  sheetBtn.addEventListener("click", openDrawer);
+  drawerClose.addEventListener("click", closeDrawer);
+  drawerOverlay.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && state.drawerOpen) closeDrawer();
+  });
+
+  /* ---------------- init ---------------- */
+  sheetDrawer.setAttribute("inert", "");
+  buildSkillGrid();
+  buildQuestList();
+  renderAll();
+})();
+</script>
+</body>
+</html>

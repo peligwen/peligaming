@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Board — Notice Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Pixelify+Sans:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   DESIGN PLAN — Job Board, Prototype A: Notice Board
+   --------------------------------------------------------------------------
+   Palette (named tokens, lifted verbatim from flip-desk.jsx .ge-root):
+     stone #3e3529 (hi #554a38 / lo #241f18), edge #0d0b08, inset #2b2620 /
+     #211d17, page #1b1712; orange #ff981f, yellow #ffe93f, white #f3ecdc,
+     tan #b3a284, dark-tan #8a7a5f; good #57d957, warn #e8b13c, bad #f26060;
+     members purple #d0a0e8. The board's own wood ground is a NEW surface,
+     not house stone: plank #2a1f14 with a 1px darker seam every ~90px. The
+     notices are the aesthetic risk: light parchment #e8dcb5, ink #2a2014,
+     parchment edge #c9b98c, pin #6b6258 — paper on wood, not more stone.
+   Type roles:
+     display  — Cinzel 700, masthead + notice titles + modal heading.
+     body     — 'Segoe UI', system-ui, sans-serif — toolbar, chips, prose.
+     numbers  — ui-monospace stack, tabular-nums — pay, qty, gp, time, xp.
+     pixel    — Pixelify Sans, small caps only — sub-line, stamps, tab-like
+                labels at 11px; never body copy, never at a size that blurs.
+   Layout concept: a compact stone toolbar and character strip sit above a
+   dark wooden board; the board is a plain CSS grid of pinned parchment
+   notices carrying only title + big pay + one line + requirement chips +
+   flag stamps, and a click lifts the notice into a stone contract modal
+   that holds the full ledger the notice deliberately leaves out.
+   ========================================================================== */
+
+:root{
+  --stone:#3e3529; --stone-hi:#554a38; --stone-lo:#241f18; --edge:#0d0b08;
+  --inset:#2b2620; --inset2:#211d17; --page:#1b1712;
+  --orange:#ff981f; --yellow:#ffe93f; --white:#f3ecdc; --tan:#b3a284; --dark-tan:#8a7a5f;
+  --good:#57d957; --warn:#e8b13c; --bad:#f26060; --members:#d0a0e8;
+
+  --wood:#2a1f14; --wood-seam:#1c140c;
+  --paper:#e8dcb5; --paper-edge:#c9b98c; --ink:#2a2014; --ink-soft:#4d4330;
+  --pin:#5c5348; --pin-hi:#8a8072;
+  --paper-good:#1f6b1f; --paper-bad:#8b1d1d; --stamp:#7a2430; --stamp2:#5a3a7a;
+
+  --mono:ui-monospace,'Cascadia Code','SF Mono',Menlo,Consolas,monospace;
+  --disp:'Cinzel',Georgia,'Times New Roman',serif;
+  --pixel:'Pixelify Sans',var(--disp);
+  color-scheme: dark;
+}
+*,*::before,*::after{ box-sizing:border-box; }
+[hidden]{ display:none !important; }
+html,body{ margin:0; padding:0; }
+body{
+  background:var(--page); color:var(--white); min-height:100vh;
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+  font-size:14px; line-height:1.45;
+}
+.wrap{ max-width:1120px; margin:0 auto; padding:16px 14px 40px; }
+.hardshadow{ text-shadow:1px 1px 0 #000; }
+button{ font-family:inherit; }
+
+/* ---------- bevelled stone panel (house style) ---------- */
+.panel{
+  background:var(--stone); border:1px solid var(--edge); border-radius:2px;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+}
+.inset{
+  background:var(--inset); border:1px solid var(--edge); border-radius:2px;
+  box-shadow:inset 1px 1px 0 #1a1712, inset -1px -1px 0 #38322a;
+}
+.stone-btn{
+  font-family:inherit; font-size:12.5px; color:var(--white); text-shadow:1px 1px 0 #000;
+  background:var(--stone); border:1px solid var(--edge); border-radius:2px; padding:6px 13px; cursor:pointer;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo);
+}
+.stone-btn:hover{ color:var(--yellow); }
+.stone-btn:active{ box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
+.stone-btn:disabled{ opacity:.45; cursor:default; color:var(--tan); }
+.stone-btn.on{ color:var(--yellow); background:var(--stone-hi); box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
+.stone-btn.small{ padding:3px 9px; font-size:11.5px; }
+
+:focus-visible{ outline:2px solid var(--yellow); outline-offset:1px; }
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+}
+
+/* ---------- masthead ---------- */
+.mast{ display:flex; align-items:flex-end; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.mast h1{
+  font-family:var(--disp); font-weight:700; font-size:clamp(22px,4vw,30px); letter-spacing:.04em;
+  color:var(--orange); margin:0; line-height:1.05; text-shadow:2px 2px 0 #000;
+}
+.mast .sub{
+  font-family:var(--pixel); font-size:11px; color:var(--tan); margin:5px 0 0; letter-spacing:.16em;
+  text-transform:uppercase; text-shadow:1px 1px 0 #000;
+}
+
+/* ---------- toolbar ---------- */
+.toolbar{ padding:11px 13px; margin-bottom:10px; }
+.mode-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.mode-hint{ font-size:12px; color:var(--tan); margin:6px 0 0; text-shadow:1px 1px 0 #000; }
+.skills-row{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid #221d16; }
+.skills-row .lbl{ font-family:var(--pixel); font-size:10.5px; color:var(--tan); text-transform:uppercase; letter-spacing:.1em; margin-right:2px; text-shadow:1px 1px 0 #000; }
+.filter-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid #221d16; }
+.filter-row .grow{ flex:1 1 200px; min-width:140px; }
+.search-in{
+  font-family:inherit; font-size:13px; color:var(--white); width:100%;
+  background:var(--inset); border:1px solid var(--edge); border-radius:2px; padding:7px 10px;
+  box-shadow:inset 1px 1px 0 #1a1712;
+}
+.search-in::placeholder{ color:var(--dark-tan); }
+.tog{
+  display:inline-flex; align-items:center; gap:7px; font-size:13px; color:var(--white); cursor:pointer;
+  user-select:none; white-space:nowrap; text-shadow:1px 1px 0 #000;
+}
+.tog input{ accent-color:var(--orange); width:15px; height:15px; }
+
+/* ---------- character strip ---------- */
+.charstrip{
+  display:flex; align-items:center; gap:0; overflow-x:auto; margin-bottom:14px;
+  padding:0; width:100%; text-align:left;
+  font-family:inherit; color:var(--white); cursor:pointer;
+}
+.charstrip .cs-inner{ display:flex; align-items:center; gap:14px; padding:8px 13px; white-space:nowrap; }
+.charstrip .rsn{ font-family:var(--disp); font-weight:700; color:var(--orange); font-size:14px; text-shadow:1px 1px 0 #000; flex:none; }
+.charstrip .cell{ display:inline-flex; align-items:center; gap:5px; font-family:var(--mono); font-size:12.5px; color:var(--white); text-shadow:1px 1px 0 #000; flex:none; }
+.charstrip .cell .g{ font-size:14px; }
+.charstrip .cell b{ font-weight:600; }
+.charstrip .p2p{
+  font-family:var(--mono); font-size:10.5px; color:var(--members); border:1px solid #5a4470; border-radius:2px;
+  padding:1px 5px; flex:none;
+}
+.charstrip .quests{ font-family:var(--mono); font-size:12px; color:var(--tan); flex:none; }
+.charstrip .hint{ margin-left:auto; font-size:11px; color:var(--dark-tan); flex:none; }
+.charstrip:hover{ background:#463b2c; }
+.charstrip[aria-expanded="true"]{ border-bottom-left-radius:0; border-bottom-right-radius:0; }
+
+.sheet-editor{ padding:12px 13px 13px; margin-bottom:14px; margin-top:-14px; border-top:1px solid #221d16; }
+.sheet-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px 14px; margin-bottom:10px; }
+.sheet-grid label{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.sheet-grid label .g{ margin-right:4px; }
+.sheet-grid input[type=number]{
+  width:56px; text-align:right; font-family:var(--mono); font-size:13px; color:var(--white);
+  background:var(--inset); border:1px solid var(--edge); border-radius:2px; padding:5px 6px;
+  box-shadow:inset 1px 1px 0 #1a1712;
+}
+.quest-row{ display:flex; gap:8px 16px; flex-wrap:wrap; align-items:center; margin:10px 0; padding-top:10px; border-top:1px solid #221d16; }
+.quest-row .qlbl{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; text-shadow:1px 1px 0 #000; cursor:pointer; }
+.quest-row .qlbl.done{ color:var(--good); }
+.quest-row .qlbl.todo{ color:var(--bad); }
+.quest-row .qlbl input{ accent-color:currentColor; width:14px; height:14px; }
+.rsn-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding-top:10px; border-top:1px solid #221d16; }
+.rsn-row input[type=text]{
+  font-family:inherit; font-size:13px; color:var(--white); width:150px;
+  background:var(--inset); border:1px solid var(--edge); border-radius:2px; padding:6px 9px;
+  box-shadow:inset 1px 1px 0 #1a1712;
+}
+.rsn-row .msg{ font-size:12px; color:var(--tan); text-shadow:1px 1px 0 #000; }
+
+/* ---------- the board (wooden ground) ---------- */
+.board{
+  background:var(--wood);
+  background-image:repeating-linear-gradient(to bottom, transparent 0 89px, var(--wood-seam) 89px 90px);
+  border:1px solid var(--edge); border-radius:2px;
+  padding:18px;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px;
+}
+
+/* ---------- notice ---------- */
+.notice{
+  position:relative; background:var(--paper); color:var(--ink);
+  border:1px solid var(--paper-edge); border-radius:1px;
+  box-shadow:2px 3px 0 rgba(0,0,0,.45);
+  padding:16px 12px 11px; text-align:left; cursor:pointer;
+  font-family:inherit; display:flex; flex-direction:column; gap:6px;
+  transform:rotate(var(--tilt,0deg));
+}
+.notice:hover{ background:#efe4c2; }
+.notice:focus-visible{ outline:3px solid var(--yellow); outline-offset:2px; }
+.notice .pin{
+  position:absolute; top:-6px; left:50%; transform:translateX(-50%);
+  width:11px; height:11px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--pin-hi), var(--pin) 65%, #33302a);
+  border:1px solid #16130f; box-shadow:0 1px 2px rgba(0,0,0,.6);
+}
+.notice.faded{ opacity:.55; filter:grayscale(65%); }
+.notice .stamps{ position:absolute; top:6px; right:6px; display:flex; flex-direction:column; align-items:flex-end; gap:2px; pointer-events:none; }
+.notice .stamp{
+  font-family:var(--pixel); font-size:9.5px; letter-spacing:.06em; text-transform:uppercase;
+  border:1.5px solid var(--stamp); color:var(--stamp); border-radius:2px; padding:1px 5px;
+  transform:rotate(6deg); opacity:.82; background:rgba(232,220,181,.55);
+}
+.notice .stamp.purple{ border-color:var(--stamp2); color:var(--stamp2); }
+.notice h3{
+  margin:0; font-family:var(--disp); font-weight:700; font-size:15.5px; color:var(--ink);
+  letter-spacing:.01em; line-height:1.2; padding-right:34px;
+}
+.notice .pay{ font-family:var(--mono); font-size:20px; font-weight:700; line-height:1.1; }
+.notice .pay.good{ color:var(--paper-good); } .notice .pay.bad{ color:var(--paper-bad); }
+.notice .line2{ font-family:var(--mono); font-size:11.5px; color:var(--ink-soft); }
+.notice .xpline{ font-family:var(--mono); font-size:11px; color:var(--ink-soft); }
+.notice .reqs{ display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
+.chip{
+  font-family:var(--mono); font-size:10px; border-radius:2px; padding:1px 5px; border:1px solid;
+  white-space:nowrap;
+}
+.chip.ok{ color:var(--paper-good); border-color:var(--paper-good); background:rgba(31,107,31,.08); }
+.chip.no{ color:var(--paper-bad); border-color:var(--paper-bad); background:rgba(139,29,29,.08); }
+.chip.unk{ color:var(--ink-soft); border-color:var(--ink-soft); background:rgba(42,32,20,.06); }
+
+.board .empty-notice{ grid-column:1/-1; max-width:420px; margin:0 auto; cursor:default; }
+.board .empty-notice h3{ padding-right:0; }
+.board .empty-notice p{ margin:2px 0 0; font-size:12.5px; color:var(--ink-soft); font-family:'Segoe UI',system-ui,sans-serif; line-height:1.5; }
+
+/* ---------- modal (contract) ---------- */
+.overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:50;
+  display:flex; align-items:center; justify-content:center; padding:14px;
+}
+.modal{
+  width:min(620px,100%); max-height:92vh; overflow:auto;
+  background:var(--stone); border:2px solid var(--edge); border-radius:3px;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo), 0 12px 40px rgba(0,0,0,.7);
+}
+.mhead{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:2px solid var(--edge); }
+.mhead .ti h2{ margin:0; font-family:var(--disp); font-weight:700; font-size:19px; color:var(--orange); letter-spacing:.02em; text-shadow:2px 2px 0 #000; }
+.mhead .ti .examine{ margin:5px 0 0; font-size:12.5px; font-style:italic; color:var(--tan); text-shadow:1px 1px 0 #000; }
+.mx{
+  width:28px; height:28px; flex:none; display:flex; align-items:center; justify-content:center;
+  background:#7a1f1f; color:#fff; font-size:14px; font-weight:700; cursor:pointer;
+  border:1px solid var(--edge); border-radius:2px;
+  box-shadow:inset 1px 1px 0 #a34040, inset -1px -1px 0 #4d1010;
+}
+.mx:hover{ background:#933030; }
+.mbody{ padding:13px 14px 16px; }
+
+.req-list{ display:flex; flex-direction:column; gap:4px; margin:0 0 12px; font-family:var(--mono); font-size:12.5px; }
+.req-list .r{ display:flex; gap:8px; }
+.req-list .r.ok{ color:var(--good); } .req-list .r.no{ color:var(--bad); } .req-list .r.unk{ color:var(--tan); }
+
+.batch-panel{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.batch-ctrl{ display:flex; align-items:center; gap:8px; }
+.batch-ctrl b{ font-family:var(--mono); font-size:17px; color:var(--yellow); min-width:64px; text-align:center; }
+.cap-note{ font-size:11.5px; color:var(--dark-tan); }
+
+.ledger{ padding:9px 11px; font-family:var(--mono); font-size:12.5px; line-height:1.8; margin-bottom:12px; }
+.ledger .op{ display:inline-block; width:50px; font-weight:700; letter-spacing:.05em; font-size:11px; }
+.ledger .op.buy{ color:var(--good); } .ledger .op.work{ color:var(--orange); } .ledger .op.sell{ color:var(--bad); }
+.ledger .clock{ color:var(--dark-tan); font-size:11.5px; }
+
+.facts{ display:flex; gap:8px 20px; flex-wrap:wrap; font-family:var(--mono); font-size:12.5px; padding:9px 11px; margin-bottom:12px; }
+.facts div span{ display:block; font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; color:var(--tan); letter-spacing:.1em; text-transform:uppercase; margin-bottom:2px; text-shadow:1px 1px 0 #000; }
+.facts div b{ font-weight:600; color:var(--white); }
+.facts .good{ color:var(--good); } .facts .bad{ color:var(--bad); } .facts .gold{ color:var(--orange); }
+
+.warn-note{ font-size:12px; color:#f1d08a; line-height:1.5; margin:0; padding:9px 11px; border:1px solid #6e5426; background:#33270f; border-radius:2px; }
+
+.sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+/* ---------- responsive ---------- */
+@media (max-width:600px){
+  .board{ grid-template-columns:1fr; padding:12px; }
+  .modal{ width:100%; }
+  .mode-row{ flex-direction:column; align-items:stretch; }
+  .mode-row .stone-btn{ width:100%; text-align:center; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="mast">
+    <div>
+      <h1 class="hardshadow">Job Board</h1>
+      <p class="sub">Prototype A · Notice Board</p>
+    </div>
+  </header>
+
+  <section class="panel toolbar" id="toolbar">
+    <div class="mode-row" role="group" aria-label="Pricing mode">
+      <button class="stone-btn" id="mode-express" type="button">Start now</button>
+      <button class="stone-btn" id="mode-patient" type="button">Full margin</button>
+    </div>
+    <p class="mode-hint hardshadow" id="mode-hint"></p>
+
+    <div class="skills-row" role="group" aria-label="Training focus">
+      <span class="lbl">Train:</span>
+      <button class="stone-btn small" data-focus="" type="button">Best pay</button>
+      <button class="stone-btn small" data-focus="Smithing" type="button">⚒ Smithing</button>
+      <button class="stone-btn small" data-focus="Crafting" type="button">✂ Crafting</button>
+      <button class="stone-btn small" data-focus="Fletching" type="button">➶ Fletching</button>
+      <button class="stone-btn small" data-focus="Cooking" type="button">♨ Cooking</button>
+      <button class="stone-btn small" data-focus="Herblore" type="button">⚗ Herblore</button>
+      <button class="stone-btn small" data-focus="Magic" type="button">✦ Magic</button>
+    </div>
+
+    <div class="filter-row">
+      <div class="grow">
+        <input class="search-in" id="search" type="text" placeholder="Search the job board… e.g. cannonball, glory, shark" aria-label="Search jobs">
+      </div>
+      <label class="tog"><input type="checkbox" id="only-can-start" checked> Only what I can start</label>
+    </div>
+  </section>
+
+  <button class="panel charstrip" id="charstrip" type="button" aria-expanded="false" aria-controls="sheet-editor">
+    <span class="cs-inner" id="cs-inner"><!-- filled by JS --></span>
+  </button>
+
+  <section class="panel sheet-editor" id="sheet-editor" hidden>
+    <div class="sheet-grid" id="sheet-grid"><!-- filled by JS --></div>
+    <div class="quest-row" id="quest-row"><!-- filled by JS --></div>
+    <div class="rsn-row">
+      <label class="tog">RuneScape name
+        <input type="text" id="rsn-input" maxlength="12" placeholder="Peli">
+      </label>
+      <button class="stone-btn" id="hiscores-btn" type="button">Hiscores</button>
+      <span class="msg" id="rsn-msg"></span>
+    </div>
+  </section>
+
+  <main class="board" id="board" aria-label="Job notices"><!-- filled by JS --></main>
+
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal panel" role="dialog" aria-modal="true" aria-labelledby="modal-title" id="modal">
+    <div class="mhead">
+      <div class="ti">
+        <h2 id="modal-title"></h2>
+        <p class="examine" id="modal-examine"></p>
+      </div>
+      <button class="mx" id="modal-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="req-list" id="modal-reqs"></div>
+      <div class="batch-panel">
+        <div class="batch-ctrl">
+          <button class="stone-btn" id="batch-minus" type="button" aria-label="Halve batch">−</button>
+          <b id="batch-n"></b>
+          <button class="stone-btn" id="batch-plus" type="button" aria-label="Double batch">+</button>
+          <button class="stone-btn" id="batch-max" type="button">Max</button>
+        </div>
+        <span class="cap-note" id="cap-note"></span>
+      </div>
+      <div class="ledger inset" id="modal-ledger"></div>
+      <div class="facts inset" id="modal-facts"></div>
+      <p class="warn-note" id="modal-warn" hidden></p>
+    </div>
+  </div>
+</div>
+
+<script src="./jobs-mock.js"></script>
+<script>
+(function(){
+  "use strict";
+  var J = window.JB;
+  var SKILLS = J.SKILLS, GLYPH = J.SKILL_GLYPH;
+
+  /* ---------------- sheet persistence ---------------- */
+  var SHEET_KEY = "jb-proto-sheet";
+  function loadSheet(){
+    try{
+      var raw = localStorage.getItem(SHEET_KEY);
+      if (raw){
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.skills) return parsed;
+      }
+    }catch(e){}
+    return JSON.parse(JSON.stringify(J.SHEET));
+  }
+  function saveSheet(){
+    try{ localStorage.setItem(SHEET_KEY, JSON.stringify(state.sheet)); }catch(e){}
+  }
+
+  /* ---------------- state ---------------- */
+  var state = {
+    mode: "express",           // "express" | "patient"
+    focus: "",                 // "" = best pay, else a skill name
+    search: "",
+    onlyCanStart: true,
+    sheet: loadSheet(),
+    batches: {},                // job key -> chosen n
+    openJob: null,               // job key of the open modal, or null
+  };
+
+  /* ---------------- helpers shared with the modal ---------------- */
+  function jobByKey(key){ return J.JOBS.find(function(j){ return j.key === key; }); }
+  function battN(job){
+    var n = state.batches[job.key] != null ? state.batches[job.key] : job.defaultN;
+    return Math.max(1, Math.min(n, job.maxN[state.mode]));
+  }
+  function setN(job, n){
+    state.batches[job.key] = Math.max(1, Math.min(n, job.maxN[state.mode]));
+    if (state.openJob === job.key) renderModal();
+  }
+
+  function fmtDurShort(h){ return J.fmtDur(h); }
+
+  function lvlChip(q, sheet){
+    var have = sheet.skills[q.s];
+    var lvl = (have === "" || have == null) ? 1 : +have;
+    var ok = lvl >= q.l;
+    return { cls: ok ? "ok" : "no", text: q.s + " " + q.l + (ok ? " ✓" : " ✗") };
+  }
+
+  /* ---------------- toolbar wiring ---------------- */
+  var modeExpressBtn = document.getElementById("mode-express");
+  var modePatientBtn = document.getElementById("mode-patient");
+  var modeHint = document.getElementById("mode-hint");
+  var HINTS = {
+    express: "Insta-buy the inputs, insta-sell the product — thinner pay, done today.",
+    patient: "Offers at the week's going rates — the whole margin, about a day per leg."
+  };
+  function refreshModeButtons(){
+    modeExpressBtn.classList.toggle("on", state.mode === "express");
+    modePatientBtn.classList.toggle("on", state.mode === "patient");
+    modeExpressBtn.setAttribute("aria-pressed", state.mode === "express");
+    modePatientBtn.setAttribute("aria-pressed", state.mode === "patient");
+    modeHint.textContent = HINTS[state.mode];
+  }
+  modeExpressBtn.addEventListener("click", function(){ state.mode = "express"; refreshModeButtons(); renderBoard(); });
+  modePatientBtn.addEventListener("click", function(){ state.mode = "patient"; refreshModeButtons(); renderBoard(); });
+
+  var focusBtns = Array.prototype.slice.call(document.querySelectorAll("[data-focus]"));
+  function refreshFocusButtons(){
+    focusBtns.forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-focus") === state.focus); b.setAttribute("aria-pressed", b.getAttribute("data-focus") === state.focus); });
+  }
+  focusBtns.forEach(function(b){
+    b.addEventListener("click", function(){ state.focus = b.getAttribute("data-focus"); refreshFocusButtons(); renderBoard(); });
+  });
+
+  var searchInput = document.getElementById("search");
+  searchInput.addEventListener("input", function(){ state.search = searchInput.value; renderBoard(); });
+
+  var onlyCanStart = document.getElementById("only-can-start");
+  onlyCanStart.checked = state.onlyCanStart;
+  onlyCanStart.addEventListener("change", function(){ state.onlyCanStart = onlyCanStart.checked; renderBoard(); });
+
+  /* ---------------- character strip ---------------- */
+  var charstrip = document.getElementById("charstrip");
+  var csInner = document.getElementById("cs-inner");
+  var sheetEditor = document.getElementById("sheet-editor");
+
+  function questsDoneCount(sheet){
+    var keys = Object.keys(sheet.quests || {});
+    var done = keys.filter(function(k){ return sheet.quests[k]; }).length;
+    return { done: done, total: keys.length };
+  }
+
+  function renderCharStrip(){
+    var sheet = state.sheet;
+    var html = '<span class="rsn hardshadow">' + escapeHtml(sheet.rsn || "Peli") + '</span>';
+    SKILLS.forEach(function(s){
+      var lvl = sheet.skills[s] != null && sheet.skills[s] !== "" ? sheet.skills[s] : "–";
+      html += '<span class="cell"><span class="g">' + GLYPH[s] + '</span>' + s + ' <b>' + lvl + '</b></span>';
+    });
+    html += sheet.members ? '<span class="p2p">P2P</span>' : '<span class="p2p" style="color:var(--dark-tan);border-color:var(--dark-tan)">F2P</span>';
+    var qc = questsDoneCount(sheet);
+    html += '<span class="quests">Quests ' + qc.done + '/' + qc.total + '</span>';
+    html += '<span class="hint">click to edit ▾</span>';
+    csInner.innerHTML = html;
+  }
+
+  charstrip.addEventListener("click", function(){
+    var open = charstrip.getAttribute("aria-expanded") === "true";
+    charstrip.setAttribute("aria-expanded", String(!open));
+    sheetEditor.hidden = open;
+    if (!open) renderSheetEditor();
+  });
+
+  function renderSheetEditor(){
+    var sheet = state.sheet;
+    var grid = document.getElementById("sheet-grid");
+    var gh = "";
+    SKILLS.forEach(function(s){
+      gh += '<label><span><span class="g">' + GLYPH[s] + '</span> ' + s + '</span>' +
+        '<input type="number" min="1" max="99" data-skill="' + s + '" value="' + (sheet.skills[s] != null ? sheet.skills[s] : "") + '"></label>';
+    });
+    gh += '<label><span>Members</span><input type="checkbox" id="members-check" ' + (sheet.members ? "checked" : "") + ' style="width:16px;height:16px;accent-color:var(--orange)"></label>';
+    grid.innerHTML = gh;
+    grid.querySelectorAll("input[data-skill]").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        sheet.skills[inp.getAttribute("data-skill")] = inp.value === "" ? "" : +inp.value;
+        saveSheet(); renderCharStrip(); renderBoard();
+      });
+    });
+    grid.querySelector("#members-check").addEventListener("change", function(e){
+      sheet.members = e.target.checked; saveSheet(); renderCharStrip(); renderBoard();
+    });
+
+    var qrow = document.getElementById("quest-row");
+    var quests = Object.keys(sheet.quests || {});
+    var qh = '<span class="lbl" style="font-family:var(--pixel);font-size:10.5px;color:var(--tan);text-transform:uppercase;letter-spacing:.1em;text-shadow:1px 1px 0 #000">Quests:</span>';
+    quests.forEach(function(u){
+      var done = !!sheet.quests[u];
+      qh += '<label class="qlbl ' + (done ? "done" : "todo") + '" title="' + escapeHtml(J.unlockNote(u)) + '">' +
+        '<input type="checkbox" data-quest="' + escapeHtml(u) + '" ' + (done ? "checked" : "") + '> ' +
+        (done ? "✓ " : "✗ ") + escapeHtml(u) + '</label>';
+    });
+    qrow.innerHTML = qh;
+    qrow.querySelectorAll("input[data-quest]").forEach(function(inp){
+      inp.addEventListener("change", function(){
+        sheet.quests[inp.getAttribute("data-quest")] = inp.checked; saveSheet(); renderCharStrip(); renderBoard(); renderSheetEditor();
+      });
+    });
+
+    document.getElementById("rsn-input").value = sheet.rsn || "";
+  }
+
+  document.getElementById("rsn-input").addEventListener("input", function(e){
+    state.sheet.rsn = e.target.value; saveSheet(); renderCharStrip();
+  });
+  document.getElementById("hiscores-btn").addEventListener("click", function(){
+    // mock lookup — fills the sheet straight from JB.SHEET
+    var msg = document.getElementById("rsn-msg");
+    state.sheet.rsn = J.SHEET.rsn;
+    state.sheet.members = J.SHEET.members;
+    state.sheet.skills = JSON.parse(JSON.stringify(J.SHEET.skills));
+    saveSheet();
+    msg.textContent = "✓ levels loaded";
+    renderCharStrip(); renderSheetEditor(); renderBoard();
+  });
+
+  /* ---------------- board ---------------- */
+  var boardEl = document.getElementById("board");
+
+  function escapeHtml(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c];
+    });
+  }
+
+  // deterministic small tilt per job so notices don't line up too perfectly
+  function tiltFor(key){
+    var h = 0;
+    for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+    return ((h % 7) - 3) * 0.4; // -1.2deg .. 1.2deg
+  }
+
+  function jobFlags(job){
+    var out = [];
+    if (job.flags.crush > 0) out.push({ cls: "", text: "≈" + Math.round(job.flags.crush * 100) + "% crush" });
+    if (job.flags.stale.length > 0 || job.flags.moving.length > 0) out.push({ cls: "", text: "thin data" });
+    if (job.flags.rich) out.push({ cls: "purple", text: "too good?" });
+    if (job.members) out.push({ cls: "purple", text: "P2P" });
+    return out;
+  }
+
+  function renderBoard(){
+    var q = state.search.trim().toLowerCase();
+    var ranked = J.rank(J.JOBS, state.mode, state.focus);
+    var visible = ranked.filter(function(job){
+      if (q && job.out.toLowerCase().indexOf(q) === -1 && job.verb.toLowerCase().indexOf(q) === -1) return false;
+      if (state.onlyCanStart && !J.canDo(job, state.sheet)) return false;
+      return true;
+    });
+
+    boardEl.innerHTML = "";
+    if (visible.length === 0){
+      var empty = document.createElement("div");
+      empty.className = "notice empty-notice";
+      var sentence;
+      if (state.focus){
+        sentence = "Nothing trains " + state.focus + " within your filters — loosen the search, or untick “Only what I can start”.";
+      } else if (q){
+        sentence = "No paying jobs match “" + escapeHtml(state.search.trim()) + "”. Try a different search, or untick “Only what I can start”.";
+      } else {
+        sentence = state.mode === "express"
+          ? "No paying jobs match. Taking the market eats both spreads — try Full margin for the whole pay."
+          : "No paying jobs match. Loosen the search, or check back when the books move.";
+      }
+      empty.innerHTML = '<span class="pin" aria-hidden="true"></span><h3>Nothing posted</h3><p>' + sentence + '</p>';
+      boardEl.appendChild(empty);
+      return;
+    }
+
+    visible.slice(0, 30).forEach(function(job){
+      var m = J.math(job, state.mode, battN(job));
+      var can = J.canDo(job, state.sheet);
+      var blockText = can ? null : J.blocker(job, state.sheet);
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "notice" + (can ? "" : " faded");
+      card.style.setProperty("--tilt", tiltFor(job.key) + "deg");
+      card.setAttribute("aria-label", job.verb + " " + job.out);
+      card.dataset.key = job.key;
+
+      var payHtml, line2Html, xpHtml = "";
+      if (state.focus){
+        var xpAmt = job.xp.find(function(x){ return x[0] === state.focus; });
+        var xpv = xpAmt ? xpAmt[1] : 0;
+        var gpx = m.gpPerXp(state.focus);
+        var good = gpx != null && gpx >= 0;
+        payHtml = '<div class="pay ' + (good ? "good" : "bad") + '">' + (gpx == null ? "–" : (good ? "" : "costs ") + J.fmtGpx(gpx) + " gp/xp") + '</div>';
+        line2Html = '<div class="line2">' + J.fmtFull(m.n) + '× · ' + fmtDurShort(m.totalH) + ' · costs ' + J.fmtGp(m.cost) + '</div>';
+        xpHtml = '<div class="xpline">' + J.fmtFull(m.n) + ' × ' + xpv + ' = ' + J.fmtXp(xpv * m.n) + ' ' + state.focus + ' xp</div>';
+      } else {
+        var pos = m.profit >= 0;
+        payHtml = '<div class="pay ' + (pos ? "good" : "bad") + '">' + (pos ? "+" : "") + J.fmtGp(m.profit) + ' gp</div>';
+        line2Html = '<div class="line2">' + J.fmtFull(m.n) + '× · ' + fmtDurShort(m.totalH) + ' · costs ' + J.fmtGp(m.cost) + '</div>';
+      }
+
+      var chips = "";
+      if (blockText){
+        chips += '<span class="chip no">' + escapeHtml(blockText) + ' ✗</span>';
+      }
+      job.levels.forEach(function(lv){
+        if (blockText === (lv.s + " " + lv.l)) return;
+        var c = lvlChip(lv, state.sheet);
+        chips += '<span class="chip ' + (c.cls === "ok" ? "ok" : "no") + '">' + c.text + '</span>';
+      });
+      job.unlocks.forEach(function(u){
+        if (blockText === u) return;
+        var done = !!state.sheet.quests[u];
+        chips += '<span class="chip ' + (done ? "ok" : "no") + '">' + escapeHtml(u) + (done ? " ✓" : " ✗") + '</span>';
+      });
+      job.facilities.forEach(function(f){ chips += '<span class="chip unk">' + escapeHtml(f) + '</span>'; });
+      job.gear.forEach(function(g){ chips += '<span class="chip unk">' + escapeHtml(g) + '</span>'; });
+
+      var stamps = jobFlags(job).map(function(f){ return '<span class="stamp ' + f.cls + '">' + f.text + '</span>'; }).join("");
+
+      card.innerHTML =
+        '<span class="pin" aria-hidden="true"></span>' +
+        (stamps ? '<span class="stamps">' + stamps + '</span>' : "") +
+        '<h3>' + job.verb + ' ' + escapeHtml(job.out) + '</h3>' +
+        payHtml + line2Html + xpHtml +
+        '<div class="reqs">' + chips + '</div>';
+
+      card.addEventListener("click", function(){ openModal(job.key); });
+      boardEl.appendChild(card);
+    });
+  }
+
+  /* ---------------- modal ---------------- */
+  var overlay = document.getElementById("overlay");
+  var modal = document.getElementById("modal");
+  var lastFocused = null;
+
+  function openModal(key){
+    state.openJob = key;
+    lastFocused = document.activeElement;
+    overlay.hidden = false;
+    renderModal();
+    document.getElementById("modal-close").focus();
+    document.addEventListener("keydown", onModalKeydown);
+  }
+  function closeModal(){
+    overlay.hidden = true;
+    state.openJob = null;
+    document.removeEventListener("keydown", onModalKeydown);
+    if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus();
+  }
+  function onModalKeydown(e){
+    if (e.key === "Escape"){ e.preventDefault(); closeModal(); return; }
+    if (e.key === "Tab"){
+      var focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      var list = Array.prototype.slice.call(focusable);
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+    }
+  }
+  document.getElementById("modal-close").addEventListener("click", closeModal);
+  overlay.addEventListener("mousedown", function(e){ if (e.target === overlay) closeModal(); });
+
+  var EXAMINE = {
+    "steel-bar": "Smelt steel bars from iron ore and coal at a furnace.",
+    "cannonballs": "Smith cannonballs at a furnace with an ammo mould.",
+    "adamant-dart-tip": "Smith adamant dart tips at an anvil, ten to a bar.",
+    "gold-bar": "Smelt gold ore into bars at a furnace.",
+    "rune-platebody": "Smith a rune platebody at an anvil from five runite bars.",
+    "diamond": "Cut an uncut diamond with a chisel.",
+    "opal": "Cut uncut opals with a chisel — cheap, plentiful, and quick.",
+    "zenyte": "Cut an uncut zenyte with a chisel — vanishingly rare stock.",
+    "amulet-of-glory": "Craft, string and enchant a dragonstone amulet at a furnace.",
+    "bow-string": "Spin flax into bow string at a spinning wheel.",
+    "black-dragon-leather": "Tan black dragonhide into leather at a tannery.",
+    "unpowered-orb": "Blow molten glass into an unpowered orb with a glassblowing pipe.",
+    "magic-longbow": "Fletch and string a magic longbow from magic logs.",
+    "broad-arrows": "Fletch broad arrowheads and headless arrows into broad arrows.",
+    "yew-longbow-u": "Fletch an unstrung yew longbow from yew logs.",
+    "karambwan": "Cook raw karambwan on a cooking range.",
+    "shark": "Cook raw shark on a cooking range.",
+    "wine": "Make jug of wine from grapes and a jug of water.",
+    "prayer-potion": "Mix ranarr weed and snape grass into prayer potions.",
+    "super-restore": "Mix snapdragon and red spiders' eggs into super restores.",
+    "saradomin-brew": "Crush a bird nest and mix toadflax into Saradomin brews.",
+    "ranarr-weed": "Clean grimy ranarr weed for the Grand Exchange.",
+    "high-alch-yew-longbow": "Cast High Level Alchemy on a yew longbow for its coin value.",
+    "low-alch-steel-platebody": "Cast Low Level Alchemy on a steel platebody for its coin value.",
+    "ring-of-recoil": "Enchant a sapphire ring into a ring of recoil.",
+    "combat-bracelet": "Enchant a dragonstone bracelet into a combat bracelet.",
+    "spin-flax": "Cast Lunar's Spin Flax to turn a whole inventory of flax to bow string at once."
+  };
+
+  function renderModal(){
+    var job = jobByKey(state.openJob);
+    if (!job) return;
+    var n = battN(job);
+    var m = J.math(job, state.mode, n);
+    var sheet = state.sheet;
+
+    document.getElementById("modal-title").textContent = job.verb + " " + job.out;
+    document.getElementById("modal-examine").textContent = EXAMINE[job.key] || (job.verb + " " + job.out + ".");
+
+    // requirements checklist
+    var reqHtml = "";
+    job.levels.forEach(function(lv){
+      var have = sheet.skills[lv.s]; var lvl = (have === "" || have == null) ? 1 : +have;
+      var ok = lvl >= lv.l;
+      reqHtml += '<div class="r ' + (ok ? "ok" : "no") + '">' + (ok ? "✓" : "✗") + ' ' + lv.s + ' ' + lv.l + ' — you have ' + lvl + '</div>';
+    });
+    job.unlocks.forEach(function(u){
+      var done = !!sheet.quests[u];
+      reqHtml += '<div class="r ' + (done ? "ok" : "no") + '" title="' + escapeHtml(J.unlockNote(u)) + '">' + (done ? "✓" : "✗") + ' ' + escapeHtml(u) + (done ? " — done" : " — not done") + '</div>';
+    });
+    job.facilities.forEach(function(f){ reqHtml += '<div class="r unk">' + escapeHtml(f) + '</div>'; });
+    job.gear.forEach(function(g){ reqHtml += '<div class="r unk" title="' + escapeHtml(J.gearNote(g)) + '">' + escapeHtml(g) + '</div>'; });
+    if (job.members && !sheet.members) reqHtml = '<div class="r no">✗ Members — this job needs P2P</div>' + reqHtml;
+    document.getElementById("modal-reqs").innerHTML = reqHtml;
+
+    // batch control
+    document.getElementById("batch-n").textContent = J.fmtFull(n);
+    var capped = n >= job.maxN[state.mode];
+    document.getElementById("cap-note").textContent = capped
+      ? (state.mode === "express" ? "capped — a bigger batch would move these books" : "capped — the books can't fill more inside a day")
+      : "";
+
+    // ledger
+    var lg = "";
+    m.lines.buys.forEach(function(b){
+      lg += '<div><span class="op buy">BUY</span>' + J.fmtFull(b.qty) + '× ' + escapeHtml(b.name) + ' @ ' + J.fmtFull(b.unitPx) + ' — ' + J.fmtGp(b.total) + ' gp';
+      if (state.mode === "patient") lg += '<span class="clock"> · fills ≈ ' + fmtDurShort(b.fillH) + '</span>';
+      lg += '</div>';
+    });
+    if (m.lines.fees > 0){
+      lg += '<div><span class="op buy">PAY</span>' + J.fmtGp(m.lines.fees) + ' gp in fees</div>';
+    }
+    if (job.alch){
+      var step = job.steps[0];
+      lg += '<div><span class="op work">' + step.verb.toUpperCase() + '</span>' + J.fmtFull(n) + '× ' + escapeHtml(job.out) + ' at ' + J.fmtFull(m.sellUnit) + ' gp apiece' +
+        '<span class="clock"> · ≈ ' + fmtDurShort(m.workH) + '</span></div>';
+      lg += '<div><span class="op sell">TAKE</span>' + J.fmtGp(Math.round(n * m.sellUnit)) + ' gp straight to your pouch — no sell offer, no GE tax</div>';
+    } else {
+      m.lines.steps.forEach(function(s){
+        lg += '<div><span class="op work">' + s.verb.toUpperCase() + '</span>' + J.fmtFull(s.count) + '× ' + escapeHtml(s.out);
+        if (s.qtyPer > 1) lg += '<span class="clock"> (' + s.qtyPer + ' per ' + s.verb.toLowerCase() + ')</span>';
+        if (s.at) lg += ' at ' + escapeHtml(s.at);
+        lg += '<span class="clock"> · ≈ ' + fmtDurShort(s.hours) + '</span></div>';
+      });
+      var taxed = m.tax > 0;
+      lg += '<div><span class="op sell">SELL</span>' + J.fmtFull(n) + '× ' + escapeHtml(job.out) + ' @ ' + J.fmtFull(job.sell.px[state.mode]) + (taxed ? " less tax" : "") + ' — ' + J.fmtGp(Math.round(n * m.sellUnit)) + ' gp';
+      if (state.mode === "patient") lg += '<span class="clock"> · fills ≈ ' + fmtDurShort(m.sellClock) + '</span>';
+      lg += '</div>';
+    }
+    document.getElementById("modal-ledger").innerHTML = lg;
+
+    // facts
+    var focusXp = state.focus ? (job.xp.find(function(x){ return x[0] === state.focus; })||[0,0])[1] : 0;
+    var factsHtml = '<div><span>Costs</span><b>' + J.fmtGp(m.cost) + ' gp</b></div>' +
+      '<div><span>Pays</span><b class="' + (m.profit >= 0 ? "good" : "bad") + '">' + (m.profit >= 0 ? "+" : "") + J.fmtGp(m.profit) + ' gp</b></div>';
+    if (job.xp.length > 0){
+      factsHtml += '<div><span>Xp</span><b class="gold">' + m.xp.map(function(x){ return J.fmtXp(x[1]) + ' ' + x[0]; }).join(" · ") + '</b></div>';
+    }
+    if (state.focus && focusXp > 0){
+      var gpx = m.gpPerXp(state.focus);
+      factsHtml += '<div><span>' + (m.profitUnit >= 0 ? "Pays per xp" : "Costs per xp") + '</span><b class="' + (m.profitUnit >= 0 ? "good" : "warn") + '">' + J.fmtGpx(gpx) + ' gp</b></div>';
+    }
+    factsHtml += '<div><span>Return</span><b>' + (m.cost > 0 ? m.roi.toFixed(1) : "–") + '%</b></div>';
+    factsHtml += '<div><span>Takes about</span><b class="gold">' + fmtDurShort(m.totalH) + '</b></div>';
+    document.getElementById("modal-facts").innerHTML = factsHtml;
+
+    // warning — at most one paragraph combining flags
+    var parts = [];
+    if (job.flags.crush > 0) parts.push("semi-precious gems crush on a failed cut — at your level ≈" + Math.round(job.flags.crush * 100) + "% of attempts fail, and the buy list above already covers the extra uncut gems");
+    if (job.flags.rich) parts.push("pays suspiciously well for the work involved — verify each leg with a 1-unit probe before committing");
+    if (job.flags.stale.length > 0 || job.flags.moving.length > 0){
+      var names = job.flags.stale.concat(job.flags.moving);
+      parts.push("weak or fast-moving data on " + names.slice(0, 2).join(", ") + (names.length > 2 ? " +" + (names.length - 2) + " more" : "") + " — check the Market Board before committing");
+    }
+    if (capped) parts.push(state.mode === "express" ? "capped — a bigger batch would move these books" : "capped — the books can't fill more inside a day");
+    var warnEl = document.getElementById("modal-warn");
+    if (parts.length){
+      warnEl.hidden = false;
+      warnEl.textContent = "⚠ " + parts.join("; ") + ".";
+    } else {
+      warnEl.hidden = true;
+    }
+  }
+
+  document.getElementById("batch-minus").addEventListener("click", function(){
+    var job = jobByKey(state.openJob); if (!job) return;
+    setN(job, Math.max(1, J.niceRound(battN(job) / 2)));
+  });
+  document.getElementById("batch-plus").addEventListener("click", function(){
+    var job = jobByKey(state.openJob); if (!job) return;
+    setN(job, Math.min(job.maxN[state.mode], J.niceRound(battN(job) * 2)));
+  });
+  document.getElementById("batch-max").addEventListener("click", function(){
+    var job = jobByKey(state.openJob); if (!job) return;
+    setN(job, job.maxN[state.mode]);
+  });
+
+  /* ---------------- boot ---------------- */
+  refreshModeButtons();
+  refreshFocusButtons();
+  renderCharStrip();
+  renderBoard();
+})();
+</script>
+</body>
+</html>

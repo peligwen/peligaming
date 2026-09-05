@@ -14,7 +14,7 @@
 import { DAY, completeDays, weekStats, dayFills, cycleOrders, hourProfile, holdout } from '../tools-src/runescape/day-model.js';
 
 const API = process.env.OSRS_API || 'https://prices.runescape.wiki/api/v1/osrs';
-const UA = 'flip-desk day-model check (gaming.peliglot.com; a few one-off requests)';
+const UA = 'job-board day-model check (gaming.peliglot.com; a few one-off requests)';
 const id = Number(process.argv[2] || 4151);
 const qty = Number(process.argv[3] || 70);
 const CAPTURE = 0.5;
@@ -24,7 +24,7 @@ const CAPTURE = 0.5;
 const NAMES = { 4151: 'Abyssal whip', 314: 'Feather', 554: 'Fire rune' };
 const name = NAMES[id] || `item ${id}`;
 
-// Mirrors the live board's GE tax rule (flip-desk.jsx's geTax) without
+// Mirrors the live board's GE tax rule (job-board.jsx's geTax) without
 // importing that file: 2% of the sale price, floored, capped at 5m/item,
 // exempt under 50gp and for Old School Bonds (13190).
 const TAX_EXEMPT_IDS = new Set([13190]);

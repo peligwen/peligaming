@@ -29,9 +29,9 @@ window.PELIGAMING = {
       accent: "#d9a334",
       tools: [
         {
-          name: "Flip Desk",
-          description: "The Grand Exchange week by week — what things are going for, how they're trending, and standing buy and sell orders priced to fill within a day of normal cycling; plus a job board that prices skilling work and ranks the cheapest xp.",
-          path: "tools/runescape/flip-desk.html",
+          name: "Job Board",
+          description: "Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now, or the cheapest xp in any skill, each with a contract to buy, work and sell — plus a Market Board of the week's going rates and standing orders priced to fill within a day, and an econ primer.",
+          path: "tools/runescape/job-board.html",
         },
         {
           name: "Gielinor Crafting Web",
