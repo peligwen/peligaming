@@ -168,24 +168,33 @@ cache:
 
 The board prices resource-processing work off the exchange itself: buy the
 inputs, do the skilling, sell the product. It looks like the thing it is
-named after — parchment notices pinned to a board, each carrying only the
-job, its pay, one line of batch · time · costs, and the requirements as
-green or red chips in the game's own words ("Smithing 35", "Dwarf Cannon").
-Tap a notice and it lifts into a contract: the requirement checklist, a
-batch control, the plan as BUY / WORK / SELL lines with clocks, the facts,
-and at most one warning. "Start now" prices every leg off the freshest tape
-(insta-buy the inputs, insta-sell the product); "Full margin" quotes at the
-week's going rates for the whole margin with about a day's wait per leg.
-Train a skill and the board re-ranks by gp per xp, each notice also showing
-what it sells for less what it costs. The player's sheet (levels, members,
-the quests that gate today's jobs, a RuneScape name to pull levels off the
-hiscores) folds into a one-line character strip above the board, and a
-blank sheet shows the whole board faded where it is out of reach rather
-than an empty wall. Facilities and tools ("Furnace", "Ammo mould") are
-reminders, not gates: the game doesn't track whether you own a chisel, and
-neither does the board. Every recipe comes from the wiki's own data (real
-tick counts, xp per action); alch jobs price the runes off the exchange and
-pay the spell's fixed coin value with no sell leg and no tax.
+named after — a parchment ledger pinned to a wooden board, one row per job:
+the job in the game's own words ("Smith Cannonball"), what it needs as green
+or red chips ("Smithing 35", "Dwarf Cannon"), what the batch pays, and the
+four numbers a trainee compares — **xp/hr**, **gp/hr**, **gp per xp** and
+**afk**, the stretch the game works on its own between your inputs. Click
+any column head to re-rank. Pick **All professions** or tick the ones you
+train — Smithing, Crafting, Fletching, Cooking, Herblore, Magic — and the
+ledger keeps only work that pays xp in them, reading xp/hr and gp/xp
+against that xp; work that costs gp but pays xp stays on the board (red)
+unless "Paying only" is ticked. Tap a row and it lifts into a contract: the
+requirement checklist, a batch control, the plan as BUY / WORK / SELL lines
+with clocks, the facts, and at most one warning. "Start now" prices every
+leg off the freshest tape (insta-buy the inputs, insta-sell the product);
+"Full margin" quotes at the week's going rates for the whole margin with
+about a day's wait per leg. The player's sheet (levels, members, the quests
+that gate today's jobs, a RuneScape name to pull levels off the hiscores)
+folds into a one-line character strip above the board, and a blank sheet
+shows the whole board faded where it is out of reach rather than an empty
+wall. Facilities and tools ("Furnace", "Ammo mould") are reminders, not
+gates: the game doesn't track whether you own a chisel, and neither does
+the board. Every recipe comes from the wiki's own data (real tick counts, xp
+per action); the afk read comes from how the game takes the work — a Make-X
+runs a whole inventory, a standard-spellbook cast or a grimy herb takes a
+click each, a Lunar production spell runs through the inventory on one
+cast — with stackable materials taking one slot for the trip. Alch jobs
+price the runes off the exchange and pay the spell's fixed coin value with
+no sell leg and no tax.
 
 ### The Market Board's day model
 

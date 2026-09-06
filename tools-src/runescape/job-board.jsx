@@ -661,10 +661,11 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 }
 .ge-tab:hover { color:var(--yellow); }
 
-/* ================= job board — the notice board =================
-   A stone toolbar and a one-line character strip above a wooden board of
-   parchment notices; a notice carries only the essentials and lifts into a
-   stone contract on click. Paper on wood, not more stone. */
+/* ================= job board — the ledger =================
+   A stone toolbar and a one-line character strip above a wooden board with
+   one parchment ledger pinned to it: a row per job, sortable by what a
+   trainee compares, lifting into a stone contract on click. Paper on wood,
+   not more stone. */
 .ge-toolbar { padding:11px 13px; margin-bottom:10px; }
 .ge-moderow { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .ge-modehint { font-size:12px; color:var(--tan); margin:6px 0 0; text-shadow:1px 1px 0 #000; }
@@ -674,6 +675,14 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 .ge-filterrow .grow { flex:1 1 200px; min-width:140px; }
 .ge-btn.on { color:var(--yellow); background:var(--stone-hi); box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
 .ge-btn.small { padding:3px 9px; font-size:11.5px; }
+/* a profession on the board: a stone chip with its tick */
+.ge-prof { display:inline-flex; align-items:center; gap:6px; padding:3px 9px 3px 7px; font-size:11.5px; color:var(--white); text-shadow:1px 1px 0 #000;
+  background:var(--stone); border:1px solid var(--edge); border-radius:2px; cursor:pointer; user-select:none; white-space:nowrap;
+  box-shadow:inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo); }
+.ge-prof:hover { color:var(--yellow); }
+.ge-prof.on { color:var(--yellow); background:var(--stone-hi); box-shadow:inset 1px 1px 0 var(--stone-lo), inset -1px -1px 0 var(--stone-hi); }
+.ge-prof input { accent-color:var(--orange); width:13px; height:13px; margin:0; }
+.ge-prof .g { margin-right:-2px; }
 
 /* the character strip: the sheet in one line, the editor beneath on click */
 .ge-charstrip { display:flex; align-items:center; overflow-x:auto; margin-bottom:14px; padding:0; width:100%; text-align:left;
@@ -704,37 +713,58 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 .ge-sheet-rsn .msg { font-size:12px; color:var(--tan); text-shadow:1px 1px 0 #000; }
 .ge-sheet-note { font-size:11.5px; color:var(--dark-tan); margin:10px 0 0; line-height:1.45; }
 
-/* the board: a wooden ground, notices in a grid */
+/* the board: a wooden ground with one parchment ledger pinned to it */
 .ge-board { background:var(--wood); background-image:repeating-linear-gradient(to bottom, transparent 0 89px, var(--wood-seam) 89px 90px);
-  border:1px solid var(--edge); border-radius:2px; padding:18px; margin-bottom:12px;
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; }
-.ge-notice { position:relative; background:var(--paper); color:var(--ink); border:1px solid var(--paper-edge); border-radius:1px;
-  box-shadow:2px 3px 0 rgba(0,0,0,.45); padding:16px 12px 11px; text-align:left; cursor:pointer;
-  font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif; font-size:14px; line-height:1.45;
-  display:flex; flex-direction:column; gap:6px; transform:rotate(var(--tilt,0deg)); }
-.ge-notice:hover { background:#efe4c2; }
-.ge-notice:focus-visible { outline:3px solid var(--yellow); outline-offset:2px; }
-.ge-notice .pin { position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:11px; height:11px; border-radius:50%;
+  border:1px solid var(--edge); border-radius:2px; padding:22px 18px 18px; margin-bottom:12px; }
+.ge-sheet { position:relative; background:var(--paper); color:var(--ink); border:1px solid var(--paper-edge); border-radius:1px;
+  box-shadow:2px 3px 0 rgba(0,0,0,.45); padding:10px 0 2px;
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif; font-size:13px; line-height:1.45; }
+.ge-sheet .pin { position:absolute; top:-6px; left:28px; width:11px; height:11px; border-radius:50%;
   background:radial-gradient(circle at 35% 30%, var(--pin-hi), var(--pin) 65%, #33302a); border:1px solid #16130f; box-shadow:0 1px 2px rgba(0,0,0,.6); }
-.ge-notice.faded { opacity:.55; filter:grayscale(65%); }
-.ge-notice .stamps { position:absolute; top:6px; right:6px; display:flex; flex-direction:column; align-items:flex-end; gap:2px; pointer-events:none; }
+.ge-sheet .pin.r { left:auto; right:28px; }
+.ge-ledgerwrap { overflow-x:auto; }
+.ge-ledgerwrap::-webkit-scrollbar { height:10px; }
+.ge-ledgerwrap::-webkit-scrollbar-track { background:rgba(42,32,20,.08); }
+.ge-ledgerwrap::-webkit-scrollbar-thumb { background:var(--paper-edge); }
+table.ge-lt { border-collapse:collapse; width:100%; min-width:820px; }
+.ge-lt th, .ge-lt td { text-align:right; white-space:nowrap; }
+.ge-lt .l { text-align:left; }
+.ge-lt thead th { padding:4px 7px 6px; border-bottom:2px solid var(--ink); vertical-align:bottom;
+  font-family:var(--pixel); font-size:10.5px; font-weight:400; line-height:1.3; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); }
+.ge-lt thead th button { font:inherit; letter-spacing:inherit; text-transform:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+.ge-lt thead th.on, .ge-lt thead th button:hover { color:var(--ink); }
+.ge-lt thead th button:focus-visible { outline:2px solid var(--stamp); outline-offset:2px; }
+.ge-lt thead th .arr { font-size:8px; margin-left:3px; }
+.ge-lt tbody td { padding:6px 7px; font-family:var(--mono); font-size:12.5px; font-variant-numeric:tabular-nums;
+  border-bottom:1px solid rgba(42,32,20,.16); }
+.ge-lt tbody tr:last-child td { border-bottom:none; }
+.ge-lt tbody tr { cursor:pointer; }
+.ge-lt tbody tr:hover td { background:rgba(42,32,20,.07); }
+.ge-lt tbody tr:focus-visible { outline:3px solid var(--stamp); outline-offset:-3px; }
+.ge-lt tbody tr.faded { opacity:.5; filter:grayscale(60%); }
+/* the job column stays put while the ledger scrolls sideways — a row should never lose its name */
+.ge-lt td.job { position:sticky; left:0; z-index:1; background:var(--paper); font-family:inherit; }
+.ge-lt tbody tr:hover td.job { background:#dfd2a8; }
+.ge-lt .nm { font-family:var(--disp); font-weight:700; font-size:13.5px; color:var(--ink); line-height:1.2; }
+.ge-lt td.job .ge-stamp { transform:none; margin-left:6px; vertical-align:2px; font-size:8.5px; padding:0 4px; }
+.ge-lt td.needs { font-family:inherit; white-space:normal; max-width:230px; line-height:1.7; }
+.ge-lt td.needs .ge-nchip { margin-right:4px; }
+.ge-lt .good { color:var(--paper-good); } .ge-lt .bad { color:var(--paper-bad); } .ge-lt .mut { color:var(--ink-soft); }
+.ge-lt td.xp .g { font-size:12px; }
+.ge-lt td.afk .secs { display:inline-block; min-width:46px; }
+.ge-afk { display:inline-block; font-family:var(--pixel); font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft);
+  border:1px solid var(--ink-soft); border-radius:2px; padding:0 4px; margin-left:6px; min-width:56px; text-align:center; opacity:.85; }
 .ge-stamp { font-family:var(--pixel); font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; border:1.5px solid var(--stamp); color:var(--stamp);
   border-radius:2px; padding:1px 5px; transform:rotate(6deg); opacity:.82; background:rgba(232,220,181,.55); }
 .ge-stamp.purple { border-color:var(--stamp2); color:var(--stamp2); }
-.ge-notice h3 { margin:0; font-family:var(--disp); font-weight:700; font-size:15.5px; color:var(--ink); letter-spacing:.01em; line-height:1.2; padding-right:34px; }
-.ge-notice .pay { font-family:var(--mono); font-size:20px; font-weight:700; line-height:1.1; font-variant-numeric:tabular-nums; }
-.ge-notice .pay.good { color:var(--paper-good); } .ge-notice .pay.bad { color:var(--paper-bad); }
-.ge-notice .line2 { font-family:var(--mono); font-size:11.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums; }
-.ge-notice .line2 .eq { white-space:nowrap; }
-.ge-notice .line2 b { font-weight:700; } .ge-notice .line2 b.good { color:var(--paper-good); } .ge-notice .line2 b.bad { color:var(--paper-bad); }
-.ge-notice .reqs { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
 .ge-nchip { font-family:var(--mono); font-size:10px; border-radius:2px; padding:1px 5px; border:1px solid; white-space:nowrap; }
 .ge-nchip.ok { color:var(--paper-good); border-color:var(--paper-good); background:rgba(31,107,31,.08); }
 .ge-nchip.no { color:var(--paper-bad); border-color:var(--paper-bad); background:rgba(139,29,29,.08); }
 .ge-nchip.unk { color:var(--ink-soft); border-color:var(--ink-soft); background:rgba(42,32,20,.06); }
-.ge-notice.empty { grid-column:1/-1; max-width:420px; margin:0 auto; cursor:default; transform:none; }
-.ge-notice.empty h3 { padding-right:0; }
-.ge-notice.empty p { margin:2px 0 0; font-size:12.5px; color:var(--ink-soft); line-height:1.5; }
+.ge-lempty { padding:22px 16px 26px; text-align:center; }
+.ge-lempty h3 { margin:0 0 4px; font-family:var(--disp); font-weight:700; font-size:15.5px; color:var(--ink); }
+.ge-lempty p { margin:0 auto; max-width:460px; font-size:12.5px; color:var(--ink-soft); line-height:1.5; }
+.ge-lmore { padding:9px 12px 8px; font-size:12px; color:var(--ink-soft); text-align:center; }
 
 /* the contract: what the notice leaves out */
 .ge-examine { margin:5px 0 0; font-size:12.5px; font-style:italic; color:var(--tan); text-shadow:1px 1px 0 #000; }
@@ -755,10 +785,12 @@ table.ge-t { border-collapse:collapse; width:100%; font-size:13px; min-width:820
 .ge-facts div b { font-weight:600; color:var(--white); }
 .ge-facts .good { color:var(--good); } .ge-facts .bad { color:var(--bad); } .ge-facts .warn { color:var(--warn); } .ge-facts .gold { color:var(--orange); }
 .ge-warnnote { font-size:12px; color:#f1d08a; line-height:1.5; margin:0; padding:9px 11px; border:1px solid #6e5426; background:#33270f; border-radius:2px; }
+@media (max-width:720px){ table.ge-lt{min-width:620px} }
 @media (max-width:600px){
-  .ge-board { grid-template-columns:1fr; padding:12px; }
+  .ge-board { padding:14px 8px 8px; }
   .ge-moderow .ge-btn { flex:1 1 0; text-align:center; }
 }
+@media (max-width:480px){ table.ge-lt{min-width:520px} }
 
 /* econ 101 */
 .ge-econ h3 { margin:0 0 7px; font-family:var(--disp); font-weight:700; font-size:16.5px; color:var(--orange);
@@ -1059,9 +1091,10 @@ function ItemPopup({ it, status, onClose }) {
 
 /* ================= the job board's arithmetic =================
    Resource-processing work priced by the market itself: buy the inputs, do the
-   skilling, sell the product. Focus is the whole job — what it pays, what it
-   costs to start, how long it takes, and whether you have the levels — never
-   gp/hr: it's low-intensity work and your GE slots run concurrently anyway.
+   skilling, sell the product. A job is the whole thing — what it pays, what it
+   costs to start, how long it takes, and whether you have the levels — and the
+   ledger also reads it as rates a trainee compares: xp per hour, gp per hour,
+   gp per xp, and how long the game works on its own between inputs.
 
    "Start now" (express) crosses the spread on both ends (insta-buy the inputs,
    insta-sell the product): thinner pay, but the job starts and ends NOW.
@@ -1122,6 +1155,50 @@ const niceRound = (n) => {
   const m = n / pow;
   return Math.round((m < 1.5 ? 1 : m < 2.5 ? 2 : m < 3.5 ? 3 : m < 4.5 ? 4 : m < 7.5 ? 5 : 10) * pow);
 };
+
+/* ---- how the game takes the work: afk or click-intensive ----
+   Most skilling is Make-X: one trip per inventory, then the game runs the
+   whole load while you watch. Standard-spellbook casts (enchant, superheat,
+   alchemy) take a click each, and so does cleaning a grimy herb. Lunar and
+   Arceuus production spells (Plank Make, Spin Flax, String Jewellery,
+   Humidify, Degrime) run through the inventory on one cast. A
+   stackable material takes one slot for the whole trip; anything else takes
+   its count per action, and the tool takes a slot. */
+const INV_SLOTS = 28;
+const STACK_RE = /(?:^|\s)(runes?|arrows?|arrowtips|arrowheads|shafts?|bolts?|tips|rack|darts?|javelins?|heads|knife|knives|thrownaxes?|nails?|feathers?|cannonballs?|coins|seeds?|scales?|tar|thread|shards?|marks?|chinchompas?|vouchers?|tokens?)$/i;
+const isStackable = (name) => STACK_RE.test(name.replace(/\s*\([^)]*\)\s*$/, ""));
+const isRune = (name) => / rune$/.test(name);
+// the player's inputs per action of recipe r: 1 for a cast or a click, a fraction for Make-X work
+function inputsPerAction(r) {
+  const mats = r.m.map(([i, q]) => [RECIPES.names[i], q]);
+  if (mats.some(([n]) => isRune(n))) {
+    const inventorySpell = (mats.some(([n]) => n === "Astral rune") || r.u === "Arceuus spellbook")
+      && mats.some(([n]) => !isRune(n) && n !== "Coins");
+    if (!inventorySpell) return 1;
+  } else {
+    if (r.s === "Herblore" && mats.length === 1 && /^Grimy /.test(mats[0][0])) return 1; // a click per herb
+  }
+  let perAction = 0; const stacks = new Set();
+  for (const [n, q] of mats) {
+    if (n === "Coins") continue;
+    if (isStackable(n)) stacks.add(n); else perAction += q;
+  }
+  const tools = r.g || r.f === "Anvil" ? 1 : 0;
+  const free = INV_SLOTS - tools - stacks.size;
+  const actions = perAction > 0 ? Math.max(1, Math.floor(free / perAction)) : INV_SLOTS - 1;
+  return 1 / actions;
+}
+const AFK_TIERS = [
+  { min: 60, text: "afk" },
+  { min: 20, text: "semi-afk" },
+  { min: 5, text: "busy" },
+  { min: 0, text: "intense" },
+];
+const afkTier = (s) => AFK_TIERS.find((t) => s >= t.min) || AFK_TIERS[AFK_TIERS.length - 1];
+const fmtSecs = (s) => (s == null || !isFinite(s) ? "—"
+  : s < 60 ? `${s < 10 ? +s.toFixed(1) : Math.round(s)} s`
+  : s < 3600 ? `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, "0")}s`
+  : `${(s / 3600).toFixed(1)} hr`);
 
 /* Express work crosses the spread NOW, so it prices off the freshest tape.
    Patient work plays out over a day or more, so its quotes anchor to the
@@ -1197,11 +1274,12 @@ function sourceUnit(nameIdx, mode, byName, memo, visiting, skills) {
   return best;
 }
 
-/* every job worth posting for the current mode: one card per craftable,
-   tradeable output whose sale beats the cost of its parts. A training focus
-   loosens the profit gate: work that costs gp but pays xp in that skill is
-   exactly what a trainee is shopping for. */
-function buildJobs(items, mode, skills, focus) {
+/* every job worth posting for the current mode: one row per craftable,
+   tradeable output whose sale beats the cost of its parts — or that pays xp,
+   since work that costs gp but trains a skill is exactly what a trainee is
+   shopping for. Which professions make the board, and in what order, is the
+   ledger's business. */
+function buildJobs(items, mode, skills) {
   const byName = new Map(items.map((it) => [it.name, it]));
   const memo = new Map();
   const jobs = [];
@@ -1247,9 +1325,9 @@ function buildJobs(items, mode, skills, focus) {
       if (s.r.e && s.r.s) xpMap.set(s.r.s, (xpMap.get(s.r.s) || 0) + s.perUnit * s.r.e);
       for (const [kn, , kxp] of s.r.k || []) if (kxp) xpMap.set(kn, (xpMap.get(kn) || 0) + s.perUnit * kxp);
     }
-    // paying jobs make the board on their own; when training a skill, work
-    // that costs gp but pays xp in that skill belongs on it too
-    if (best.profitUnit <= 0 && !(focus && xpMap.get(focus) > 0)) continue;
+    // paying jobs make the board on their own; work that costs gp but pays xp
+    // belongs on it too — the ledger's "Paying only" tick hides it
+    if (best.profitUnit <= 0 && ![...xpMap.values()].some((v) => v > 0)) continue;
 
     // requirements across every step — listed in work order, raw materials first
     const levels = new Map(); const facilities = new Set(); const unlocks = new Set();
@@ -1288,9 +1366,13 @@ function buildJobs(items, mode, skills, focus) {
     const staleLegs = legs.filter((x) => x.tier === "C").map((x) => x.name);
     const movingLegs = legs.filter((x) => x.moving).map((x) => x.name);
     const crushP = Math.min(1, ...stepList.map((s) => succOf(s.r, skills)));
+    // the stretch the game works on its own between the player's inputs
+    let inputs = 0, rawSecs = 0;
+    for (const s of stepList) { inputs += s.perUnit * inputsPerAction(s.r); rawSecs += s.perUnit * secsOf(s.r); }
+    const gapSecs = inputs > 0 ? rawSecs / inputs : rawSecs;
 
     jobs.push({
-      key: outIdx + ":" + mode, out, mode, ...best,
+      key: outIdx + ":" + mode, out, mode, ...best, gapSecs,
       sellUnit, stepList, buyList, maxN, members,
       levels: [...levels].map(([s, l]) => ({ s, l })),
       facilities: [...facilities],
@@ -1322,8 +1404,7 @@ function buildJobs(items, mode, skills, focus) {
       if (!(value > 0) || it.id === nat.id || it.id === fire.id) continue;
       const cost = jobBuyPx(it, mode) + natPx + sp.fires * firePx;
       const profitUnit = value - cost;
-      // training Magic, a cheap loss per cast is the product — keep those jobs
-      if (profitUnit <= 0 && focus !== "Magic") continue;
+      // a losing cast still pays Magic xp — it stays on the board for the trainee
       const buyList = [{ it, perUnit: 1 }, { it: nat, perUnit: 1 }, { it: fire, perUnit: sp.fires }];
       const caps = [];
       for (const b of buyList) {
@@ -1340,6 +1421,7 @@ function buildJobs(items, mode, skills, focus) {
         key: "alch:" + sp.tag + ":" + it.id + ":" + mode, out: it, mode, alch: true,
         r: { s: "Magic", l: sp.lvl, f: "", a: 1 },
         cost, secs: sp.secs, coins: 0, profitUnit, sellUnit: value,
+        gapSecs: sp.secs / OVERHEAD, // a click per cast
         stepList: [], buyList, maxN, members: it.members,
         levels: [{ s: "Magic", l: sp.lvl }], facilities: [], unlocks: [],
         xp: [["Magic", sp.xp]],
@@ -1383,7 +1465,9 @@ function blockerOf(job, sheet) {
   return null;
 }
 const canDo = (job, sheet) => !blockerOf(job, sheet);
-const focusXpOf = (job, focus) => (focus ? job.xp.find(([s]) => s === focus)?.[1] || 0 : 0);
+// the xp a job pays per unit in the professions on the board — every skill when none is ticked
+const xpIn = (job, pick) => job.xp.reduce((t, [s, v]) => t + (pick.size === 0 || pick.has(s) ? v : 0), 0);
+const skillsIn = (job, pick) => job.xp.filter(([s, v]) => v > 0 && (pick.size === 0 || pick.has(s))).map(([s]) => s);
 // a patient leg's clock, in hours: the units over the share of a day's flow a standing offer catches
 const clockH = (units, flowPerDay) => (flowPerDay > 0 ? Math.max((units / (flowPerDay * CAPTURE)) * 24, 1) : Infinity);
 /* the whole batch's numbers — the notice and the contract read the same sums */
@@ -1404,12 +1488,6 @@ function jobMath(job, n) {
 }
 const an = (s) => (/^[aeiou]/i.test(s) ? "an " : "a ") + s;
 const gearOf = (job) => [...new Set(job.stepList.map((s) => s.r.g).filter(Boolean))];
-// a deterministic small tilt per notice, so the board doesn't line up too perfectly
-function tiltFor(key) {
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return ((h % 7) - 3) * 0.4;
-}
 const capNote = (job) => (job.mode === "express" ? "capped — a bigger batch would move these books" : "capped — the books can't fill more inside a day");
 /* everything a job asks of the player, in one list: a chip for the notice, a
    line for the contract. Levels and quests are green or red; facilities and
@@ -1464,41 +1542,60 @@ function examineOf(job) {
   return `${verbOf(job.r)} ${job.out.name}${from}${at}${gear.length ? `, with ${an(gear[0].toLowerCase())}` : ""}.`;
 }
 
-/* one notice on the board */
-function Notice({ job, n, sheet, focus, onOpen }) {
-  const m = jobMath(job, n);
-  const reqs = requirementsOf(job, sheet);
-  const blocked = reqs.some((x) => x.cls === "no");
-  const chips = [...reqs.filter((x) => x.cls === "no"), ...reqs.filter((x) => x.cls !== "no")];
-  const stamps = stampsOf(job);
-  const fx = focusXpOf(job, focus);
-  const gpx = fx > 0 ? job.profitUnit / fx : null;
-  const sign = m.profit >= 0 ? "+" : "";
+/* a sortable column head on the ledger */
+function SortTh({ k, dir = -1, sortKey, sortDir, onSort, cls = "", title, children }) {
+  const on = sortKey === k;
   return (
-    <button type="button" className={"ge-notice" + (blocked ? " faded" : "")} style={{ "--tilt": `${tiltFor(job.key)}deg` }}
-      onClick={onOpen} aria-label={`${verbOf(job.r)} ${job.out.name}${blocked ? ` — needs ${blockerOf(job, sheet)}` : ""}`}>
-      <span className="pin" aria-hidden="true" />
-      {stamps.length > 0 && <span className="stamps">{stamps.map((s) => <span key={s.text} className={"ge-stamp " + s.cls}>{s.text}</span>)}</span>}
-      <h3>{verbOf(job.r)} {job.out.name}</h3>
-      {focus ? (
-        <>
-          <div className={"pay " + (gpx != null && gpx >= 0 ? "good" : "bad")}>{gpx == null ? "–" : `${gpx >= 0 ? "pays" : "costs"} ${fmtGpx(gpx)} gp/xp`}</div>
-          <div className="line2">{fmtFull(n)}× · {fmtDurShort(m.totalH)} · {fmtXp(fx * n)} xp</div>
-          <div className="line2">{job.alch ? "alchs" : "sells"} {fmtGp(m.sale)} − costs {fmtGp(m.cost)} <span className="eq">= <b className={m.profit >= 0 ? "good" : "bad"}>{sign}{fmtGp(m.profit)}</b></span></div>
-        </>
-      ) : (
-        <>
-          <div className={"pay " + (m.profit >= 0 ? "good" : "bad")}>{sign}{fmtGp(m.profit)} gp</div>
-          <div className="line2">{fmtFull(n)}× · {fmtDurShort(m.totalH)} · costs {fmtGp(m.cost)}</div>
-        </>
-      )}
-      <div className="reqs">{chips.map((c) => <span key={c.k} className={"ge-nchip " + c.cls} title={c.title}>{c.chip}</span>)}</div>
-    </button>
+    <th className={(on ? "on " : "") + cls} title={title} aria-sort={on ? (sortDir === -1 ? "descending" : "ascending") : "none"}>
+      <button type="button" onClick={() => onSort(k, dir)}>
+        {children}{on && <span className="arr" aria-hidden="true">{sortDir === -1 ? "▼" : "▲"}</span>}
+      </button>
+    </th>
+  );
+}
+
+/* one line of the ledger: the job, what it needs, what the batch pays, and the
+   four rates a trainee compares — xp/hr, gp/hr, gp/xp, and how afk the work is */
+function JobRow({ row, sheet, pick, onOpen }) {
+  const { job, n } = row;
+  const m = jobMath(job, n);
+  // facilities and tools are reminders, not gates — the contract carries them
+  const reqs = requirementsOf(job, sheet).filter((x) => x.cls !== "unk");
+  const blocked = reqs.some((x) => x.cls === "no");
+  const chips = blocked ? reqs.filter((x) => x.cls === "no") : reqs;
+  const stamps = stampsOf(job);
+  const glyphs = skillsIn(job, pick).map((s) => SKILL_GLYPH[s]).join("");
+  const onKey = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } };
+  return (
+    <tr className={blocked ? "faded" : ""} tabIndex={0} onClick={onOpen} onKeyDown={onKey}
+      aria-label={`${row.name}${blocked ? ` — needs ${blockerOf(job, sheet)}` : ""}`}>
+      <td className="l job" title={examineOf(job)}>
+        <span className="nm">{row.name}</span>
+        {stamps.map((s) => <span key={s.text} className={"ge-stamp " + s.cls}>{s.text}</span>)}
+      </td>
+      <td className="l needs hide-xs">
+        {chips.length === 0 && <span className="mut">–</span>}
+        {chips.slice(0, 3).map((c) => <span key={c.k} className={"ge-nchip " + c.cls} title={c.title}>{c.chip}</span>)}
+        {chips.length > 3 && <span className="mut"> +{chips.length - 3}</span>}
+      </td>
+      <td className={m.profit >= 0 ? "good" : "bad"} title={`${fmtFull(n)}× in ${fmtDurShort(m.totalH)}: ${job.alch ? "alchs" : "sells"} ${fmtGp(m.sale)} − costs ${fmtGp(m.cost)}`}>
+        {m.profit >= 0 ? "+" : ""}{fmtGp(m.profit)}
+      </td>
+      <td className="mut hide-md">{fmtFull(n)}× · {fmtDurShort(m.totalH)}</td>
+      <td className="xp" title={job.xp.length ? job.xp.map(([s, v]) => `${fmtXp(v)} ${s} per unit`).join(" · ") : "pays no xp"}>
+        {row.xpUnit > 0 ? <><span className="g" aria-hidden="true">{glyphs}</span> {fmtXp(row.xpH)}</> : <span className="mut">–</span>}
+      </td>
+      <td className={row.gpH >= 0 ? "good" : "bad"}>{row.gpH >= 0 ? "+" : ""}{fmtGp(row.gpH)}</td>
+      <td className={row.gpx == null ? "mut" : row.gpx >= 0 ? "good" : "bad"}>
+        {row.gpx == null ? "–" : (row.gpx >= 0 ? "+" : "−") + fmtGpx(row.gpx)}
+      </td>
+      <td className="afk"><span className="secs">{fmtSecs(row.afk)}</span><span className="ge-afk">{afkTier(row.afk).text}</span></td>
+    </tr>
   );
 }
 
 /* the contract: the notice lifted off the board, with everything it left out */
-function JobContract({ job, n, setN, sheet, focus, onClose }) {
+function JobContract({ job, n, setN, sheet, pick, onClose }) {
   const m = jobMath(job, n);
   const closeRef = useRef(null);
   const modalRef = useRef(null);
@@ -1525,7 +1622,7 @@ function JobContract({ job, n, setN, sheet, focus, onClose }) {
   }, [onClose]);
   const { out, mode } = job;
   const reqs = requirementsOf(job, sheet);
-  const fx = focusXpOf(job, focus);
+  const fx = xpIn(job, pick);
   const warn = warningOf(job);
   const sellPx = jobSellPx(out, mode);
   return (
@@ -1609,6 +1706,10 @@ function JobContract({ job, n, setN, sheet, focus, onClose }) {
             )}
             <div><span>Return</span><b>{m.cost > 0 ? ((m.profit / m.cost) * 100).toFixed(1) : "–"}%</b></div>
             <div><span>Takes about</span><b className="gold">{fmtDurShort(m.totalH)}</b></div>
+            <div><span>Gp/hr</span><b className={job.wage >= 0 ? "good" : "bad"}>{job.wage >= 0 ? "+" : ""}{fmtGp(job.wage)}</b></div>
+            {fx > 0 && <div><span>Xp/hr</span><b className="gold">{fmtXp((fx * 3600) / job.secs)}</b></div>}
+            <div title="How long the game works on its own between your inputs — a Make-X runs an inventory, a cast or a herb takes a click each">
+              <span>Between inputs</span><b>{fmtSecs(job.gapSecs)} · {afkTier(job.gapSecs).text}</b></div>
           </div>
           {warn && <p className="ge-warnnote">{warn}</p>}
         </div>
@@ -1617,14 +1718,28 @@ function JobContract({ job, n, setN, sheet, focus, onClose }) {
   );
 }
 
+const SORT_NOTE = {
+  name: () => "In alphabetical order",
+  pays: (d) => (d === -1 ? "Ranked by what the batch pays — the fattest contracts first" : "Ranked by what the batch pays — the thinnest first"),
+  xpH: (d) => (d === -1 ? "Ranked by xp per hour of work — the fastest training first" : "Ranked by xp per hour of work — the slowest first"),
+  gpH: (d) => (d === -1 ? "Ranked by gp per hour of work — the best wage first" : "Ranked by gp per hour of work — the worst first"),
+  gpx: (d) => (d === -1 ? "Ranked by gp per xp — the market pays for the ones in green, then the cheapest xp" : "Ranked by gp per xp — the dearest xp first"),
+  afk: (d) => (d === -1 ? "Ranked by the stretch the game works on its own between your inputs — the most afk work first" : "Ranked by the stretch between your inputs — the most click-intensive work first"),
+};
+
 function JobBoard({ items, status }) {
   const [mode, setMode] = useState("express");
-  const [focus, setFocus] = useState(""); // "" = best pay; a skill name = train it
+  const [pick, setPick] = useState(() => new Set()); // the professions on the board; empty = all of them
   const [search, setSearch] = useState("");
+  const [payingOnly, setPayingOnly] = useState(false);
+  const [sortKey, setSortKey] = useState("gpH");
+  const [sortDir, setSortDir] = useState(-1);
   const [batches, setBatches] = useState({}); // job key -> chosen n
   const [openKey, setOpenKey] = useState(null); // the contract on the table, if any
   // a job's key carries its mode, so switching modes takes any open contract off the table
   const pickMode = (m) => { setMode(m); setOpenKey(null); };
+  const togglePick = (s) => setPick((p) => { const next = new Set(p); if (next.has(s)) next.delete(s); else next.add(s); return next; });
+  const onSort = (k, dir) => { if (sortKey === k) setSortDir((d) => -d); else { setSortKey(k); setSortDir(dir); } };
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheet, setSheet] = useState(loadSheet);
   // a blank sheet shows the whole board, faded where it's out of reach — the
@@ -1652,34 +1767,61 @@ function JobBoard({ items, status }) {
     setRsnBusy(false);
   };
 
-  const jobs = useMemo(() => buildJobs(items, mode, sheet.skills, focus), [items, mode, sheet.skills, focus]);
-  // training focus: only work that pays xp in the chosen skill, cheapest xp first
-  const ranked = useMemo(() => {
-    if (!focus) return jobs;
-    const xpOf = (j) => focusXpOf(j, focus);
-    return jobs.filter((j) => xpOf(j) > 0)
-      .sort((a, b) => (-a.profitUnit / xpOf(a)) - (-b.profitUnit / xpOf(b)));
-  }, [jobs, focus]);
+  const jobs = useMemo(() => buildJobs(items, mode, sheet.skills), [items, mode, sheet.skills]);
   // only the quests that actually gate a job on today's board make the sheet
   const questList = useMemo(() => [...new Set(jobs.flatMap((j) => j.unlocks))].sort(), [jobs]);
   const questsDone = questList.filter((u) => sheet.quests?.[u]).length;
 
+  // every job's line on the ledger, read against the professions on the board
+  const rows = useMemo(() => jobs.map((job) => {
+    const n = clamp(batches[job.key] ?? job.defaultN, 1, job.maxN);
+    const xpUnit = xpIn(job, pick);
+    return {
+      job, n, xpUnit,
+      name: `${verbOf(job.r)} ${job.out.name}`,
+      pays: job.profitUnit * n,
+      xpH: (xpUnit * 3600) / job.secs,
+      gpH: job.wage,
+      gpx: xpUnit > 0 ? job.profitUnit / xpUnit : null,
+      afk: job.gapSecs,
+    };
+  }), [jobs, pick, batches]);
+  // the pool: every job in the professions on the board
+  const pool = useMemo(() => rows.filter((r) => pick.size === 0 || r.xpUnit > 0), [rows, pick]);
+  const payingN = pool.filter((r) => r.job.profitUnit > 0).length;
+  const canN = pool.filter((r) => canDo(r.job, sheet)).length;
+
   const q = search.trim().toLowerCase();
-  const matches = (j) => !q || j.out.name.toLowerCase().includes(q) || verbOf(j.r).toLowerCase().includes(q);
-  const canN = ranked.filter((j) => canDo(j, sheet)).length;
-  const shown = ranked.filter((j) => (!onlyCan || canDo(j, sheet)) && matches(j)).slice(0, 30);
+  const sorted = useMemo(() => {
+    const list = pool.filter((r) => (!payingOnly || r.job.profitUnit > 0) && (!onlyCan || canDo(r.job, sheet)) && (!q || r.name.toLowerCase().includes(q)));
+    list.sort((a, b) => {
+      const va = a[sortKey], vb = b[sortKey];
+      if (sortKey === "name") return (va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
+      // a row with no number for the column always sinks, whichever way the sort runs
+      const na = va == null || Number.isNaN(va), nb = vb == null || Number.isNaN(vb);
+      if (na || nb) return na && nb ? 0 : na ? 1 : -1;
+      if (va !== vb) return (va - vb) * sortDir;
+      return b.gpH - a.gpH || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0); // a tie goes to the better wage
+    });
+    return list;
+  }, [pool, payingOnly, onlyCan, sheet, q, sortKey, sortDir]);
+  const SHOW = 100;
+  const shown = sorted.slice(0, SHOW);
   const open = openKey ? jobs.find((j) => j.key === openKey) : null;
   const closeContract = useCallback(() => setOpenKey(null), []);
   const nOf = (job) => clamp(batches[job.key] ?? job.defaultN, 1, job.maxN);
   const setNOf = (job) => (v) => setBatches((b) => ({ ...b, [job.key]: clamp(v, 1, job.maxN) }));
   const setSkill = (s, v) => setSheet((sh) => ({ ...sh, skills: { ...sh.skills, [s]: v } }));
 
-  const emptyLine = focus
-    ? `Nothing trains ${focus} within your filters — loosen the search, or untick “Only what I can start”.`
-    : q ? `No paying jobs match “${search.trim()}”. Try another search, or untick “Only what I can start”.`
-    : ranked.length > 0 && onlyCan ? "Nothing here is within your reach yet — fill in your levels above, or untick “Only what I can start” to see the whole board."
-    : mode === "express" ? "No paying jobs right now. Starting now eats both spreads — try Full margin for the whole pay."
-    : "No paying jobs right now. Check back when the books move.";
+  const picked = SKILL_LIST.filter((s) => pick.has(s));
+  const pickLabel = picked.length ? picked.join(" / ") + " jobs" : "jobs";
+  const emptyLine = q ? `Nothing matches “${search.trim()}” within your filters — try another search, or loosen them.`
+    : pool.length === 0 ? `Nothing on today's market trains ${picked.join(" or ")} — tick another profession, or All professions.`
+    : onlyCan && canN === 0 ? "Nothing here is within your reach yet — fill in your levels above, or untick “Only what I can start” to see the whole board."
+    : payingOnly && payingN === 0
+      ? (mode === "express" ? "No paying jobs right now. Starting now eats both spreads — try Full margin for the whole pay, or untick “Paying only” for the training work." : "No paying jobs right now — untick “Paying only” for the training work, or check back when the books move.")
+    : "Nothing posted within your filters — loosen one to see the whole board.";
+  const th = { sortKey, sortDir, onSort };
 
   return (
     <>
@@ -1689,13 +1831,14 @@ function JobBoard({ items, status }) {
           <button className={"ge-btn" + (mode === "patient" ? " on" : "")} aria-pressed={mode === "patient"} onClick={() => pickMode("patient")}>Full margin</button>
         </div>
         <p className="ge-modehint">{MODE_HINT[mode]}</p>
-        <div className="ge-skillrow" role="group" aria-label="Training focus">
-          <span className="ge-pixlbl">Train:</span>
-          <button className={"ge-btn small" + (focus === "" ? " on" : "")} aria-pressed={focus === ""} onClick={() => setFocus("")}>Best pay</button>
+        <div className="ge-skillrow" role="group" aria-label="Professions">
+          <span className="ge-pixlbl">Professions:</span>
+          <button className={"ge-btn small" + (pick.size === 0 ? " on" : "")} aria-pressed={pick.size === 0} onClick={() => setPick(new Set())}>All professions</button>
           {SKILL_LIST.map((s) => (
-            <button key={s} className={"ge-btn small" + (focus === s ? " on" : "")} aria-pressed={focus === s} onClick={() => setFocus(s)}>
-              {SKILL_GLYPH[s]} {s}
-            </button>
+            <label key={s} className={"ge-prof" + (pick.has(s) ? " on" : "")}>
+              <input type="checkbox" checked={pick.has(s)} onChange={() => togglePick(s)} />
+              <span className="g" aria-hidden="true">{SKILL_GLYPH[s]}</span>{s}
+            </label>
           ))}
         </div>
         <div className="ge-filterrow">
@@ -1704,6 +1847,7 @@ function JobBoard({ items, status }) {
               onChange={(e) => setSearch(e.target.value)} aria-label="Search jobs" />
           </div>
           <label className="ge-tog"><input type="checkbox" checked={onlyCan} onChange={(e) => setOnlyCan(e.target.checked)} />Only what I can start</label>
+          <label className="ge-tog" title="Hide the work that costs gp and pays only xp"><input type="checkbox" checked={payingOnly} onChange={(e) => setPayingOnly(e.target.checked)} />Paying only</label>
         </div>
       </section>
 
@@ -1771,39 +1915,58 @@ function JobBoard({ items, status }) {
         <p className="ge-read">Offline snapshot — the board only sees the {items.length} baked items, so most work is hidden until the live feed returns.</p>
       )}
       <p className="ge-read">
-        {focus
-          ? <><b>{ranked.length}</b> jobs train {focus} on today's market, cheapest xp first — the market pays for the ones in green</>
-          : <><b>{ranked.length}</b> jobs pay on the exchange right now</>}
+        <b>{payingN}</b> {pickLabel} pay on today's market
+        {pool.length > payingN && <>, <b>{(pool.length - payingN).toLocaleString()}</b> more cost gp but pay xp</>}
         {" "}· <b>{canN}</b> you can start
-        {q && <> · <b>{shown.length}</b> match “{search.trim()}”</>}
-        . Tap a notice for its contract.
+        {q && <> · <b>{sorted.length}</b> match “{search.trim()}”</>}
+        . {SORT_NOTE[sortKey](sortDir)}; click any column to re-rank. Tap a row for its contract.
       </p>
 
-      <section className="ge-board" aria-label="Job notices">
-        {shown.map((job) => (
-          <Notice key={job.key} job={job} n={nOf(job)} sheet={sheet} focus={focus} onOpen={() => setOpenKey(job.key)} />
-        ))}
-        {shown.length === 0 && (
-          <div className="ge-notice empty">
-            <span className="pin" aria-hidden="true" />
-            <h3>Nothing posted</h3>
-            <p>{emptyLine}</p>
+      <section className="ge-board" aria-label="Job ledger">
+        <div className="ge-sheet">
+          <span className="pin" aria-hidden="true" /><span className="pin r" aria-hidden="true" />
+          <div className="ge-ledgerwrap">
+            <table className="ge-lt">
+              <thead>
+                <tr>
+                  <SortTh k="name" dir={1} cls="l" {...th}>Job</SortTh>
+                  <th className="l plain hide-xs" title="Levels, quests and membership — red is what stands between you and the job; facilities and tools are in the contract">Needs</th>
+                  <SortTh k="pays" title="What the batch pays after tax, at the size and clock in the next column" {...th}>Pays</SortTh>
+                  <th className="plain hide-md" title="The batch: how many, and how long it takes with any GE clocks">Batch</th>
+                  <SortTh k="xpH" title="Xp per hour of hands-on work, in the professions on the board" {...th}>Xp/hr</SortTh>
+                  <SortTh k="gpH" title="Gp per hour of hands-on work — the wage the market pays for the labour" {...th}>Gp/hr</SortTh>
+                  <SortTh k="gpx" title="Gp per xp — green pays you to train, red is what the xp costs" {...th}>Gp/xp</SortTh>
+                  <SortTh k="afk" title="How long the game works on its own between your inputs — a Make-X runs an inventory, a cast or a herb takes a click each" {...th}>Afk</SortTh>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((r) => <JobRow key={r.job.key} row={r} sheet={sheet} pick={pick} onOpen={() => setOpenKey(r.job.key)} />)}
+              </tbody>
+            </table>
+            {shown.length === 0 && (
+              <div className="ge-lempty">
+                <h3>Nothing posted</h3>
+                <p>{emptyLine}</p>
+              </div>
+            )}
+            {sorted.length > SHOW && <div className="ge-lmore">Showing the top {SHOW} of {sorted.length.toLocaleString()} — search or filter to narrow the board.</div>}
           </div>
-        )}
+        </div>
       </section>
 
       <p className="ge-foot">
         Batches default to roughly 5–10 minutes of work, capped by 4-hour buy limits and what the books can absorb
         (≈10% of a day's volume when starting now; about a day of patient fills on full margin). Action speeds and xp
-        come from the wiki's own recipe data, +15% for banking. Alch jobs price every rune off the exchange and pay
-        the spell's fixed coin value on the spot — no sell leg, no GE tax — so they appear the moment an item dips
-        below its alch floor.<br />
-        Train a skill and the board re-ranks by gp per xp — a green notice means the market pays you to train. A fat
-        margin on labour-heavy work is just a wage; a notice stamped "too good?" or "thin data" wants a 1-unit probe
-        first. The market moves while you work — the pay is an estimate, not a contract.
+        come from the wiki's own recipe data, +15% for banking, and the rates read per hour of hands-on work. Afk is
+        the stretch the game works on its own between your inputs — a Make-X runs an inventory, a cast or a herb
+        takes a click each. Alch jobs price every rune off the exchange and pay the spell's fixed coin value on the
+        spot — no sell leg, no GE tax — so they appear the moment an item dips below its alch floor.<br />
+        Tick the professions you train and xp/hr and gp/xp read against their xp — green means the market pays you to
+        train, red is what the xp costs. A fat margin on labour-heavy work is just a wage; a row stamped "too good?"
+        or "thin data" wants a 1-unit probe first. The market moves while you work — the pay is an estimate, not a contract.
       </p>
 
-      {open && <JobContract key={open.key} job={open} n={nOf(open)} setN={setNOf(open)} sheet={sheet} focus={focus} onClose={closeContract} />}
+      {open && <JobContract key={open.key} job={open} n={nOf(open)} setN={setNOf(open)} sheet={sheet} pick={pick} onClose={closeContract} />}
     </>
   );
 }
@@ -1953,8 +2116,9 @@ function Econ101() {
             something stands out from the trend around it.</li>
           <li>The <b>Job Board</b> prices whole production chains from the same numbers — buy the inputs, work
             them, sell the output, tax and buy limits included — with the wiki's own tick counts and xp per
-            action on every step. Set a training focus and the same chains rank by <b>gp per xp</b> instead:
-            the market's true price list for levelling a skill, green when it pays you.</li>
+            action on every step. Tick the professions you train and sort the same chains by <b>gp per xp</b>:
+            the market's true price list for levelling a skill, green when it pays you — or by xp/hr, gp/hr, and
+            how long the game works on its own between your inputs.</li>
         </ul>
       </section>
     </div>
