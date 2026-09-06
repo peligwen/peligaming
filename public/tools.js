@@ -43,6 +43,11 @@ window.PELIGAMING = {
           description: "Chart sailing routes between ports, wrecks and shoals — around krakens, fetid waters and icy seas, weighed against what your own hull and keel can take — and plot courier-task silk roads: port loops that keep every task slot earning, priced in gp/h and xp/h.",
           path: "tools/runescape/naval-pathfinder.html",
         },
+        {
+          name: "Lingo Cheat Sheet",
+          description: "OSRS Spanish for English speakers: a searchable phrasebook of neutral international Spanish for greetings, trading, bossing, the wildy, skilling and clan chat, the game's own Spanglish verbs (dropear, tradear, lurear), chat shorthand, and the regional flavour that tells you where a player is from — click any phrase to copy it, with a chat-spelling toggle for how it is really typed.",
+          path: "tools/runescape/lingo-cheat-sheet.html",
+        },
       ],
     },
     {

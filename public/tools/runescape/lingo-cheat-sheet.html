@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lingo Cheat Sheet — OSRS Spanish for English speakers</title>
+<meta name="description" content="A phrasebook for Old School RuneScape chat: neutral international Spanish for English speakers, the game's own slang and Spanglish verbs, chat shorthand, and the regional flavour that tells you where a player is from.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗣️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d0a07; --gold:#ffb83f; --yellow:#ffe95c; --parch:#f0e6d2; --dim:#a99a7e; --dimmer:#7a6c52;
+    --bevel-hi:#6f5b39; --bevel-lo:#1c150c; --red:#ff6a4d; --teal:#6fd7c8; --green:#9be564; --violet:#c9a6ff;
+    --ink:#1c150c; --mono:"VT323",monospace; --sans:"Segoe UI",system-ui,-apple-system,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{scroll-behavior:smooth;scroll-padding-top:120px;}
+  body{background:var(--bg);color:var(--parch);font-family:var(--sans);line-height:1.4;min-height:100vh;
+    background-image:radial-gradient(ellipse 70% 40% at 50% -10%,rgba(255,184,63,.08),transparent);}
+  a{color:var(--teal);}
+  .panel{background:linear-gradient(#39301fee,#291f13ee);border:2px solid;
+    border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);
+    box-shadow:0 4px 16px rgba(0,0,0,.6);}
+  .sunk{background:#1c150c;border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);}
+
+  /* header + toolbar, sticky */
+  #hdr{position:sticky;top:0;z-index:30;background:linear-gradient(#3a3024f8,#2a2217f8);border-bottom:2px solid var(--bevel-lo);
+    box-shadow:inset 0 1px 0 var(--bevel-hi),0 4px 14px rgba(0,0,0,.5);}
+  #hdr .row{display:flex;gap:10px;align-items:center;padding:7px 12px;flex-wrap:wrap;}
+  #hdr h1{font-family:var(--mono);font-weight:400;font-size:26px;color:var(--gold);text-shadow:2px 2px 0 #000;line-height:1;white-space:nowrap;}
+  #hdr .sub{font-family:var(--mono);font-size:14px;color:var(--dim);line-height:1.1;max-width:520px;}
+  #stats{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{font-family:var(--mono);font-size:16px;color:var(--yellow);background:#1c150c;border:2px solid;
+    border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);padding:2px 9px;white-space:nowrap;line-height:1.1;}
+  .chip b{color:var(--gold);font-weight:400;}
+  #tools{display:flex;gap:8px;align-items:center;padding:0 12px 8px;flex-wrap:wrap;}
+  #q{flex:1 1 260px;min-width:180px;font-family:var(--mono);font-size:20px;color:var(--yellow);padding:5px 10px;outline:none;}
+  #q::placeholder{color:var(--dimmer);}
+  .tog{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:16px;color:var(--parch);cursor:pointer;
+    background:#1c150c;border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:3px 9px;user-select:none;white-space:nowrap;}
+  .tog input{accent-color:var(--gold);}
+  .tog:hover{color:var(--yellow);}
+  .filt{display:flex;gap:0;}
+  .filt button{font-family:var(--mono);font-size:16px;background:#1c150c;color:var(--dim);cursor:pointer;border:2px solid;
+    border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:3px 10px;margin-right:-2px;}
+  .filt button:hover{color:var(--parch);}
+  .filt button.on{color:var(--yellow);background:#39301f;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);}
+  kbd{font-family:var(--mono);font-size:13px;color:var(--dimmer);border:1px solid var(--bevel-hi);padding:0 4px;border-radius:3px;}
+
+  /* layout */
+  #wrap{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;max-width:1240px;margin:0 auto;padding:14px 12px 80px;}
+  #side{position:sticky;top:118px;align-self:start;max-height:calc(100vh - 130px);overflow-y:auto;scrollbar-width:thin;padding:8px;}
+  #side h3{font-family:var(--mono);font-weight:400;font-size:15px;color:var(--dim);letter-spacing:1px;margin:0 0 4px 4px;}
+  #side a{display:flex;justify-content:space-between;gap:6px;align-items:baseline;text-decoration:none;color:var(--parch);
+    font-family:var(--mono);font-size:17px;padding:2px 6px;line-height:1.15;}
+  #side a:hover{background:#39301f;color:var(--yellow);}
+  #side a.dim{opacity:.4;}
+  #side a .n{color:var(--dimmer);font-size:14px;}
+  #side .ico{width:22px;display:inline-block;}
+  #sheet{display:flex;flex-direction:column;gap:14px;min-width:0;}
+  section.sec{padding:10px 12px 12px;}
+  section.sec h2{font-family:var(--mono);font-weight:400;font-size:24px;color:var(--gold);text-shadow:1px 1px 0 #000;
+    border-bottom:1px solid var(--bevel-hi);padding-bottom:3px;margin-bottom:6px;display:flex;align-items:baseline;gap:8px;}
+  section.sec h2 .cnt{font-size:15px;color:var(--dimmer);margin-left:auto;font-weight:400;}
+  .blurb{color:var(--dim);font-size:13.5px;margin:0 0 8px;max-width:78ch;}
+  .blurb b{color:var(--parch);font-weight:600;}
+  ul.notes{list-style:none;display:flex;flex-direction:column;gap:7px;}
+  ul.notes li{font-size:13.5px;color:var(--parch);padding-left:18px;position:relative;max-width:82ch;}
+  ul.notes li::before{content:"✦";color:var(--gold);position:absolute;left:0;top:0;font-size:12px;}
+  ul.notes li b{color:var(--yellow);font-weight:600;}
+  ul.notes li i{color:var(--teal);font-style:normal;}
+
+  /* the phrase table */
+  table{width:100%;border-collapse:collapse;table-layout:fixed;}
+  th{font-family:var(--mono);font-weight:400;font-size:15px;color:var(--dimmer);text-align:left;letter-spacing:1px;padding:0 6px 3px;border-bottom:1px solid var(--bevel-lo);}
+  th.en{width:26%;} th.es{width:36%;} th.no{width:38%;}
+  tr.e{border-bottom:1px solid #1c150c99;}
+  tr.e:hover{background:#39301f66;}
+  tr.e.hit td.en{box-shadow:inset 3px 0 0 var(--gold);}
+  td{padding:5px 6px;vertical-align:top;font-size:14px;}
+  td.en{color:var(--parch);}
+  td.es{color:var(--yellow);}
+  .v{display:inline-block;cursor:copy;padding:0 4px;margin:0 3px 2px -4px;border-radius:3px;border:1px solid transparent;}
+  .v:hover{border-color:var(--gold);background:#1c150c;}
+  .v.copied{background:var(--gold);color:var(--ink);}
+  .sep{color:var(--dimmer);margin-right:4px;}
+  .say{display:block;font-family:var(--mono);font-size:15px;color:var(--teal);line-height:1.05;margin-top:1px;}
+  .say::before{content:"🔈 ";font-size:10px;}
+  body.nosay .say{display:none;}
+  td.no{color:var(--dim);font-size:12.5px;line-height:1.35;}
+  td.no b{color:var(--parch);font-weight:600;}
+  td.no i{color:var(--yellow);font-style:normal;}
+  .tag{display:inline-block;font-family:var(--mono);font-size:12.5px;line-height:1;padding:2px 5px 1px;margin:0 4px 2px 0;border:1px solid;vertical-align:1px;}
+  .tag.casual{color:var(--green);border-color:#4c7a2c;}
+  .tag.slang{color:var(--violet);border-color:#6b5399;}
+  .tag.spanglish{color:var(--teal);border-color:#2f6d64;}
+  .tag.vulgar{color:var(--red);border-color:#8a3b2c;}
+  .tag.formal{color:var(--dim);border-color:var(--bevel-hi);}
+  .tag.gotcha{color:var(--gold);border-color:#8a6a2c;}
+  .tag.r{color:var(--parch);border-color:var(--bevel-hi);background:#1c150c;}
+  tr.grp td{font-family:var(--mono);font-size:19px;color:var(--gold);padding:12px 6px 3px;letter-spacing:.5px;}
+  tr.grp td small{font-family:var(--sans);font-size:12.5px;color:var(--dim);letter-spacing:0;margin-left:8px;}
+  tr.grp:first-child td{padding-top:4px;}
+  .conj{font-family:var(--mono);font-size:15px;color:var(--dim);margin:4px 0 8px;line-height:1.3;}
+  .conj b{color:var(--teal);font-weight:400;}
+
+  #none{display:none;padding:30px;text-align:center;font-family:var(--mono);font-size:22px;color:var(--dim);}
+  #toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%) translateY(20px);opacity:0;z-index:50;pointer-events:none;
+    font-family:var(--mono);font-size:18px;color:var(--ink);background:var(--gold);padding:5px 14px;border:2px solid var(--bevel-lo);transition:opacity .15s,transform .15s;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  footer{font-family:var(--mono);font-size:14px;color:var(--dimmer);padding:14px 4px 0;line-height:1.5;max-width:90ch;}
+  footer a{color:var(--dim);}
+  .peligaming-home{position:fixed;right:10px;bottom:8px;z-index:9999;font:12px/1 system-ui,sans-serif;color:#fff;opacity:.35;text-decoration:none;background:#00000073;padding:4px 9px;border-radius:12px;transition:opacity .15s}
+  .peligaming-home:hover{opacity:1}
+
+  @media (max-width:900px){
+    #wrap{grid-template-columns:1fr;padding:10px 8px 80px;}
+    #side{position:static;max-height:none;display:flex;gap:4px;overflow-x:auto;padding:6px;scrollbar-width:none;}
+    #side h3{display:none;}
+    #side a{white-space:nowrap;flex:none;background:#1c150c;border:1px solid var(--bevel-hi);font-size:15px;}
+    #side a .n{display:none;}
+    #side a.dim{display:none;}
+    .filt{flex-wrap:wrap;}
+    .filt button{margin:0 -2px -2px 0;}
+    #tools{gap:6px;}
+    #hdr h1{font-size:22px;}
+    html{scroll-padding-top:150px;}
+    th.en{width:28%;} th.es{width:40%;} th.no{width:32%;}
+    td{font-size:13px;} td.no{font-size:11.5px;}
+    #hdr .sub{display:none;}
+  }
+  @media (max-width:560px){
+    table, thead, tbody, tr, td, th{display:block;}
+    thead{display:none;}
+    tr.e{padding:6px 2px;}
+    td{padding:1px 4px;}
+    td.en{font-weight:600;}
+    td.no{margin-top:2px;}
+  }
+  @media print{
+    body{background:#fff;color:#000;}
+    #hdr,#side,.peligaming-home,#toast,footer{display:none !important;}
+    #wrap{display:block;padding:0;max-width:none;}
+    .panel{background:none;border:none;box-shadow:none;}
+    section.sec{page-break-inside:auto;padding:0 0 10px;}
+    section.sec h2{color:#000;text-shadow:none;border-bottom:1px solid #000;}
+    td.en,td.es,td.no,.blurb,ul.notes li,.conj{color:#000;}
+    .say{color:#444;} .tag{color:#000 !important;border-color:#000 !important;}
+    tr.e{border-bottom:1px solid #ddd;page-break-inside:avoid;}
+    tr.grp td{color:#000;}
+  }
+</style>
+</head>
+<body>
+<header id="hdr">
+  <div class="row">
+    <div>
+      <h1>🗣️ Lingo Cheat Sheet</h1>
+      <div class="sub">OSRS Spanish for English speakers — neutral international Spanish, the game's own slang, chat shorthand, and the regional flavour that gives a player away.</div>
+    </div>
+    <div id="stats"><span class="chip" id="stat-shown"><b>0</b> phrases</span><span class="chip" id="stat-sec"><b>0</b> sections</span></div>
+  </div>
+  <div id="tools">
+    <input id="q" class="sunk" type="search" placeholder="search English or Spanish… ( / )" autocomplete="off" spellcheck="false">
+    <div class="filt" id="filt">
+      <button data-f="all" class="on">All</button><button data-f="neutral">Neutral</button><button data-f="slang">Slang</button><button data-f="spanglish">Spanglish</button><button data-f="regional">Regional</button>
+    </div>
+    <label class="tog" title="A respelling for English mouths under each phrase"><input type="checkbox" id="tog-say" checked> pronunciation</label>
+    <label class="tog" title="Show the phrases the way they are actually typed in game chat: no accents, no ¿ or ¡"><input type="checkbox" id="tog-chat"> chat spelling</label>
+    <label class="tog" title="Swearing you will meet in chat, marked in red"><input type="checkbox" id="tog-vulgar"> show vulgar</label>
+  </div>
+</header>
+
+<div id="wrap">
+  <nav id="side" class="panel"><h3>SECTIONS</h3></nav>
+  <main id="sheet">
+    <div id="none">Nothing matches — try fewer letters, or search the Spanish you saw in chat.</div>
+    <footer>Neutral Spanish throughout: <b>tú</b> forms, no <b>vosotros</b>, and words every Spanish speaker knows. Regional entries are marked with where they are from.
+      Click any Spanish phrase to copy it. Press <kbd>/</kbd> to search, <kbd>Esc</kbd> to clear.
+      A community-made phrasebook — not affiliated with Jagex. <a href="../../" title="peligaming — all tools">⌂ more tools</a></footer>
+  </main>
+</div>
+<div id="toast"></div>
+<a class="peligaming-home" href="../../" title="peligaming — all tools">⌂ peligaming</a>
+<script>
+// ---------------------------------------------------------------------------
+// The phrasebook. Each section: { id, icon, title, blurb, entries } — or notes
+// for the intro card. Entry fields:
+//   en    English
+//   es    Spanish; " · " separates variants (each copies on its own)
+//   say   a respelling for English speakers (first variant only)
+//   no    note — regional alternatives, gotchas, how it is really used
+//   t     tags: casual, slang, spanglish, vulgar, formal, gotcha
+//   r     region code, for the regional section (ES MX AR CO CL VE PE CA)
+// Neutral by default: tú forms, no vosotros, vocabulary shared across the
+// Spanish-speaking world. Voseo alternatives (Argentina, Uruguay, much of
+// Central America) are given in notes where the form actually changes.
+// ---------------------------------------------------------------------------
+const SECTIONS = [
+{ id:"how", icon:"📜", title:"How Spanish OSRS chat actually works", notes:[
+  "<b>Game words stay in English.</b> There is no Spanish client, so items, bosses, places and most skills keep their English names: <i>whip</i>, <i>Zulrah</i>, <i>GE</i>, <i>slayer</i>, <i>prayer</i>. Nobody says <i>capa de fuego</i>; everyone says <i>fire cape</i>. The Spanish goes around the English nouns.",
+  "<b>English verbs get Spanish endings.</b> Take the English word, add <i>-ear</i>, conjugate like any regular verb: <i>dropear, tradear, farmear, banear, lurear, skillear, afkear</i>. There is a whole section of these below. <i>Me dropeó</i> = it dropped for me.",
+  "<b>Numbers: k, kk and m.</b> <i>k</i> is a thousand. <i>kk</i> is a million and is at least as common as <i>m</i> in Latin America: <i>10kk</i> = 10M. Careful with <i>b</i>: in Spanish <i>un billón</i> is a million million, so 1b of gp is <i>mil millones</i>.",
+  "<b>Laughter is jaja, not lol.</b> <i>jaja</i>, <i>jajaja</i>, <i>jeje</i> (a sly or awkward laugh), and <i>xd</i> as near-punctuation. <i>lol</i> is understood but reads as an English speaker.",
+  "<b>Accents get dropped in chat.</b> Players type <i>que, como, esta, no se</i> with no accent and skip the opening <i>¿ ¡</i>. The <b>chat spelling</b> toggle above shows every phrase that way; the accented spelling is still the correct one.",
+  "<b>Tú, vos and usted.</b> This sheet uses <i>tú</i>, understood everywhere. Argentinians, Uruguayans and much of Central America use <i>vos</i>: <i>¿vendés?</i>, <i>vení</i>, <i>mirá</i>, <i>tenés</i>. The stress moves to the last syllable, and you will be understood if you keep to <i>tú</i>. <i>Usted</i> is the polite form; in game chat it is either a joke or a Colombian.",
+  "<b>Where they are from.</b> Most Spanish-speaking OSRS players are Latin American, with Argentina, Mexico, Colombia, Chile and Venezuela well represented, plus Spain. The regional section at the bottom lists the words that give a country away, and the ones that mean different things in different places.",
+]},
+
+{ id:"greet", icon:"👋", title:"Greetings & courtesy", blurb:"The first thing to type. <b>Buenas</b> alone covers hello at any hour, and <b>gracias / de nada</b> gets you through most trades.", entries:[
+  { en:"Hi / hello", es:"Hola", say:"OH-la" },
+  { en:"Hey / hi there", es:"Buenas", say:"BWEH-nas", t:["casual"], no:"Short for <i>buenos días</i> / <i>buenas tardes</i>; works any time of day and is the default chat greeting." },
+  { en:"Good morning", es:"Buenos días", say:"BWEH-nos DEE-as" },
+  { en:"Good afternoon / evening", es:"Buenas tardes", say:"BWEH-nas TAR-des", no:"Until dark; then <i>buenas noches</i>." },
+  { en:"Good night", es:"Buenas noches", say:"BWEH-nas NOH-ches", no:"Both a greeting after dark and a goodbye at bedtime." },
+  { en:"How's it going?", es:"¿Qué tal? · ¿Cómo va? · ¿Cómo estás?", say:"keh TAL", no:"Voseo: <i>¿cómo andás?</i> — Mexico: <i>¿qué onda?</i> — Colombia: <i>¿qué más?</i>" },
+  { en:"All good / fine", es:"Todo bien · Bien · Tranquilo", say:"TOH-doh byen", no:"<i>Tranquilo</i> (chill, calm) is the reply as often as the request." },
+  { en:"Thanks", es:"Gracias", say:"GRAH-syas", no:"Chat: <i>grax</i>, <i>grx</i>, <i>gcs</i>. <i>ty</i> is used too." },
+  { en:"Thanks a lot", es:"Muchas gracias · Mil gracias", say:"MOO-chas GRAH-syas" },
+  { en:"You're welcome", es:"De nada", say:"deh NAH-da", no:"Also <i>no hay de qué</i>, <i>a ti</i> (thank <b>you</b>). Chat: <i>np</i>, <i>ntp</i>." },
+  { en:"Please", es:"Por favor", say:"por fa-VOR", no:"Chat: <i>porfa</i>, <i>porfis</i>, <i>xfa</i>, <i>pls</i>." },
+  { en:"Sorry", es:"Perdón · Lo siento · Disculpa", say:"per-DOHN", no:"<i>Perdón</i> is the everyday one. <i>Lo siento</i> is a heavier I'm sorry. <i>Mi culpa</i> = my bad." },
+  { en:"Excuse me (getting attention)", es:"Disculpa · Oye · Ey", say:"dis-KOOL-pa", no:"<i>Oye</i> = hey, listen. Voseo: <i>oí</i>." },
+  { en:"Yes / no", es:"Sí · No", say:"see", no:"Chat: <i>sip</i> = yep, <i>nop</i> = nope, <i>si</i> without the accent." },
+  { en:"OK / sure / fine", es:"Ok · Está bien · Bueno", say:"es-TAH byen", no:"Regional: <i>vale</i> (Spain), <i>dale</i> (Argentina, most of South America), <i>sale</i> / <i>va</i> (Mexico), <i>ya</i> (Chile, Peru), <i>listo</i> (Colombia).", t:["gotcha"] },
+  { en:"See you / bye", es:"Nos vemos · Chao · Adiós", say:"nos BEH-mos", no:"<i>Chao</i> (Argentina and Chile spell it <i>chau</i>) is the everyday goodbye. <i>Adiós</i> is a bit final. Spain: <i>venga, hasta luego</i>." },
+  { en:"Take care", es:"Cuídate", say:"KWEE-da-teh", no:"Voseo: <i>cuidate</i>." },
+  { en:"Good luck", es:"Suerte · Buena suerte", say:"SWER-teh" },
+  { en:"Have fun", es:"Que te diviertas · Diviértete", say:"keh teh dee-BYER-tas" },
+  { en:"Good game", es:"gg · Buen juego", say:"bwen HWEH-go", no:"<i>gg</i> is universal; <i>gg ez</i> is as rude in Spanish as in English." },
+  { en:"Congrats (level, drop, pet)", es:"Felicidades · Felicitaciones", say:"feh-lee-see-DAH-des", no:"Chat: <i>gz</i>, <i>grats</i>, <i>feli</i>. <i>Felicitaciones</i> is more South American." },
+  { en:"Nice! / awesome", es:"¡Genial! · ¡Buenísimo! · ¡Qué bueno!", say:"heh-NYAL", no:"Regional cool-words: <i>chévere</i> (Caribbean, Colombia, Venezuela), <i>chido</i> (Mexico), <i>bacán</i> (Chile, Peru), <i>copado</i> (Argentina), <i>guay</i> (Spain)." },
+  { en:"Wow", es:"Guau · Uff · Wow", say:"gwow", no:"<i>Uff</i> is the impressed sigh: <i>uff qué drop</i>." },
+  { en:"lol / haha", es:"jaja · jajaja · xd", say:"HA-ha", no:"See the shorthand section. <i>jeje</i> is a sly laugh, <i>jiji</i> a giggle.", t:["casual"] },
+  { en:"I don't speak Spanish", es:"No hablo español", say:"noh AH-blo es-pa-NYOL" },
+  { en:"I speak a little Spanish", es:"Hablo un poco de español", say:"AH-blo oon POH-ko deh es-pa-NYOL" },
+  { en:"I'm learning Spanish", es:"Estoy aprendiendo español", say:"es-TOY ah-pren-DYEN-doh es-pa-NYOL", no:"Say this and most players will slow down and help." },
+  { en:"Do you speak English?", es:"¿Hablas inglés?", say:"AH-blas een-GLEHS", no:"Voseo: <i>¿hablás inglés?</i>" },
+  { en:"I don't understand", es:"No entiendo", say:"noh en-TYEN-doh" },
+  { en:"Slower, please", es:"Más despacio, por favor", say:"mas des-PA-syo" },
+  { en:"Can you repeat that?", es:"¿Puedes repetir?", say:"PWEH-des reh-peh-TEER", no:"Voseo: <i>¿podés repetir?</i>" },
+  { en:"What does X mean?", es:"¿Qué significa X?", say:"keh seeg-nee-FEE-ka" },
+  { en:"How do you say X?", es:"¿Cómo se dice X?", say:"KOH-mo seh DEE-seh" },
+  { en:"Where are you from?", es:"¿De dónde eres?", say:"deh DOHN-deh EH-res", no:"Voseo: <i>¿de dónde sos?</i>" },
+  { en:"I'm from…", es:"Soy de…", say:"soy deh", no:"<i>Soy de Estados Unidos / Inglaterra / Canadá / Australia</i>." },
+  { en:"My name is…", es:"Me llamo…", say:"meh YAH-mo", no:"The double l sounds like y (Argentina: like sh)." },
+  { en:"Nice to meet you", es:"Mucho gusto", say:"MOO-cho GOOS-to" },
+  { en:"Friend / bro / mate", es:"Amigo · Hermano · Bro", say:"ah-MEE-go", no:"<i>Hermano</i> (brother) is the Latin American bro. The regional section has the local ones: <i>tío, wey, che, parce, weón, pana</i>.", t:["casual"] },
+  { en:"Are you there?", es:"¿Estás? · ¿Estás ahí?", say:"es-TAS ah-EE" },
+  { en:"I'm back", es:"Ya volví · Volví", say:"ya bol-BEE" },
+  { en:"brb", es:"Ya vuelvo · Ahora vuelvo · brb", say:"ya BWEL-bo", no:"<i>brb</i> itself is understood." },
+  { en:"afk", es:"afk · Estoy afk · Me fui un rato", say:"meh FWEE oon RAH-to", no:"<i>Afkear</i> is the verb. <i>Un rato</i> = a while." },
+  { en:"Wait", es:"Espera · Aguanta", say:"es-PEH-ra", no:"Voseo: <i>esperá</i>. <i>Aguanta</i> = hold on, hang on." },
+  { en:"One moment / one sec", es:"Un momento · Un seg · Ya", say:"oon mo-MEN-to", no:"<i>Ya</i> on its own can mean right away, already, or ok." },
+  { en:"Hurry up / come on", es:"Rápido · Apúrate · Dale", say:"ah-POO-ra-teh", no:"Voseo: <i>apurate</i>. Spain: <i>date prisa</i>, <i>venga</i>." },
+  { en:"I have to go", es:"Me tengo que ir · Me voy", say:"meh TEN-go keh eer" },
+  { en:"I'm logging off", es:"Me deslogueo · Me salgo · Ya me voy", say:"meh des-lo-GEH-o", no:"<i>Desloguear</i> is Spanglish for log out; <i>salir</i> = leave.", t:["spanglish"] },
+  { en:"Good night (going to bed)", es:"Buenas noches · Que descanses", say:"keh des-KAN-ses", no:"<i>Que descanses</i> = rest well." },
+]},
+{ id:"short", icon:"⌨️", title:"Chat shorthand", blurb:"Spanish texting habits, which are what you actually see in public chat. Most of it is dropping letters: <b>q</b> for <i>que</i>, <b>x</b> for <i>por</i>, <b>tb</b> for <i>también</i>.", entries:[
+  { en:"what / that (que, qué)", es:"q · k · ke", say:"keh", t:["casual"], no:"<i>q haces</i> = what are you doing. <i>q</i> is by far the most common abbreviation in Spanish chat." },
+  { en:"why / because (por qué, porque)", es:"xq · pq · xk", say:"por-KEH", t:["casual"], no:"<i>xq no vienes</i> = why aren't you coming." },
+  { en:"for / by (por)", es:"x", say:"por", t:["casual"], no:"<i>x fa</i> = por favor, <i>x ahora</i> = for now, <i>2x1</i> = two for one." },
+  { en:"for / to (para)", es:"pa", say:"pa", t:["casual"], no:"<i>pa que</i> = what for. <i>pa'l</i> = para el." },
+  { en:"also (también)", es:"tb · tmb · tmbn", say:"tam-BYEN", t:["casual","gotcha"], no:"Gotcha: in a PvP context <i>tb</i> also means teleblock. Read the room." },
+  { en:"good / fine (bien)", es:"bn", say:"byen", t:["casual"], no:"<i>ta bn</i> = it's fine." },
+  { en:"of (de)", es:"d", say:"deh", t:["casual"], no:"<i>d nada</i>, <i>capa d fuego</i>." },
+  { en:"where (dónde)", es:"dnd", say:"DOHN-deh", t:["casual"], no:"<i>dnd estas</i> = where are you." },
+  { en:"I am / you are / it is (estoy, estás, está)", es:"toy · tas · ta", say:"toy", t:["casual"], no:"The <i>es-</i> gets swallowed: <i>toy afk</i>, <i>ta bien</i>, <i>tas ahí?</i>" },
+  { en:"don't worry / np", es:"ntp", say:"noh teh preh-oh-KOO-pes", t:["casual"], no:"<i>No te preocupes.</i> The Spanish np." },
+  { en:"no problem (English np)", es:"np · no hay problema", say:"noh eye pro-BLEH-ma", t:["casual"] },
+  { en:"thanks", es:"grax · grx · gcs · thx", say:"GRAH-syas", t:["casual"] },
+  { en:"cheers / greetings (saludos)", es:"salu2", say:"sa-LOO-dos", t:["casual"], no:"<i>salu-dos</i>: two is <i>dos</i>. A sign-off." },
+  { en:"please", es:"porfa · porfis · xfa · plis", say:"POR-fa", t:["casual"] },
+  { en:"haha", es:"jaja · jajaja · jeje · jiji", say:"HA-ha", t:["casual"], no:"More <i>ja</i>s = funnier. <i>jeje</i> is sly or awkward, <i>jiji</i> a giggle. <i>JAJAJA</i> in caps is losing it." },
+  { en:"xd", es:"xd · XD", say:"EH-kees DEH", t:["casual"], no:"Even more common than in English. Often ends a sentence like a full stop." },
+  { en:"hmm", es:"mmm · mm", t:["casual"] },
+  { en:"yes / yep", es:"si · sip · sii · sisi", say:"seep", t:["casual"], no:"<i>sisi</i> = yeah yeah. <i>si</i> without an accent is how it's typed." },
+  { en:"no / nope", es:"no · nop · nel", say:"nohp", t:["casual"], no:"<i>Nel</i> is Mexican for nope." },
+  { en:"ok", es:"ok · oki · okis · oks", t:["casual"] },
+  { en:"message / pm", es:"msj · pm · md", say:"men-SA-heh", t:["casual"], no:"<i>mándame msj</i> = send me a message. <i>md</i> = mensaje directo." },
+  { en:"here (aquí)", es:"aki · aqui · aca", say:"ah-KEE", t:["casual"] },
+  { en:"I don't know (no sé)", es:"nse · no se · ni idea", say:"noh SEH", t:["casual"], no:"<i>Ni idea</i> = no idea." },
+  { en:"just kidding", es:"jk · es broma · ntc", say:"es BRO-ma", t:["casual"], no:"<i>ntc</i> = <i>no te creas</i>, Mexican for jk." },
+  { en:"love ya (friendly)", es:"tqm · tkm", say:"teh KYEH-ro MOO-cho", t:["casual"], no:"<i>Te quiero mucho.</i> Between friends; not a confession." },
+  { en:"dude (Chile)", es:"wn · weon", say:"weh-OHN", t:["slang","regional"], no:"<i>Weón</i>: dude, mate, or idiot, depending entirely on tone. Chile's most-typed word." },
+  { en:"dude (Mexico)", es:"wey · we · güey", say:"way", t:["slang","regional"], no:"Mexico's dude. <i>no we</i> = no way, man." },
+  { en:"no way (Mexico, mild)", es:"no manches", say:"noh MAN-ches", t:["slang","regional"], no:"The polite version of <i>no mames</i>." },
+  { en:"no way / f— off (Mexico)", es:"nmms · no mames", say:"noh MAH-mes", t:["vulgar","regional"], no:"Surprise, disbelief or annoyance. Very common, very Mexican, not for your grandmother." },
+  { en:"no f-ing idea", es:"npi", say:"nee POO-ta ee-DEH-a", t:["vulgar"], no:"<i>Ni puta idea.</i>" },
+  { en:"damn it / holy sh—", es:"ptm · puta madre", say:"POO-ta MAH-dreh", t:["vulgar"], no:"Frustration or amazement: <i>ptm qué drop</i>. Argentina: <i>lpm</i> (<i>la puta madre</i>)." },
+  { en:"screw it / it's screwed (Mexico)", es:"alv · a la verga", say:"ah la BER-ga", t:["vulgar","regional"], no:"<i>me fui alv</i> = I'm out / I died. <i>vrg</i> = verga on its own." },
+  { en:"damn (Chile)", es:"ctm · conchetumare", say:"kon-cheh-too-MAH-reh", t:["vulgar","regional"], no:"Chile's all-purpose swear. Can be an insult or a whoa." },
+  { en:"bastard / dude (varies)", es:"cabrón · kbron", say:"ka-BROHN", t:["vulgar"], no:"Insult in most places; in Mexico also awesome (<i>está cabrón</i>) or, between friends, dude." },
+]},
+
+{ id:"trade", icon:"💰", title:"Trading & the Grand Exchange", blurb:"<b>Vendo</b> (selling) and <b>compro</b> (buying) start almost every trade line. Prices come as <b>k</b> and <b>kk</b>, and haggling is done with <b>dejar</b>: <i>¿me lo dejas en 500k?</i>", entries:[
+  { en:"Selling…", es:"Vendo…", say:"BEN-doh", no:"<i>vendo whip 1.5m</i>. Also <i>vendo todo</i> = selling everything." },
+  { en:"Buying…", es:"Compro…", say:"KOM-pro", no:"<i>compro bones</i>, <i>compro en cantidad</i> = buying in bulk." },
+  { en:"Are you selling?", es:"¿Vendes?", say:"BEN-des", no:"Voseo: <i>¿vendés?</i>" },
+  { en:"Are you buying?", es:"¿Compras?", say:"KOM-pras", no:"Voseo: <i>¿comprás?</i>" },
+  { en:"How much?", es:"¿Cuánto?", say:"KWAN-toh" },
+  { en:"How much for it? / what price?", es:"¿A cuánto? · ¿A cuánto lo vendes? · ¿Qué precio?", say:"ah KWAN-toh", no:"<i>¿A cuánto lo dejas?</i> = what'll you let it go for." },
+  { en:"Price", es:"Precio", say:"PREH-syo" },
+  { en:"Make me an offer", es:"Hazme una oferta · ¿Cuánto ofreces?", say:"AS-meh OO-na oh-FER-ta", no:"Voseo: <i>haceme una oferta</i>." },
+  { en:"Trade me", es:"Trade · Dame trade · Tradéame", say:"DA-meh trayd", t:["spanglish"], no:"<i>Tradear</i> is the verb everyone uses; <i>intercambiar</i> is the dictionary word nobody types." },
+  { en:"Deal", es:"Trato · Hecho · Dale", say:"TRAH-to", no:"<i>Hecho</i> = done. <i>Dale</i> = go on, ok." },
+  { en:"No thanks / no deal", es:"No, gracias · Así no", say:"ah-SEE noh", no:"<i>Así no</i> = not like that." },
+  { en:"Too expensive", es:"Muy caro · Carísimo", say:"mooy KAH-ro" },
+  { en:"Cheap", es:"Barato · Regalado", say:"ba-RAH-to", no:"<i>Regalado</i> (gifted) = a steal." },
+  { en:"Lower the price", es:"Baja el precio · Bájale", say:"BA-ha el PREH-syo", no:"Voseo: <i>bajá</i>. <i>Bájale</i> is Mexican." },
+  { en:"Can you do it for 500k?", es:"¿Me lo dejas en 500k?", say:"meh lo DEH-has en", no:"<i>Dejar en</i> = let it go for. The haggling verb. Voseo: <i>¿me lo dejás?</i>" },
+  { en:"I can't afford it", es:"No me alcanza · No tengo tanto", say:"noh meh al-KAN-sa", no:"<i>No me alcanza</i> = it doesn't reach; I'm short." },
+  { en:"I'm broke", es:"Estoy pobre · No tengo plata · No tengo ni un gp", say:"es-TOY PO-breh", t:["casual"] },
+  { en:"Money / gp", es:"Plata · Dinero · Oro · gp", say:"PLAH-ta", no:"<i>Plata</i> (silver) is the Latin American word for money. Spain: <i>pasta</i>. Mexico: <i>lana</i>, <i>varo</i>. Argentina: <i>guita</i>. <i>Oro</i> = gold." },
+  { en:"Coins", es:"Monedas · Coins", say:"mo-NEH-das" },
+  { en:"thousand / million (k, kk, m)", es:"k · kk · m", say:"meel / mee-YOHN", t:["gotcha"], no:"<i>k</i> = mil. <i>kk</i> = millón, extremely common: <i>5kk</i> = 5M. <i>m</i> also = millón. <i>1b</i> = <i>mil millones</i> — in Spanish a <i>billón</i> is a million million." },
+  { en:"Each", es:"Cada uno · c/u", say:"KA-da OO-no", no:"<i>100k c/u</i>." },
+  { en:"All of them / the lot", es:"Todos · Todo", say:"TOH-dos" },
+  { en:"Total / all together", es:"Total · Todo junto", say:"TOH-doh HOON-to" },
+  { en:"In bulk", es:"En cantidad · Al por mayor", say:"en kan-tee-DAD" },
+  { en:"How many do you have?", es:"¿Cuántos tienes?", say:"KWAN-tos TYEH-nes", no:"Voseo: <i>¿cuántos tenés?</i>" },
+  { en:"The GE", es:"El GE · El Grand Exchange", say:"el heh-EH", no:"Said as English letters or Spanish <i>ge-e</i>. Nobody translates it." },
+  { en:"GE / market price", es:"Precio de mercado · Precio del GE · Precio wiki", say:"PREH-syo deh mer-KA-doh" },
+  { en:"Above / below GE", es:"Arriba del GE · Abajo del GE · Sobre / bajo el precio", say:"ah-REE-ba del heh-EH" },
+  { en:"Margin", es:"Margen", say:"MAR-hen" },
+  { en:"Flipping / merching", es:"Flipear · Merchear · Hacer flips", say:"flee-peh-AR", t:["spanglish"] },
+  { en:"Instant buy / sell", es:"Al instante · Instantáneo · Insta", say:"al eens-TAN-teh" },
+  { en:"Sold!", es:"Vendido · Se vendió", say:"ben-DEE-doh" },
+  { en:"All gone / none left", es:"Ya no tengo · Se acabó", say:"seh ah-ka-BOH", no:"<i>Se acabó</i> = it's over / ran out." },
+  { en:"Is it yours?", es:"¿Es tuyo?", say:"es TOO-yo" },
+  { en:"Scam / scammer", es:"Estafa · Estafador · Scam · Scamer", say:"es-TAH-fa", no:"<i>Me estafaron</i> = I got scammed. <i>Scamear</i> is the Spanglish verb." },
+  { en:"Don't scam me", es:"No me estafes · Sin scam", say:"noh meh es-TAH-fes" },
+  { en:"Legit / trustworthy", es:"De confianza · Legal · Confiable", say:"deh kon-FYAN-sa" },
+  { en:"Can you lend me…?", es:"¿Me prestas…?", say:"meh PRES-tas", no:"Voseo: <i>¿me prestás?</i> <i>Prestado</i> = borrowed / on loan." },
+  { en:"Give it back", es:"Devuélvemelo · Devuélveme", say:"deh-BWEL-beh-meh-lo", no:"Voseo: <i>devolvémelo</i>." },
+  { en:"Free / for free", es:"Gratis", say:"GRAH-tees" },
+  { en:"A gift / I'll gift it", es:"Regalo · Te lo regalo", say:"teh lo reh-GAH-lo", no:"<i>Regalar</i> = to give as a gift." },
+  { en:"Can you spare something? (begging)", es:"¿Me regalas algo? · ¿Me das algo?", say:"meh reh-GAH-las AL-go", t:["casual"], no:"What the Lumbridge beggars type. <i>Mendigo</i> / <i>limosnero</i> = beggar." },
+  { en:"Junk / trash", es:"Basura", say:"ba-SOO-ra" },
+  { en:"Rare", es:"Raro · Rare", say:"RAH-ro", no:"<i>Un rare</i> in the OSRS sense stays English." },
+  { en:"Untradeable", es:"No es tradeable · No se puede tradear", say:"noh es tray-DEH-ah-bleh", t:["spanglish"] },
+  { en:"Noted / un-noted", es:"Noteado · Sin notear · En nota", say:"no-teh-AH-doh", t:["spanglish"], no:"<i>Notear</i> = to note. <i>Desnotear</i> = to un-note." },
+  { en:"Bank", es:"Banco", say:"BAHN-ko" },
+  { en:"I'm going to the bank / banking", es:"Voy al banco · Voy a bankear", say:"boy al BAHN-ko", t:["spanglish"], no:"<i>Bankear</i> / <i>banquear</i>: to bank." },
+  { en:"The GE tax", es:"El impuesto · El tax", say:"el eem-PWES-to" },
+  { en:"Bond", es:"Bond · Bono", say:"bond", no:"Usually the English word." },
+  { en:"Real-world trading", es:"rwt · Comprar oro · Venta de oro", say:"kom-PRAR OH-ro", no:"<i>Vendo oro</i> spam is the same scam in any language." },
+]},
+
+{ id:"num", icon:"🔢", title:"Numbers, money & time", blurb:"Enough to read a price and set a meeting. Spanish numbers are regular after fifteen; the traps are <b>billón</b> and the vagueness of <b>ahorita</b>.", entries:[
+  { en:"1 · 2 · 3 · 4 · 5", es:"uno · dos · tres · cuatro · cinco", say:"OO-no, dos, tres, KWA-tro, SEEN-ko" },
+  { en:"6 · 7 · 8 · 9 · 10", es:"seis · siete · ocho · nueve · diez", say:"says, SYEH-teh, OH-cho, NWEH-beh, dyes" },
+  { en:"11 · 12 · 13 · 14 · 15", es:"once · doce · trece · catorce · quince", say:"OHN-seh, DOH-seh, TREH-seh, ka-TOR-seh, KEEN-seh" },
+  { en:"16 – 19", es:"dieciséis · diecisiete · dieciocho · diecinueve", say:"dyeh-see-SAYS", no:"Ten-and-six, ten-and-seven…" },
+  { en:"20 · 30 · 40 · 50", es:"veinte · treinta · cuarenta · cincuenta", say:"BAYN-teh, TRAYN-ta, kwa-REN-ta, seen-KWEN-ta", no:"21 = <i>veintiuno</i>, 35 = <i>treinta y cinco</i>." },
+  { en:"60 · 70 · 80 · 90", es:"sesenta · setenta · ochenta · noventa", say:"seh-SEN-ta, seh-TEN-ta, oh-CHEN-ta, no-BEN-ta" },
+  { en:"99", es:"noventa y nueve · el 99", say:"no-BEN-ta ee NWEH-beh", no:"<i>Saqué 99</i> = I got 99." },
+  { en:"100 · 200 · 500", es:"cien · doscientos · quinientos", say:"syen, dos-SYEN-tos, kee-NYEN-tos", no:"<i>Ciento</i> before more numbers: <i>ciento cincuenta</i> = 150." },
+  { en:"1,000 · 1M · 1B", es:"mil · un millón · mil millones", say:"meel, oon mee-YOHN, meel mee-YOH-nes", t:["gotcha"], no:"Never say <i>un billón</i> for 1B gp; that is a trillion in Spanish." },
+  { en:"Half / double / triple", es:"La mitad · El doble · El triple", say:"la mee-TAD" },
+  { en:"First / second / last", es:"Primero · Segundo · Último", say:"pree-MEH-ro" },
+  { en:"Percent", es:"Por ciento · %", say:"por SYEN-to", no:"<i>10% menos</i> = 10% off." },
+  { en:"More / less", es:"Más · Menos", say:"mas / MEH-nos" },
+  { en:"Now", es:"Ahora · Ya", say:"ah-OH-ra", no:"<i>Ya</i> = right now, or already: <i>ya llegué</i> = I'm here." },
+  { en:"Right now / in a bit (Mexico)", es:"Ahorita", say:"ah-oh-REE-ta", t:["regional","gotcha"], no:"Famously vague: anything from this second to never. Also used in Colombia and Venezuela." },
+  { en:"Later", es:"Después · Luego · Más tarde", say:"des-PWES" },
+  { en:"Soon", es:"Pronto · Al rato", say:"PRON-to", no:"<i>Al rato</i> = in a while." },
+  { en:"Today / tomorrow / yesterday", es:"Hoy · Mañana · Ayer", say:"oy, ma-NYA-na, ah-YER", no:"<i>Mañana</i> is also morning: <i>en la mañana</i>." },
+  { en:"Tonight", es:"Esta noche · Hoy en la noche", say:"ES-ta NO-cheh" },
+  { en:"Weekend", es:"Fin de semana · Finde", say:"feen deh seh-MAH-na", no:"<i>El finde</i> is casual." },
+  { en:"Minute / hour / day / week", es:"Minuto · Hora · Día · Semana", say:"mee-NOO-to, OH-ra, DEE-a, seh-MAH-na" },
+  { en:"5 minutes", es:"5 minutos · 5 min", say:"SEEN-ko mee-NOO-tos" },
+  { en:"Half an hour", es:"Media hora", say:"MEH-dya OH-ra" },
+  { en:"What time?", es:"¿A qué hora?", say:"ah keh OH-ra" },
+  { en:"At 8 (o'clock)", es:"A las 8", say:"ah las OH-cho", no:"<i>A la una</i> for one o'clock; <i>a las</i> for everything else." },
+  { en:"Time zone", es:"Zona horaria · Horario", say:"SO-na oh-RAH-rya", no:"<i>¿Qué hora es allá?</i> = what time is it there?" },
+  { en:"Always / never", es:"Siempre · Nunca", say:"SYEM-preh / NOON-ka" },
+  { en:"Again", es:"Otra vez · De nuevo", say:"OH-tra bes" },
+  { en:"A while", es:"Un rato", say:"oon RAH-to", no:"<i>Un ratito</i> = a little while." },
+  { en:"A lot / a little", es:"Mucho · Poco · Un montón · Un poquito", say:"MOO-cho / PO-ko", no:"<i>Un montón</i> = a ton. Argentina: <i>una banda</i>." },
+  { en:"Enough / that's enough", es:"Suficiente · Basta", say:"BAS-ta", no:"<i>¡Basta!</i> = stop it." },
+]},
+{ id:"pvm", icon:"⚔️", title:"Combat, PvM & bossing", blurb:"Callouts are short imperatives: <b>cuidado, corre, come, reza</b>. Loot talk runs on <b>caer</b>, to fall: <i>me cayó una whip</i> means the whip dropped for me.", entries:[
+  { en:"Careful / watch out", es:"Cuidado · Ojo", say:"kwee-DAH-doh", no:"<i>Ojo</i> (eye) = heads up. <i>Ojo con los pkers</i>." },
+  { en:"Run!", es:"¡Corre! · ¡Corran!", say:"KOH-reh", no:"Voseo: <i>corré</i>. <i>Corran</i> to a group." },
+  { en:"Back / step back", es:"Atrás · Retrocede · Aléjate", say:"ah-TRAS", no:"<i>Aléjate</i> = get away from it." },
+  { en:"Eat / heal up", es:"Come · Come algo · Cúrate", say:"KOH-meh", no:"Voseo: <i>comé</i>. <i>Curar</i> = heal; <i>healear</i> exists but <i>curar</i> wins in OSRS." },
+  { en:"Pray / switch prayer", es:"Reza · Cambia el prayer · Pray mage / range", say:"REH-sa", no:"<i>Prayer</i> stays English; <i>rezar</i> = to pray. Voseo: <i>rezá</i>." },
+  { en:"Turn on / off the prayer", es:"Prende el prayer · Activa el prayer · Apágalo", say:"PREN-deh el PRAY-er", no:"<i>Prender</i> = switch on (Latin America); Spain says <i>enciende</i>. <i>Apagar</i> = switch off." },
+  { en:"Flick", es:"Flick · Flickear", say:"flee-keh-AR", t:["spanglish"] },
+  { en:"Special attack", es:"Spec · El especial · Tira spec", say:"TEE-ra spek", no:"<i>Tirar</i> (throw) = fire off: <i>tira el spec</i>." },
+  { en:"Attack / hit it", es:"Ataca · Pégale · Dale", say:"PEH-ga-leh", no:"<i>Pegar</i> = to hit. Voseo: <i>pegale</i>." },
+  { en:"Don't attack", es:"No ataques · No le pegues", say:"noh ah-TA-kes" },
+  { en:"Hold / wait", es:"Espera · Aguanta · Quieto", say:"ah-GWAN-ta", no:"<i>Quieto</i> = stay still." },
+  { en:"Go! / now!", es:"¡Ya! · ¡Vamos! · ¡Dale!", say:"ya" },
+  { en:"Ready?", es:"¿Listo? · ¿Listos?", say:"LEES-to", no:"<i>Listos</i> to a group; <i>lista</i> if you are a woman." },
+  { en:"I'm ready", es:"Listo · Lista", say:"LEES-to" },
+  { en:"Not yet", es:"Todavía no · Aún no", say:"toh-da-BEE-a noh" },
+  { en:"Come here", es:"Ven · Ven acá · Vente", say:"ben", no:"Voseo: <i>vení</i>. <i>Acá</i> is Latin American for here." },
+  { en:"Follow me", es:"Sígueme", say:"SEE-geh-meh", no:"Voseo: <i>seguime</i>." },
+  { en:"I'm coming", es:"Ya voy · Voy", say:"ya boy" },
+  { en:"Where are you?", es:"¿Dónde estás?", say:"DOHN-deh es-TAS", no:"Voseo: <i>¿dónde andás?</i>" },
+  { en:"I'm here", es:"Aquí estoy · Acá estoy", say:"ah-KEE es-TOY" },
+  { en:"I'm out of food", es:"No tengo comida · Me quedé sin comida", say:"meh keh-DEH seen ko-MEE-da", no:"<i>Quedarse sin</i> = run out of." },
+  { en:"I'm out of prayer", es:"No tengo prayer · Me quedé sin prayer", say:"seen PRAY-er" },
+  { en:"Supplies", es:"Supplies · Suministros · Comida y pots", say:"soo-mee-NEES-tros" },
+  { en:"Potion / pot", es:"Poción · Pot", say:"po-SYOHN", no:"<i>Pociones</i> plural. <i>Tomar una pot</i> = drink one." },
+  { en:"Food", es:"Comida", say:"ko-MEE-da" },
+  { en:"I need to bank", es:"Tengo que banquear · Voy al banco", say:"TEN-go keh ban-keh-AR", t:["spanglish"] },
+  { en:"One more (kill / trip)", es:"Una más · Otra", say:"OO-na mas" },
+  { en:"Last one", es:"La última · El último", say:"la OOL-tee-ma" },
+  { en:"Let's go again", es:"Otra vez · Vamos de nuevo · Otra ronda", say:"OH-tra RON-da" },
+  { en:"Kill / kills", es:"Kill · Matar · Matamos al boss", say:"ma-TAR", no:"<i>Kill</i> and <i>kc</i> stay English; <i>matar</i> = to kill." },
+  { en:"How many kc?", es:"¿Cuánto kc tienes? · ¿Cuántas kills llevas?", say:"KWAN-tas kills YEH-bas", no:"<i>Llevar</i> = to have so far: <i>llevo 300 kc</i>." },
+  { en:"It dropped for me", es:"Me cayó · Me dropeó", say:"meh ka-YOH", t:["spanglish"], no:"<i>Caer</i> = to fall. <i>Me cayó el pet</i> = I got the pet. The single most useful PvM phrase." },
+  { en:"Nothing dropped", es:"No cayó nada · Nada", say:"noh ka-YOH NA-da" },
+  { en:"Loot", es:"Loot · Botín · Lootear", say:"loo-teh-AR", t:["spanglish"], no:"<i>Botín</i> is the dictionary word; <i>loot</i> is what people say." },
+  { en:"Split / share the loot", es:"Repartir · ¿Repartimos? · Split", say:"reh-par-TEE-mos", no:"<i>Repartimos</i> = we split it." },
+  { en:"FFA", es:"ffa · Libre · Cada quien lo suyo", say:"KA-da kyen lo SOO-yo", no:"<i>Cada quien lo suyo</i> = each keeps their own." },
+  { en:"Whose is it?", es:"¿De quién es?", say:"deh kyen es" },
+  { en:"It's mine / yours", es:"Es mío · Es tuyo", say:"es MEE-o" },
+  { en:"Take it", es:"Tómalo · Agárralo", say:"TOH-ma-lo", t:["gotcha"], no:"Spain says <i>cógelo</i>; in most of Latin America <i>coger</i> is a vulgar word for sex, so <i>agarrar</i> or <i>tomar</i>." },
+  { en:"Nice drop!", es:"¡Buen drop! · ¡Qué suerte!", say:"bwen drop" },
+  { en:"Lucky", es:"Suertudo · Con suerte", say:"swer-TOO-doh", no:"<i>Qué suertudo</i> = lucky you." },
+  { en:"Dry / unlucky", es:"Seco · Salado · Sin suerte", say:"SEH-ko", t:["slang"], no:"<i>Estoy seco</i> = I'm dry. <i>Salado</i> (salty) = jinxed, in Latin America." },
+  { en:"I died", es:"Morí · Me morí · Me mataron", say:"mo-REE", no:"<i>Me mataron</i> = they killed me." },
+  { en:"I lost everything", es:"Perdí todo", say:"per-DEE TOH-doh" },
+  { en:"Gravestone / Death's office", es:"Lápida · La tumba · Death's office", say:"LA-pee-da", no:"<i>Recuperar</i> = to get back: <i>fui a recuperar mis cosas</i>." },
+  { en:"Boss", es:"Boss · Jefe", say:"HEH-feh", no:"<i>Jefe</i> is formal; <i>el boss</i> is what people say." },
+  { en:"Team / group", es:"Equipo · Team · Grupo", say:"eh-KEE-po" },
+  { en:"Mass", es:"Mass · En masa", say:"en MA-sa" },
+  { en:"Tank", es:"Tank · Tanque · Tankear", say:"tan-keh-AR", t:["spanglish"], no:"<i>¿Quién tankea?</i> = who's tanking?" },
+  { en:"DPS", es:"dps · Hacer daño", say:"ah-SER DA-nyo" },
+  { en:"Damage", es:"Daño · dmg", say:"DA-nyo" },
+  { en:"A hit (of 40)", es:"Un golpe · Pegó un 40 · Un hit", say:"oon GOL-peh", no:"<i>Pegó</i> = it hit." },
+  { en:"Max hit", es:"Golpe máximo · Max hit", say:"GOL-peh MAK-see-mo" },
+  { en:"Miss / splash", es:"Falló · Splash · Splashear", say:"fa-YOH", t:["spanglish"], no:"<i>Fallar</i> = to miss. <i>Splashear</i> is the magic one." },
+  { en:"HP / hitpoints", es:"Vida · hp · Puntos de vida", say:"BEE-da", no:"<i>Vida</i> = life. <i>¿Cuánta vida tienes?</i>" },
+  { en:"Low HP", es:"Poca vida · Estoy bajo de vida", say:"PO-ka BEE-da" },
+  { en:"Full HP", es:"Vida llena · Full vida", say:"BEE-da YEH-na" },
+  { en:"Stats / levels", es:"Stats · Niveles", say:"nee-BEH-les" },
+  { en:"Combat level", es:"Nivel de combate · cb", say:"nee-BEL deh kom-BA-teh", no:"<i>¿Qué cb tienes?</i>" },
+  { en:"Gear", es:"Gear · Equipo · Armadura · Set", say:"ar-ma-DOO-ra", no:"<i>Equipo</i> is both team and equipment. <i>¿Qué gear llevo?</i> = what gear do I bring?" },
+  { en:"Weapon", es:"Arma", say:"AR-ma" },
+  { en:"Armour / shield / helmet / cape", es:"Armadura · Escudo · Casco · Capa", say:"es-KOO-doh, KAS-ko, KA-pa" },
+  { en:"Arrows / bolts / runes", es:"Flechas · Bolts · Runas", say:"FLEH-chas, ROO-nas", no:"<i>Virotes</i> is bolts in the dictionary; nobody says it." },
+  { en:"Melee / ranged / magic", es:"Melee · Rango · Magia", say:"RAN-go, MA-hya", no:"<i>Rango</i> is Spanglish for ranged and universal. <i>Mage</i> stays English too." },
+  { en:"Safe spot", es:"Safespot · Safe · Un lugar seguro", say:"sayf", no:"<i>Safear</i> = to safe-spot." },
+  { en:"Aggro", es:"Aggro · Te tiene aggro · Te agrearon", say:"AH-gro", t:["spanglish"] },
+  { en:"Poisoned / venom", es:"Envenenado · Veneno · Venom", say:"en-beh-neh-NA-doh", no:"<i>Veneno</i> covers both poison and venom; <i>venom</i> the OSRS mechanic stays English." },
+  { en:"Cure / antidote", es:"Cura · Antídoto · Anti", say:"an-TEE-doh-to" },
+  { en:"Stunned", es:"Aturdido · Stuneado", say:"ah-toor-DEE-doh", t:["spanglish"] },
+  { en:"Frozen", es:"Congelado · Freezeado · Me freezaron", say:"kon-heh-LA-doh", t:["spanglish"] },
+  { en:"Teleport", es:"Tele · Teletransporte · tp · Telear", say:"TEH-leh", no:"<i>Hacer tp</i> = to teleport. <i>Teletransportarse</i> is the full verb." },
+  { en:"Tele out!", es:"¡Tele! · ¡Sal! · ¡tp!", say:"sal", no:"<i>Salir</i> = get out. Voseo: <i>¡salí!</i>" },
+  { en:"Log out!", es:"Deslogea · Desconéctate · Salte", say:"des-lo-GEH-a", t:["spanglish"], no:"<i>Salte</i> = get out (of the game)." },
+  { en:"Lag", es:"Lag · Tengo lag · Me laguea · Estoy lageado", say:"meh la-GEH-a", t:["spanglish"] },
+  { en:"I got disconnected", es:"Me desconecté · Se me cayó · dc", say:"seh meh ka-YOH", no:"<i>Se me cayó</i> = it dropped on me (the connection). <i>Se me fue el internet</i> = my internet went." },
+  { en:"Respawn", es:"Respawn · Respawnear · Reaparecer", say:"reh-ah-pa-reh-SER", t:["spanglish"] },
+  { en:"Phase / mechanic", es:"Fase · Mecánica", say:"FA-seh, meh-KA-nee-ka" },
+  { en:"Dodge / avoid", es:"Esquiva · Evita", say:"es-KEE-ba" },
+  { en:"Move!", es:"¡Muévete! · ¡Muévanse!", say:"MWEH-beh-teh", no:"Voseo: <i>movete</i>. Plural: <i>muévanse</i>." },
+  { en:"Stay there", es:"Quédate ahí", say:"KEH-da-teh ah-EE", no:"Voseo: <i>quedate</i>." },
+  { en:"Behind you", es:"Detrás de ti · Atrás tuyo", say:"deh-TRAS deh tee" },
+  { en:"North / south / east / west", es:"Norte · Sur · Este · Oeste", say:"NOR-teh, soor, ES-teh, oh-ES-teh", no:"<i>Al norte</i> = to the north." },
+  { en:"Left / right", es:"Izquierda · Derecha", say:"ees-KYER-da, deh-REH-cha" },
+  { en:"Upstairs / downstairs", es:"Arriba · Abajo", say:"ah-REE-ba, ah-BA-ho", no:"<i>Sube</i> = go up, <i>baja</i> = go down." },
+  { en:"Inside / outside", es:"Adentro · Afuera", say:"ah-DEN-tro, ah-FWEH-ra" },
+  { en:"Near / far", es:"Cerca · Lejos", say:"SER-ka, LEH-hos" },
+  { en:"Door / gate / ladder / stairs", es:"Puerta · Reja · Escalera · Escaleras", say:"PWER-ta, REH-ha, es-ka-LEH-ra" },
+  { en:"Cave / mine / tower / island", es:"Cueva · Mina · Torre · Isla", say:"KWEH-ba, MEE-na, TOR-reh, EES-la" },
+  { en:"Altar / shrine", es:"Altar", say:"al-TAR", no:"<i>Recargar prayer</i> = recharge prayer." },
+]},
+
+{ id:"pvp", icon:"💀", title:"Wilderness & PvP", blurb:"<b>Pker</b> becomes <b>pekero</b>, <b>pkear</b> is the verb, and <b>skull</b> stays English. The one phrase to know in the wildy is <i>no me pegues</i>: don't hit me.", entries:[
+  { en:"The Wilderness", es:"La wildy · El wilderness · Las tierras salvajes", say:"la WIL-dee", no:"<i>Tierras salvajes</i> is the translation you will only see in a guide." },
+  { en:"PKer", es:"Pker · Pekero", say:"peh-KEH-ro", t:["spanglish"], no:"Also <i>pikero</i>. <i>Hay pekeros</i> = there are PKers about." },
+  { en:"There are PKers!", es:"¡Hay pkers! · ¡Cuidado, pkers!", say:"eye peh-KEH-ros" },
+  { en:"To PK / go PKing", es:"Pkear · Ir a pkear", say:"peh-keh-AR", t:["spanglish"] },
+  { en:"Skulled", es:"Skulleado · Con skull · Tiene skull", say:"skool-eh-AH-doh", t:["spanglish"] },
+  { en:"Risk / how much are you risking?", es:"Riesgo · ¿Cuánto arriesgas?", say:"RYES-go", no:"Voseo: <i>¿cuánto arriesgás?</i>" },
+  { en:"Risk fight", es:"Pelea de riesgo · Risk", say:"peh-LEH-a deh RYES-go" },
+  { en:"Fight? / 1v1?", es:"¿Peleamos? · ¿1v1? · ¿Un uno contra uno?", say:"peh-leh-AH-mos", no:"<i>Pelear</i> = to fight." },
+  { en:"Truce / peace", es:"Paz · Tregua", say:"pas", no:"<i>Paz, no te pego</i> = peace, I won't hit you." },
+  { en:"Don't hit me", es:"No me pegues", say:"noh meh PEH-ges" },
+  { en:"I'm not attacking / I won't attack you", es:"No estoy atacando · No te voy a atacar", say:"noh teh boy ah ah-ta-KAR" },
+  { en:"Let me leave", es:"Déjame irme · Déjame salir", say:"DEH-ha-meh EER-meh", no:"Voseo: <i>dejame</i>." },
+  { en:"They rushed me", es:"Me rushearon", say:"meh roo-sheh-AH-ron", t:["spanglish"], no:"<i>Rushear</i> = to rush." },
+  { en:"Rag / ragger", es:"Rag · Ragear · Un ragger", say:"ra-geh-AR", t:["spanglish"] },
+  { en:"Pile-jumped", es:"Me pjearon · pj", say:"meh peh-hoh-teh-AH-ron", t:["spanglish"] },
+  { en:"Freeze", es:"Congelar · Freezar · Me freezaron", say:"kon-heh-LAR", t:["spanglish"] },
+  { en:"Teleblocked", es:"Teleblockeado · Me tbearon · tb", say:"teh-leh-blo-keh-AH-doh", t:["spanglish","gotcha"], no:"<i>tb</i> is also <i>también</i> (also) in every other context." },
+  { en:"Run north / to the ditch", es:"Corre al norte · Corre a la zanja", say:"KOH-reh al NOR-teh", no:"<i>Zanja</i> = ditch; <i>el ditch</i> is heard too." },
+  { en:"Wilderness level", es:"Nivel · Estoy en nivel 30", say:"nee-BEL" },
+  { en:"Multi / single", es:"Multi · Single · Zona multi · Zona single", say:"SO-na MOOL-tee" },
+  { en:"Anti-PK", es:"Anti · Antear · Anti-pk", say:"an-teh-AR", t:["spanglish"] },
+  { en:"Spec tab / spec'd me out", es:"Me speceó · Me sacó con spec", say:"meh speh-seh-OH", t:["spanglish"], no:"<i>Sacar</i> (take out) = kill." },
+  { en:"Lure / they lured me", es:"Lurear · Me lurearon · Lureador", say:"loo-reh-AR", t:["spanglish"], no:"<i>Engaño</i> = a trick; <i>trampa</i> = a trap." },
+  { en:"Bot / botter", es:"Bot · Botero · Botear", say:"bo-TEH-ro", t:["spanglish"] },
+  { en:"Cheat / cheater", es:"Trampa · Tramposo · Chetear", say:"tram-PO-so", t:["spanglish"], no:"<i>Hacer trampa</i> = to cheat. <i>Chetear</i> is the Spanglish verb." },
+  { en:"OP / broken", es:"Chetado · Roto · Está roto", say:"cheh-TA-doh", t:["slang"], no:"<i>Chetado</i> (from cheat) = overpowered. <i>Cheto</i> in Argentina = a cheater, or posh." },
+  { en:"Report", es:"Reportar · Lo reporté", say:"reh-por-TAR" },
+  { en:"Banned", es:"Baneado · Lo banearon · Ban", say:"ba-neh-AH-doh", t:["spanglish"] },
+  { en:"Muted", es:"Muteado · Mute", say:"moo-teh-AH-doh", t:["spanglish"] },
+  { en:"Hacked", es:"Hackeado · Me hackearon", say:"ha-keh-AH-doh", t:["spanglish"] },
+  { en:"Account", es:"Cuenta", say:"KWEN-ta", no:"<i>Cuenta principal</i> = main. <i>Alt</i> / <i>secundaria</i>. <i>Iron</i> / <i>ironman</i> stays English." },
+  { en:"Password", es:"Contraseña · Pass", say:"kon-tra-SEH-nya", t:["gotcha"], no:"Nobody legit ever asks for it, in any language." },
+  { en:"Clan wars / a war", es:"Guerra · Clan wars · Una war", say:"GEH-ra" },
+  { en:"Revenge", es:"Venganza · Revancha", say:"reh-BAN-cha", no:"<i>¿Revancha?</i> = rematch?" },
+  { en:"Rematch", es:"Revancha · Otra", say:"reh-BAN-cha" },
+  { en:"Noob / newbie", es:"Noob · Nub · Novato · Nuevo", say:"no-BA-to", t:["casual"], no:"<i>Novato</i> = rookie, neutral. <i>Nuevo</i> = new. <i>Manco</i> (one-armed) = bad at the game, in Latin America." },
+  { en:"Bad at the game", es:"Manco · Malo · Malísimo", say:"MAN-ko", t:["slang"], no:"<i>Manco</i> is affectionate-rude, Latin American." },
+  { en:"Pro / a beast", es:"Pro · Crack · Máquina · Capo", say:"krak", t:["slang"], no:"<i>Crack</i> is used everywhere for a star player. <i>Máquina</i> is Spain, <i>capo</i> Argentina." },
+  { en:"Easy / ez", es:"Fácil · ez · Facilito", say:"FA-seel" },
+  { en:"Cry more / mad?", es:"Llora · ¿Enojado? · ¿Tilteado?", say:"YO-ra", t:["slang"], no:"<i>Tiltearse</i> = to tilt. Spain: <i>¿rabia?</i>" },
+]},
+{ id:"skill", icon:"🪓", title:"Skilling", blurb:"<b>Skillear</b> is the verb, <b>subir</b> (to go up) is how you level, and <b>sacar</b> (to take out) is how you get a 99: <i>saqué 99 en cocina</i>.", entries:[
+  { en:"To skill / I'm skilling", es:"Skillear · Estoy skilleando", say:"skee-leh-AN-doh", t:["spanglish"], no:"<i>Habilidad</i> = a skill, in a guide. <i>Skill</i> in chat." },
+  { en:"Level", es:"Nivel · lvl", say:"nee-BEL" },
+  { en:"Level up / I levelled", es:"Subir de nivel · Subí · Subí de nivel", say:"soo-BEE", no:"<i>Subir</i> = go up. <i>Subí 5 niveles</i> = I gained 5 levels." },
+  { en:"What level are you in X?", es:"¿Qué nivel tienes de X? · ¿Qué lvl?", say:"keh nee-BEL TYEH-nes deh", no:"Voseo: <i>¿qué nivel tenés?</i>" },
+  { en:"XP", es:"Xp · Experiencia · Exp", say:"eks-peh-RYEN-sya" },
+  { en:"XP per hour", es:"Xp por hora · xp/h", say:"por OH-ra" },
+  { en:"Grind / to grind", es:"Grindear · El grind · Farmear", say:"green-deh-AR", t:["spanglish"] },
+  { en:"Farm (drops or resources)", es:"Farmear", say:"far-meh-AR", t:["spanglish"], no:"Not the Farming skill; that is <i>farming</i> or <i>agricultura</i>." },
+  { en:"AFK / to afk", es:"afk · Afkear · Afkeando", say:"af-keh-AR", t:["spanglish"], no:"<i>Está afk</i> = they're afk. <i>Algo afk</i> = something afk to train." },
+  { en:"Train", es:"Entrenar", say:"en-treh-NAR" },
+  { en:"Where do you train X?", es:"¿Dónde entrenas X?", say:"DOHN-deh en-TREH-nas", no:"Voseo: <i>¿dónde entrenás?</i>" },
+  { en:"Best way to train X?", es:"¿Cuál es la mejor forma de entrenar X?", say:"kwal es la meh-HOR FOR-ma" },
+  { en:"Fast / slow xp", es:"Rápido · Lento", say:"RA-pee-doh / LEN-to" },
+  { en:"Cheap / expensive method", es:"Barato · Caro · Método", say:"MEH-to-doh" },
+  { en:"I got 99", es:"Saqué 99 · Llegué a 99", say:"sa-KEH", no:"<i>Sacar</i> = take out, get. <i>Llegar a</i> = reach." },
+  { en:"Maxed", es:"Maxeado · Maxear · Cuenta maxeada", say:"mak-seh-AH-doh", t:["spanglish"] },
+  { en:"Skillcape", es:"Capa de 99 · La capa · Skillcape", say:"KA-pa deh no-BEN-ta ee NWEH-beh" },
+  { en:"Quest cape", es:"Capa de quests · Qcape", say:"KA-pa deh kwests" },
+  { en:"Achievement diary", es:"Diario · Los diarios", say:"DYA-ryo" },
+  { en:"Total level", es:"Nivel total · Total", say:"nee-BEL to-TAL" },
+  { en:"Gz on the 99!", es:"Felicidades por el 99 · gz x el 99", say:"feh-lee-see-DAH-des por el" },
+  { en:"Gather / collect", es:"Recolectar · Juntar · Recoger", say:"hoon-TAR", no:"<i>Juntar</i> is the Latin American everyday word." },
+  { en:"Chop trees", es:"Cortar árboles · Talar · Cortar", say:"kor-TAR AR-bo-les" },
+  { en:"Mine", es:"Minar · Minando", say:"mee-NAR" },
+  { en:"Fish", es:"Pescar · Pescando", say:"pes-KAR" },
+  { en:"Cook", es:"Cocinar · Cocinando", say:"ko-see-NAR" },
+  { en:"I burned it", es:"Se me quemó · Lo quemé", say:"seh meh keh-MOH", no:"<i>Quemar</i> = to burn." },
+  { en:"Craft / make", es:"Craftear · Hacer · Fabricar", say:"kraf-teh-AR", t:["spanglish"], no:"<i>Hacer</i> = make / do, covers most of it." },
+  { en:"Smith / forge", es:"Forjar · Smithear", say:"for-HAR", t:["spanglish"] },
+  { en:"Ore / bar", es:"Mena · Mineral · Barra", say:"MEH-na, BA-ra", no:"<i>Mineral</i> is the everyday word for ore." },
+  { en:"Log / plank", es:"Tronco · Leño · Tablón · Tabla", say:"TRON-ko, ta-BLOHN" },
+  { en:"Herb / potion", es:"Hierba · Poción", say:"YER-ba, po-SYOHN", no:"<i>Herb</i> stays English for the OSRS sense." },
+  { en:"Seed / patch / harvest", es:"Semilla · Parcela · Cosecha", say:"seh-MEE-ya, par-SEH-la, ko-SEH-cha", no:"<i>El patch</i> is heard as much as <i>parcela</i>." },
+  { en:"Farm run", es:"Ronda de farming · Hacer las plantas · Farm run", say:"ah-SER las PLAN-tas", no:"<i>Hacer las plantas</i> = do the plants." },
+  { en:"Birdhouse run", es:"Hacer los birdhouses · Los pájaros", say:"los PA-ha-ros" },
+  { en:"Agility course / lap", es:"Curso de agilidad · Hacer laps · Vuelta", say:"BWEL-ta", no:"<i>Vuelta</i> = a lap." },
+  { en:"Runecrafting", es:"Runecraft · rc · Hacer runas", say:"ah-SER ROO-nas" },
+  { en:"Thieving / pickpocket", es:"Thieving · Robar · Pickpockear", say:"ro-BAR", t:["spanglish"], no:"<i>Robar</i> = to steal." },
+  { en:"Hunter / to hunt", es:"Hunter · Cazar · Cazando", say:"ka-SAR" },
+  { en:"Construction / the house", es:"Construcción · La casa · POH", say:"la KA-sa" },
+  { en:"Slayer task", es:"Tarea · Task · Me tocó X", say:"ta-REH-a", no:"<i>Me tocó</i> = I got assigned. <i>¿Qué tarea tienes?</i> = what's your task?" },
+  { en:"Skip / block a task", es:"Skipear · Saltar · Bloquear · Blockear", say:"skee-peh-AR", t:["spanglish"] },
+  { en:"Cannon", es:"Cañón", say:"ka-NYOHN" },
+  { en:"Clue scroll", es:"Clue · Pista · Hacer clues", say:"PEES-ta", no:"<i>Pista</i> is the translation; <i>clue</i> is the word." },
+  { en:"Casket", es:"Cofre · Caja", say:"KO-freh" },
+  { en:"Pet", es:"Pet · Mascota", say:"mas-KO-ta", no:"<i>Me cayó el pet</i> = I got the pet." },
+  { en:"Collection log", es:"Log · Collection log · Colección", say:"ko-lek-SYOHN" },
+  { en:"Boost (a level)", es:"Boost · Boostear · Subir con pot", say:"boos-teh-AR", t:["spanglish"], no:"<i>Subir con pot</i> = raise with a potion." },
+  { en:"Alch / to alch", es:"Alchear · Hacer alchs · Alcheé todo", say:"al-cheh-AR", t:["spanglish"] },
+  { en:"Fletch", es:"Fletchear · Hacer flechas", say:"flet-cheh-AR", t:["spanglish"] },
+  { en:"Inventory / an invent", es:"Inventario · Inv · Un inventario de", say:"een-ben-TA-ryo" },
+  { en:"Bank standing", es:"Skillear en el banco · Estar en el banco", say:"en el BAHN-ko" },
+  { en:"Tick", es:"Tick · Ticks", say:"teek", no:"<i>Tick manipulation</i> stays English." },
+  { en:"Hours played", es:"Horas jugadas · Horas", say:"OH-ras hoo-GA-das" },
+]},
+
+{ id:"skills", icon:"📊", title:"The skills by name", blurb:"Three columns: the skill, its proper Spanish, and what players actually type. Most stay English; the ones that turn Spanish are the everyday trades: <b>minería, pesca, cocina, herrería</b>.", entries:[
+  { en:"Attack", es:"Ataque · att", say:"ah-TA-keh" },
+  { en:"Strength", es:"Fuerza · str", say:"FWER-sa" },
+  { en:"Defence", es:"Defensa · def", say:"deh-FEN-sa" },
+  { en:"Ranged", es:"Rango · Range · A distancia", say:"RAN-go", t:["spanglish"], no:"<i>Rango</i> (rank / range) is the universal Spanglish. <i>Arquería</i> is a guide word." },
+  { en:"Prayer", es:"Prayer · Pray · Oración", say:"oh-ra-SYOHN", no:"Stays English in chat; <i>rezar</i> = to pray." },
+  { en:"Magic", es:"Magia · Mage", say:"MA-hya" },
+  { en:"Runecraft", es:"Runecraft · rc · Creación de runas", say:"kreh-ah-SYOHN deh ROO-nas" },
+  { en:"Construction", es:"Construcción · Con · La casa", say:"kons-trook-SYOHN" },
+  { en:"Hitpoints", es:"Vida · hp · Puntos de vida", say:"BEE-da" },
+  { en:"Agility", es:"Agilidad · Agi", say:"ah-hee-lee-DAD" },
+  { en:"Herblore", es:"Herblore · Herb · Herbología · Pociones", say:"er-bo-lo-HEE-a" },
+  { en:"Thieving", es:"Thieving · Thiev · Robo · Hurto", say:"RO-bo" },
+  { en:"Crafting", es:"Crafting · Craft · Artesanía", say:"ar-teh-sa-NEE-a" },
+  { en:"Fletching", es:"Fletching · Fletch · Flechas", say:"FLEH-chas" },
+  { en:"Slayer", es:"Slayer", say:"SLAY-er", no:"Never translated." },
+  { en:"Hunter", es:"Hunter · Caza · Cazar", say:"KA-sa" },
+  { en:"Mining", es:"Minería · Minar · Mining", say:"mee-neh-REE-a" },
+  { en:"Smithing", es:"Herrería · Smithing · Forjar", say:"eh-reh-REE-a" },
+  { en:"Fishing", es:"Pesca · Pescar · Fishing", say:"PES-ka" },
+  { en:"Cooking", es:"Cocina · Cocinar · Cooking", say:"ko-SEE-na" },
+  { en:"Firemaking", es:"Firemaking · fm · Quemar troncos", say:"keh-MAR TRON-kos", no:"<i>Hacer fuego</i> in a guide." },
+  { en:"Woodcutting", es:"Tala · wc · Cortar árboles · Leñador", say:"TA-la", no:"<i>Leñador</i> = woodcutter." },
+  { en:"Farming", es:"Farming · Agricultura · Plantar", say:"ah-gree-kool-TOO-ra" },
+  { en:"Sailing", es:"Sailing · Navegación · Navegar", say:"na-beh-ga-SYOHN" },
+  { en:"Members / free-to-play", es:"Members · Miembros · p2p · f2p", say:"MYEM-bros", no:"<i>Membresía</i> = membership. <i>¿Eres member?</i>" },
+  { en:"Ironman / hardcore / ultimate", es:"Iron · Ironman · hc · uim", say:"EYE-ron", no:"All English. <i>Soy iron</i> = I'm an iron." },
+  { en:"Main / alt", es:"Main · Cuenta principal · Alt · Secundaria", say:"KWEN-ta preen-see-PAL" },
+  { en:"Quest", es:"Quest · Misión", say:"mee-SYOHN", no:"<i>La quest</i> or <i>el quest</i>, gender varies. <i>Misión</i> in guides." },
+  { en:"Minigame", es:"Minijuego · Minigame", say:"mee-nee-HWEH-go" },
+  { en:"Raid", es:"Raid · Raidear", say:"ray-deh-AR", t:["spanglish"] },
+  { en:"Dungeon", es:"Mazmorra · Dungeon · Calabozo", say:"mas-MO-ra" },
+  { en:"Spell / spellbook", es:"Hechizo · Libro de hechizos · Spellbook", say:"eh-CHEE-so" },
+  { en:"Item / items", es:"Ítem · Ítems · Objeto · Cosas", say:"EE-tem", no:"<i>Cosas</i> = stuff: <i>perdí mis cosas</i>." },
+  { en:"Drop table / drop rate", es:"Tabla de drops · Rate · Probabilidad", say:"TA-bla deh drops" },
+  { en:"Update / patch", es:"Actualización · Update · Parche", say:"ak-twa-lee-sa-SYOHN" },
+  { en:"Poll", es:"Encuesta · Poll · Votación", say:"en-KWES-ta", no:"<i>Votar</i> = to vote." },
+  { en:"Wiki", es:"La wiki", say:"la WEE-kee" },
+  { en:"Hiscores", es:"Hiscores · Ranking · Tabla", say:"RAN-keen" },
+  { en:"Mod / Jagex", es:"Mod · Jagex · Los mods", say:"mod" },
+]},
+{ id:"help", icon:"🗺️", title:"Questing & getting help", blurb:"<b>¿Me ayudas?</b> opens the door. Directions come back as imperatives: <b>ve, sube, entra, habla con</b>. When in doubt, <i>fíjate en la wiki</i>.", entries:[
+  { en:"Help!", es:"¡Ayuda!", say:"ah-YOO-da" },
+  { en:"Can you help me?", es:"¿Me ayudas?", say:"meh ah-YOO-das", no:"Voseo: <i>¿me ayudás?</i>" },
+  { en:"I need help with…", es:"Necesito ayuda con…", say:"neh-seh-SEE-to ah-YOO-da kon" },
+  { en:"Can I ask you something?", es:"¿Te puedo preguntar algo?", say:"teh PWEH-doh preh-goon-TAR AL-go" },
+  { en:"How do I get to…?", es:"¿Cómo llego a…?", say:"KOH-mo YEH-go ah" },
+  { en:"Where is…?", es:"¿Dónde está…? · ¿Dónde queda…?", say:"DOHN-deh es-TAH", no:"<i>Quedar</i> = to be located." },
+  { en:"Where do I get / buy…?", es:"¿Dónde consigo…? · ¿Dónde compro…?", say:"DOHN-deh kon-SEE-go", no:"<i>Conseguir</i> = get hold of." },
+  { en:"What do I need?", es:"¿Qué necesito?", say:"keh neh-seh-SEE-to" },
+  { en:"Requirements / reqs", es:"Requisitos · Reqs", say:"reh-kee-SEE-tos", no:"<i>¿Qué requisitos pide?</i> = what does it require?" },
+  { en:"Do I need…?", es:"¿Necesito…? · ¿Hace falta…?", say:"AH-seh FAL-ta", no:"<i>Hacer falta</i> = to be needed." },
+  { en:"Is it members-only?", es:"¿Es de members? · ¿Es solo para miembros? · ¿Es p2p?", say:"es deh MEM-bers" },
+  { en:"I'm doing a quest", es:"Estoy haciendo una quest", say:"es-TOY ah-SYEN-doh OO-na kwest" },
+  { en:"Guide", es:"Guía", say:"GEE-a", no:"<i>Guía de la quest</i>." },
+  { en:"Check the wiki", es:"Fíjate en la wiki · Mira la wiki · Busca en la wiki", say:"FEE-ha-teh en la WEE-kee", no:"<i>Fijarse</i> = check, have a look. Voseo: <i>fijate</i>." },
+  { en:"I'm stuck", es:"Estoy atorado · Estoy atascado · Estoy trabado", say:"es-TOY ah-to-RA-doh", no:"<i>Atorado</i> (Mexico, Latin America), <i>atascado</i> (Spain), <i>trabado</i> (Argentina). <i>No sé qué hacer</i> = I don't know what to do." },
+  { en:"How do I…?", es:"¿Cómo hago para…? · ¿Cómo se hace…?", say:"KOH-mo AH-go PA-ra" },
+  { en:"What does this do?", es:"¿Qué hace esto? · ¿Para qué sirve?", say:"keh AH-seh ES-to", no:"<i>¿Para qué sirve?</i> = what's it for?" },
+  { en:"What is this?", es:"¿Qué es esto?", say:"keh es ES-to" },
+  { en:"Which one?", es:"¿Cuál?", say:"kwal" },
+  { en:"Talk to…", es:"Habla con…", say:"AH-bla kon", no:"Voseo: <i>hablá con</i>." },
+  { en:"Use X on Y", es:"Usa X en Y · Usa X con Y", say:"OO-sa" },
+  { en:"Click on…", es:"Haz clic en… · Dale clic a… · Cliquea…", say:"as kleek en", no:"Mexico: <i>pícale</i>. Argentina: <i>hacé clic</i>." },
+  { en:"Go to…", es:"Ve a… · Anda a…", say:"beh ah", no:"Voseo: <i>andá a</i>." },
+  { en:"Go up / go down", es:"Sube · Baja", say:"SOO-beh / BA-ha", no:"Voseo: <i>subí / bajá</i>." },
+  { en:"Enter / get in", es:"Entra · Métete", say:"EN-tra", no:"Voseo: <i>entrá</i>." },
+  { en:"Leave / get out", es:"Sal · Salte · Vete", say:"sal", no:"<i>Vete</i> = go away. Voseo: <i>salí</i>, <i>andate</i>." },
+  { en:"Kill X", es:"Mata a X", say:"MA-ta ah", no:"Voseo: <i>matá</i>." },
+  { en:"Bring / take…", es:"Trae… · Lleva…", say:"TRA-eh / YEH-ba", no:"<i>Traer</i> = bring here, <i>llevar</i> = take along. Voseo: <i>traé, llevá</i>." },
+  { en:"You need…", es:"Necesitas…", say:"neh-seh-SEE-tas", no:"Voseo: <i>necesitás</i>." },
+  { en:"You have to…", es:"Tienes que… · Hay que…", say:"TYEH-nes keh", no:"<i>Hay que</i> = one has to. Voseo: <i>tenés que</i>." },
+  { en:"First… then…", es:"Primero… después… · Luego…", say:"pree-MEH-ro / des-PWES" },
+  { en:"Done / finished", es:"Listo · Terminé · Ya", say:"ter-mee-NEH", no:"<i>Ya</i> = done, already." },
+  { en:"Got it / understood", es:"Entendido · Ya entendí · Va", say:"en-ten-DEE-doh", no:"<i>Va</i> is Mexican for got it / ok." },
+  { en:"Thanks for the help", es:"Gracias por la ayuda", say:"GRAH-syas por la ah-YOO-da" },
+  { en:"I don't know", es:"No sé · Ni idea", say:"noh SEH" },
+  { en:"Maybe", es:"Quizás · Tal vez · Capaz", say:"kee-SAS", no:"<i>Capaz</i> (maybe) is South American: <i>capaz que sí</i>." },
+  { en:"Probably / surely", es:"Probablemente · Seguro · De seguro", say:"seh-GOO-ro" },
+  { en:"I think so / I don't think so", es:"Creo que sí · Creo que no", say:"KREH-o keh see" },
+  { en:"Really? / seriously?", es:"¿En serio? · ¿De verdad?", say:"en SEH-ryo", no:"Mexico: <i>¿neta?</i> Argentina: <i>¿posta?</i> Colombia: <i>¿en serio?</i>" },
+  { en:"That's true / that's a lie", es:"Es verdad · Es cierto · Mentira", say:"es ber-DAD", no:"<i>Mentira</i> alone = no way, you're kidding." },
+  { en:"It's easy / hard", es:"Es fácil · Es difícil", say:"es FA-seel / dee-FEE-seel" },
+  { en:"Long / short", es:"Largo · Corto", say:"LAR-go / KOR-to" },
+  { en:"Reward", es:"Recompensa · Premio", say:"reh-kom-PEN-sa" },
+  { en:"Unlock", es:"Desbloquear", say:"des-blo-keh-AR" },
+  { en:"Achievement", es:"Logro", say:"LO-gro" },
+  { en:"Level requirement", es:"Nivel requerido · Necesitas nivel 60", say:"nee-BEL reh-keh-REE-doh" },
+  { en:"Members' world / f2p world", es:"Mundo de members · Mundo f2p", say:"MOON-doh deh MEM-bers" },
+]},
+
+{ id:"clan", icon:"🏰", title:"Clans, teams & chat", blurb:"A <b>clan hispano</b> is a Spanish-speaking clan. <b>Agrégame</b> adds a friend, <b>por privado</b> takes it to pm, and <b>¿alguien para…?</b> finds a team.", entries:[
+  { en:"Clan", es:"Clan", say:"klan" },
+  { en:"Clan chat / friends chat", es:"Chat del clan · El cc · El fc", say:"chat del klan" },
+  { en:"Can I join the clan?", es:"¿Puedo entrar al clan? · ¿Me aceptan?", say:"PWEH-doh en-TRAR al klan" },
+  { en:"Is there a Spanish-speaking clan?", es:"¿Hay algún clan en español? · ¿Clan hispano?", say:"eye al-GOON klan en es-pa-NYOL" },
+  { en:"Spanish-speaking", es:"Hispano · De habla hispana · Hispanohablante", say:"ees-PA-no", no:"<i>Clan hispano</i>, <i>comunidad hispana</i>." },
+  { en:"Join", es:"Únete · Entra", say:"OO-neh-teh", no:"Voseo: <i>unite</i>." },
+  { en:"Invite me", es:"Invítame · Mándame invitación", say:"een-BEE-ta-meh", no:"Voseo: <i>invitame</i>." },
+  { en:"Add me", es:"Agrégame · Agrégame de amigo", say:"ah-GREH-ga-meh", no:"Voseo: <i>agregame</i>. <i>Te agrego</i> = I'll add you." },
+  { en:"Private message", es:"Mensaje privado · pm · Por privado", say:"por pree-BA-doh", no:"<i>Escríbeme por privado</i> = pm me. <i>Mándame pm</i>." },
+  { en:"Public chat", es:"Chat público · En público", say:"en POO-blee-ko" },
+  { en:"Rank", es:"Rango · Rank", say:"RAN-go", t:["gotcha"], no:"Same word as ranged. <i>Rango en el clan</i> vs <i>entreno rango</i>." },
+  { en:"Leader / owner", es:"Líder · Dueño", say:"LEE-der / DWEH-nyo" },
+  { en:"Admin / mod", es:"Admin · Mod · Moderador", say:"mo-deh-ra-DOR" },
+  { en:"Kick", es:"Kickear · Echar · Expulsar", say:"kee-keh-AR", t:["spanglish"], no:"<i>Echar</i> = throw out. <i>Lo echaron</i> = he got kicked." },
+  { en:"Rules", es:"Reglas", say:"REH-glas" },
+  { en:"Event", es:"Evento", say:"eh-BEN-to" },
+  { en:"Let's team up", es:"¿Nos juntamos? · Hagamos equipo · ¿Team?", say:"nos hoon-TA-mos", no:"<i>Juntarse</i> = get together." },
+  { en:"Anyone for…?", es:"¿Alguien para…? · ¿Alguien quiere…?", say:"AL-gyen PA-ra", no:"<i>¿Alguien para cox?</i> = anyone for CoX?" },
+  { en:"Looking for a team", es:"Busco equipo · Busco team · lfg", say:"BOOS-ko eh-KEE-po" },
+  { en:"We need one more", es:"Falta uno · Necesitamos uno más", say:"FAL-ta OO-no", no:"<i>Faltar</i> = to be missing. <i>Faltan dos</i> = two more." },
+  { en:"We're full", es:"Estamos llenos · Full", say:"es-TA-mos YEH-nos" },
+  { en:"Let's go!", es:"¡Vamos! · ¡Dale! · ¡Vámonos!", say:"BA-mos" },
+  { en:"Everyone ready?", es:"¿Todos listos?", say:"TOH-dos LEES-tos" },
+  { en:"World", es:"Mundo · w", say:"MOON-doh", no:"<i>¿Qué mundo?</i> = what world? <i>Mundo 302</i>." },
+  { en:"Hop worlds", es:"Cambiar de mundo · Hopear · Hopea", say:"ho-peh-AR", t:["spanglish"] },
+  { en:"Which world are you on?", es:"¿En qué mundo estás?", say:"en keh MOON-doh es-TAS" },
+  { en:"Come to world 302", es:"Ven al mundo 302 · Vente al 302", say:"ben al MOON-doh", no:"Voseo: <i>vení al 302</i>." },
+  { en:"Meet at…", es:"Nos vemos en… · Juntémonos en…", say:"nos BEH-mos en", no:"<i>Nos vemos en el GE.</i>" },
+  { en:"I'm at the GE", es:"Estoy en el GE", say:"es-TOY en el heh-EH" },
+  { en:"Do you have Discord?", es:"¿Tienes Discord? · Pásame tu Discord", say:"TYEH-nes DEES-kord", no:"Voseo: <i>¿tenés?</i> <i>Pasar</i> = pass along, send." },
+  { en:"Spam", es:"Spam · Spamear · No spamees", say:"spa-meh-AR", t:["spanglish"] },
+  { en:"Flame / insult", es:"Flamear · Insultar · No insultes", say:"een-sool-TAR", t:["spanglish"] },
+  { en:"Toxic", es:"Tóxico · Es un tóxico", say:"TOK-see-ko" },
+  { en:"Troll", es:"Troll · Trolear · Me están troleando", say:"tro-leh-AR", t:["spanglish"] },
+  { en:"Newbie / new player", es:"Nuevo · Novato · Principiante", say:"NWEH-bo", no:"<i>Soy nuevo</i> = I'm new. Women: <i>nueva</i>." },
+  { en:"Veteran / old-timer", es:"Veterano · De hace años", say:"beh-teh-RA-no" },
+  { en:"Quiet / shh", es:"Silencio · Shh", say:"see-LEN-syo" },
+  { en:"Calm down / chill", es:"Cálmate · Tranquilo · Tranqui · Relax", say:"TRAN-kee", t:["casual"], no:"<i>Tranqui</i> is the universal chill. Voseo: <i>calmate</i>." },
+  { en:"Whatever / never mind", es:"Da igual · Olvídalo · Nada", say:"da ee-GWAL", no:"<i>Da igual</i> = makes no difference. <i>Nada, ya lo encontré</i> = never mind, found it." },
+  { en:"Kidding", es:"Es broma · Era chiste · jk", say:"es BRO-ma" },
+  { en:"Seriously / for real", es:"En serio · De verdad", say:"en SEH-ryo" },
+  { en:"Agreed / ok", es:"De acuerdo · Ok · Va", say:"deh ah-KWER-doh" },
+  { en:"Sure / obviously", es:"Claro · Obvio", say:"KLA-ro", no:"<i>Obvio</i> = obviously, duh." },
+  { en:"Of course", es:"Por supuesto · Claro que sí", say:"por soo-PWES-to" },
+  { en:"No way", es:"Ni loco · Ni de chiste · Nah", say:"nee LO-ko", t:["casual"], no:"<i>Ni loco</i> = not even crazy. Argentina: <i>ni en pedo</i> (vulgar)." },
+  { en:"Let me see / let's see", es:"Déjame ver · A ver", say:"ah ber", no:"<i>A ver</i> is the filler that starts half of all sentences." },
+  { en:"Well… / so…", es:"Bueno… · Pues… · Entonces…", say:"BWEH-no", no:"<i>Pues</i> is Spain and Mexico; <i>bueno</i> everywhere. <i>Entonces</i> = so, then." },
+  { en:"Anyway", es:"En fin · Bueno · Igual", say:"en feen" },
+  { en:"Nickname / in-game name", es:"Nick · Nombre · Usuario", say:"neek", no:"<i>¿Cuál es tu nick?</i>" },
+  { en:"Streamer / YouTuber", es:"Streamer · Youtuber · Hace directos", say:"AH-seh dee-REK-tos", no:"<i>Directo</i> = a live stream (Spain); Latin America says <i>stream</i>." },
+]},
+
+{ id:"glue", icon:"🧩", title:"Small words that hold a sentence together", blurb:"Question words, pronouns and the little connectors. Learn these and you can read most of what scrolls past.", entries:[
+  { en:"What?", es:"¿Qué? · ¿Cómo?", say:"keh", no:"<i>¿Cómo?</i> = pardon? <i>¿Qué?</i> alone can be blunt." },
+  { en:"Who?", es:"¿Quién?", say:"kyen" },
+  { en:"When?", es:"¿Cuándo?", say:"KWAN-doh" },
+  { en:"Where?", es:"¿Dónde?", say:"DOHN-deh" },
+  { en:"Why?", es:"¿Por qué?", say:"por KEH" },
+  { en:"How?", es:"¿Cómo?", say:"KOH-mo" },
+  { en:"How many / how much?", es:"¿Cuántos? · ¿Cuánto?", say:"KWAN-tos" },
+  { en:"Which?", es:"¿Cuál?", say:"kwal" },
+  { en:"Here / there / over there", es:"Aquí · Acá · Ahí · Allá", say:"ah-KEE, ah-KAH, ah-EE, ah-YAH", no:"<i>Acá</i> is Latin American here. <i>Allá</i> = over there." },
+  { en:"This / that", es:"Esto · Eso · Este · Ese", say:"ES-to / EH-so" },
+  { en:"I / you / he / she", es:"Yo · Tú · Él · Ella", say:"yo, too, el, EH-ya", no:"Voseo: <i>vos</i> for you." },
+  { en:"We / you all / they", es:"Nosotros · Ustedes · Ellos", say:"no-SO-tros, oos-TEH-des, EH-yos", no:"Spain says <i>vosotros</i> for you-all; everyone else says <i>ustedes</i>." },
+  { en:"Mine / yours", es:"Mío · Tuyo", say:"MEE-o / TOO-yo" },
+  { en:"Nothing / something / everything", es:"Nada · Algo · Todo", say:"NA-da, AL-go, TOH-doh" },
+  { en:"Nobody / somebody / everybody", es:"Nadie · Alguien · Todos", say:"NA-dyeh, AL-gyen, TOH-dos" },
+  { en:"And / or / but", es:"Y · O · Pero", say:"ee, oh, PEH-ro" },
+  { en:"Because", es:"Porque", say:"POR-keh" },
+  { en:"With / without", es:"Con · Sin", say:"kon / seen" },
+  { en:"For / to", es:"Para · Por", say:"PA-ra / por", no:"<i>Para ti</i> = for you. <i>Por 100k</i> = for 100k." },
+  { en:"If", es:"Si", say:"see", no:"<i>Si</i> without an accent = if; <i>sí</i> = yes. Chat drops the accent, so read from context." },
+  { en:"Then / so", es:"Entonces", say:"en-TON-ses" },
+  { en:"Also / too", es:"También", say:"tam-BYEN" },
+  { en:"Neither / either", es:"Tampoco", say:"tam-PO-ko", no:"<i>Yo tampoco</i> = me neither." },
+  { en:"Only / just", es:"Solo · Nomás", say:"SO-lo", no:"<i>Nomás</i> = just, Latin American: <i>uno nomás</i> = just one." },
+  { en:"Almost", es:"Casi", say:"KA-see" },
+  { en:"Too much / too many", es:"Demasiado · Demasiados", say:"deh-ma-SYA-doh" },
+  { en:"Very / really", es:"Muy · Súper · Bien", say:"mooy", no:"Argentina: <i>re</i> (<i>re bueno</i> = really good). Latin America: <i>bien lejos</i> = really far." },
+  { en:"Good / bad", es:"Bueno · Malo · Bien · Mal", say:"BWEH-no / MA-lo", no:"<i>Bueno/malo</i> describe things; <i>bien/mal</i> describe how it went." },
+  { en:"Big / small", es:"Grande · Pequeño · Chico", say:"GRAN-deh", no:"<i>Chico</i> = small, in Latin America." },
+  { en:"New / old", es:"Nuevo · Viejo", say:"NWEH-bo / BYEH-ho" },
+  { en:"Same / different", es:"Igual · Lo mismo · Diferente · Distinto", say:"ee-GWAL" },
+  { en:"Yes, but…", es:"Sí, pero…", say:"see PEH-ro" },
+  { en:"Me too / me neither", es:"Yo también · Yo tampoco", say:"yo tam-BYEN" },
+  { en:"Already / still / not yet", es:"Ya · Todavía · Todavía no", say:"ya / toh-da-BEE-a" },
+  { en:"Thing / stuff", es:"Cosa · Cosas", say:"KO-sa", no:"Venezuela and the Caribbean: <i>vaina</i>." },
+  { en:"Guy / girl", es:"Chico · Chica · Tipo", say:"CHEE-ko", no:"<i>Tipo</i> = a guy. Argentina: <i>pibe / piba</i>. Mexico: <i>chavo / chava</i>." },
+  { en:"Man! / dude! (interjection)", es:"¡Hombre! · ¡Bro!", say:"OM-breh", t:["casual"] },
+  { en:"Ugh / meh", es:"Uf · Bah · Meh", say:"oof", t:["casual"] },
+  { en:"Oops", es:"Ups · Uy", say:"oops", t:["casual"] },
+]},
+{ id:"verbs", icon:"🔧", title:"Spanglish verbs: the -ear machine", blurb:"Take the English word, add <b>-ear</b>, conjugate like <i>hablar</i>. Every one of these is heard in Spanish OSRS chat; the dictionary word, where one exists, is in the note.", conj:"dropear → yo <b>dropeo</b> · tú <b>dropeas</b> · él <b>dropea</b> · nosotros <b>dropeamos</b> · ellos <b>dropean</b> · past: <b>dropeé</b>, <b>dropeó</b>, <b>dropearon</b> · done: <b>dropeado</b> · doing: <b>dropeando</b> · voseo: vos <b>dropeás</b>", entries:[
+  { en:"to drop (an item, or a boss drops it)", es:"dropear", say:"dro-peh-AR", t:["spanglish"], no:"<i>Tirar</i> / <i>soltar</i> = drop it on the floor. <i>Me dropeó</i> = it dropped for me." },
+  { en:"to loot", es:"lootear", say:"loo-teh-AR", t:["spanglish"] },
+  { en:"to farm", es:"farmear", say:"far-meh-AR", t:["spanglish"] },
+  { en:"to trade", es:"tradear", say:"tra-deh-AR", t:["spanglish"], no:"<i>Intercambiar</i> is the dictionary word; nobody types it." },
+  { en:"to ban", es:"banear", say:"ba-neh-AR", t:["spanglish"], no:"<i>Baneado</i> = banned." },
+  { en:"to flame", es:"flamear", say:"fla-meh-AR", t:["spanglish"], no:"<i>Insultar</i> = to insult." },
+  { en:"to lure", es:"lurear", say:"loo-reh-AR", t:["spanglish"], no:"<i>Lureado</i> = lured. <i>Engañar</i> = to trick." },
+  { en:"to PK", es:"pkear", say:"peh-keh-AR", t:["spanglish"], no:"<i>Pekero</i> = PKer." },
+  { en:"to craft", es:"craftear", say:"kraf-teh-AR", t:["spanglish"], no:"<i>Fabricar</i>, <i>hacer</i>." },
+  { en:"to grind", es:"grindear", say:"green-deh-AR", t:["spanglish"] },
+  { en:"to skill", es:"skillear", say:"skee-leh-AR", t:["spanglish"] },
+  { en:"to camp (a spot, a boss)", es:"campear", say:"kam-peh-AR", t:["spanglish"], no:"<i>Campeando zulrah</i>." },
+  { en:"to rush", es:"rushear", say:"roo-sheh-AR", t:["spanglish"] },
+  { en:"to tank", es:"tankear", say:"tan-keh-AR", t:["spanglish"] },
+  { en:"to splash", es:"splashear", say:"spla-sheh-AR", t:["spanglish"] },
+  { en:"to stake", es:"stakear", say:"stey-keh-AR", t:["spanglish"], no:"<i>Apostar</i> = to bet." },
+  { en:"to flip / merch", es:"flipear · merchear", say:"flee-peh-AR", t:["spanglish"] },
+  { en:"to afk", es:"afkear", say:"af-keh-AR", t:["spanglish"] },
+  { en:"to bot", es:"botear", say:"bo-teh-AR", t:["spanglish"], no:"<i>Botero</i> = botter." },
+  { en:"to lag", es:"laguear · lagear", say:"la-geh-AR", t:["spanglish"], no:"<i>Me laguea</i> = it's lagging on me." },
+  { en:"to log in / log out", es:"loguear · desloguear", say:"lo-geh-AR", t:["spanglish"], no:"Also spelled <i>logear</i>. <i>Conectarse / desconectarse</i> are the proper verbs." },
+  { en:"to spawn / respawn", es:"spawnear · respawnear", say:"res-paw-neh-AR", t:["spanglish"], no:"<i>Aparecer / reaparecer</i>." },
+  { en:"to skip", es:"skipear", say:"skee-peh-AR", t:["spanglish"], no:"<i>Saltar</i> = to skip / jump." },
+  { en:"to mute", es:"mutear", say:"moo-teh-AR", t:["spanglish"], no:"<i>Silenciar</i>." },
+  { en:"to scam", es:"scamear · estafar", say:"ska-meh-AR", t:["spanglish"], no:"<i>Estafar</i> is real Spanish and just as common." },
+  { en:"to report", es:"reportar · reportear", say:"reh-por-TAR", t:["spanglish"], no:"<i>Reportar</i> is real Spanish." },
+  { en:"to cheat", es:"chetear", say:"cheh-teh-AR", t:["spanglish"], no:"<i>Chetado</i> = OP. <i>Hacer trampa</i> = to cheat." },
+  { en:"to hop worlds", es:"hopear", say:"ho-peh-AR", t:["spanglish"], no:"<i>Cambiar de mundo</i>." },
+  { en:"to buff / nerf", es:"buffear · nerfear", say:"ner-feh-AR", t:["spanglish"], no:"<i>Lo nerfearon</i> = they nerfed it." },
+  { en:"to flick (prayer)", es:"flickear", say:"flee-keh-AR", t:["spanglish"] },
+  { en:"to freeze", es:"freezar · freezear", say:"free-SAR", t:["spanglish"], no:"<i>Congelar</i>." },
+  { en:"to teleport", es:"telear · hacer tp", say:"teh-leh-AR", t:["spanglish"], no:"<i>Teletransportarse</i> is the full word." },
+  { en:"to kite", es:"kitear", say:"kee-teh-AR", t:["spanglish"] },
+  { en:"to boost (a level)", es:"boostear", say:"boos-teh-AR", t:["spanglish"] },
+  { en:"to bank", es:"bankear · banquear", say:"ban-keh-AR", t:["spanglish"], no:"<i>Ir al banco</i>." },
+  { en:"to heal", es:"healear · curar", say:"hee-leh-AR", t:["spanglish"], no:"<i>Curar</i> wins in OSRS; <i>healear</i> comes from MOBA players." },
+  { en:"to quest", es:"questear · hacer quests", say:"kwes-teh-AR", t:["spanglish"], no:"Less common; <i>hacer quests</i> is the norm." },
+  { en:"to pickpocket", es:"pickpockear · pickpocketear", say:"peek-po-keh-AR", t:["spanglish"], no:"<i>Robar</i>." },
+  { en:"to alch", es:"alchear", say:"al-cheh-AR", t:["spanglish"], no:"<i>Alcheé todo</i> = I alched everything." },
+  { en:"to note (items)", es:"notear", say:"no-teh-AR", t:["spanglish"], no:"<i>Noteado</i> = noted." },
+  { en:"to fletch", es:"fletchear", say:"flet-cheh-AR", t:["spanglish"] },
+  { en:"to spam", es:"spamear", say:"spa-meh-AR", t:["spanglish"] },
+  { en:"to troll", es:"trolear", say:"tro-leh-AR", t:["spanglish"] },
+  { en:"to hack", es:"hackear", say:"ha-keh-AR", t:["spanglish"], no:"<i>Me hackearon</i> = I got hacked." },
+  { en:"to bug out / glitch", es:"buguear · bugear · glitchear", say:"boo-geh-AR", t:["spanglish"], no:"<i>Se bugueó</i> = it bugged out." },
+  { en:"to crash (the game, or someone's spot)", es:"crashear", say:"kra-sheh-AR", t:["spanglish"], no:"<i>Se crasheó el juego</i>; <i>me crashearon</i> = they crashed my spot." },
+  { en:"to tilt", es:"tiltearse", say:"teel-teh-AR-seh", t:["spanglish"], no:"<i>Estoy tilteado</i> = I'm tilted." },
+  { en:"to spec", es:"specear", say:"speh-seh-AR", t:["spanglish"] },
+  { en:"to safe-spot", es:"safear", say:"sa-feh-AR", t:["spanglish"] },
+  { en:"to raid", es:"raidear", say:"ray-deh-AR", t:["spanglish"] },
+  { en:"to max", es:"maxear", say:"mak-seh-AR", t:["spanglish"] },
+  { en:"to level up", es:"subir · subir de nivel · upear", say:"soo-BEER", no:"<i>Subir</i> is real Spanish and the usual word; <i>upear</i> exists but is rarer." },
+]},
+
+{ id:"region", icon:"🌎", title:"Regional flavour", blurb:"None of this is neutral: these words tell you where a player is from, and a few mean different things in different countries. Listen for them; use them only once you know the room.", entries:[
+  { r:"ES", en:"dude / mate", es:"tío · tía", say:"TEE-o", t:["slang"], no:"Literally uncle. <i>Tío</i> every second sentence = Spain." },
+  { r:"ES", en:"ok / alright", es:"vale", say:"BA-leh", t:["slang"], no:"The Spanish ok. Latin Americans understand it and never say it." },
+  { r:"ES", en:"it's cool / it rocks", es:"mola · qué guay", say:"MO-la", t:["slang"] },
+  { r:"ES", en:"to freak out / be amazed", es:"flipar · flipo", say:"flee-PAR", t:["slang"], no:"<i>Flipo con ese drop</i> = I'm losing it over that drop." },
+  { r:"ES", en:"mate / buddy", es:"colega · chaval", say:"ko-LEH-ga", t:["slang"], no:"<i>Chaval</i> = kid, lad." },
+  { r:"ES", en:"money", es:"pasta", say:"PAS-ta", t:["slang"] },
+  { r:"ES", en:"to work / grind (real life)", es:"currar", say:"koo-RAR", t:["slang"], no:"<i>Estoy currando</i> = I'm at work." },
+  { r:"ES", en:"come on / ok bye", es:"venga", say:"BEN-ga", t:["slang"], no:"<i>Venga, hasta luego</i>." },
+  { r:"ES", en:"no way", es:"qué va", say:"keh ba", t:["slang"] },
+  { r:"ES", en:"like… (filler)", es:"en plan", say:"en plan", t:["slang"] },
+  { r:"ES", en:"f— / damn (all-purpose)", es:"joder", say:"ho-DER", t:["vulgar"], no:"Surprise, anger, joy. Spain's most-used swear." },
+  { r:"ES", en:"whoa / damn", es:"hostia · ostia", say:"OS-tya", t:["vulgar"], no:"<i>Qué hostia</i> = what a hit." },
+  { r:"MX", en:"dude", es:"wey · güey · we", say:"way", t:["slang"], no:"Mexico's dude. <i>Ya wey</i> = come on, man." },
+  { r:"MX", en:"cool", es:"chido · padre", say:"CHEE-doh", t:["slang"], no:"<i>Qué padre</i> = how cool (yes, literally how father)." },
+  { r:"MX", en:"really / for real", es:"neta · ¿neta?", say:"NEH-ta", t:["slang"], no:"<i>La neta</i> = the truth, honestly." },
+  { r:"MX", en:"wow / ok / come on", es:"órale", say:"OH-ra-leh", t:["slang"], no:"Means whatever the tone means." },
+  { r:"MX", en:"no way (mild)", es:"no manches", say:"noh MAN-ches", t:["slang"] },
+  { r:"MX", en:"no way (rude)", es:"no mames", say:"noh MA-mes", t:["vulgar"] },
+  { r:"MX", en:"money", es:"lana · varo · feria", say:"LA-na", t:["slang"] },
+  { r:"MX", en:"work / job", es:"chamba", say:"CHAM-ba", t:["slang"], no:"Also Peru and Central America." },
+  { r:"MX", en:"awesome / badass", es:"chingón", say:"cheen-GOHN", t:["vulgar"], no:"Positive but from a swear. <i>Está chingón</i>." },
+  { r:"MX", en:"hell yes", es:"a huevo", say:"ah WEH-bo", t:["vulgar"] },
+  { r:"MX", en:"damn / bloody", es:"pinche", say:"PEEN-cheh", t:["vulgar"], no:"<i>Pinche lag</i> = bloody lag." },
+  { r:"MX", en:"ok / deal", es:"sale · va · órale", say:"SA-leh", t:["slang"] },
+  { r:"MX", en:"bummer / damn", es:"chale", say:"CHA-leh", t:["slang"] },
+  { r:"MX", en:"bro", es:"carnal · compa", say:"kar-NAL", t:["slang"], no:"<i>Compa</i> = buddy; also Central America." },
+  { r:"MX", en:"in a bit (maybe never)", es:"ahorita", say:"ah-oh-REE-ta", t:["slang","gotcha"] },
+  { r:"AR", en:"hey / dude", es:"che", say:"cheh", t:["slang"], no:"Argentina and Uruguay. <i>Che, ¿vendés?</i>" },
+  { r:"AR", en:"dude / idiot", es:"boludo · bolu", say:"bo-LOO-doh", t:["vulgar"], no:"Between friends it is dude; from a stranger it is an insult. Uruguay too." },
+  { r:"AR", en:"ok / go on", es:"dale", say:"DA-leh", t:["slang"], no:"Spread across all of South America." },
+  { r:"AR", en:"cool", es:"copado · zarpado", say:"ko-PA-doh", t:["slang"], no:"<i>Zarpado</i> = wild, crazy good." },
+  { r:"AR", en:"money", es:"guita · plata", say:"GEE-ta", t:["slang"] },
+  { r:"AR", en:"for real", es:"posta", say:"POS-ta", t:["slang"] },
+  { r:"AR", en:"drama / chaos", es:"bardo", say:"BAR-doh", t:["slang"], no:"<i>Hacer bardo</i> = stir things up." },
+  { r:"AR", en:"really (intensifier)", es:"re", say:"reh", t:["slang"], no:"<i>Re bueno</i>, <i>re caro</i>. Rioplatense signature." },
+  { r:"AR", en:"legend / boss", es:"capo · crack", say:"KA-po", t:["slang"] },
+  { r:"AR", en:"kid / guy", es:"pibe · piba", say:"PEE-beh", t:["slang"] },
+  { r:"AR", en:"to imagine things / trip", es:"flashear", say:"fla-sheh-AR", t:["slang"], no:"<i>Flasheaste</i> = you're imagining it." },
+  { r:"AR", en:"no way", es:"ni en pedo · ni ahí", say:"nee en PEH-doh", t:["vulgar"], no:"<i>Ni ahí</i> is the clean version." },
+  { r:"AR", en:"cheater / OP / posh", es:"cheto", say:"CHEH-to", t:["slang"] },
+  { r:"AR", en:"you (voseo)", es:"vos · tenés · querés · vení", say:"bos", t:["gotcha"], no:"<i>Vos</i> replaces <i>tú</i> and the verb stress moves to the end. Also Uruguay, Paraguay, and much of Central America." },
+  { r:"CO", en:"mate / bro", es:"parce · parcero", say:"PAR-seh", t:["slang"] },
+  { r:"CO", en:"cool", es:"bacano · chévere", say:"ba-KA-no", t:["slang"], no:"<i>Chévere</i> is shared with Venezuela and the Caribbean." },
+  { r:"CO", en:"what's up", es:"¿qué más? · ¿quiubo?", say:"keh mas", t:["slang"] },
+  { r:"CO", en:"ok / done", es:"listo", say:"LEES-to", t:["slang"] },
+  { r:"CO", en:"right away / let's do it", es:"de una", say:"deh OO-na", t:["slang"] },
+  { r:"CO", en:"awesome", es:"una chimba · qué chimba", say:"CHEEM-ba", t:["vulgar"], no:"Also means the opposite depending on phrasing; safest to just recognise it." },
+  { r:"CO", en:"tough / awesome", es:"berraco · verraco", say:"beh-RA-ko", t:["slang"] },
+  { r:"CO", en:"dude (between friends)", es:"marica", say:"ma-REE-ka", t:["vulgar","gotcha"], no:"A slur almost everywhere else; among Colombian and Venezuelan friends it is dude. Do not try it yourself." },
+  { r:"CO", en:"you (polite, but everyday)", es:"usted", say:"oos-TED", t:["gotcha"], no:"Colombians use <i>usted</i> even with friends. It is not coldness." },
+  { r:"CL", en:"dude / idiot", es:"weón · wn · weá", say:"weh-OHN", t:["vulgar"], no:"<i>Weá</i> = thing, stuff, anything. Chile's grammar runs on these two." },
+  { r:"CL", en:"you know? / get it?", es:"cachai", say:"ka-CHAI", t:["slang"], no:"<i>Cachar</i> = to get, understand." },
+  { r:"CL", en:"cool", es:"bacán · la raja", say:"ba-KAN", t:["slang"], no:"<i>La raja</i> is stronger and ruder." },
+  { r:"CL", en:"(emphasis)", es:"po · sí po · ya po", say:"po", t:["slang"], no:"From <i>pues</i>. <i>Sí po</i> = well yes." },
+  { r:"CL", en:"boring", es:"fome", say:"FO-meh", t:["slang"] },
+  { r:"CL", en:"right away", es:"al tiro", say:"al TEE-ro", t:["slang"] },
+  { r:"CL", en:"intense / crazy", es:"cuático", say:"KWA-tee-ko", t:["slang"] },
+  { r:"CL", en:"a thousand (pesos, or gp)", es:"luca · lucas", say:"LOO-ka", t:["slang"], no:"<i>10 lucas</i> = 10k. Some Chilean players carry it into gp." },
+  { r:"CL", en:"damn / whoa", es:"conchetumare · ctm", say:"kon-cheh-too-MA-reh", t:["vulgar"] },
+  { r:"VE", en:"dude", es:"chamo · chama", say:"CHA-mo", t:["slang"] },
+  { r:"VE", en:"mate / buddy", es:"pana", say:"PA-na", t:["slang"], no:"Also Ecuador, Puerto Rico, Dominican Republic." },
+  { r:"VE", en:"cool / fine", es:"chévere · fino", say:"CHEH-beh-reh", t:["slang"] },
+  { r:"VE", en:"thing / stuff", es:"vaina", say:"BAI-na", t:["slang"], no:"<i>¿Qué es esa vaina?</i> = what's that thing? Also Colombia, Caribbean." },
+  { r:"VE", en:"a lot", es:"burda · burda de", say:"BOOR-da", t:["slang"] },
+  { r:"VE", en:"annoying", es:"ladilla · qué ladilla", say:"la-DEE-ya", t:["vulgar"] },
+  { r:"PE", en:"mate", es:"causa · pata", say:"KOW-sa", t:["slang"] },
+  { r:"PE", en:"(filler, = pues)", es:"pe · ya pe", say:"peh", t:["slang"] },
+  { r:"PE", en:"right away", es:"al toque", say:"al TO-keh", t:["slang"] },
+  { r:"PE", en:"wow", es:"asu · asu mare", say:"ah-SOO", t:["slang"] },
+  { r:"PE", en:"you get it?", es:"¿manyas?", say:"MAN-yas", t:["slang"] },
+  { r:"CA", en:"dude (Costa Rica)", es:"mae", say:"mah-eh", t:["slang"], no:"<i>Pura vida</i> = hi, bye, all good." },
+  { r:"CA", en:"dude / idiot (Honduras, Nicaragua)", es:"maje", say:"MA-heh", t:["slang"] },
+  { r:"CA", en:"what's up (Dominican Republic)", es:"klk · qué lo que", say:"keh lo keh", t:["slang"], no:"<i>Diablo</i> = wow." },
+  { r:"CA", en:"mate / what's up (Cuba)", es:"asere · ¿qué bolá?", say:"ah-SEH-reh", t:["slang"] },
+  { r:"CA", en:"awesome (Puerto Rico)", es:"brutal · wepa", say:"broo-TAL", t:["slang"], no:"<i>Corillo</i> = crew, the friend group." },
+  { r:"CA", en:"dude (Guatemala, El Salvador)", es:"vos · cerote · maje", say:"seh-RO-teh", t:["vulgar"], no:"<i>Cerote</i> is rude-affectionate in Guatemala, plain rude elsewhere." },
+]},
+];
+const REGIONS = { ES:"Spain", MX:"Mexico", AR:"Argentina & Uruguay", CO:"Colombia", CL:"Chile", VE:"Venezuela", PE:"Peru", CA:"Central America & the Caribbean" };
+</script>
+<script>
+(() => {
+  const $ = (s, el) => (el || document).querySelector(s);
+  const sheet = $("#sheet"), side = $("#side"), none = $("#none"), q = $("#q"), toast = $("#toast");
+  const TAGS = { casual:"casual", slang:"slang", spanglish:"spanglish", vulgar:"vulgar", formal:"formal", gotcha:"gotcha" };
+  const fold = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  // how a phrase is actually typed in game chat: no accents, no ¿ ¡
+  const chat = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[¿¡]/g, "");
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const store = (k, v) => { try { v === undefined ? 0 : localStorage.setItem("lingo:" + k, JSON.stringify(v)); return JSON.parse(localStorage.getItem("lingo:" + k)); } catch (e) { return null; } };
+
+  const state = { q:"", f:"all", say: store("say") !== false, chat: store("chat") === true, vulgar: store("vulgar") === true };
+  $("#tog-say").checked = state.say; $("#tog-chat").checked = state.chat; $("#tog-vulgar").checked = state.vulgar;
+  document.body.classList.toggle("nosay", !state.say);
+
+  // ---- render once; filtering toggles rows -----------------------------
+  const rows = [];   // { tr, sec, hay, tags, vulgar, regional }
+  const secs = [];   // { id, el, cnt, link, n }
+  SECTIONS.forEach(sec => {
+    const el = document.createElement("section");
+    el.className = "sec panel"; el.id = "sec-" + sec.id;
+    let html = `<h2><span>${sec.icon}</span>${esc(sec.title)}<span class="cnt"></span></h2>`;
+    if (sec.blurb) html += `<p class="blurb">${sec.blurb}</p>`;
+    if (sec.conj) html += `<p class="conj">${sec.conj}</p>`;
+    if (sec.notes) html += `<ul class="notes">${sec.notes.map(n => `<li>${n}</li>`).join("")}</ul>`;
+    if (sec.entries) html += `<table><thead><tr><th class="en">English</th><th class="es">Español</th><th class="no">Notes</th></tr></thead><tbody></tbody></table>`;
+    el.innerHTML = html;
+    sheet.insertBefore(el, none);
+    const link = document.createElement("a");
+    link.href = "#sec-" + sec.id;
+    link.innerHTML = `<span><span class="ico">${sec.icon}</span>${esc(sec.title)}</span><span class="n"></span>`;
+    side.appendChild(link);
+    const S = { id:sec.id, el, cnt: $(".cnt", el), link, n:0, notes: !!sec.notes };
+    secs.push(S);
+    if (!sec.entries) return;
+    const tb = $("tbody", el);
+    let lastR = null;
+    sec.entries.forEach(e => {
+      if (e.r && e.r !== lastR) {
+        lastR = e.r;
+        const g = document.createElement("tr"); g.className = "grp"; g.dataset.r = e.r;
+        g.innerHTML = `<td colspan="3">${esc(REGIONS[e.r] || e.r)}<small>${e.r}</small></td>`;
+        tb.appendChild(g);
+      }
+      const tags = e.t || [];
+      const tr = document.createElement("tr"); tr.className = "e";
+      const vs = e.es.split(" · ");
+      const esHtml = vs.map((v, i) => `<span class="v" data-v="${esc(v)}">${esc(v)}</span>` + (i < vs.length - 1 ? `<span class="sep">·</span>` : "")).join("")
+        + (e.say ? `<span class="say">${esc(e.say)}</span>` : "");
+      const tagHtml = (e.r ? `<span class="tag r">${e.r}</span>` : "") + tags.filter(t => TAGS[t]).map(t => `<span class="tag ${t}">${t}</span>`).join("");
+      tr.innerHTML = `<td class="en">${esc(e.en)}</td><td class="es">${esHtml}</td><td class="no">${tagHtml}${e.no || ""}</td>`;
+      tb.appendChild(tr);
+      rows.push({ tr, sec:S, hay: fold([e.en, e.es, e.say || "", (e.no || "").replace(/<[^>]+>/g, ""), e.r ? (REGIONS[e.r] || "") : ""].join(" | ")),
+        tags, vulgar: tags.includes("vulgar"), regional: !!e.r || tags.includes("regional"),
+        neutral: !e.r && !tags.some(t => t === "slang" || t === "spanglish" || t === "vulgar" || t === "regional") });
+    });
+  });
+  $("#stat-sec b").textContent = secs.length;
+
+  // ---- chat spelling: swap the visible text of every variant -----------
+  function applyChat() {
+    document.querySelectorAll(".v").forEach(v => { v.textContent = state.chat ? chat(v.dataset.v) : v.dataset.v; });
+  }
+
+  // ---- filter -----------------------------------------------------------
+  function apply() {
+    const terms = fold(state.q).split(/\s+/).filter(Boolean);
+    let shown = 0;
+    secs.forEach(s => { s.n = 0; });
+    rows.forEach(r => {
+      let ok = true;
+      if (r.vulgar && !state.vulgar) ok = false;
+      if (ok && state.f === "neutral" && !r.neutral) ok = false;
+      if (ok && state.f === "slang" && !(r.tags.includes("slang") || r.tags.includes("casual") || r.vulgar)) ok = false;
+      if (ok && state.f === "spanglish" && !r.tags.includes("spanglish")) ok = false;
+      if (ok && state.f === "regional" && !r.regional) ok = false;
+      if (ok && terms.length && !terms.every(t => r.hay.includes(t))) ok = false;
+      r.tr.hidden = !ok;
+      r.tr.classList.toggle("hit", ok && terms.length > 0);
+      if (ok) { shown++; r.sec.n++; }
+    });
+    // region group headers follow their rows
+    document.querySelectorAll("tr.grp").forEach(g => {
+      let t = g.nextElementSibling, any = false;
+      while (t && !t.classList.contains("grp")) { if (!t.hidden) { any = true; break; } t = t.nextElementSibling; }
+      g.hidden = !any;
+    });
+    const searching = terms.length > 0 || state.f !== "all";
+    secs.forEach(s => {
+      const show = s.notes ? !searching : s.n > 0;
+      s.el.hidden = !show;
+      s.cnt.textContent = s.notes ? "" : s.n;
+      $(".n", s.link).textContent = s.notes ? "" : s.n;
+      s.link.classList.toggle("dim", !show);
+    });
+    none.style.display = shown === 0 ? "block" : "none";
+    $("#stat-shown b").textContent = shown;
+  }
+
+  // ---- wiring -----------------------------------------------------------
+  q.addEventListener("input", () => { state.q = q.value; apply(); });
+  $("#filt").addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    state.f = b.dataset.f;
+    document.querySelectorAll("#filt button").forEach(x => x.classList.toggle("on", x === b));
+    apply();
+  });
+  $("#tog-say").addEventListener("change", ev => { state.say = ev.target.checked; store("say", state.say); document.body.classList.toggle("nosay", !state.say); });
+  $("#tog-chat").addEventListener("change", ev => { state.chat = ev.target.checked; store("chat", state.chat); applyChat(); });
+  $("#tog-vulgar").addEventListener("change", ev => { state.vulgar = ev.target.checked; store("vulgar", state.vulgar); apply(); });
+  document.addEventListener("keydown", ev => {
+    if (ev.key === "/" && document.activeElement !== q) { ev.preventDefault(); q.focus(); q.select(); }
+    else if (ev.key === "Escape" && document.activeElement === q) { q.value = ""; state.q = ""; apply(); q.blur(); }
+  });
+
+  // click a Spanish variant to copy it (chat spelling if that toggle is on)
+  let toastT = 0;
+  function say(msg) { toast.textContent = msg; toast.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => toast.classList.remove("show"), 1400); }
+  sheet.addEventListener("click", ev => {
+    const v = ev.target.closest(".v"); if (!v) return;
+    const text = state.chat ? chat(v.dataset.v) : v.dataset.v;
+    const done = () => { v.classList.add("copied"); setTimeout(() => v.classList.remove("copied"), 600); say("copied: " + text); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => fallback(text, done));
+    else fallback(text, done);
+  });
+  function fallback(text, done) {
+    const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { say("select & copy: " + text); }
+    document.body.removeChild(ta);
+  }
+
+  // ?q= in the URL pre-fills the search, so a phrase can be linked
+  const u = new URLSearchParams(location.search);
+  if (u.get("q")) { q.value = u.get("q"); state.q = q.value; }
+  applyChat();
+  apply();
+})();
+</script>
+</body>
+</html>

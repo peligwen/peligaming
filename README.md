@@ -142,6 +142,7 @@ next-best pick at each call when those aren't there.
 | --- | --- | --- |
 | RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer |
 | RuneScape | Gielinor Crafting Web | Every craftable item as an explorable 3D recipe web, with per-skill xp lenses |
+| RuneScape | Lingo Cheat Sheet | OSRS Spanish for English speakers: a searchable phrasebook of neutral international Spanish for trading, bossing, the wildy, skilling and clan chat, the game's Spanglish verbs, chat shorthand, and the regional slang that tells you where a player is from; click a phrase to copy it, or flip to chat spelling |
 | Fortnite | Tactical Terrain | The island in 3D — sightlines, dead ground, cover |
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
 | Skyrim | Alchemy Lab | Best-value potions from your ingredient stock |
