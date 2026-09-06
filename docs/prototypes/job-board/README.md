@@ -2,7 +2,10 @@
 
 **Outcome: A, the Notice Board, was chosen and ported into the tool**
 (`tools-src/runescape/job-board.jsx`). B and C stay here as the record of
-the directions considered.
+the directions considered. A later revision kept A's paper-on-wood board but
+replaced the grid of notices with one parchment ledger — C's sortable table,
+its columns now the rates a trainee compares (xp/hr, gp/hr, gp/xp, afk) —
+and the single training focus with a tick-list of professions.
 
 Three click-through prototypes for revamping the Flip Desk's Job Board, built
 against one shared mock dataset so the comparison is about layout and
