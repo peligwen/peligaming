@@ -1,0 +1,218 @@
+// The Chaos Elemental — west of the Rogues' Castle. See docs/sand-table/AUTHORING.md.
+SAND_TABLE.register({
+  id: "chaos-elemental",
+  name: "Chaos Elemental",
+  aka: ["Chaos Ele", "the cloud"],
+  group: "wilderness",
+  region: "West of the Rogues' Castle, level 50 Wilderness (multi)",
+  team: "1 (any number can attack it)",
+  difficulty: 2,
+  kc: "Chaos Elemental",
+  tagline: "Three attacks that all look alike, a teleport, and a disarm that a full inventory switches off — in the deepest multi in the game, so bring nothing you can't lose.",
+  release: "2006",
+
+  requirements: [
+    { kind: "other", text: "Members" },
+    { kind: "skill", skill: "Prayer", level: 37, note: "Protect from Magic — its most common damage type" },
+    { kind: "other", text: "A full inventory of things that leave something behind (pies, curry, Guthix rest) if you want Madness never to fire" },
+  ],
+  recommended: [
+    { kind: "skill", skill: "Attack", level: 80, note: "if you melee (flinching or the safe spot)" },
+    { kind: "skill", skill: "Strength", level: 80 },
+    { kind: "skill", skill: "Ranged", level: 75, note: "if you range it" },
+    { kind: "skill", skill: "Defence", level: 70, note: "d'hide against ranged and magic, players included" },
+    { kind: "skill", skill: "Hitpoints", level: 70 },
+    { kind: "skill", skill: "Prayer", level: 70, note: "Protect Item costs points too; keep enough for it when a player arrives" },
+  ],
+
+  expect: {
+    overview: "The Chaos Elemental is a level 305 cloud with 250 hitpoints that wanders the field west of the Rogues' Castle at level 50 Wilderness. Its main attack is one projectile that can be melee, ranged or magic damage and looks the same every time, so you hold Protect from Magic (the most common) and eat the rest. Its two specials do no damage: Confusion throws you a few tiles away, Madness unequips up to four things, weapon first — unless your inventory is full, in which case it cannot. The boss is easy. The place is not: multi, no teleports, and the castle next door is where PKers scout from.",
+    mechanics: [
+      { name: "Discord", cue: "A stream of three colours flies at you — every time, whatever the damage type", response: "Protect from Magic and leave it there: magic is the most frequent type, ranged and melee hits get through and you eat them. Up to 28. D'hide covers two of the three", style: "magic", danger: "med", scene: "field" },
+      { name: "Confusion", cue: "A red streak, and you're standing somewhere else", response: "It does no damage. Walk back — off your line, and out of a safe spot, is the only cost. The flinch and safe-spot methods break here", style: "typeless", danger: "low", scene: "field" },
+      { name: "Madness (disarm)", cue: "Your weapon (and up to three more pieces) is suddenly in your inventory", response: "Re-equip before the next attack. Or prevent it: with no free inventory slot it cannot happen — summer pies, curry, Guthix rest, vial smashing off", style: "typeless", danger: "med", scene: "field" },
+      { name: "Respawn window", cue: "It dies; 14 ticks (8.4 s) later it is back", response: "Loot fast. It respawns too quickly to hop between kills comfortably, and out of combat is when you're easiest to catch", style: "none", danger: "low", scene: "field" },
+      { name: "A player at the castle", cue: "A name appears near the Rogues' Castle — they hop worlds in there and your projectiles are visible from far away", response: "Level 50 multi: no teleport. Obelisk south-east of the castle (random destination unless hard diary; useless if teleblocked); the castle's doors and stairs to break line of sight; the Resource Area west (7,500 coins they may not have); the magic axe hut north-west (lockpick, singles); the Deserted Keep lever with a knife for the web", style: "none", danger: "high", scene: "field" },
+    ],
+    notes: [
+      "It is immune to venom — anything that would venom it poisons it instead. Air spells get a 50% bonus.",
+      "Its attacks follow you through walls and land wherever you are.",
+      "The flinch: aggro it, stand behind one of the dead trees at the south-west tip of the castle, hit once when its health bar vanishes, step back. Attack speed doesn't matter, so a slow heavy weapon is ideal.",
+      "The safe spot: a north–south line of tiles by the Resource Area fence is as far west as it can attack. Lure it south along the fence, then north, then step one tile west of the line and it never hits back. Confusion can throw you past the line and break it.",
+      "Killing it is a hard Wilderness Diary task.",
+    ],
+  },
+
+  bring: {
+    setups: [
+      {
+        name: "Ranged (black d'hide — what most people risk)",
+        style: "ranged",
+        worn: {
+          head: "Archer helm", cape: "Ava's accumulator", neck: "Amulet of glory", ammo: "Diamond bolts (e)",
+          weapon: "Rune crossbow", body: "Black d'hide body", shield: "Book of law", legs: "Black d'hide chaps",
+          hands: "Black d'hide vambraces", feet: "Snakeskin boots", ring: "Explorer's ring 4",
+        },
+        inventory: [
+          { item: "Ranging potion(4)", qty: 1 },
+          { item: "Blighted super restore(4)", qty: 3, why: "Protect from Magic all fight, and prayer is Protect Item too" },
+          { item: "Looting bag", qty: 1 },
+          { item: "Antidote++(4)", qty: 1, why: "it poisons you (never venom), and players venom you" },
+          { item: "Summer pie", qty: 22, why: "22 healing in two bites and the dish stays behind: a full inventory means Madness never fires" },
+        ],
+        notes: [
+          "Turn vial smashing off so empty vials keep the inventory full. Nothing worn is worth more than a couple of kills.",
+          "The crossbow, the glory and the body are the three you keep if you never get skulled — turn PK skull prevention on.",
+        ],
+      },
+      {
+        name: "Melee (flinching behind the tree)",
+        style: "melee",
+        worn: {
+          head: "Helm of neitiznot", cape: "Obsidian cape", neck: "Amulet of glory", weapon: "Abyssal whip",
+          body: "Black d'hide body", shield: "Rune defender", legs: "Black d'hide chaps",
+          hands: "Barrows gloves", feet: "Dragon boots", ring: "Berserker ring (i)",
+        },
+        inventory: [
+          { item: "Super combat potion(4)", qty: 1 },
+          { item: "Blighted super restore(4)", qty: 2 },
+          { item: "Looting bag", qty: 1 },
+          { item: "Antidote++(4)", qty: 1 },
+          { item: "Summer pie", qty: 23, why: "the dish blocks the disarm; you barely eat while flinching" },
+        ],
+        notes: [
+          "Flinching ignores attack speed, so a slower hard-hitting weapon (a godsword, a dragon warhammer) is better if it's one of your three. The whip is the cheap version.",
+        ],
+      },
+      {
+        name: "Melee (Verac's — fast kills, one piece at risk)",
+        style: "melee",
+        worn: {
+          head: "Verac's helm", cape: "Obsidian cape", neck: "Amulet of glory", weapon: "Verac's flail",
+          body: "Verac's brassard", shield: "Rune defender", legs: "Verac's plateskirt",
+          hands: "Barrows gloves", feet: "Dragon boots", ring: "Berserker ring (i)",
+        },
+        inventory: [
+          { item: "Super combat potion(4)", qty: 1 },
+          { item: "Blighted super restore(4)", qty: 3 },
+          { item: "Looting bag", qty: 1 },
+          { item: "Antidote++(4)", qty: 1 },
+          { item: "Summer pie", qty: 22 },
+        ],
+        notes: [
+          "Four Verac's pieces means one is always outside your three protected items; a Smite loses it. Barrows gear is protected by its broken value, so check Items Kept on Death before you commit.",
+        ],
+      },
+    ],
+    musts: [
+      { item: "Summer pie", why: "Food that leaves an item is the whole counter to Madness. A full inventory cannot be disarmed." },
+      { item: "Antidote++(4)", why: "It poisons on hit, and every PKer's weapon here venoms." },
+    ],
+    notes: [
+      "Check Items Kept on Death with 'Wilderness beyond level 20' ticked. Three items unskulled, four with Protect Item, none if skulled. Never bring anything you'd mind seeing in a PKer's loot.",
+      "Black d'hide is the standard: defence against its ranged and magic, and against the barrages that actually kill you.",
+      "A sack of potatoes or a basket of fruit is the old trick: empty it after each bite to refill the slot, or just before Madness lands.",
+      "A Falador shield 4 restores prayer once for free — a last Protect Item when the restores are gone.",
+    ],
+  },
+
+  route: [
+    "Hard Wilderness Diary: a Wilderness Obelisk (house, or outside Ferox Enclave) set to level 50, then run west past the Rogues' Castle. No items needed, shortest walk.",
+    "Elite diary: the Wilderness sword's Fountain of Rune teleport, then west.",
+    "Annakarl (tablet or 90 Magic): run north-west to the gate in the fence, then north-east.",
+    "From Edgeville with a knife: the lever south of the bank to the Deserted Keep, cut the web, then east past the Resource Area and the Scorpion Pit. The Mage Arena lever works the same way with two webs.",
+  ],
+  loot: {
+    uniques: [
+      { item: "Dragon pickaxe", note: "1/256 — most of the value in the table" },
+      { item: "Dragon 2h sword", note: "2/128" },
+      { item: "Pet Chaos Elemental", note: "1/300 — three times the Chaos Fanatic's rate" },
+    ],
+    notes: [
+      "Elite clue 1/200 (1/100 with a ring of wealth (i)); looting bag 1/3 of kills; stacks of chaos runes.",
+      "People come for the pet, the pickaxe and the diary task, not the gp per hour.",
+    ],
+  },
+  tips: [
+    "You are always taking some damage unless you flinch or safe-spot it: the projectile is random and only one prayer works at a time. Maximise healing, minimise risk.",
+    "Leave exactly one slot free if you want it to waste attacks: Madness then only takes one item (your weapon) and does no damage, replacing a Discord that could have hit 28.",
+    "PKers hop at the castle with low-level scouts. Projectiles show beyond normal view distance, so a fight in progress is visible from there.",
+    "If you're caught and it's going badly: stop eating once you can't keep Protect Item up. Every hit you tank is another Smite tick towards losing the fourth item. The Demonic Ruins to the south give a prayer point every 3 seconds.",
+    "You cannot use the obelisk, the levers, or enter the Enclave while teleblocked (5 minutes; 2.5 if Protect from Magic was on when it landed).",
+  ],
+
+  wiki: {
+    page: "Chaos Elemental",
+    monsters: [{ page: "Chaos Elemental", label: "Chaos Elemental" }],
+  },
+
+  scenes: [
+    {
+      id: "field",
+      name: "West of the Rogues' Castle",
+      subtitle: "one kill at range: Discord in all three flavours, Confusion, Madness — then the respawn window and a PKer from the castle",
+      arena: {
+        w: 20, h: 16, floor: "grass", walls: false,
+        features: [
+          { kind: "block", x: 16, y: 5, w: 4, h: 8, label: "Rogues' Castle" },
+          { kind: "pillar", x: 15, y: 3, height: 3, label: "Dead tree (flinch spot)" },
+          { kind: "pillar", x: 14, y: 2, height: 3 },
+          { kind: "block", x: 8, y: 11, w: 2, h: 2, label: "Tree" },
+          { kind: "marker", x: 18, y: 1, label: "→ Obelisk (lvl 50), SE of the castle", color: "#7ad" },
+          { kind: "marker", x: 0, y: 8, label: "→ Resource Area / Deserted Keep lever (W)", color: "#7ad" },
+          { kind: "marker", x: 1, y: 14, label: "→ Magic axe hut (NW)", color: "#7ad" },
+          { kind: "marker", x: 3, y: 0, label: "Safe-spot line runs N–S near the fence", color: "#ff0" },
+        ],
+      },
+      actors: [
+        { id: "boss", kind: "boss", label: "Chaos Elemental", shape: "orb", size: 3, x: 9, y: 7, color: "#2c2440", hp: 250 },
+      ],
+      player: { x: 9, y: 3 },
+      length: 70,
+      script: [
+        { t: 0, type: "phase", name: "Discord — three colours, one prayer" },
+        { t: 0, type: "note", text: "The cloud, west of the castle, level 50 multi. You stand three tiles off with a crossbow, a full inventory of pies, and Protect from Magic up — it stays up the whole kill." },
+        { t: 0, type: "pray", pray: "magic" },
+        { t: 1, type: "move", actor: "player", to: [9, 4] },
+        { t: 2, type: "note", text: "Everything it throws looks the same: a stream of three colours. It might be magic, ranged or melee damage and you cannot tell which. Magic is the most common, so that's the prayer, and the other two you eat." },
+        { t: 3, type: "attack", from: "boss", style: "magic", max: 28, hit: 2, label: "Discord", cue: "the three-colour stream — this one is magic" },
+        { t: 3, type: "note", text: "Discord. Up to 28 if the type gets through; a zero if it's magic and you're praying it." },
+        { t: 7, type: "attack", from: "boss", style: "magic", max: 28, hit: 2, label: "Discord", cue: "the same stream" },
+        { t: 11, type: "attack", from: "boss", style: "typeless", max: 0, hit: 2, pray: null, label: "Confusion", cue: "a red streak" },
+        { t: 11, type: "note", text: "Confusion: a red streak and no damage — it just teleports you a few tiles away. If you were flinching or on the safe-spot line, you're not any more." },
+        { t: 13, type: "move", actor: "player", to: [5, 2] },
+        { t: 14, type: "note", text: "You landed off to the side. Walk back to your three-tile gap before it floats after you — it wanders when it isn't in reach." },
+        { t: 15, type: "move", actor: "player", to: [9, 4] },
+        { t: 17, type: "attack", from: "boss", style: "ranged", pray: "magic", max: 28, hit: 2, label: "Discord (ranged)", cue: "identical stream — this one was ranged damage" },
+        { t: 17, type: "note", text: "Same projectile, ranged damage: it got through your Protect from Magic. That's the cost of this fight. Don't switch — the next one is probably magic again — eat it and carry on." },
+        { t: 21, type: "attack", from: "boss", style: "magic", max: 28, hit: 2, label: "Discord", cue: "the stream" },
+        { t: 25, type: "attack", from: "boss", style: "typeless", max: 0, hit: 2, pray: null, label: "Madness (disarm)", cue: "its other special — nothing visible lands, but your weapon is in your bag" },
+        { t: 25, type: "note", text: "Madness: up to four worn items go into your inventory, weapon first — if there's room. With 28 things in the bag there is no room and nothing happens. This run left one slot free: the crossbow pops off." },
+        { t: 27, type: "note", text: "Re-equip before its next attack. Leaving that one slot free on purpose is a real tactic: Madness does no damage and replaces a Discord that could have hit 28." },
+        { t: 29, type: "attack", from: "boss", style: "magic", max: 28, hit: 2, label: "Discord", cue: "the stream" },
+        { t: 33, type: "attack", from: "boss", style: "melee", pray: "magic", max: 28, hit: 2, label: "Discord (melee)", cue: "the stream again — melee damage, from three tiles away" },
+        { t: 33, type: "note", text: "Melee damage from range — yes, that happens here. Still Protect from Magic. D'hide's high ranged and magic defence is why you're wearing it and not the platebody." },
+        { t: 37, type: "attack", from: "boss", style: "magic", max: 28, hit: 2, label: "Discord", cue: "the stream" },
+        { t: 41, type: "attack", from: "boss", style: "typeless", max: 0, hit: 2, pray: null, label: "Confusion", cue: "red streak" },
+        { t: 43, type: "move", actor: "player", to: [12, 3] },
+        { t: 45, type: "move", actor: "player", to: [9, 4] },
+        { t: 47, type: "attack", from: "boss", style: "magic", max: 28, hit: 2, label: "Discord", cue: "the stream" },
+        { t: 51, type: "attack", from: "boss", style: "magic", max: 28, hit: 2, label: "Discord", cue: "the stream" },
+        { t: 54, type: "hp", actor: "boss", pct: 0 },
+        { t: 54, type: "anim", actor: "boss", kind: "die" },
+        { t: 54, type: "msg", text: "Your Chaos Elemental kill count is: 1." },
+        { t: 54, type: "note", text: "Down. It respawns in 14 ticks — 8.4 seconds — which is barely time to loot and no time to hop worlds. Out of combat, right here, is when you're easiest to catch." },
+        { t: 57, type: "spawn", actor: { id: "pker", kind: "team", label: "PKer", shape: "biped", size: 1, x: 15, y: 8, color: "#f33" } },
+        { t: 57, type: "note", text: "A name at the castle — that's where they hop and scout from, and your bolts were visible from further than you could see them. Level 50 multi: no teleport. Choose a door now." },
+        { t: 58, type: "attack", from: "pker", style: "magic", max: 30, hit: 3, label: "Ice Barrage (PKer)", cue: "a freeze from the castle side" },
+        { t: 59, type: "note", text: "The obelisk is behind them, south-east of the castle. West it is: the Resource Area gate costs 7,500 coins a PKer may not have brought, the magic axe hut is singles with a lockpick, the Deserted Keep lever needs a knife for the web. Pray Magic for the barrage and run." },
+        { t: 59, type: "move", actor: "player", to: [4, 4] },
+        { t: 62, type: "move", actor: "player", to: [0, 8] },
+        { t: 64, type: "note", text: "Keep Protect Item's prayer in hand, not your food: once you can't hold it, more eating is just more Smite ticks. If a teleblock lands (5 minutes, 2.5 with Protect from Magic up) the obelisk and the levers are off the table anyway — the Resource Area and the hut still work." },
+        { t: 68, type: "hp", actor: "boss", pct: 100 },
+        { t: 68, type: "anim", actor: "boss", kind: "rise" },
+        { t: 68, type: "note", text: "The cloud is back. You're not. Next kill starts three tiles off it with a full inventory." },
+      ],
+    },
+  ],
+});

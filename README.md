@@ -136,10 +136,141 @@ remaining ceiling could beat the eighth best expectation. The plan shows the
 pack with every task up as what to look for, each task's odds, and the
 next-best pick at each call when those aren't there.
 
+## ⚔️ Sand Table
+
+A bossing and raiding rehearsal tool for Old School RuneScape: every fight's
+**briefing**, its **kit**, and the fight itself rebuilt tile by tile as a 3D
+sand table you scrub through and then drill.
+
+**Try it: [gaming.peliglot.com/tools/runescape/sand-table](https://gaming.peliglot.com/tools/runescape/sand-table)**
+
+![Sand Table](docs/sand-table.jpg)
+
+The wiki tells you what a boss does. What it can't do is show you *when*,
+*where*, and *what you do about it* at the same time — so this puts each
+mechanic in space and time, then turns the table around and grades you.
+
+- **The board**: sixty-odd encounters — the three raids, the group bosses,
+  every solo boss from Scurrius to the Doom of Mokhaiotl, the Slayer bosses,
+  the Wilderness bosses, the Fight Caves, Inferno, Colosseum, Gauntlet,
+  Barrows and Moons, and the skilling bosses — each with a portrait, a
+  difficulty in skulls, the team size, and, once you type your RuneScape
+  name, your kill count off the hiscores and a ready/locked pip.
+- **The briefing**: requirements ticked against your hiscores levels (quests
+  are a click-to-tick checklist kept in your browser), a comfortable
+  first-kill bar, the boss's real numbers from the wiki's infobox (combat,
+  hitpoints, max hits by style, attack speed in ticks, defensive bonuses,
+  elemental weakness, immunities), the phases or rooms, and every mechanic as
+  *what you see → what you do*, with a ▶ that jumps the sand table to the
+  moment it happens.
+- **The kit**: two or three setups per fight (one a mid-level player could
+  own, one strong) laid out as the worn-equipment panel and the 4×7
+  inventory with the wiki's icons; hover any item for the *why*.
+- **The sand table**: the arena at tile scale in low-poly 3D — the boss and
+  its adds, pillars and pools, the player and the team — with a tick clock
+  (0.6 s) you play, step and scrub. Attacks fly as projectiles coloured by
+  style, danger tiles glow before they land, hitsplats pop, the boss talks
+  overhead, phases banner, and a coach's note narrates what is happening
+  and what to do. Every scene is a scripted reenactment of one representative
+  rotation, not a combat simulation.
+- **Drill**: flip the mode and the guide's hands come off. Read the cue in
+  the chat, hit `1`/`2`/`3` for the protection prayer before the hit lands,
+  click a tile to step off the floor, `E` to eat from your kit's food, and it
+  grades every attack and every floor mechanic — then lists your mistakes,
+  each one a click away from watching the guide play that moment.
+
+### How it's built
+
+- `public/tools/runescape/sand-table.html` is the app: vanilla JS and
+  three.js, no build step.
+- Each encounter is one file under
+  `public/tools/runescape/data/sand-table/encounters/` calling
+  `SAND_TABLE.register({...})` — requirements, expectations, kit, route,
+  loot, and one or more scenes (an arena, actors, and a script of events in
+  game ticks). `docs/sand-table/AUTHORING.md` is the schema and the rules;
+  `npm run check:sand-table` validates every file against it (tiles inside
+  the arena, sorted scripts, the guide's own movement dodging every floor
+  mechanic, and so on). `data/sand-table/index.js` is the roster.
+- `npm run data:bosses` (`scripts/fetch-boss-data.mjs`) pulls the wiki's
+  monster infoboxes for every monster the encounters name, an inventory
+  icon for every item, and a portrait per encounter into `wiki.json` and
+  `portraits/`, cached in `.sand-table-cache/`. Run it after adding or
+  editing encounters.
+
+## ⚔️ Sand Table
+
+A bossing and raiding rehearsal tool for Old School RuneScape. The wiki tells
+you what a boss does; the Sand Table puts the mechanic in **space and time**:
+every fight is rebuilt as a tile-scale 3D diorama with a tick clock you
+scrub, then turned around into a drill that grades your prayer switches and
+your footwork.
+
+**Try it: [gaming.peliglot.com/tools/runescape/sand-table](https://gaming.peliglot.com/tools/runescape/sand-table)**
+
+![Sand Table](docs/sand-table.jpg)
+
+- **The board.** Raids, group bosses, solo bosses, Slayer bosses, wilderness
+  bosses, challenges and skilling bosses, each with a portrait, a difficulty
+  in skulls, a team size and a region. Type your RuneScape name and the
+  hiscores fill in your levels and your kill count at every boss; cards you
+  cannot enter yet fade.
+- **The briefing.** Requirements as a checklist ticked against your levels
+  (quests are a click-to-tick list kept in your browser), a comfortable
+  first-kill bar, the boss's own numbers from the wiki's infobox (combat,
+  hitpoints, max hits by style, attack speed in ticks, size, elemental
+  weakness, immunities, every defensive bonus), the phases or the raid's
+  rooms, and every mechanic as **cue → response** with a ▶ that jumps the
+  table to the moment it happens.
+- **The kit.** Two or three setups per fight — one a mid-level player can
+  own, one strong — laid out as the worn-equipment panel and the 4×7
+  inventory with the wiki's own icons; hover any item for the *why*.
+- **The sand table.** The arena tile by tile, the boss and its adds as
+  low-poly figures, your own figure with the overhead prayer, projectiles,
+  hitsplats, danger tiles and safe tiles, boss text and the chatbox, and a
+  coach's note narrating each beat. A timeline of every attack, floor
+  mechanic and phase; play, pause, step a tick, scrub, half or double speed.
+  Click an actor to examine it.
+- **The drill.** Flip the table and the guide's hands come off: read the cue
+  in the chat, press <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> for the overhead,
+  click a tile to step off the floor, <kbd>E</kbd> to eat from the setup's
+  own food. Every attack is graded at the tick it lands; at the end a card
+  says what you prayed, what you dodged, what you took, and lets you click
+  any mistake to watch the guide play that moment.
+
+Every scene is a **scripted reenactment of one representative rotation**,
+not a combat simulation: the boss does what the script says, damage rolls
+are illustrative, and the real fight will surprise you. That is the honest
+limit of the design and it is stated on every scene.
+
+### How it's built
+
+- Each encounter is one file under
+  `public/tools/runescape/data/sand-table/encounters/<id>.js` — the
+  briefing, the kit, the loot and route, and the scenes — written to the
+  schema in [`docs/sand-table/AUTHORING.md`](docs/sand-table/AUTHORING.md)
+  from the wiki's strategy pages, in original prose. The roster is
+  `data/sand-table/index.js`.
+- `npm run check:sand-table` validates every file: tiles inside the arena,
+  events in order, inventories of at most 28, and that the guide's own
+  player never stands on a floor mechanic when it lands.
+- `npm run data:bosses` (`scripts/fetch-boss-data.mjs`) pulls what the files
+  reference from the OSRS Wiki's API into `data/sand-table/wiki.json` — every
+  monster's infobox stats, an inventory icon for every item named — and a
+  portrait per encounter into `data/sand-table/portraits/`. Downloads are
+  cached in `.sand-table-cache/`.
+- The app (`public/tools/runescape/sand-table.html`) is vanilla JS and
+  three.js: a deterministic tick engine (events fire at their tick, hits
+  resolve at theirs, scrubbing replays from zero), an OSRS-flavoured HUD,
+  and a low-poly shape library that builds each actor from primitives.
+  Hiscores lookups go through the site's existing `/api/osrs/hiscores`
+  proxy.
+
 ## Other tools
 
 | Game | Tool | What it does |
 | --- | --- | --- |
+| RuneScape | Sand Table | Boss & raid rehearsals: the briefing, the kit, and the fight rebuilt tile by tile in 3D with a drill mode |
+| RuneScape | Sand Table | Boss and raid rehearsals: the briefing checked against your hiscores, the kit slot by slot, and the fight rebuilt tile by tile in 3D with a tick clock — then a drill that grades your prayers and footwork |
 | RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer |
 | RuneScape | Gielinor Crafting Web | Every craftable item as an explorable 3D recipe web, with per-skill xp lenses |
 | RuneScape | Lingo Cheat Sheet | OSRS Spanish for English speakers: a searchable phrasebook of neutral international Spanish for trading, bossing, the wildy, skilling and clan chat, the game's Spanglish verbs, chat shorthand, and the regional slang that tells you where a player is from; click a phrase to copy it, or flip to chat spelling |
@@ -310,10 +441,11 @@ Three kinds of things live here under different terms — see
 - **Code** (the tools, scripts, worker and site chrome) is **MIT**.
 - **Game data** derived from the
   [Old School RuneScape Wiki](https://oldschool.runescape.wiki)
-  (`naval.json`, `navcells.png`) is
+  (`naval.json`, `navcells.png`, the Sand Table's `wiki.json`) is
   **[CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/)**,
   the same license as the wiki content it comes from.
-- **Game imagery** (`map.jpg`, rendered from the game's world map) is the
+- **Game imagery** (`map.jpg`, rendered from the game's world map; the Sand
+  Table's item icons and monster portraits) is the
   intellectual property of Jagex Limited, used non-commercially under
   [Jagex's Fan Content Policy](https://legal.jagex.com/docs/policies/fan-content-policy).
   Material relating to other games belongs to their respective owners.
