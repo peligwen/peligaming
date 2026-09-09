@@ -29,6 +29,11 @@ window.PELIGAMING = {
       accent: "#d9a334",
       tools: [
         {
+          name: "Sand Table",
+          description: "Boss and raid rehearsals: every fight's requirements ticked against your hiscores, what to expect and what to bring (the worn kit and the 28 slots, with a why on the odd items), and the arena rebuilt tile by tile in 3D with a tick clock you scrub — then a drill mode that grades your prayer switches and your footwork. Chambers, Theatre, Tombs, the Hueycoatl, Scurrius, Zulrah, Vorkath, the Inferno and fifty more.",
+          path: "tools/runescape/sand-table.html",
+        },
+        {
           name: "Job Board",
           description: "Skilling work priced by the Grand Exchange: a ledger of jobs for the professions you tick, sortable by xp/hr, gp/hr, gp per xp and how afk the work is, each with a contract to buy, work and sell — plus a Market Board of the week's going rates and standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer.",
           path: "tools/runescape/job-board.html",

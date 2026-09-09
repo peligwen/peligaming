@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sand Table — OSRS boss &amp; raid rehearsals in 3D</title>
+<meta name="description" content="A bossing and raiding rehearsal tool for Old School RuneScape: requirements checked against your hiscores, what to expect and what to bring, and every fight rebuilt tile by tile as a 3D sand table you scrub through — then drill, with your prayer switches and movement graded in game ticks.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#0d0a07; --gold:#ffb83f; --yellow:#ffe95c; --parch:#f0e6d2; --dim:#a99a7e; --dimmer:#7a6c52;
+    --bevel-hi:#6f5b39; --bevel-lo:#1c150c; --ink:#1c150c;
+    --red:#ff6a4d; --green:#9be564; --teal:#6fd7c8; --violet:#c9a6ff; --blue:#7fb2ff;
+    --melee:#d9483b; --ranged:#5cb85c; --magic:#3f7fd9; --typeless:#9a9a9a;
+    --mono:"VT323",monospace; --sans:"Segoe UI",system-ui,-apple-system,sans-serif;
+    --hdr:62px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{scroll-behavior:smooth;}
+  body{background:var(--bg);color:var(--parch);font-family:var(--sans);line-height:1.4;min-height:100vh;
+    background-image:radial-gradient(ellipse 70% 40% at 50% -10%,rgba(255,184,63,.08),transparent);}
+  a{color:var(--teal);}
+  button{font-family:inherit;}
+  .panel{background:linear-gradient(#39301fee,#291f13ee);border:2px solid;
+    border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);box-shadow:0 4px 16px rgba(0,0,0,.6);}
+  .sunk{background:#1c150c;border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);}
+  .mono{font-family:var(--mono);}
+  .hidden{display:none !important;}
+
+  /* header */
+  #hdr{position:sticky;top:0;z-index:30;background:linear-gradient(#3a3024f8,#2a2217f8);border-bottom:2px solid var(--bevel-lo);
+    box-shadow:inset 0 1px 0 var(--bevel-hi),0 4px 14px rgba(0,0,0,.5);}
+  #hdr .row{display:flex;gap:10px;align-items:center;padding:7px 12px;flex-wrap:wrap;min-height:var(--hdr);}
+  #hdr h1{font-family:var(--mono);font-weight:400;font-size:28px;color:var(--gold);text-shadow:2px 2px 0 #000;line-height:1;white-space:nowrap;cursor:pointer;}
+  #hdr h1 span{color:var(--yellow);}
+  #hdr .sub{font-family:var(--mono);font-size:15px;color:var(--dim);line-height:1.1;max-width:360px;}
+  #sheet{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  #rsn{width:150px;font-family:var(--mono);font-size:19px;color:var(--yellow);padding:3px 8px;outline:none;}
+  #rsn::placeholder{color:var(--dimmer);}
+  .btn{font-family:var(--mono);font-size:17px;color:var(--parch);background:#39301f;cursor:pointer;border:2px solid;
+    border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:3px 10px;line-height:1.15;white-space:nowrap;}
+  .btn:hover{color:var(--yellow);}
+  .btn.on{color:var(--yellow);background:#1c150c;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .chip{font-family:var(--mono);font-size:15px;color:var(--yellow);background:#1c150c;border:2px solid;
+    border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);padding:1px 8px;white-space:nowrap;line-height:1.15;}
+  .chip b{color:var(--gold);font-weight:400;}
+  .chip.ok{color:var(--green);} .chip.bad{color:var(--red);} .chip.dim{color:var(--dim);}
+  #sheetMsg{font-family:var(--mono);font-size:15px;color:var(--dim);}
+  kbd{font-family:var(--mono);font-size:13px;color:var(--dimmer);border:1px solid var(--bevel-hi);padding:0 4px;border-radius:3px;}
+
+  /* the board */
+  #board{max-width:1240px;margin:0 auto;padding:14px 12px 80px;}
+  #filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  #q{flex:1 1 220px;min-width:160px;font-family:var(--mono);font-size:20px;color:var(--yellow);padding:4px 10px;outline:none;}
+  #q::placeholder{color:var(--dimmer);}
+  .filt{display:flex;flex-wrap:wrap;}
+  .filt .btn{margin-right:-2px;}
+  .group{margin-bottom:22px;}
+  .group h2{font-family:var(--mono);font-weight:400;font-size:24px;color:var(--gold);text-shadow:1px 1px 0 #000;
+    border-bottom:1px solid var(--bevel-hi);padding-bottom:2px;margin-bottom:8px;display:flex;align-items:baseline;gap:10px;}
+  .group h2 .n{font-size:15px;color:var(--dimmer);}
+  .group h2 .blurb{font-size:14px;color:var(--dim);font-family:var(--sans);margin-left:auto;text-align:right;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;}
+  .card{display:grid;grid-template-columns:72px 1fr;gap:10px;padding:8px;cursor:pointer;text-decoration:none;color:var(--parch);position:relative;
+    transition:transform .12s;}
+  .card:hover{transform:translateY(-2px);}
+  .card:hover .name{color:var(--yellow);}
+  .card .port{width:72px;height:72px;background:#1c150c;border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .card .port img{max-width:100%;max-height:100%;image-rendering:auto;}
+  .card .port .glyph{font-family:var(--mono);font-size:34px;color:var(--dimmer);}
+  .card .name{font-family:var(--mono);font-size:22px;color:var(--gold);line-height:1;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;}
+  .card .name .aka{font-size:14px;color:var(--dimmer);}
+  .card .tag{font-size:12.5px;color:var(--dim);margin-top:3px;line-height:1.3;}
+  .card .meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
+  .card .meta .chip{font-size:13px;padding:0 6px;}
+  .skulls{color:var(--red);letter-spacing:-1px;}
+  .skulls .off{color:#3a2f22;}
+  .pip{display:inline-block;width:9px;height:9px;border-radius:50%;border:1px solid #000;vertical-align:-1px;margin-right:4px;}
+  .pip.ok{background:var(--green);} .pip.bad{background:var(--red);} .pip.unk{background:#5a4d3a;}
+  .card.faded{opacity:.45;}
+  .card.faded:hover{opacity:.9;}
+  #intro{font-size:13.5px;color:var(--dim);max-width:86ch;margin:0 0 14px;}
+  #intro b{color:var(--parch);}
+
+  /* the encounter view */
+  #enc{max-width:1600px;margin:0 auto;padding:10px 12px 60px;}
+  #encHead{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:8px 10px;margin-bottom:10px;}
+  #encHead .port{width:64px;height:64px;background:#1c150c;border:2px solid;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  #encHead .port img{max-width:100%;max-height:100%;}
+  #encHead h2{font-family:var(--mono);font-weight:400;font-size:32px;color:var(--gold);text-shadow:2px 2px 0 #000;line-height:1;}
+  #encHead h2 .aka{font-size:16px;color:var(--dimmer);margin-left:8px;}
+  #encHead .tag{font-size:13px;color:var(--dim);max-width:70ch;}
+  #encHead .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  #encHead .right{margin-left:auto;display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+  .split{display:grid;grid-template-columns:minmax(380px,460px) minmax(0,1fr);gap:12px;align-items:start;}
+  #left{position:sticky;top:calc(var(--hdr) + 8px);max-height:calc(100vh - var(--hdr) - 20px);display:flex;flex-direction:column;min-width:0;}
+  .tabs{display:flex;padding:6px 6px 0;gap:0;}
+  .tabs .btn{margin-right:-2px;}
+  .tabpanes{overflow-y:auto;scrollbar-width:thin;padding:10px;flex:1;min-height:0;}
+  .tabpane h3{font-family:var(--mono);font-weight:400;font-size:20px;color:var(--gold);text-shadow:1px 1px 0 #000;border-bottom:1px solid var(--bevel-hi);
+    padding-bottom:2px;margin:12px 0 6px;display:flex;align-items:baseline;gap:8px;}
+  .tabpane h3:first-child{margin-top:0;}
+  .tabpane h3 .n{font-size:14px;color:var(--dimmer);margin-left:auto;font-family:var(--sans);}
+  .tabpane p{font-size:13.5px;margin:0 0 8px;max-width:80ch;}
+  .tabpane p.dim{color:var(--dim);}
+  ul.req{list-style:none;display:flex;flex-direction:column;gap:3px;}
+  ul.req li{font-size:13.5px;display:flex;gap:8px;align-items:baseline;padding:2px 4px;}
+  ul.req li .st{font-family:var(--mono);font-size:17px;width:16px;text-align:center;flex:0 0 auto;}
+  ul.req li.ok .st{color:var(--green);} ul.req li.bad .st{color:var(--red);} ul.req li.unk .st{color:var(--dimmer);}
+  ul.req li.ok{color:var(--green);} ul.req li.bad{color:var(--red);}
+  ul.req li .note{color:var(--dim);font-size:12.5px;}
+  ul.req li .you{margin-left:auto;font-family:var(--mono);font-size:15px;color:var(--dim);white-space:nowrap;}
+  ul.req li.quest{cursor:pointer;} ul.req li.quest:hover{background:#39301f66;}
+  ul.notes{list-style:none;display:flex;flex-direction:column;gap:6px;}
+  ul.notes li{font-size:13.5px;padding-left:16px;position:relative;max-width:80ch;}
+  ul.notes li::before{content:"✦";color:var(--gold);position:absolute;left:0;top:1px;font-size:11px;}
+  ol.route{padding-left:20px;font-size:13.5px;display:flex;flex-direction:column;gap:4px;}
+  .phase{margin:0 0 8px;padding:6px 8px;background:#1c150c88;border-left:3px solid var(--bevel-hi);}
+  .phase b{font-family:var(--mono);font-weight:400;font-size:17px;color:var(--yellow);display:block;margin-bottom:2px;}
+  .phase p{margin:0;font-size:13px;}
+  .mech{margin:0 0 6px;padding:6px 8px;background:#1c150c88;border-left:3px solid var(--typeless);cursor:default;}
+  .mech.melee{border-left-color:var(--melee);} .mech.ranged{border-left-color:var(--ranged);} .mech.magic{border-left-color:var(--magic);}
+  .mech.none{border-left-color:#5a4d3a;}
+  .mech .h{display:flex;gap:8px;align-items:baseline;}
+  .mech .h b{font-family:var(--mono);font-weight:400;font-size:18px;color:var(--yellow);}
+  .mech .h .st{font-family:var(--mono);font-size:13px;padding:0 6px;border:1px solid;line-height:1.3;}
+  .mech .h .st.melee{color:var(--melee);border-color:var(--melee);} .mech .h .st.ranged{color:var(--ranged);border-color:var(--ranged);}
+  .mech .h .st.magic{color:var(--magic);border-color:var(--magic);} .mech .h .st.typeless{color:var(--typeless);border-color:var(--typeless);}
+  .mech .h .st.none{color:var(--dimmer);border-color:var(--dimmer);}
+  .mech .h .dng{font-family:var(--mono);font-size:13px;color:var(--dim);}
+  .mech .h .dng.high{color:var(--red);} .mech .h .dng.med{color:var(--gold);}
+  .mech .h .show{margin-left:auto;font-family:var(--mono);font-size:14px;color:var(--teal);background:none;border:1px solid var(--teal);padding:0 7px;cursor:pointer;line-height:1.4;}
+  .mech .h .show:hover{background:#1c3b3a;}
+  .mech .cr{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:13px;margin-top:3px;}
+  .mech .cr .k{font-family:var(--mono);font-size:14px;color:var(--dimmer);}
+  .mech .cr .cue{color:var(--parch);} .mech .cr .resp{color:var(--green);}
+  table.stats{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:8px;}
+  table.stats th{font-family:var(--mono);font-weight:400;font-size:14px;color:var(--dimmer);text-align:left;padding:1px 6px 1px 0;white-space:nowrap;vertical-align:top;width:34%;}
+  table.stats td{padding:1px 0;color:var(--parch);vertical-align:top;}
+  table.stats caption{font-family:var(--mono);font-size:17px;color:var(--yellow);text-align:left;padding:4px 0 2px;}
+  .defs{display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 8px;}
+  .defs span{font-family:var(--mono);font-size:13px;color:var(--dim);background:#1c150c;padding:0 5px;border:1px solid var(--bevel-lo);}
+  .defs span b{color:var(--parch);font-weight:400;}
+  .defs span.weak b{color:var(--green);} .defs span.strong b{color:var(--red);}
+
+  /* the kit */
+  .setups{display:flex;flex-wrap:wrap;margin-bottom:8px;}
+  .kit{display:grid;grid-template-columns:auto auto;gap:14px;justify-content:start;align-items:start;}
+  .worn{display:grid;grid-template-columns:repeat(3,40px);grid-auto-rows:40px;gap:3px;padding:6px;}
+  .inv{display:grid;grid-template-columns:repeat(4,40px);grid-auto-rows:40px;gap:3px;padding:6px;}
+  .slot{width:40px;height:40px;background:#3e3325;border:1px solid #1c150c;display:flex;align-items:center;justify-content:center;position:relative;cursor:default;}
+  .slot.empty{background:#2a2217;opacity:.6;}
+  .slot.gap{background:none;border:none;}
+  .slot img{max-width:36px;max-height:34px;image-rendering:pixelated;}
+  .slot .abbr{font-family:var(--mono);font-size:13px;color:var(--parch);text-align:center;line-height:1;padding:2px;overflow:hidden;}
+  .slot .qty{position:absolute;left:2px;top:0;font-family:var(--mono);font-size:13px;color:var(--yellow);text-shadow:1px 1px 0 #000;}
+  .slot.why{box-shadow:inset 0 0 0 1px var(--gold);}
+  .slot:hover{outline:1px solid var(--yellow);z-index:2;}
+  .kitnotes{margin-top:8px;}
+  .must{display:flex;gap:8px;align-items:center;font-size:13.5px;margin:0 0 5px;}
+  .must .slot{width:32px;height:32px;flex:0 0 auto;}
+  .must .slot img{max-width:28px;max-height:28px;}
+  .must b{color:var(--yellow);font-weight:600;}
+  #tip{position:fixed;z-index:60;pointer-events:none;max-width:280px;padding:5px 8px;font-size:12.5px;background:#1c150cf2;border:1px solid var(--bevel-hi);color:var(--parch);display:none;}
+  #tip b{color:var(--yellow);font-weight:600;display:block;font-family:var(--mono);font-size:16px;}
+
+  /* loot */
+  .uniq{display:flex;gap:8px;align-items:center;font-size:13.5px;margin:0 0 5px;}
+  .uniq .slot{width:32px;height:32px;flex:0 0 auto;} .uniq .slot img{max-width:28px;max-height:28px;}
+  .uniq b{color:var(--yellow);font-weight:600;}
+
+  /* the sand table */
+  #right{display:flex;flex-direction:column;min-width:0;}
+  #sceneTabs{display:flex;flex-wrap:wrap;padding:6px 6px 0;}
+  #stage{position:relative;height:calc(100vh - var(--hdr) - 250px);min-height:400px;background:#0a0806;overflow:hidden;}
+  #stage canvas{display:block;touch-action:none;width:100%;height:100%;cursor:crosshair;}
+  .hud{position:absolute;z-index:5;pointer-events:none;}
+  #sceneTitle{left:10px;top:8px;font-family:var(--mono);color:var(--gold);text-shadow:2px 2px 0 #000;font-size:22px;line-height:1;}
+  #sceneTitle small{display:block;font-size:14px;color:var(--dim);margin-top:2px;max-width:60ch;}
+  #phaseBanner{left:10%;right:10%;top:30%;text-align:center;font-family:var(--mono);font-size:30px;line-height:1.05;color:var(--yellow);text-shadow:3px 3px 0 #000;opacity:0;transition:opacity .4s;}
+  #bossBars{right:10px;top:8px;display:flex;flex-direction:column;gap:4px;align-items:flex-end;}
+  .bossbar{width:200px;background:#1c150cdd;border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:3px 5px;}
+  .bossbar .nm{font-family:var(--mono);font-size:15px;color:var(--yellow);text-shadow:1px 1px 0 #000;display:flex;justify-content:space-between;}
+  .bossbar .bar{height:8px;background:#8b1a1a;margin-top:2px;}
+  .bossbar .bar i{display:block;height:100%;background:#3fbf3f;transition:width .3s;}
+  #coach{left:10px;bottom:10px;max-width:min(520px,60%);pointer-events:auto;}
+  #note{background:linear-gradient(#f0e6d2f2,#e2d5b8f2);color:var(--ink);padding:8px 10px;font-size:13.5px;border:2px solid;border-color:#fff7e6 #8a7250 #8a7250 #fff7e6;min-height:44px;box-shadow:0 4px 14px rgba(0,0,0,.6);}
+  #note b{color:#7a3a10;font-family:var(--mono);font-weight:400;font-size:15px;margin-right:4px;}
+  #chat{margin-top:4px;background:#000000aa;padding:3px 6px;font-family:var(--mono);font-size:15px;line-height:1.15;color:var(--parch);}
+  #chat div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #chat .g{color:#7fb2ff;} #chat .r{color:#ff6a4d;} #chat .y{color:var(--yellow);} #chat .x{color:#c9a6ff;}
+  #playerHud{right:10px;bottom:10px;pointer-events:auto;display:flex;flex-direction:column;gap:5px;align-items:flex-end;}
+  #hpwrap{display:flex;gap:6px;align-items:center;background:#1c150cdd;border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:3px 6px;}
+  #hpwrap .lbl{font-family:var(--mono);font-size:15px;color:var(--dim);}
+  #hpbar{width:110px;height:10px;background:#8b1a1a;}
+  #hpbar i{display:block;height:100%;background:#3fbf3f;}
+  #hpnum{font-family:var(--mono);font-size:17px;color:var(--yellow);min-width:52px;text-align:right;}
+  #prayers{display:flex;gap:4px;}
+  .pray{width:46px;height:54px;background:#1c150cdd;border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0;}
+  .pray canvas{width:24px;height:24px;image-rendering:pixelated;}
+  .pray span{font-family:var(--mono);font-size:12px;color:var(--dimmer);line-height:1;}
+  .pray.on{background:#4a3a1c;border-color:var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);box-shadow:inset 0 0 0 1px var(--yellow);}
+  .pray.on span{color:var(--yellow);}
+  #food{font-family:var(--mono);font-size:15px;color:var(--parch);background:#1c150cdd;border:2px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);padding:3px 8px;cursor:pointer;}
+  #food:hover{color:var(--yellow);}
+  #score{font-family:var(--mono);font-size:15px;color:var(--dim);background:#1c150cdd;padding:2px 8px;border:1px solid var(--bevel-lo);}
+  #score b{color:var(--yellow);font-weight:400;} #score i{color:var(--red);font-style:normal;} #score em{color:var(--green);font-style:normal;}
+  #overlay{position:absolute;inset:0;z-index:8;display:none;align-items:center;justify-content:center;background:#00000088;pointer-events:auto;}
+  #overlay .box{max-width:520px;width:92%;padding:14px 16px;}
+  #overlay h3{font-family:var(--mono);font-weight:400;font-size:30px;color:var(--yellow);text-shadow:2px 2px 0 #000;margin-bottom:6px;}
+  #overlay p{font-size:13.5px;margin-bottom:8px;}
+  #overlay ul{list-style:none;font-size:13px;display:flex;flex-direction:column;gap:3px;max-height:200px;overflow:auto;margin-bottom:10px;}
+  #overlay ul li{color:var(--parch);cursor:pointer;} #overlay ul li:hover{color:var(--yellow);}
+  #overlay ul li .t{font-family:var(--mono);color:var(--dimmer);margin-right:6px;}
+  #overlay ul li.bad{color:var(--red);} #overlay ul li.good{color:var(--green);}
+  #overlay .btns{display:flex;gap:6px;flex-wrap:wrap;}
+  #examine{left:50%;transform:translateX(-50%);bottom:10px;font-family:var(--mono);font-size:16px;color:var(--teal);text-shadow:1px 1px 0 #000;background:#000000aa;padding:2px 10px;display:none;}
+
+  /* timeline & controls */
+  #timeline{padding:8px 10px 6px;}
+  #marks{position:relative;height:14px;margin:0 6px;}
+  #marks i{position:absolute;top:2px;width:3px;height:10px;background:var(--dim);cursor:pointer;transform:translateX(-1px);}
+  #marks i.attack.melee{background:var(--melee);} #marks i.attack.ranged{background:var(--ranged);} #marks i.attack.magic{background:var(--magic);}
+  #marks i.attack.typeless{background:var(--typeless);} #marks i.aoe{background:#ff3a1a;height:12px;top:1px;}
+  #marks i.phase{background:var(--gold);width:2px;height:14px;top:0;} #marks i.note{background:#f0e6d266;height:5px;top:9px;width:2px;}
+  #marks i.spawn{background:var(--violet);height:7px;top:7px;}
+  #scrub{width:100%;accent-color:var(--gold);margin:0;}
+  #ctrls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;}
+  #ctrls .btn{padding:2px 9px;font-size:18px;}
+  #tick{font-family:var(--mono);font-size:17px;color:var(--yellow);min-width:130px;}
+  #tick small{color:var(--dimmer);font-size:14px;}
+  #ctrls .grp{display:flex;} #ctrls .grp .btn{margin-right:-2px;}
+  #ctrls .spacer{flex:1;}
+  #keys{font-family:var(--mono);font-size:13px;color:var(--dimmer);}
+  #keys kbd{color:var(--dim);}
+  #attrib{max-width:1240px;margin:20px auto 0;padding:10px 12px;font-size:11.5px;color:var(--dimmer);line-height:1.5;border-top:1px solid var(--bevel-lo);}
+  #attrib a{color:var(--dim);}
+  #loading{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:var(--bg);transition:opacity .4s;}
+  #loading .t{font-family:var(--mono);font-size:26px;color:var(--gold);text-shadow:2px 2px 0 #000;}
+  #loading .bar{width:220px;height:6px;background:#1c150c;border:1px solid var(--bevel-hi);}
+  #loading .bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s;}
+
+  @media (max-width:1000px){
+    .split{grid-template-columns:1fr;}
+    #left{position:static;max-height:none;order:2;}
+    #right{order:1;}
+    #stage{height:62vh;min-height:360px;}
+    .tabpanes{max-height:70vh;}
+    #hdr .sub{display:none;}
+    #coach{max-width:70%;}
+  }
+  @media (max-width:600px){
+    .kit{grid-template-columns:1fr;}
+    #encHead h2{font-size:26px;}
+    #coach{max-width:100%;right:10px;bottom:120px;}
+    #playerHud{left:10px;right:10px;flex-direction:row;justify-content:space-between;align-items:flex-end;}
+    #bossBars{top:auto;bottom:196px;}
+  }
+</style>
+</head>
+<body>
+<div id="hdr">
+  <div class="row">
+    <h1 id="home" title="back to the board">Sand <span>Table</span></h1>
+    <div class="sub">boss &amp; raid rehearsals: the briefing, the kit, and the fight rebuilt tile by tile</div>
+    <div id="sheet">
+      <input id="rsn" class="sunk" placeholder="RuneScape name" maxlength="12" autocomplete="off" spellcheck="false">
+      <button id="rsnBtn" class="btn" title="pull your levels and boss kill counts off the hiscores">Hiscores</button>
+      <span id="sheetMsg"></span>
+      <span id="sheetChip" class="chip hidden"></span>
+    </div>
+  </div>
+</div>
+
+<main id="board">
+  <p id="intro">Pick a fight. Each one has a <b>briefing</b> (requirements ticked against your hiscores, what to expect, how to get there), a <b>kit</b> (what to wear and the 28 slots, with a <i>why</i> on the odd items), and a <b>sand table</b>: the arena rebuilt tile by tile with a tick clock you can scrub, the boss's attacks and floor mechanics played out with the prayer and the step that answers each — then flip it to <b>drill</b> and it grades <i>you</i>.</p>
+  <div id="filters">
+    <input id="q" class="sunk" placeholder="search a boss, a raid, a nickname…" autocomplete="off" spellcheck="false">
+    <div class="filt" id="groupFilt"></div>
+    <button id="canDo" class="btn" title="fade what your levels and quests don't unlock yet">✓ what I can do</button>
+  </div>
+  <div id="groups"></div>
+</main>
+
+<main id="enc" class="hidden">
+  <div id="encHead" class="panel">
+    <button id="back" class="btn" title="back to the board">◀ Board</button>
+    <div class="port"><img id="encPort" alt=""></div>
+    <div>
+      <h2><span id="encName"></span><span class="aka" id="encAka"></span></h2>
+      <div class="tag" id="encTag"></div>
+      <div class="meta" id="encMeta"></div>
+    </div>
+    <div class="right" id="encRight"></div>
+  </div>
+  <div class="split">
+    <section id="left" class="panel">
+      <div class="tabs">
+        <button class="btn on" data-tab="brief">Briefing</button>
+        <button class="btn" data-tab="kit">Kit</button>
+        <button class="btn" data-tab="loot">Route &amp; loot</button>
+      </div>
+      <div class="tabpanes">
+        <div class="tabpane" id="tab-brief"></div>
+        <div class="tabpane hidden" id="tab-kit"></div>
+        <div class="tabpane hidden" id="tab-loot"></div>
+      </div>
+    </section>
+    <section id="right" class="panel">
+      <div id="sceneTabs"></div>
+      <div id="stage">
+        <div class="hud" id="sceneTitle"></div>
+        <div class="hud" id="phaseBanner"></div>
+        <div class="hud" id="bossBars"></div>
+        <div class="hud" id="coach"><div id="note"></div><div id="chat"></div></div>
+        <div class="hud" id="playerHud">
+          <div id="score" class="hidden"></div>
+          <div id="hpwrap"><span class="lbl">HP</span><div id="hpbar"><i></i></div><span id="hpnum"></span></div>
+          <div id="prayers"></div>
+          <button id="food" class="hidden" title="eat (E)"></button>
+        </div>
+        <div class="hud" id="examine"></div>
+        <div id="overlay"><div class="box panel"><h3 id="ovTitle"></h3><p id="ovText"></p><ul id="ovList"></ul><div class="btns" id="ovBtns"></div></div></div>
+      </div>
+      <div id="timeline">
+        <div id="marks"></div>
+        <input id="scrub" type="range" min="0" max="10" value="0" step="1">
+        <div id="ctrls">
+          <div class="grp">
+            <button class="btn" id="bRestart" title="restart (R)">⏮</button>
+            <button class="btn" id="bBack" title="one tick back (←)">◀</button>
+            <button class="btn" id="bPlay" title="play / pause (space)">▶</button>
+            <button class="btn" id="bFwd" title="one tick forward (→)">▶|</button>
+          </div>
+          <span id="tick"></span>
+          <div class="grp" id="speed"><button class="btn" data-s="0.5">½×</button><button class="btn on" data-s="1">1×</button><button class="btn" data-s="2">2×</button></div>
+          <div class="grp" id="mode"><button class="btn on" data-m="reenact" title="the guide plays it: watch the prayers and the steps">Reenact</button><button class="btn" data-m="drill" title="you play it: prayers on 1/2/3, click to move — graded at the end">Drill</button></div>
+          <span class="spacer"></span>
+          <button class="btn" id="bCam" title="reset the camera (C)">⌖ cam</button>
+          <span id="keys"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> pray · <kbd>E</kbd> eat · <kbd>space</kbd> play · <kbd>←</kbd><kbd>→</kbd> step · drag to orbit · click a tile to walk</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="tip"></div>
+<div id="loading"><div class="t">SETTING THE TABLE…</div><div class="bar"><i id="loadBar"></i></div></div>
+
+<div id="attrib">Created using intellectual property belonging to Jagex Limited under the terms of Jagex's <a href="https://legal.jagex.com/docs/policies/fan-content-policy" target="_blank" rel="noopener">Fan Content Policy</a>. This content is not endorsed by or affiliated with Jagex. Monster stats, item icons and portraits from the <a href="https://oldschool.runescape.wiki" target="_blank" rel="noopener">OSRS Wiki</a> (<a href="https://creativecommons.org/licenses/by-nc-sa/3.0/" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>); the briefings and scenes are original, written from the wiki's strategy pages, and every scene is a scripted reenactment of one representative rotation, not a combat simulation — the game will surprise you. Hiscores lookups are public and per-name. <a href="https://github.com/peligwen/peligaming" target="_blank" rel="noopener">source</a> · <a href="../../" title="peligaming — all tools">⌂ more tools</a></div>
+
+<script src="data/sand-table/index.js"></script>
+<script>
+(() => {
+'use strict';
+/* ================================================================== data */
+const ST = window.SAND_TABLE;
+ST.enc = ST.enc || {};
+ST.register = (o) => { ST.enc[o.id] = o; };
+const $ = (s) => document.querySelector(s);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const GROUPS = [
+  ['raid', 'Raids', 'the three multi-room raids — a briefing per room, a sand table for the bosses'],
+  ['group', 'Group bosses', 'built for teams; most have a solo method too'],
+  ['solo', 'Solo bosses', 'from the first boss you ever fight to the ones that end accounts'],
+  ['slayer', 'Slayer bosses', 'need a Slayer level and, mostly, a task'],
+  ['wilderness', 'Wilderness bosses', 'the fight is half the danger — bring what you can lose'],
+  ['minigame', 'Challenges', 'waves, caves and tombs with their own rules'],
+  ['skilling', 'Skilling bosses', 'no combat level needed; the boss is the loop'],
+];
+const GROUP_LABEL = Object.fromEntries(GROUPS.map(([k, v]) => [k, v]));
+const STYLE_LABEL = { melee: 'Melee', ranged: 'Ranged', magic: 'Magic', typeless: 'Typeless', none: '—' };
+const PRAY_LABEL = { melee: 'Protect from Melee', ranged: 'Protect from Missiles', magic: 'Protect from Magic', none: 'no overhead' };
+const FOOD = { 'Shark': 20, 'Manta ray': 22, 'Dark crab': 22, 'Anglerfish': 22, 'Sea turtle': 21, 'Cooked karambwan': 18, 'Monkfish': 16,
+  'Swordfish': 14, 'Lobster': 12, 'Tuna': 10, 'Trout': 7, 'Salmon': 9, 'Bass': 13, 'Potato with cheese': 16, 'Tuna potato': 22,
+  'Pineapple pizza': 11, 'Summer pie': 11, 'Wild pie': 11, 'Saradomin brew(4)': 16, 'Moonlight potion(4)': 16, 'Paddlefish': 16, 'Corrupted paddlefish': 16, 'Cooked bream': 16 };
+const FOOD_DOSES = { 'Saradomin brew(4)': 4, 'Moonlight potion(4)': 4 };
+
+let WIKI = { monsters: {}, icons: {} };
+let sheet = null;        // {rsn, skills:{}, activities:{}, fetched}
+let quests = {};         // {name: true}
+try { sheet = JSON.parse(localStorage.getItem('sandtable.sheet') || 'null'); } catch { sheet = null; }
+try { quests = JSON.parse(localStorage.getItem('sandtable.quests') || '{}'); } catch { quests = {}; }
+const saveQuests = () => { try { localStorage.setItem('sandtable.quests', JSON.stringify(quests)); } catch {} };
+
+/* ---------------------------------------------------------------- loader */
+function loadEncounters() {
+  const ids = ST.ids || [];
+  let done = 0;
+  const bar = $('#loadBar');
+  return Promise.all(ids.map((id) => new Promise((res) => {
+    const s = document.createElement('script');
+    s.src = `data/sand-table/encounters/${id}.js`;
+    s.onload = s.onerror = () => { done++; bar.style.width = `${(done / ids.length) * 100}%`; res(); };
+    document.head.appendChild(s);
+  })));
+}
+function loadWiki() {
+  return fetch('data/sand-table/wiki.json', { headers: { Accept: 'application/json' } })
+    .then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) WIKI = d; }).catch(() => {});
+}
+
+/* ---------------------------------------------------------------- sheet */
+function levelOf(skill) { return sheet && sheet.skills ? sheet.skills[skill] : null; }
+function kcOf(enc) {
+  if (!sheet || !sheet.activities || !enc.kc) return null;
+  const names = Array.isArray(enc.kc) ? enc.kc : [enc.kc];
+  return names.map((n) => ({ name: n, kc: sheet.activities[n] })).filter((x) => x.kc != null && x.kc >= 0);
+}
+// ready | blocked | unknown — skills against the sheet, quests against the checklist
+function readiness(enc) {
+  const reqs = enc.requirements || [];
+  let unknown = false, blocked = false;
+  for (const r of reqs) {
+    if (r.kind === 'skill') { const lv = levelOf(r.skill); if (lv == null) unknown = true; else if (lv < r.level) blocked = true; }
+    else if (r.kind === 'quest') { if (!quests[r.name]) { if (sheet) blocked = true; else unknown = true; } }
+  }
+  if (blocked) return 'blocked';
+  return unknown ? 'unknown' : 'ready';
+}
+async function fetchHiscores(rsn) {
+  const res = await fetch('/api/osrs/hiscores?player=' + encodeURIComponent(rsn), { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(String(res.status));
+  const d = await res.json();
+  const skills = {}, activities = {};
+  for (const s of d.skills || []) skills[s.name] = s.level;
+  for (const a of d.activities || []) activities[a.name] = a.score;
+  return { rsn, skills, activities, fetched: Date.now() };
+}
+function renderSheetChip() {
+  const chip = $('#sheetChip');
+  if (!sheet) { chip.classList.add('hidden'); return; }
+  chip.classList.remove('hidden');
+  const cb = sheet.skills['Overall'] != null ? '' : '';
+  chip.innerHTML = `<b>${esc(sheet.rsn)}</b> · hp ${sheet.skills.Hitpoints ?? '?'} · pray ${sheet.skills.Prayer ?? '?'}${cb} <span title="forget this name" style="cursor:pointer;color:var(--dimmer)">✕</span>`;
+  chip.querySelector('span').onclick = () => { sheet = null; try { localStorage.removeItem('sandtable.sheet'); } catch {} renderSheetChip(); rerender(); };
+}
+$('#rsnBtn').onclick = async () => {
+  const rsn = $('#rsn').value.trim();
+  if (!rsn) return;
+  $('#sheetMsg').textContent = 'looking up…';
+  $('#rsnBtn').disabled = true;
+  try {
+    sheet = await fetchHiscores(rsn);
+    try { localStorage.setItem('sandtable.sheet', JSON.stringify(sheet)); } catch {}
+    $('#sheetMsg').textContent = '';
+    renderSheetChip();
+    rerender();
+  } catch (e) {
+    $('#sheetMsg').textContent = /404/.test(e.message) ? 'not on the hiscores' : (location.protocol === 'file:' ? 'needs the site (no proxy here)' : 'lookup failed — try again shortly');
+  }
+  $('#rsnBtn').disabled = false;
+};
+$('#rsn').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#rsnBtn').click(); });
+if (sheet) { $('#rsn').value = sheet.rsn; renderSheetChip(); }
+
+/* ---------------------------------------------------------------- board */
+let filterGroup = 'all', onlyCanDo = false, query = '';
+function skulls(n) { let s = ''; for (let i = 1; i <= 5; i++) s += i <= n ? '<span>☠</span>' : '<span class="off">☠</span>'; return `<span class="skulls" title="difficulty ${n} of 5">${s}</span>`; }
+function matches(enc, q) {
+  if (!q) return true;
+  const hay = [enc.name, ...(enc.aka || []), enc.region, enc.tagline, GROUP_LABEL[enc.group]].join(' ').toLowerCase();
+  return q.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
+}
+function renderBoard() {
+  const root = $('#groups');
+  root.innerHTML = '';
+  const filt = $('#groupFilt');
+  filt.innerHTML = '';
+  for (const [k, label] of [['all', 'All'], ...GROUPS]) {
+    const b = el('button', 'btn' + (filterGroup === k ? ' on' : ''), label);
+    b.onclick = () => { filterGroup = k; renderBoard(); };
+    filt.appendChild(b);
+  }
+  $('#canDo').classList.toggle('on', onlyCanDo);
+  $('#canDo').disabled = !sheet;
+  $('#canDo').title = sheet ? 'fade what your levels and quests don\'t unlock yet' : 'enter a RuneScape name first';
+  let shown = 0;
+  for (const [g, label, blurb] of GROUPS) {
+    if (filterGroup !== 'all' && filterGroup !== g) continue;
+    const list = (ST.ids || []).map((id) => ST.enc[id]).filter((e) => e && e.group === g && matches(e, query));
+    if (!list.length) continue;
+    const sec = el('section', 'group');
+    const h = el('h2');
+    h.innerHTML = `${esc(label)} <span class="n">${list.length}</span><span class="blurb">${esc(blurb)}</span>`;
+    sec.appendChild(h);
+    const cards = el('div', 'cards');
+    for (const e of list) {
+      const r = readiness(e);
+      const a = el('a', 'card panel' + (onlyCanDo && r === 'blocked' ? ' faded' : ''));
+      a.href = `#${e.id}`;
+      const kcs = kcOf(e);
+      const kcTxt = kcs && kcs.length ? kcs.map((k) => `${k.kc.toLocaleString()} kc${kcs.length > 1 ? ' ' + shortKc(k.name, e) : ''}`).join(' · ') : '';
+      a.innerHTML = `<div class="port"><img src="data/sand-table/portraits/${esc(e.id)}.png" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'glyph',textContent:'⚔'}))"></div>
+        <div><div class="name">${esc(e.name)}${e.aka && e.aka.length ? `<span class="aka">${esc(e.aka.slice(0, 2).join(' · '))}</span>` : ''}</div>
+        <div class="tag">${esc(e.tagline)}</div>
+        <div class="meta">${skulls(e.difficulty)}<span class="chip dim">${esc(e.team)}</span><span class="chip dim">${esc(e.region)}</span>
+        ${kcTxt ? `<span class="chip"><b>${esc(kcTxt)}</b></span>` : ''}
+        <span class="chip ${r === 'ready' ? 'ok' : r === 'blocked' ? 'bad' : 'dim'}"><span class="pip ${r === 'ready' ? 'ok' : r === 'blocked' ? 'bad' : 'unk'}"></span>${r === 'ready' ? 'ready' : r === 'blocked' ? 'locked' : 'reqs'}</span>
+        <span class="chip dim">${(e.scenes || []).length || 1} scene${(e.scenes || []).length === 1 ? '' : 's'}</span></div></div>`;
+      cards.appendChild(a);
+      shown++;
+    }
+    sec.appendChild(cards);
+    root.appendChild(sec);
+  }
+  if (!shown) root.appendChild(el('p', 'dim', 'Nothing on the board matches that.'));
+}
+function shortKc(name, e) { return name.replace(e.name, '').replace(/^[:\s-]+/, '').replace('Challenge Mode', 'CM').replace('Hard Mode', 'HM').replace('Expert Mode', 'Expert') || ''; }
+$('#q').addEventListener('input', (ev) => { query = ev.target.value.trim(); renderBoard(); });
+$('#canDo').onclick = () => { onlyCanDo = !onlyCanDo; renderBoard(); };
+
+/* ---------------------------------------------------------------- encounter: briefing */
+let current = null;   // the open encounter
+function reqLine(r, soft) {
+  const li = el('li');
+  let st = '·', cls = 'unk', text = '', you = '';
+  if (r.kind === 'skill') {
+    text = `${r.skill} ${r.level}`;
+    const lv = levelOf(r.skill);
+    if (lv != null) { cls = lv >= r.level ? 'ok' : 'bad'; st = lv >= r.level ? '✓' : '✗'; you = `you: ${lv}`; }
+  } else if (r.kind === 'quest') {
+    text = r.name;
+    li.classList.add('quest');
+    li.title = 'click to mark this quest done (kept in this browser)';
+    cls = quests[r.name] ? 'ok' : (sheet ? 'bad' : 'unk'); st = quests[r.name] ? '✓' : (sheet ? '✗' : '□');
+    li.onclick = () => { quests[r.name] = !quests[r.name]; saveQuests(); rerender(); };
+  } else if (r.kind === 'item') { text = r.item; if (r.text) text += ` — ${r.text}`; st = '⚑'; }
+  else { text = r.text; st = '·'; }
+  if (soft && cls === 'bad') cls = 'unk';
+  li.className += ' ' + cls;
+  li.innerHTML = `<span class="st">${st}</span><span>${esc(text)}${r.note ? ` <span class="note">${esc(r.note)}</span>` : ''}</span>${you ? `<span class="you">${esc(you)}</span>` : ''}`;
+  return li;
+}
+function styleOf(m) { return m.style || 'typeless'; }
+function firstTickFor(scene, mech) {
+  if (!scene) return null;
+  const key = mech.name.toLowerCase();
+  const words = key.split(/\W+/).filter((w) => w.length > 3);
+  let best = null;
+  for (const ev of scene.script) {
+    const txt = ((ev.label || '') + ' ' + (ev.text || '') + ' ' + (ev.name || '')).toLowerCase();
+    const hit = txt.includes(key) || (words.length && words.every((w) => txt.includes(w)));
+    if (hit && (best == null || ev.t < best)) best = ev.t;
+  }
+  return best;
+}
+function monsterStats(ref) {
+  const key = `${ref.page}#${ref.version ?? ''}`;
+  return WIKI.monsters[key] || WIKI.monsters[`${ref.page}#`] || null;
+}
+function immunities(s) {
+  const out = [];
+  const pr = String(s.poisonresistance ?? s.immunepoison ?? '');
+  const vr = String(s.venomresistance ?? s.immunevenom ?? '');
+  if (pr === '100' || /^yes$/i.test(pr)) out.push('immune to poison'); else if (pr && pr !== '0' && !/^no$/i.test(pr)) out.push(`poison ${pr}% resisted`);
+  if (vr === '100' || /^yes$/i.test(vr)) out.push('immune to venom'); else if (/poison/i.test(vr)) out.push('venom only poisons it'); else if (vr && vr !== '0' && !/^no$/i.test(vr)) out.push(`venom ${vr}% resisted`);
+  if (/^yes$/i.test(String(s.immunecannon))) out.push('no cannon');
+  if (/^yes$/i.test(String(s.immunethrall))) out.push('no thralls');
+  if (s.freezeresistance === 100) out.push('cannot be frozen'); else if (s.freezeresistance > 0) out.push(`freezes ${s.freezeresistance}% shorter`);
+  return out;
+}
+function statsTable(ref) {
+  const s = monsterStats(ref);
+  const label = ref.label || ref.page;
+  if (!s) return '';   // a minor NPC without an infobox, or data not fetched yet — nothing to say
+  const spd = s['attack speed'];
+  const spdTxt = typeof spd === 'number' ? `${spd} ticks (${(spd * 0.6).toFixed(1)}s)` : (spd || '—');
+  const rows = [
+    ['Combat', s.combat ?? '—'], ['Hitpoints', s.hitpoints ?? '—'], ['Max hit', s['max hit'] ?? '—'],
+    ['Attacks with', s['attack style'] ?? '—'], ['Attack speed', spdTxt], ['Size', s.size ? `${s.size}×${s.size} tiles` : '—'],
+  ];
+  if (s.slaylvl) rows.push(['Slayer level', s.slaylvl]);
+  if (s.elementalweaknesstype) rows.push(['Elemental weakness', `${s.elementalweaknesstype}${s.elementalweaknesspercent ? ` (+${s.elementalweaknesspercent}%)` : ''}`]);
+  const imm = immunities(s);
+  if (imm.length) rows.push(['Immunities', imm.join(', ')]);
+  if (s.examine) rows.push(['Examine', s.examine]);
+  const defs = [['stab', s.dstab], ['slash', s.dslash], ['crush', s.dcrush], ['magic', s.dmagic], ['light', s.dlight], ['std', s.dstandard], ['heavy', s.dheavy]]
+    .filter(([, v]) => typeof v === 'number');
+  const vals = defs.map(([, v]) => v);
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const defHtml = defs.length ? `<div class="defs" title="defensive bonuses: lower is easier to hit">${defs.map(([k, v]) => `<span class="${v === lo && hi - lo > 40 ? 'weak' : v === hi && hi - lo > 40 ? 'strong' : ''}">${k} <b>${v}</b></span>`).join('')}<span title="Defence · Magic · Ranged levels">def <b>${s.def ?? '?'}</b> mag <b>${s.mage ?? '?'}</b> rng <b>${s.range ?? '?'}</b></span></div>` : '';
+  return `<table class="stats"><caption>${esc(label)}${s.version ? ` <span style="color:var(--dimmer);font-size:14px">(${esc(s.version)})</span>` : ''}</caption>${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>${defHtml}`;
+}
+function renderBrief(e) {
+  const pane = $('#tab-brief');
+  const r = readiness(e);
+  const parts = [];
+  parts.push(`<h3>Requirements <span class="n">${r === 'ready' ? 'you meet them' : r === 'blocked' ? 'not yet' : sheet ? '' : 'enter a name to check'}</span></h3>`);
+  const ul = el('ul', 'req');
+  (e.requirements || []).forEach((q) => ul.appendChild(reqLine(q, false)));
+  if (!(e.requirements || []).length) ul.appendChild(el('li', 'unk', 'Nothing beyond a membership.'));
+  parts.push(ul.outerHTML);
+  if (e.recommended && e.recommended.length) {
+    parts.push('<h3>Comfortable at <span class="n">a first-kill bar, not a max one</span></h3>');
+    const ul2 = el('ul', 'req');
+    e.recommended.forEach((q) => ul2.appendChild(reqLine(q, true)));
+    parts.push(ul2.outerHTML);
+  }
+  parts.push('<h3>What to expect</h3>');
+  parts.push(`<p>${esc(e.expect.overview)}</p>`);
+  for (const m of e.wiki?.monsters || []) parts.push(statsTable(m));
+  if (e.expect.phases && e.expect.phases.length) {
+    parts.push(`<h3>${e.group === 'raid' ? 'Rooms' : 'Phases'} <span class="n">${e.expect.phases.length}</span></h3>`);
+    for (const p of e.expect.phases) parts.push(`<div class="phase"><b>${esc(p.name)}</b><p>${esc(p.text)}</p></div>`);
+  }
+  parts.push(`<h3>Mechanics <span class="n">cue → response</span></h3>`);
+  const mechs = el('div');
+  e.expect.mechanics.forEach((m, i) => {
+    const st = styleOf(m);
+    const d = el('div', `mech ${st}`);
+    d.innerHTML = `<div class="h"><b>${esc(m.name)}</b><span class="st ${st}">${STYLE_LABEL[st]}</span>${m.danger ? `<span class="dng ${m.danger}">${m.danger === 'high' ? 'deadly' : m.danger === 'med' ? 'hurts' : 'minor'}</span>` : ''}${m.scene ? `<button class="show" data-i="${i}">▶ show</button>` : ''}</div>
+      <div class="cr"><span class="k">see</span><span class="cue">${esc(m.cue)}</span><span class="k">do</span><span class="resp">${esc(m.response)}</span></div>`;
+    mechs.appendChild(d);
+  });
+  parts.push(mechs.outerHTML);
+  if (e.expect.notes && e.expect.notes.length) parts.push(`<h3>Also</h3><ul class="notes">${e.expect.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>`);
+  if (e.tips && e.tips.length) parts.push(`<h3>What the wiki doesn't stress</h3><ul class="notes">${e.tips.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>`);
+  pane.innerHTML = parts.join('');
+  // the quest toggles were serialised through outerHTML: rebind
+  pane.querySelectorAll('li.quest').forEach((li) => {
+    const name = li.querySelector('span:nth-child(2)').textContent.trim().replace(/\s+\(.*$/, '');
+    li.onclick = () => { const q = (e.requirements || []).concat(e.recommended || []).find((x) => x.kind === 'quest' && li.textContent.includes(x.name)); if (q) { quests[q.name] = !quests[q.name]; saveQuests(); rerender(); } };
+  });
+  pane.querySelectorAll('button.show').forEach((b) => {
+    b.onclick = () => {
+      const m = e.expect.mechanics[+b.dataset.i];
+      const scene = (e.scenes || []).find((s) => s.id === m.scene) || (e.scenes || [])[0];
+      if (!scene) return;
+      openScene(scene.id);
+      const t = firstTickFor(scene, m);
+      sim.setMode('reenact');
+      sim.seek(t != null ? t : 0);
+      sim.play();
+      if (window.innerWidth <= 1000) $('#stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+  });
+}
+
+/* ---------------------------------------------------------------- encounter: kit */
+let setupIdx = 0;
+const WORN_LAYOUT = [[null, 'head', null], ['cape', 'neck', 'ammo'], ['weapon', 'body', 'shield'], [null, 'legs', null], ['hands', 'feet', 'ring']];
+function abbr(name) {
+  const w = name.replace(/\(.*?\)/g, '').trim().split(/\s+/);
+  return w.length === 1 ? w[0].slice(0, 5) : w.map((x) => x[0]).join('').slice(0, 4).toUpperCase();
+}
+function slot(item, opts = {}) {
+  const d = el('div', 'slot' + (item ? '' : ' empty') + (opts.why ? ' why' : ''));
+  if (!item) { if (opts.label) d.title = opts.label; return d; }
+  const icon = WIKI.icons[item];
+  if (icon) { const img = el('img'); img.src = icon; img.alt = item; d.appendChild(img); }
+  else d.appendChild(el('span', 'abbr', abbr(item)));
+  if (opts.qty > 1) d.appendChild(el('span', 'qty', String(opts.qty)));
+  d.dataset.item = item;
+  if (opts.why) d.dataset.why = opts.why;
+  d.addEventListener('mouseenter', showTip); d.addEventListener('mousemove', moveTip); d.addEventListener('mouseleave', hideTip);
+  d.addEventListener('click', (ev) => { showTip(ev); });
+  return d;
+}
+function showTip(ev) { const t = $('#tip'); const d = ev.currentTarget; t.innerHTML = `<b>${esc(d.dataset.item)}</b>${d.dataset.why ? esc(d.dataset.why) : ''}`; t.style.display = 'block'; moveTip(ev); }
+function moveTip(ev) { const t = $('#tip'); const x = Math.min(ev.clientX + 14, window.innerWidth - 290), y = Math.min(ev.clientY + 14, window.innerHeight - 80); t.style.left = x + 'px'; t.style.top = y + 'px'; }
+function hideTip() { $('#tip').style.display = 'none'; }
+function renderKit(e) {
+  const pane = $('#tab-kit');
+  pane.innerHTML = '';
+  const setups = e.bring.setups || [];
+  if (setupIdx >= setups.length) setupIdx = 0;
+  const h = el('h3'); h.innerHTML = `Setups <span class="n">hover an item for the why</span>`; pane.appendChild(h);
+  const tabs = el('div', 'setups');
+  setups.forEach((s, i) => { const b = el('button', 'btn' + (i === setupIdx ? ' on' : ''), s.name); b.onclick = () => { setupIdx = i; renderKit(e); syncFood(); }; tabs.appendChild(b); });
+  pane.appendChild(tabs);
+  const s = setups[setupIdx];
+  if (s) {
+    const kit = el('div', 'kit');
+    const worn = el('div', 'worn sunk');
+    for (const row of WORN_LAYOUT) for (const k of row) {
+      if (!k) { worn.appendChild(el('div', 'slot gap')); continue; }
+      worn.appendChild(slot(s.worn?.[k], { label: k }));
+    }
+    const inv = el('div', 'inv sunk');
+    let n = 0;
+    for (const it of s.inventory || []) {
+      const qty = Math.max(1, it.qty | 0);
+      for (let i = 0; i < qty && n < 28; i++, n++) inv.appendChild(slot(it.item, { why: it.why }));
+    }
+    for (; n < 28; n++) inv.appendChild(slot(null));
+    kit.appendChild(worn); kit.appendChild(inv);
+    pane.appendChild(kit);
+    const cnt = el('p', 'dim'); cnt.style.marginTop = '6px';
+    cnt.textContent = `${STYLE_LABEL[s.style === 'hybrid' ? 'typeless' : s.style] === 'Typeless' ? 'Hybrid' : STYLE_LABEL[s.style]} · ${Math.min(28, (s.inventory || []).reduce((a, it) => a + Math.max(1, it.qty | 0), 0))} of 28 slots`;
+    pane.appendChild(cnt);
+    if (s.notes && s.notes.length) { const ul = el('ul', 'notes kitnotes'); s.notes.forEach((t) => ul.appendChild(el('li', null, t))); pane.appendChild(ul); }
+  }
+  if (e.bring.musts && e.bring.musts.length) {
+    const h2 = el('h3'); h2.innerHTML = 'Don\'t leave without'; pane.appendChild(h2);
+    for (const m of e.bring.musts) { const d = el('div', 'must'); d.appendChild(slot(m.item, { why: m.why })); d.innerHTML += `<span><b>${esc(m.item)}</b>${m.why ? ' — ' + esc(m.why) : ''}</span>`; pane.appendChild(d); }
+    pane.querySelectorAll('.must .slot').forEach((d) => { d.addEventListener('mouseenter', showTip); d.addEventListener('mousemove', moveTip); d.addEventListener('mouseleave', hideTip); });
+  }
+  if (e.bring.notes && e.bring.notes.length) { const h3 = el('h3', null, 'Kit notes'); pane.appendChild(h3); const ul = el('ul', 'notes'); e.bring.notes.forEach((t) => ul.appendChild(el('li', null, t))); pane.appendChild(ul); }
+}
+function currentFood() {
+  const s = current?.bring?.setups?.[setupIdx];
+  const out = [];
+  for (const it of s?.inventory || []) {
+    const heal = FOOD[it.item];
+    if (!heal) continue;
+    const qty = Math.max(1, it.qty | 0) * (FOOD_DOSES[it.item] || 1);
+    out.push({ item: it.item, heal, qty });
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------- encounter: route & loot */
+function renderLoot(e) {
+  const pane = $('#tab-loot');
+  const route = Array.isArray(e.route) ? e.route : [e.route];
+  const parts = [`<h3>Getting there</h3><ol class="route">${route.map((r) => `<li>${esc(r)}</li>`).join('')}</ol>`];
+  parts.push('<h3>Why people go</h3>');
+  const uniq = el('div');
+  for (const u of e.loot.uniques || []) { const d = el('div', 'uniq'); d.appendChild(slot(u.item)); d.innerHTML += `<span><b>${esc(u.item)}</b>${u.note ? ' — ' + esc(u.note) : ''}</span>`; uniq.appendChild(d); }
+  parts.push(uniq.outerHTML);
+  if (e.loot.notes && e.loot.notes.length) parts.push(`<ul class="notes">${e.loot.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>`);
+  parts.push(`<h3>On the wiki</h3><p><a href="https://oldschool.runescape.wiki/w/${encodeURIComponent((e.wiki?.page || e.name).replace(/ /g, '_'))}" target="_blank" rel="noopener">${esc(e.wiki?.page || e.name)}</a> · <a href="https://oldschool.runescape.wiki/w/${encodeURIComponent((e.wiki?.page || e.name).replace(/ /g, '_'))}/Strategies" target="_blank" rel="noopener">strategies</a> — the source of the numbers here.</p>`);
+  pane.innerHTML = parts.join('');
+  pane.querySelectorAll('.uniq .slot').forEach((d) => { d.addEventListener('mouseenter', showTip); d.addEventListener('mousemove', moveTip); d.addEventListener('mouseleave', hideTip); });
+}
+
+/* ================================================================== 3D: the table */
+const T3 = THREE;
+const FLOOR = { stone: [0x5c5951, 0x534f48], sand: [0xb89c6a, 0xab9060], ice: [0xa3bccc, 0x95afc1], blood: [0x4d1f1f, 0x431a1a], cave: [0x45403b, 0x3b3733],
+  grass: [0x527c3c, 0x487034], metal: [0x56616c, 0x4b5560], swamp: [0x4c5c3d, 0x425335], dark: [0x2c2823, 0x241f1c] };
+const TILE_OVERRIDE = { water: 0x2f6a9a, lava: 0xd85a1e, pit: 0x120f0c };
+const STYLE_COLOR = { melee: 0xd9483b, ranged: 0x5cb85c, magic: 0x3f7fd9, typeless: 0xcfcfcf, none: 0x9a9a9a };
+const PRAY_COLOR = { melee: '#b3271e', ranged: '#2f8f2f', magic: '#2f5fc4' };
+const shade = (hex, f) => { const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255; const k = (v) => Math.max(0, Math.min(255, Math.round(v * f))); return (k(r) << 16) | (k(g) << 8) | k(b); };
+const cssHex = (c) => (typeof c === 'string' ? parseInt(c.replace('#', ''), 16) : c);
+const mat = (c, o) => new T3.MeshPhongMaterial(Object.assign({ color: c, flatShading: true, shininess: 6 }, o || {}));
+function box(w, h, d, c, x, y, z, o) { const m = new T3.Mesh(new T3.BoxGeometry(w, h, d), mat(c, o)); m.position.set(x, y, z); return m; }
+function sph(r, c, x, y, z, o, seg) { const m = new T3.Mesh(new T3.SphereGeometry(r, seg || 7, 5), mat(c, o)); m.position.set(x, y, z); return m; }
+function cone(r, h, c, x, y, z, seg) { const m = new T3.Mesh(new T3.ConeGeometry(r, h, seg || 6), mat(c)); m.position.set(x, y, z); return m; }
+function cyl(rt, rb, h, c, x, y, z, seg) { const m = new T3.Mesh(new T3.CylinderGeometry(rt, rb, h, seg || 7), mat(c)); m.position.set(x, y, z); return m; }
+const tileCenter = (x, y, size) => [x + (size || 1) / 2, -(y + (size || 1) / 2)];
+
+/* ---- canvas sprites: text, hitsplats, prayer icons ---- */
+const spriteCache = new Map();
+function textSprite(text, opts = {}) {
+  const key = `t|${text}|${opts.color}|${opts.size}`;
+  if (spriteCache.has(key)) return spriteCache.get(key).clone();
+  const c = document.createElement('canvas'), ctx = c.getContext('2d');
+  const font = `${opts.size || 28}px VT323, monospace`;
+  ctx.font = font;
+  const w = Math.ceil(ctx.measureText(text).width) + 12, h = (opts.size || 28) + 10;
+  c.width = w; c.height = h;
+  ctx.font = font; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#000'; ctx.fillText(text, w / 2 + 2, h / 2 + 2);
+  ctx.fillStyle = opts.color || '#ffff00'; ctx.fillText(text, w / 2, h / 2);
+  const tex = new T3.CanvasTexture(c); tex.minFilter = T3.LinearFilter;
+  const s = new T3.Sprite(new T3.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  const hh = opts.height || 0.45;
+  s.scale.set(hh * w / h, hh, 1);
+  s.renderOrder = 10;
+  spriteCache.set(key, s);
+  return s.clone();
+}
+function splatSprite(n, blocked) {
+  const c = document.createElement('canvas'); c.width = 44; c.height = 44;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = blocked ? '#2d5fb8' : '#c81e1e';
+  ctx.beginPath(); ctx.moveTo(22, 2); ctx.lineTo(42, 22); ctx.lineTo(22, 42); ctx.lineTo(2, 22); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = blocked ? '#173a75' : '#7a1111'; ctx.lineWidth = 2; ctx.strokeStyle = ctx.fillStyle; ctx.stroke();
+  ctx.font = '22px VT323, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff'; ctx.fillText(String(n), 22, 23);
+  const tex = new T3.CanvasTexture(c); tex.minFilter = T3.LinearFilter;
+  const s = new T3.Sprite(new T3.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  s.scale.set(0.55, 0.55, 1); s.renderOrder = 12;
+  return s;
+}
+function prayerCanvas(kind, px = 32) {
+  const c = document.createElement('canvas'); c.width = px; c.height = px;
+  const ctx = c.getContext('2d');
+  if (!kind || kind === 'none') { ctx.strokeStyle = '#6b5d45'; ctx.lineWidth = 2; ctx.strokeRect(6, 6, px - 12, px - 12); return c; }
+  ctx.fillStyle = PRAY_COLOR[kind]; ctx.beginPath(); ctx.arc(px / 2, px / 2, px / 2 - 2, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#1a1207'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  const m = px / 2;
+  if (kind === 'melee') { // crossed swords
+    ctx.beginPath(); ctx.moveTo(m - 7, m + 7); ctx.lineTo(m + 7, m - 7); ctx.moveTo(m + 7, m + 7); ctx.lineTo(m - 7, m - 7); ctx.stroke();
+  } else if (kind === 'ranged') { // an arrow
+    ctx.beginPath(); ctx.moveTo(m - 7, m + 7); ctx.lineTo(m + 6, m - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(m + 7, m - 7); ctx.lineTo(m + 7, m); ctx.lineTo(m, m - 7); ctx.closePath(); ctx.fill();
+  } else { // a spark
+    ctx.beginPath(); ctx.moveTo(m, m - 9); ctx.lineTo(m + 3, m - 3); ctx.lineTo(m + 9, m); ctx.lineTo(m + 3, m + 3); ctx.lineTo(m, m + 9); ctx.lineTo(m - 3, m + 3); ctx.lineTo(m - 9, m); ctx.lineTo(m - 3, m - 3); ctx.closePath(); ctx.fill();
+  }
+  return c;
+}
+const prayerTex = {};
+function prayerSprite(kind) {
+  const k = kind || 'none';
+  if (!prayerTex[k]) { prayerTex[k] = new T3.CanvasTexture(prayerCanvas(k, 48)); prayerTex[k].minFilter = T3.LinearFilter; }
+  const s = new T3.Sprite(new T3.SpriteMaterial({ map: prayerTex[k], transparent: true, depthTest: false }));
+  s.scale.set(0.55, 0.55, 1); s.renderOrder = 11;
+  return s;
+}
+function barSprite(pct, w = 1.6) {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 10;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#8b1a1a'; ctx.fillRect(0, 0, 64, 10);
+  ctx.fillStyle = '#3fbf3f'; ctx.fillRect(0, 0, Math.round(64 * pct / 100), 10);
+  const tex = new T3.CanvasTexture(c); tex.minFilter = T3.LinearFilter;
+  const s = new T3.Sprite(new T3.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  s.scale.set(w, w * 10 / 64, 1); s.renderOrder = 11;
+  return s;
+}
+
+/* ---- actor shapes ---- */
+function skinFor(c) { return 0xd9a77c; }
+function shapeBiped(s, c, o = {}) {
+  const g = new T3.Group(); const k = (o.k || 0.95) * (o.flat ? 1 : Math.sqrt(s));
+  const skin = o.skin || skinFor(c), dark = shade(c, 0.7);
+  g.add(box(0.5 * k, 0.6 * k, 0.32 * k, c, 0, 0.95 * k, 0));
+  g.add(box(0.34 * k, 0.34 * k, 0.34 * k, skin, 0, 1.45 * k, 0));
+  g.add(box(0.2 * k, 0.65 * k, 0.24 * k, dark, -0.14 * k, 0.33 * k, 0));
+  g.add(box(0.2 * k, 0.65 * k, 0.24 * k, dark, 0.14 * k, 0.33 * k, 0));
+  g.add(box(0.16 * k, 0.56 * k, 0.18 * k, skin, -0.36 * k, 0.95 * k, 0));
+  g.add(box(0.16 * k, 0.56 * k, 0.18 * k, skin, 0.36 * k, 0.95 * k, 0));
+  if (o.weapon) g.add(box(0.08 * k, 0.9 * k, 0.08 * k, 0x9aa0a8, 0.44 * k, 1.05 * k, -0.25 * k));
+  if (o.horns) { g.add(cone(0.08 * k, 0.3 * k, 0x2b2320, -0.14 * k, 1.75 * k, 0)); g.add(cone(0.08 * k, 0.3 * k, 0x2b2320, 0.14 * k, 1.75 * k, 0)); }
+  if (o.wings) { const w1 = box(0.9 * k, 0.05, 0.7 * k, dark, -0.6 * k, 1.2 * k, 0.15 * k); w1.rotation.z = 0.5; const w2 = w1.clone(); w2.position.x *= -1; w2.rotation.z = -0.5; g.add(w1, w2); g.userData.wings = [w1, w2]; }
+  g.userData.height = 1.75 * k;
+  return g;
+}
+function shapeSerpent(s, c) {
+  const g = new T3.Group(); const n = 6, segs = [];
+  const dark = shade(c, 0.75);
+  for (let i = 0; i < n; i++) {
+    const r = (0.42 - i * 0.045) * s * 0.55;
+    const m = sph(r, i % 2 ? dark : c, 0, 0.35 * s + Math.max(0, (2 - i)) * 0.35 * s, (-0.45 + i * 0.28) * s * 0.9);
+    g.add(m); segs.push(m);
+  }
+  const head = box(0.5 * s * 0.55, 0.36 * s * 0.55, 0.7 * s * 0.55, c, 0, 1.15 * s, -0.7 * s * 0.9);
+  head.rotation.x = 0.35; g.add(head); segs.unshift(head);
+  const e1 = sph(0.05 * s, 0xffe95c, -0.12 * s * 0.55, 1.2 * s, -0.95 * s * 0.9, { emissive: 0xffe95c }, 5); const e2 = e1.clone(); e2.position.x *= -1; g.add(e1, e2);
+  g.userData.segs = segs; g.userData.height = 1.5 * s;
+  return g;
+}
+function shapeDragon(s, c) {
+  const g = new T3.Group(); const dark = shade(c, 0.7);
+  const k = s * 0.32;
+  g.add(box(1.3 * k, 0.8 * k, 1.9 * k, c, 0, 0.9 * k, 0));
+  const neck = box(0.5 * k, 0.5 * k, 1.1 * k, c, 0, 1.4 * k, -1.2 * k); neck.rotation.x = 0.6; g.add(neck);
+  g.add(box(0.55 * k, 0.45 * k, 0.9 * k, dark, 0, 1.95 * k, -1.9 * k));
+  const tail = cone(0.3 * k, 1.8 * k, dark, 0, 0.8 * k, 1.8 * k); tail.rotation.x = -Math.PI / 2 - 0.2; g.add(tail);
+  const w1 = box(1.9 * k, 0.06, 1.1 * k, dark, -1.4 * k, 1.35 * k, 0.1 * k); w1.rotation.z = 0.35;
+  const w2 = w1.clone(); w2.position.x *= -1; w2.rotation.z = -0.35; g.add(w1, w2);
+  for (const sx of [-0.5, 0.5]) for (const sz of [-0.6, 0.6]) g.add(box(0.3 * k, 0.9 * k, 0.3 * k, dark, sx * k, 0.45 * k, sz * k));
+  g.userData.wings = [w1, w2]; g.userData.height = 2.6 * k;
+  return g;
+}
+function shapeOlm(s, c) {
+  const g = new T3.Group(); const k = s * 0.2, dark = shade(c, 0.65);
+  const head = box(3.2 * k, 2.2 * k, 2.4 * k, c, 0, 1.0 * k, 0); head.rotation.x = -0.35; g.add(head);
+  const jaw = box(2.6 * k, 0.6 * k, 2.0 * k, dark, 0, 0.2 * k, -0.4 * k); jaw.rotation.x = -0.2; g.add(jaw);
+  for (let i = -1; i <= 1; i++) g.add(cone(0.3 * k, 1.1 * k, dark, i * 0.9 * k, 2.4 * k, 0.3 * k));
+  const eye = sph(0.3 * k, 0xa6ff4d, -0.9 * k, 1.5 * k, -1.15 * k, { emissive: 0x4dff4d, emissiveIntensity: 0.6 }, 6); const eye2 = eye.clone(); eye2.position.x *= -1; g.add(eye, eye2);
+  g.userData.eyes = [eye, eye2]; g.userData.height = 2.8 * k;
+  return g;
+}
+function shapeHand(s, c) {
+  const g = new T3.Group(); const k = s * 0.22, dark = shade(c, 0.75);
+  g.add(box(3 * k, 0.9 * k, 2.6 * k, c, 0, 0.45 * k, 0.3 * k));
+  for (let i = 0; i < 4; i++) g.add(box(0.55 * k, 0.6 * k, 1.5 * k, dark, (-1.1 + i * 0.73) * k, 0.4 * k, -1.6 * k));
+  g.add(box(0.6 * k, 0.6 * k, 1.1 * k, dark, 1.6 * k, 0.4 * k, 0.4 * k));
+  g.userData.height = 1.2 * k;
+  return g;
+}
+function shapeQuadruped(s, c, o = {}) {
+  const g = new T3.Group(); const k = s * 0.36, dark = shade(c, 0.7);
+  g.add(box(0.9 * k, 0.65 * k, 1.5 * k, c, 0, 0.8 * k, 0));
+  g.add(box(0.55 * k, 0.5 * k, 0.6 * k, dark, 0, 1.15 * k, -0.95 * k));
+  if (o.heads === 3) { g.add(box(0.4 * k, 0.4 * k, 0.5 * k, dark, -0.45 * k, 1.05 * k, -0.85 * k)); g.add(box(0.4 * k, 0.4 * k, 0.5 * k, dark, 0.45 * k, 1.05 * k, -0.85 * k)); }
+  for (const sx of [-0.3, 0.3]) for (const sz of [-0.5, 0.5]) g.add(box(0.22 * k, 0.8 * k, 0.22 * k, dark, sx * k, 0.4 * k, sz * k));
+  const tail = cone(0.1 * k, 0.8 * k, dark, 0, 1.0 * k, 0.95 * k); tail.rotation.x = -Math.PI / 2 + 0.5; g.add(tail);
+  g.add(cone(0.08 * k, 0.25 * k, dark, -0.18 * k, 1.5 * k, -0.95 * k)); g.add(cone(0.08 * k, 0.25 * k, dark, 0.18 * k, 1.5 * k, -0.95 * k));
+  g.userData.height = 1.6 * k;
+  return g;
+}
+function shapeSpider(s, c) {
+  const g = new T3.Group(); const k = s * 0.3, dark = shade(c, 0.7);
+  g.add(sph(0.42 * k, c, 0, 0.55 * k, -0.2 * k)); g.add(sph(0.6 * k, dark, 0, 0.7 * k, 0.65 * k));
+  for (let i = 0; i < 4; i++) for (const sx of [-1, 1]) {
+    const leg = box(1.3 * k, 0.08 * k, 0.08 * k, dark, sx * 0.7 * k, 0.55 * k, (-0.45 + i * 0.3) * k);
+    leg.rotation.z = sx * 0.55; leg.rotation.y = sx * (i - 1.5) * 0.25; g.add(leg);
+  }
+  const e = sph(0.06 * k, 0xff4d4d, -0.15 * k, 0.7 * k, -0.55 * k, { emissive: 0xff2020 }, 5); const e2 = e.clone(); e2.position.x *= -1; g.add(e, e2);
+  g.userData.height = 1.1 * k;
+  return g;
+}
+function shapeRat(s, c) {
+  const g = new T3.Group(); const k = s * 0.36, dark = shade(c, 0.7);
+  const body = sph(0.5 * k, c, 0, 0.5 * k, 0.1 * k); body.scale.set(1, 0.95, 1.5); g.add(body);
+  const head = cone(0.3 * k, 0.7 * k, dark, 0, 0.5 * k, -0.9 * k); head.rotation.x = -Math.PI / 2; g.add(head);
+  g.add(sph(0.12 * k, dark, -0.18 * k, 0.8 * k, -0.6 * k, null, 5)); g.add(sph(0.12 * k, dark, 0.18 * k, 0.8 * k, -0.6 * k, null, 5));
+  const tail = cyl(0.03 * k, 0.06 * k, 1.3 * k, 0xc79a86, 0, 0.2 * k, 1.35 * k); tail.rotation.x = Math.PI / 2; g.add(tail);
+  g.userData.height = 0.9 * k;
+  return g;
+}
+function shapeBlob(s, c) {
+  const g = new T3.Group(); const k = s * 0.45;
+  const b = sph(1.0 * k, c, 0, 0.75 * k, 0, { transparent: true, opacity: 0.92 }, 8); b.scale.set(1, 0.75, 1); g.add(b);
+  g.add(sph(0.4 * k, shade(c, 1.3), 0, 1.2 * k, -0.4 * k, null, 6));
+  g.userData.blob = b; g.userData.height = 1.6 * k;
+  return g;
+}
+function shapeBird(s, c) {
+  const g = new T3.Group(); const k = s * 0.3, dark = shade(c, 0.7);
+  const body = sph(0.55 * k, c, 0, 2.0 * k, 0); body.scale.set(0.8, 0.8, 1.3); g.add(body);
+  g.add(cone(0.2 * k, 0.6 * k, 0xf0c040, 0, 2.0 * k, -0.95 * k).rotateX(-Math.PI / 2));
+  const w1 = box(2.4 * k, 0.05, 0.9 * k, dark, -1.4 * k, 2.1 * k, 0); const w2 = w1.clone(); w2.position.x *= -1; g.add(w1, w2);
+  g.userData.wings = [w1, w2]; g.userData.hover = true; g.userData.height = 2.8 * k;
+  return g;
+}
+function shapeOrb(s, c) {
+  const g = new T3.Group(); const k = s * 0.5;
+  g.add(sph(0.45 * k, c, 0, 1.0 * k, 0, { emissive: c, emissiveIntensity: 0.5 }, 8));
+  g.userData.hover = true; g.userData.height = 1.6 * k;
+  return g;
+}
+function shapeCrystal(s, c) {
+  const g = new T3.Group(); const k = s * 0.5;
+  const m = new T3.Mesh(new T3.OctahedronGeometry(0.55 * k), mat(c, { emissive: c, emissiveIntensity: 0.35 })); m.position.y = 0.6 * k; g.add(m);
+  g.userData.spin = m; g.userData.height = 1.3 * k;
+  return g;
+}
+function shapeWorm(s, c) {
+  const g = new T3.Group(); const k = s * 0.45;
+  for (let i = 0; i < 3; i++) g.add(sph((0.42 - i * 0.06) * k, i % 2 ? shade(c, 0.75) : c, 0, (0.3 + i * 0.6) * k, 0));
+  g.add(sph(0.3 * k, shade(c, 0.5), 0, 1.9 * k, -0.15 * k, null, 6));
+  g.userData.height = 2.2 * k;
+  return g;
+}
+function shapeKraken(s, c) {
+  const g = new T3.Group(); const k = s * 0.25, dark = shade(c, 0.7);
+  g.add(sph(1.1 * k, c, 0, 0.9 * k, 0, null, 8));
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const t = cone(0.22 * k, 2.2 * k, dark, Math.cos(a) * 1.4 * k, 0.9 * k, Math.sin(a) * 1.4 * k); t.rotation.z = Math.cos(a) * 0.7; t.rotation.x = -Math.sin(a) * 0.7; g.add(t); }
+  const e = sph(0.15 * k, 0xffe95c, -0.4 * k, 1.2 * k, -1.0 * k, { emissive: 0xffe95c }, 5); const e2 = e.clone(); e2.position.x *= -1; g.add(e, e2);
+  g.userData.height = 2.2 * k;
+  return g;
+}
+function shapeBeetle(s, c) {
+  const g = new T3.Group(); const k = s * 0.3, dark = shade(c, 0.7);
+  const b = sph(0.9 * k, c, 0, 0.6 * k, 0.1 * k, null, 8); b.scale.set(1.1, 0.55, 1.4); g.add(b);
+  g.add(box(0.7 * k, 0.4 * k, 0.6 * k, dark, 0, 0.5 * k, -1.3 * k));
+  g.add(cone(0.12 * k, 0.9 * k, dark, 0, 0.9 * k, -1.7 * k).rotateX(-0.9));
+  for (let i = 0; i < 3; i++) for (const sx of [-1, 1]) { const leg = box(0.9 * k, 0.07 * k, 0.07 * k, dark, sx * 0.9 * k, 0.35 * k, (-0.5 + i * 0.5) * k); leg.rotation.z = sx * 0.4; g.add(leg); }
+  g.userData.height = 1.1 * k;
+  return g;
+}
+function shapePillar(s, c) {
+  const g = new T3.Group(); const k = s * 0.5;
+  g.add(cyl(0.35 * k, 0.45 * k, 2.2 * k, c, 0, 1.1 * k, 0, 8));
+  g.add(cyl(0.5 * k, 0.5 * k, 0.15 * k, shade(c, 0.7), 0, 0.08 * k, 0, 8));
+  g.userData.height = 2.4 * k;
+  return g;
+}
+function buildShape(a) {
+  const c = cssHex(a.color || '#8a8a8a'), s = a.size || 1;
+  switch (a.shape) {
+    case 'biped': return shapeBiped(s, c, { flat: s === 1 });
+    case 'giant': return shapeBiped(s, c, { k: 1.25, weapon: true });
+    case 'skeleton': return shapeBiped(s, c, { skin: 0xe8e2cc, weapon: true });
+    case 'golem': return shapeBiped(s, c, { k: 1.15, skin: shade(c, 0.85) });
+    case 'demon': return shapeBiped(s, c, { k: 1.2, skin: shade(c, 0.9), horns: true, wings: true });
+    case 'serpent': return shapeSerpent(s, c);
+    case 'dragon': return shapeDragon(s, c);
+    case 'olm': return shapeOlm(s, c);
+    case 'hand': return shapeHand(s, c);
+    case 'quadruped': return shapeQuadruped(s, c, { heads: /cerberus/i.test(a.label || '') ? 3 : 1 });
+    case 'wolf': return shapeQuadruped(s, c);
+    case 'spider': return shapeSpider(s, c);
+    case 'rat': return shapeRat(s, c);
+    case 'blob': return shapeBlob(s, c);
+    case 'bird': return shapeBird(s, c);
+    case 'orb': return shapeOrb(s, c);
+    case 'crystal': return shapeCrystal(s, c);
+    case 'worm': return shapeWorm(s, c);
+    case 'kraken': return shapeKraken(s, c);
+    case 'beetle': return shapeBeetle(s, c);
+    case 'pillar': return shapePillar(s, c);
+    default: return shapeBiped(s, c);
+  }
+}
+
+/* ---- the view ---- */
+const view = {
+  renderer: null, scene: null, camera: null, arena: null, actorsG: null, fxG: null, floorMesh: null,
+  cam: { yaw: 0, pitch: 0.95, dist: 20, tx: 0, tz: 0 }, dangerPool: [], safePool: [], actorObjs: new Map(), w: 10, h: 10,
+  init() {
+    const stage = $('#stage');
+    this.renderer = new T3.WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setClearColor(0x0a0806, 1);
+    stage.insertBefore(this.renderer.domElement, stage.firstChild);
+    this.scene = new T3.Scene();
+    this.scene.fog = new T3.Fog(0x0a0806, 40, 90);
+    this.camera = new T3.PerspectiveCamera(42, 1, 0.1, 400);
+    const hemi = new T3.HemisphereLight(0xd9e2ee, 0x3a2e21, 0.85); this.scene.add(hemi);
+    const sun = new T3.DirectionalLight(0xfff1d6, 0.9); sun.position.set(-8, 16, 10); this.scene.add(sun);
+    const fill = new T3.DirectionalLight(0x9fb3d9, 0.25); fill.position.set(10, 8, -12); this.scene.add(fill);
+    this.actorsG = new T3.Group(); this.fxG = new T3.Group(); this.scene.add(this.actorsG, this.fxG);
+    this.raycaster = new T3.Raycaster();
+    new ResizeObserver(() => this.resize()).observe(stage);
+    this.resize();
+    this.bindPointer();
+  },
+  resize() {
+    const stage = $('#stage'); const w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) return;
+    this.renderer.setSize(w, h, false);
+    this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+  },
+  setArena(scene) {
+    if (this.arena) this.scene.remove(this.arena);
+    this.arena = new T3.Group();
+    const a = scene.arena; const w = this.w = a.w, h = this.h = a.h;
+    const [c1, c2] = FLOOR[a.floor || 'stone'] || FLOOR.stone;
+    const over = new Map();
+    for (const f of a.features || []) if (TILE_OVERRIDE[f.kind] != null) for (let y = f.y; y < f.y + (f.h || 1); y++) for (let x = f.x; x < f.x + (f.w || 1); x++) over.set(`${x},${y}`, TILE_OVERRIDE[f.kind]);
+    const pos = [], col = [], idx = [];
+    let vi = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const base = over.get(`${x},${y}`) ?? ((x + y) % 2 ? c1 : c2);
+      const jitter = 1 + (((x * 7 + y * 13) % 5) - 2) * 0.012;
+      const c = new T3.Color(base).multiplyScalar(jitter);
+      const z0 = -y, z1 = -(y + 1);
+      pos.push(x, 0, z0, x + 1, 0, z0, x + 1, 0, z1, x, 0, z1);
+      for (let i = 0; i < 4; i++) col.push(c.r, c.g, c.b);
+      idx.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3); vi += 4;   // counter-clockwise seen from above: the normal points up
+    }
+    const geo = new T3.BufferGeometry();
+    geo.setAttribute('position', new T3.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new T3.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    this.floorMesh = new T3.Mesh(geo, new T3.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 2, side: T3.DoubleSide }));
+    this.arena.add(this.floorMesh);
+    // grid
+    const gp = [];
+    for (let x = 0; x <= w; x++) gp.push(x, 0.006, 0, x, 0.006, -h);
+    for (let y = 0; y <= h; y++) gp.push(0, 0.006, -y, w, 0.006, -y);
+    const gg = new T3.BufferGeometry(); gg.setAttribute('position', new T3.Float32BufferAttribute(gp, 3));
+    this.arena.add(new T3.LineSegments(gg, new T3.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22 })));
+    // walls
+    if (a.walls !== false) {
+      const wc = shade(c2, 0.75), th = 0.35, hh = 1.1;
+      this.arena.add(box(w + 2 * th, hh, th, wc, w / 2, hh / 2, th / 2));
+      this.arena.add(box(w + 2 * th, hh, th, wc, w / 2, hh / 2, -h - th / 2));
+      this.arena.add(box(th, hh, h, wc, -th / 2, hh / 2, -h / 2));
+      this.arena.add(box(th, hh, h, wc, w + th / 2, hh / 2, -h / 2));
+    }
+    // features
+    for (const f of a.features || []) {
+      const fw = f.w || 1, fh = f.h || 1; const [cx, cz] = [f.x + fw / 2, -(f.y + fh / 2)];
+      const fc = f.color ? cssHex(f.color) : null;
+      let obj = null;
+      if (f.kind === 'pillar') obj = box(fw * 0.9, f.height || 3, fh * 0.9, fc || 0x6f6960, cx, (f.height || 3) / 2, cz);
+      else if (f.kind === 'block') obj = box(fw, 1.2, fh, fc || 0x4f4941, cx, 0.6, cz);
+      else if (f.kind === 'rock') { obj = new T3.Mesh(new T3.DodecahedronGeometry(0.42 * Math.max(fw, fh)), mat(fc || 0x6b6357)); obj.position.set(cx, 0.35, cz); obj.rotation.set(f.x * 0.7, f.y * 1.3, 0); }
+      else if (f.kind === 'altar') { obj = new T3.Group(); obj.add(box(fw * 0.9, 0.8, fh * 0.9, fc || 0x3d3b5c, cx, 0.4, cz)); obj.add(box(fw * 1.0, 0.12, fh * 1.0, shade(fc || 0x3d3b5c, 1.3), cx, 0.86, cz)); }
+      else if (f.kind === 'portal') { obj = new T3.Group(); const ring = new T3.Mesh(new T3.TorusGeometry(0.6, 0.09, 6, 14), mat(fc || 0x7ad0ff, { emissive: fc || 0x7ad0ff, emissiveIntensity: 0.5 })); ring.position.set(cx, 0.9, cz); obj.add(ring); const disc = new T3.Mesh(new T3.CircleGeometry(0.52, 14), new T3.MeshBasicMaterial({ color: fc || 0x7ad0ff, transparent: true, opacity: 0.35, side: T3.DoubleSide })); disc.position.set(cx, 0.9, cz); obj.add(disc); }
+      if (obj) this.arena.add(obj);
+      if (f.label) { const sp = textSprite(f.label, { color: f.kind === 'marker' ? (f.color || '#ffe95c') : '#f0e6d2', size: 26, height: 0.4 }); sp.position.set(cx, (f.kind === 'pillar' ? (f.height || 3) : f.kind === 'marker' ? 0.05 : 1.1) + 0.35, cz); this.arena.add(sp); }
+      if (f.kind === 'marker') { const o = new T3.LineLoop(new T3.BufferGeometry().setFromPoints([new T3.Vector3(f.x + 0.06, 0.01, -f.y - 0.06), new T3.Vector3(f.x + fw - 0.06, 0.01, -f.y - 0.06), new T3.Vector3(f.x + fw - 0.06, 0.01, -f.y - fh + 0.06), new T3.Vector3(f.x + 0.06, 0.01, -f.y - fh + 0.06)]), new T3.LineBasicMaterial({ color: fc || 0xffe95c })); this.arena.add(o); }
+    }
+    this.scene.add(this.arena);
+    this.resetCam();
+  },
+  resetCam() {
+    const d = Math.max(this.w, this.h);
+    this.cam = { yaw: 0, pitch: 0.92, dist: d * 1.25 + 4, tx: this.w / 2, tz: -this.h / 2 };
+    // fog is scenery, not a wall: keep it well behind the far edge of the arena
+    this.scene.fog.near = this.cam.dist * 2.2; this.scene.fog.far = this.cam.dist * 4.5;
+  },
+  applyCam() {
+    const c = this.cam;
+    const px = c.tx + Math.sin(c.yaw) * Math.cos(c.pitch) * c.dist;
+    const pz = c.tz + Math.cos(c.yaw) * Math.cos(c.pitch) * c.dist;
+    const py = Math.sin(c.pitch) * c.dist;
+    this.camera.position.set(px, py, pz);
+    this.camera.lookAt(c.tx, 0.4, c.tz);
+  },
+  clearActors() { while (this.actorsG.children.length) this.actorsG.remove(this.actorsG.children[0]); this.actorObjs.clear(); },
+  addActor(rec) {
+    const a = rec.def;
+    const g = buildShape(a);
+    const wrap = new T3.Group(); wrap.add(g);
+    wrap.userData = { id: a.id, model: g, kind: a.kind };
+    const sh = new T3.Mesh(new T3.CircleGeometry(0.42 * (a.size || 1), 12), new T3.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32 }));
+    sh.rotation.x = -Math.PI / 2; sh.position.y = 0.012; wrap.add(sh); wrap.userData.shadow = sh;
+    const hgt = g.userData.height || 1.6;
+    if (a.kind === 'boss' || a.kind === 'add' || a.kind === 'npc') { const lbl = textSprite(a.label || a.id, { color: a.kind === 'boss' ? '#ffe95c' : '#f0e6d2', size: 24, height: 0.36 }); lbl.position.y = hgt + 0.55; wrap.add(lbl); wrap.userData.label = lbl; }
+    if (a.kind === 'team') { const lbl = textSprite(a.label || 'Teammate', { color: '#6fd7c8', size: 22, height: 0.32 }); lbl.position.y = hgt + 0.35; wrap.add(lbl); }
+    if (a.hp != null) { const bar = barSprite(100, Math.max(1.2, (a.size || 1) * 0.8)); bar.position.y = hgt + 0.25; wrap.add(bar); wrap.userData.bar = bar; }
+    this.actorsG.add(wrap);
+    this.actorObjs.set(a.id, wrap);
+    return wrap;
+  },
+  removeActor(id) { const o = this.actorObjs.get(id); if (o) { this.actorsG.remove(o); this.actorObjs.delete(id); } },
+  setBar(id, pct) {
+    const o = this.actorObjs.get(id); if (!o || !o.userData.bar) return;
+    const old = o.userData.bar; const nb = barSprite(pct, old.scale.x); nb.position.copy(old.position); o.remove(old); o.add(nb); o.userData.bar = nb;
+  },
+  addPlayer(rec, color) {
+    const g = shapeBiped(1, cssHex(color || '#3b6fd6'), { flat: true });
+    const wrap = new T3.Group(); wrap.add(g); wrap.userData = { id: 'player', model: g, kind: 'player' };
+    const sh = new T3.Mesh(new T3.CircleGeometry(0.4, 12), new T3.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32 })); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.012; wrap.add(sh);
+    const ring = new T3.LineLoop(new T3.BufferGeometry().setFromPoints([new T3.Vector3(-0.47, 0.02, -0.47), new T3.Vector3(0.47, 0.02, -0.47), new T3.Vector3(0.47, 0.02, 0.47), new T3.Vector3(-0.47, 0.02, 0.47)]), new T3.LineBasicMaterial({ color: 0xffe95c })); wrap.add(ring);
+    wrap.userData.pray = null;
+    this.actorsG.add(wrap); this.actorObjs.set('player', wrap);
+    return wrap;
+  },
+  setPlayerPrayer(kind) {
+    const o = this.actorObjs.get('player'); if (!o) return;
+    if (o.userData.praySprite) { o.remove(o.userData.praySprite); o.userData.praySprite = null; }
+    if (kind && kind !== 'none') { const s = prayerSprite(kind); s.position.y = (o.userData.model.userData.height || 1.7) + 0.4; o.add(s); o.userData.praySprite = s; }
+  },
+  // per-frame: positions, facing, idle animation, effects
+  frame(now, sim) {
+    const t = performance.now() / 1000;
+    for (const [id, o] of this.actorObjs) {
+      const rec = id === 'player' ? sim.player : sim.actors.get(id);
+      if (!rec) continue;
+      const size = id === 'player' ? 1 : (rec.def.size || 1);
+      const k = Math.max(0, Math.min(1, now - Math.floor(now)));
+      const px = rec.prev[0] + (rec.cur[0] - rec.prev[0]) * k, py = rec.prev[1] + (rec.cur[1] - rec.prev[1]) * k;
+      const [wx, wz] = tileCenter(px, py, size);
+      o.position.set(wx, 0, wz);
+      o.visible = rec.alive !== false || (rec.anim && rec.anim.kind === 'die' && now - rec.anim.t0 < 2);
+      const model = o.userData.model, ud = model.userData;
+      // facing
+      const dx = rec.cur[0] - rec.prev[0], dy = rec.cur[1] - rec.prev[1];
+      let face = rec.face;
+      if (dx || dy) face = [dx, dy];
+      if (face) { const target = Math.atan2(-face[0], face[1]); o.rotation.y = target; }
+      // idle & anims
+      let y = 0, sy = 1, rz = 0;
+      if (ud.hover) y = 0.15 * Math.sin(t * 2 + o.position.x);
+      if (ud.wings) { const f = Math.sin(t * 6) * 0.35; ud.wings[0].rotation.z = 0.35 + f; ud.wings[1].rotation.z = -0.35 - f; }
+      if (ud.segs) ud.segs.forEach((m, i) => { m.position.x = Math.sin(t * 3 + i * 0.8) * 0.12 * size; });
+      if (ud.blob) ud.blob.scale.y = 0.75 + Math.sin(t * 3) * 0.05;
+      if (ud.spin) ud.spin.rotation.y = t * 1.2;
+      if (id === 'player' || o.userData.kind === 'team') { if (dx || dy) { model.children[2].rotation.x = Math.sin(t * 14) * 0.5; model.children[3].rotation.x = -Math.sin(t * 14) * 0.5; } else { model.children[2].rotation.x = model.children[3].rotation.x = 0; } }
+      const an = rec.anim;
+      if (an) {
+        const e = now - an.t0;
+        if (an.kind === 'slam') { sy = e < 0.5 ? 1 - e * 0.5 : 1 - (1 - e) * 0.5; if (e > 1) rec.anim = null; }
+        else if (an.kind === 'lunge') { const fx = Math.sin(Math.min(1, e) * Math.PI); o.position.x += -Math.sin(o.rotation.y) * fx * 0.35; o.position.z += -Math.cos(o.rotation.y) * fx * 0.35; if (e > 1) rec.anim = null; }
+        else if (an.kind === 'rise') { y = -1.5 * (1 - Math.min(1, e / 2)); if (e > 2) rec.anim = null; }
+        else if (an.kind === 'sink') { y = -1.5 * Math.min(1, e / 2); }
+        else if (an.kind === 'spin') { o.rotation.y = t * 8; if (e > 2) rec.anim = null; }
+        else if (an.kind === 'die') { rz = Math.min(1, e / 1.5) * Math.PI / 2; y = -0.2 * Math.min(1, e / 1.5); if (e > 2) { o.visible = false; } }
+        else if (an.kind === 'flash') { model.traverse((m) => { if (m.material && m.material.emissive) m.material.emissive.setHex(e < 0.6 ? 0xffffff : 0x000000); }); if (e > 0.6) { rec.anim = null; } }
+        else if (an.kind === 'shield') { if (!o.userData.shield) { const sh = sph(Math.max(0.9, size * 0.8), 0x7fd0ff, 0, (ud.height || 1.6) * 0.5, 0, { transparent: true, opacity: 0.28, emissive: 0x7fd0ff, emissiveIntensity: 0.4 }, 10); o.add(sh); o.userData.shield = sh; } }
+      }
+      if (o.userData.shield && (!an || an.kind !== 'shield')) { o.remove(o.userData.shield); o.userData.shield = null; }
+      if (an && an.kind === 'shield') o.userData.shield.material.opacity = 0.22 + 0.1 * Math.sin(t * 4);
+      o.position.y = y; model.scale.y = sy; model.rotation.z = rz;
+      if (o.userData.shadow) o.userData.shadow.visible = y > -0.5;
+    }
+    // effects: danger / safe tiles, projectiles, splats, overheads
+    while (this.fxG.children.length) this.fxG.remove(this.fxG.children[0]);
+    const pulse = 0.35 + 0.15 * Math.sin(t * 9);
+    for (const d of sim.dangers) {
+      if (now < d.t0 || now >= d.t1 + 0.35) continue;
+      const late = Math.max(0, Math.min(1, (now - d.t0) / Math.max(0.01, d.t1 - d.t0)));
+      const m = new T3.MeshBasicMaterial({ color: d.color ? cssHex(d.color) : 0xff2a1a, transparent: true, opacity: now >= d.t1 ? 0.8 : pulse + late * 0.25, depthWrite: false });
+      for (const [x, y] of d.tiles) { const p = new T3.Mesh(new T3.PlaneGeometry(0.94, 0.94), m); p.rotation.x = -Math.PI / 2; p.position.set(x + 0.5, 0.018, -(y + 0.5)); this.fxG.add(p); }
+    }
+    for (const s of sim.safes) {
+      if (now < s.t0 || now >= s.t1) continue;
+      const m = new T3.MeshBasicMaterial({ color: 0x5cff5c, transparent: true, opacity: 0.28, depthWrite: false });
+      for (const [x, y] of s.tiles) { const p = new T3.Mesh(new T3.PlaneGeometry(0.94, 0.94), m); p.rotation.x = -Math.PI / 2; p.position.set(x + 0.5, 0.016, -(y + 0.5)); this.fxG.add(p); }
+    }
+    if (sim.walkTarget) { const [x, y] = sim.walkTarget; const o = new T3.LineLoop(new T3.BufferGeometry().setFromPoints([new T3.Vector3(x + 0.08, 0.02, -y - 0.08), new T3.Vector3(x + 0.92, 0.02, -y - 0.08), new T3.Vector3(x + 0.92, 0.02, -y - 0.92), new T3.Vector3(x + 0.08, 0.02, -y - 0.92)]), new T3.LineBasicMaterial({ color: 0xff3a1a })); this.fxG.add(o); }
+    for (const p of sim.projectiles) {
+      if (now < p.t0 || now > p.t1) continue;
+      const k = (now - p.t0) / Math.max(0.01, p.t1 - p.t0);
+      const tgt = this.actorObjs.get(p.to); if (!tgt) continue;
+      const tx = tgt.position.x, tz = tgt.position.z, ty = 0.9;
+      const x = p.from[0] + (tx - p.from[0]) * k, z = p.from[2] + (tz - p.from[2]) * k, y = p.from[1] + (ty - p.from[1]) * k + Math.sin(k * Math.PI) * 1.4;
+      const m = sph(p.style === 'melee' ? 0.001 : 0.14, STYLE_COLOR[p.style] || 0xffffff, x, y, z, { emissive: STYLE_COLOR[p.style] || 0xffffff, emissiveIntensity: 0.7 }, 6);
+      this.fxG.add(m);
+    }
+    for (const s of sim.splats) {
+      const e = now - s.t; if (e < 0 || e > 1.1) continue;
+      const tgt = this.actorObjs.get(s.actor); if (!tgt) continue;
+      const sp = splatSprite(s.dmg, s.dmg === 0);
+      sp.position.set(tgt.position.x, 0.9 + e * 0.5 + (s.slot || 0) * 0.5, tgt.position.z);
+      sp.material.opacity = e < 0.8 ? 1 : 1 - (e - 0.8) / 0.3;
+      this.fxG.add(sp);
+    }
+    for (const o of sim.overheads) {
+      if (now < o.t0 || now > o.t1) continue;
+      const tgt = this.actorObjs.get(o.actor); if (!tgt) continue;
+      const sp = textSprite(o.text, { color: '#ffff00', size: 30, height: 0.5 });
+      sp.position.set(tgt.position.x, (tgt.userData.model.userData.height || 1.6) + 1.0, tgt.position.z);
+      this.fxG.add(sp);
+    }
+    this.applyCam();
+    this.renderer.render(this.scene, this.camera);
+  },
+  bindPointer() {
+    const cv = this.renderer.domElement;
+    let drag = null, moved = 0, pinch = null;
+    const ptrs = new Map();
+    cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); drag = { x: e.clientX, y: e.clientY, b: e.button, alt: e.shiftKey }; moved = 0; if (ptrs.size === 2) { const p = [...ptrs.values()]; pinch = { d: Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]), dist: this.cam.dist }; } });
+    cv.addEventListener('pointermove', (e) => {
+      if (!ptrs.has(e.pointerId)) return;
+      ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      if (ptrs.size === 2 && pinch) { const p = [...ptrs.values()]; const d = Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]); this.cam.dist = Math.max(4, Math.min(140, pinch.dist * pinch.d / d)); moved = 99; return; }
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
+      if (drag.b === 2 || drag.b === 1 || drag.alt) { const s = this.cam.dist * 0.0018; this.cam.tx -= (dx * Math.cos(this.cam.yaw) - dy * Math.sin(this.cam.yaw)) * s * -1; this.cam.tz -= (dx * Math.sin(this.cam.yaw) + dy * Math.cos(this.cam.yaw)) * s * -1; }
+      else { this.cam.yaw -= dx * 0.008; this.cam.pitch = Math.max(0.25, Math.min(1.45, this.cam.pitch + dy * 0.006)); }
+    });
+    const up = (e) => {
+      ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null;
+      if (drag && moved < 5 && drag.b === 0) this.click(e.clientX, e.clientY);
+      if (ptrs.size === 0) drag = null;
+    };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('wheel', (e) => { e.preventDefault(); this.cam.dist = Math.max(4, Math.min(140, this.cam.dist * (1 + Math.sign(e.deltaY) * 0.1))); }, { passive: false });
+    cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  },
+  click(cx, cy) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const m = new T3.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    this.raycaster.setFromCamera(m, this.camera);
+    const hitsA = this.raycaster.intersectObjects(this.actorsG.children, true);
+    for (const h of hitsA) { let o = h.object; while (o && !o.userData.id) o = o.parent; if (o && o.userData.id && o.visible && !(h.object instanceof T3.Sprite)) { this.onActor && this.onActor(o.userData.id); return; } }
+    if (!this.floorMesh) return;
+    const hit = this.raycaster.intersectObject(this.floorMesh)[0];
+    if (hit) { const x = Math.floor(hit.point.x), y = Math.floor(-hit.point.z); if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.onTile && this.onTile(x, y); }
+  },
+};
+
+/* ================================================================== the tick engine */
+const LAND = 0.7;   // visual delay so a hit lands as the walker arrives on the tile
+function mulberry(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function areaTiles(ev, w, h) {
+  if (ev.tiles) return ev.tiles.filter(([x, y]) => x >= 0 && y >= 0 && x < w && y < h);
+  const a = ev.area || {}; const out = [];
+  const push = (x, y) => { if (x >= 0 && y >= 0 && x < w && y < h) out.push([x, y]); };
+  if (a.kind === 'rect') for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) push(x, y);
+  else if (a.kind === 'square') for (let y = a.y - a.r; y <= a.y + a.r; y++) for (let x = a.x - a.r; x <= a.x + a.r; x++) push(x, y);
+  else if (a.kind === 'ring') for (let y = a.y - a.r; y <= a.y + a.r; y++) for (let x = a.x - a.r; x <= a.x + a.r; x++) if (Math.max(Math.abs(x - a.x), Math.abs(y - a.y)) === a.r) push(x, y);
+  else if (a.kind === 'row') for (let x = 0; x < w; x++) push(x, a.y);
+  else if (a.kind === 'col') for (let y = 0; y < h; y++) push(a.x, y);
+  else if (a.kind === 'line') { const n = Math.max(Math.abs(a.x2 - a.x1), Math.abs(a.y2 - a.y1)); for (let i = 0; i <= n; i++) push(Math.round(a.x1 + (a.x2 - a.x1) * i / (n || 1)), Math.round(a.y1 + (a.y2 - a.y1) * i / (n || 1))); }
+  return out;
+}
+function pathBetween(from, to, ticks) {
+  const n = Math.max(1, ticks | 0); const out = [];
+  for (let i = 1; i <= n; i++) out.push([Math.round(from[0] + (to[0] - from[0]) * i / n), Math.round(from[1] + (to[1] - from[1]) * i / n)]);
+  return out;
+}
+// where the reenactment's player stands at the end of every tick (the validator's semantics)
+function guidePositions(scene) {
+  const pos = []; let cur = [scene.player.x, scene.player.y]; const paths = [];
+  for (const ev of scene.script) if (ev.type === 'move' && ev.actor === 'player') {
+    const dist = Math.max(Math.abs(ev.to[0] - cur[0]), Math.abs(ev.to[1] - cur[1]));
+    const path = pathBetween(cur, ev.to, ev.ticks || Math.max(1, Math.ceil(dist / 2)));
+    path.forEach((p, i) => { paths[ev.t + i] = p; }); cur = ev.to;
+  }
+  cur = [scene.player.x, scene.player.y];
+  for (let t = 0; t <= scene.length; t++) { if (paths[t]) cur = paths[t]; pos[t] = cur; }
+  return pos;
+}
+function synthScene(e) {
+  const mechs = e.expect.mechanics; const w = 14, h = 12;
+  const script = [{ t: 0, type: 'note', text: `${e.name} has no bespoke scene yet, so this is a generic rotation built from its mechanics list: each attack with the prayer that answers it, each floor mechanic as a tile to step off.` }];
+  let t = 2;
+  for (const m of mechs) {
+    const st = m.style || 'typeless';
+    script.push({ t, type: 'note', text: `${m.name}: ${m.cue} → ${m.response}` });
+    if (['melee', 'ranged', 'magic'].includes(st)) { script.push({ t, type: 'attack', from: 'boss', style: st, max: 20, hit: st === 'melee' ? 1 : 2, label: m.name, cue: m.cue }); t += 5; }
+    else if (st === 'typeless') { script.push({ t, type: 'aoe', label: m.name, tiles: [[6, 5], [7, 5], [5, 5]], warn: 3, max: 20 }); script.push({ t: t + 1, type: 'move', actor: 'player', to: [6, 4] }); script.push({ t: t + 5, type: 'move', actor: 'player', to: [6, 5] }); t += 8; }
+    else t += 3;
+  }
+  return { id: 'generic', name: e.name, subtitle: 'a generic rotation from the mechanics list — no bespoke scene yet', synthetic: true,
+    arena: { w, h, floor: 'stone', walls: true, features: [] },
+    actors: [{ id: 'boss', kind: 'boss', label: e.name, shape: 'biped', size: 3, x: 6, y: 6, color: '#8a6a4a', hp: 100 }],
+    player: { x: 6, y: 5 }, length: t + 2, script };
+}
+
+const sim = {
+  scene: null, t: 0, frac: 0, playing: false, speed: 1, mode: 'reenact', raf: 0, last: 0,
+  actors: new Map(), player: null, dangers: [], safes: [], projectiles: [], splats: [], overheads: [], pending: [], log: [],
+  walkTarget: null, note: '', noteTick: 0, chat: [], phase: '', phaseTick: -99, dead: false, finished: false, verdicts: [],
+  load(scene) { this.scene = scene; this.guidePos = guidePositions(scene); this.reset(); },
+  maxHp() { return (sheet && sheet.skills && sheet.skills.Hitpoints) || 99; },
+  reset() {
+    const s = this.scene;
+    this.actors = new Map();
+    for (const a of s.actors || []) this.actors.set(a.id, { def: a, prev: [a.x, a.y], cur: [a.x, a.y], path: [], hp: a.hp != null ? 100 : null, alive: true, anim: null, face: null });
+    const food = currentFood().map((f) => ({ ...f }));
+    this.player = { prev: [s.player.x, s.player.y], cur: [s.player.x, s.player.y], path: [], hp: this.maxHp(), pray: 'none', food, alive: true, anim: null, face: [0, 1] };
+    this.dangers = []; this.safes = []; this.projectiles = []; this.splats = []; this.overheads = []; this.pending = []; this.log = []; this.verdicts = [];
+    this.walkTarget = null; this.note = ''; this.noteTick = 0; this.chat = []; this.phase = ''; this.phaseTick = -99; this.dead = false; this.finished = false;
+    this.t = 0; this.frac = 0;
+    this.applyTick(0);
+    this.sync(true);
+  },
+  seek(T) {
+    T = Math.max(0, Math.min(this.scene.length, T | 0));
+    const wasPlaying = this.playing;
+    if (T < this.t) { this.reset(); }
+    while (this.t < T) { this.t++; this.applyTick(this.t); }
+    this.frac = 0;
+    for (const r of this.actors.values()) r.prev = r.cur;
+    this.player.prev = this.player.cur;
+    this.sync(true);
+    if (!wasPlaying) this.playing = false;
+  },
+  fire(ev) {
+    const t = this.t, s = this.scene, W = s.arena.w, H = s.arena.h;
+    switch (ev.type) {
+      case 'attack': {
+        const from = this.actors.get(ev.from); if (!from) break;
+        const [fx, fz] = tileCenter(from.cur[0], from.cur[1], from.def.size || 1);
+        from.face = [this.player.cur[0] - from.cur[0] - (from.def.size || 1) / 2 + 0.5, this.player.cur[1] - from.cur[1] - (from.def.size || 1) / 2 + 0.5];
+        const hit = ev.hit | 0;
+        if (ev.style === 'melee' || hit === 0) from.anim = { kind: 'lunge', t0: t };
+        else { from.anim = { kind: 'flash', t0: t }; this.projectiles.push({ from: [fx, (view.actorObjs.get(ev.from)?.userData.model.userData.height || 1.5) * 0.6, fz], to: 'player', t0: t + 0.1, t1: t + hit + LAND, style: ev.style }); }
+        if (ev.cue) this.say(`${from.def.label || ev.from}: ${ev.cue}`, 'x');
+        const need = ev.pray === undefined ? (ev.style === 'typeless' ? null : ev.style) : ev.pray;
+        this.pending.push({ due: t + hit, kind: 'attack', ev, need, prio: 1 });
+        if (this.mode === 'reenact' && need) this.pending.push({ due: Math.max(t, t + hit - 1), kind: 'autopray', pray: need, prio: 0 });
+        break;
+      }
+      case 'aoe': {
+        let tiles = areaTiles(ev, W, H);
+        if (this.mode === 'drill' && tiles.length <= 9 && this.guidePos) {
+          // a small pattern that was aimed at the guide's tile is aimed at *you* in the drill
+          const g = this.guidePos[Math.max(0, t - 1)], g2 = this.guidePos[t];
+          const aimed = tiles.some(([x, y]) => (x === g[0] && y === g[1]) || (x === g2[0] && y === g2[1]));
+          if (aimed) {
+            const anchor = tiles.find(([x, y]) => x === g[0] && y === g[1]) || tiles.find(([x, y]) => x === g2[0] && y === g2[1]);
+            const dx = this.player.cur[0] - anchor[0], dy = this.player.cur[1] - anchor[1];
+            tiles = tiles.map(([x, y]) => [Math.max(0, Math.min(W - 1, x + dx)), Math.max(0, Math.min(H - 1, y + dy))]);
+          }
+        }
+        this.dangers.push({ tiles, t0: t, t1: t + ev.warn + LAND, label: ev.label, color: ev.color });
+        this.pending.push({ due: t + ev.warn, kind: 'aoe', ev, tiles, prio: 1 });
+        if (ev.note) this.say(ev.note, 'x');
+        break;
+      }
+      case 'move': {
+        const rec = ev.actor === 'player' ? (this.mode === 'reenact' ? this.player : null) : this.actors.get(ev.actor);
+        if (!rec) break;
+        const dist = Math.max(Math.abs(ev.to[0] - rec.cur[0]), Math.abs(ev.to[1] - rec.cur[1]));
+        rec.path = pathBetween(rec.cur, ev.to, ev.ticks || Math.max(1, Math.ceil(dist / 2)));
+        break;
+      }
+      case 'say': this.overheads.push({ actor: ev.actor, text: ev.text, t0: t, t1: t + (ev.dur || 3) }); this.say(`${ev.actor === 'player' ? 'You' : (this.actors.get(ev.actor)?.def.label || ev.actor)}: ${ev.text}`, 'y'); break;
+      case 'msg': this.say(ev.text, 'g'); break;
+      case 'note': if (this.mode === 'reenact') { this.note = ev.text; this.noteTick = t; } break;
+      case 'phase': this.phase = ev.name; this.phaseTick = t; this.say(`— ${ev.name} —`, 'y'); break;
+      case 'spawn': { const a = ev.actor; this.actors.set(a.id, { def: a, prev: [a.x, a.y], cur: [a.x, a.y], path: [], hp: a.hp != null ? 100 : null, alive: true, anim: { kind: 'rise', t0: t }, face: null }); break; }
+      case 'despawn': { const r = this.actors.get(ev.actor); if (r) r.alive = false; break; }
+      case 'safe': this.safes.push({ tiles: areaTiles(ev, W, H), t0: t, t1: t + ev.dur, label: ev.label }); break;
+      case 'pray': if (this.mode === 'reenact') this.player.pray = ev.pray; break;
+      case 'hp': { const r = this.actors.get(ev.actor); if (r) r.hp = ev.pct; break; }
+      case 'anim': { const r = this.actors.get(ev.actor); if (r) { r.anim = { kind: ev.kind, t0: t }; if (ev.kind === 'die') r.dying = true; } break; }
+      case 'face': { const r = this.actors.get(ev.actor); if (!r) break; const d = { n: [0, 1], s: [0, -1], e: [1, 0], w: [-1, 0] }[ev.dir]; r.face = d || [this.player.cur[0] - r.cur[0], this.player.cur[1] - r.cur[1]]; break; }
+    }
+  },
+  say(text, cls) { this.chat.push({ text, cls, t: this.t }); if (this.chat.length > 40) this.chat.shift(); },
+  applyTick(t) {
+    for (const ev of this.scene.script) if (ev.t === t) this.fire(ev);
+    // movement
+    for (const r of this.actors.values()) { r.prev = r.cur; if (r.path.length) r.cur = r.path.shift(); }
+    const p = this.player; p.prev = p.cur;
+    if (this.mode === 'drill') {
+      if (this.walkTarget) {
+        let [x, y] = p.cur; const [tx, ty] = this.walkTarget;
+        for (let i = 0; i < 2 && (x !== tx || y !== ty); i++) { x += Math.sign(tx - x); y += Math.sign(ty - y); }
+        p.cur = [x, y]; if (x === tx && y === ty) this.walkTarget = null;
+      }
+    } else if (p.path.length) p.cur = p.path.shift();
+    // resolutions
+    const due = this.pending.filter((q) => q.due === t).sort((a, b) => a.prio - b.prio);
+    this.pending = this.pending.filter((q) => q.due !== t);
+    let slot = 0;
+    for (const q of due) {
+      if (q.kind === 'autopray') { p.pray = q.pray; continue; }
+      const rng = mulberry(t * 7919 + slot * 131 + (this.scene.id.length || 1));
+      if (q.kind === 'attack') {
+        const ev = q.ev; const blocked = q.need && p.pray === q.need;
+        let dmg = 0;
+        if (!blocked) dmg = rng() < 0.82 ? 1 + Math.floor(rng() * Math.max(1, ev.max)) : 0;
+        if (blocked || ev.max === 0) dmg = 0;
+        this.splats.push({ actor: 'player', dmg, t: t + LAND, slot: slot++ });
+        p.hp -= dmg;
+        const res = blocked ? 'prayed' : q.need ? 'unprayed' : 'unblockable';
+        this.log.push({ t, kind: 'attack', label: ev.label, res, dmg, need: q.need, had: p.pray });
+        if (this.mode === 'drill') this.verdict(blocked ? `✓ ${ev.label} — ${PRAY_LABEL[q.need]} was up` : q.need ? `✗ ${ev.label} — needed ${PRAY_LABEL[q.need]}, you had ${PRAY_LABEL[p.pray] || 'none'}: ${dmg}` : `· ${ev.label} — no prayer helps: ${dmg}`, blocked);
+      } else if (q.kind === 'aoe') {
+        const on = q.tiles.some(([x, y]) => x === p.cur[0] && y === p.cur[1]);
+        const dmg = on ? Math.max(1, Math.round(q.ev.max * (0.6 + rng() * 0.4))) : 0;
+        if (on) { this.splats.push({ actor: 'player', dmg, t: t + LAND, slot: slot++ }); p.hp -= dmg; }
+        this.log.push({ t, kind: 'aoe', label: q.ev.label, res: on ? 'hit' : 'dodged', dmg });
+        if (this.mode === 'drill') this.verdict(on ? `✗ ${q.ev.label} — you were standing in it: ${dmg}` : `✓ ${q.ev.label} — stepped clear`, !on);
+      }
+    }
+    if (p.hp <= 0) {
+      if (this.mode === 'drill') { p.hp = 0; this.dead = true; this.say('Oh dear, you are dead!', 'r'); }
+      else { p.hp = this.maxHp(); this.say('(the guide would have brewed up here — no deaths on the table)', 'g'); }
+    } else if (this.mode === 'reenact' && p.hp <= this.maxHp() * 0.55) this.eat(true);
+    for (const r of this.actors.values()) if (r.dying && r.anim && t - r.anim.t0 >= 2) { r.alive = false; r.dying = false; }
+    if (t >= this.scene.length) this.finished = true;
+  },
+  verdict(text, good) { this.verdicts.push({ text, good, t: this.t }); if (this.verdicts.length > 3) this.verdicts.shift(); },
+  eat(auto) {
+    const p = this.player; const f = p.food.filter((x) => x.qty > 0).sort((a, b) => b.heal - a.heal)[0];
+    if (!f) { if (!auto) this.say('You have no food left.', 'r'); return; }
+    f.qty--; p.hp = Math.min(this.maxHp() + (f.item.includes('brew') ? 16 : 0), p.hp + f.heal);
+    this.say(`You ${f.item.includes('(4)') ? 'drink a dose of the' : 'eat the'} ${f.item.replace(/\(4\)$/, '').toLowerCase()}.`, 'g');
+    syncFood();
+  },
+  setPrayer(k) { if (this.mode !== 'drill') return; this.player.pray = k; this.sync(false); },
+  clickTile(x, y) {
+    if (this.mode !== 'drill') { showExamine(`tile ${x}, ${y}`); return; }
+    const feats = this.scene.arena.features || [];
+    if (feats.some((f) => ['pillar', 'block', 'rock', 'altar'].includes(f.kind) && x >= f.x && x < f.x + (f.w || 1) && y >= f.y && y < f.y + (f.h || 1))) return;
+    this.walkTarget = [x, y];
+    if (!this.playing && !this.dead && !this.finished) this.play();
+  },
+  setMode(m) {
+    if (this.mode === m) return;
+    this.mode = m; this.playing = false;
+    $('#mode').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+    $('#score').classList.toggle('hidden', m !== 'drill');
+    $('#food').classList.toggle('hidden', m !== 'drill');
+    this.reset();
+    if (m === 'drill') { this.note = ''; hideOverlay(); }
+    this.sync(true);
+  },
+  play() { if (this.dead || (this.finished && this.mode === 'drill')) return; this.playing = true; this.last = performance.now(); $('#bPlay').textContent = '❚❚'; },
+  pause() { this.playing = false; $('#bPlay').textContent = '▶'; },
+  toggle() { this.playing ? this.pause() : this.play(); },
+  tickForward() { if (this.t >= this.scene.length) { if (this.mode === 'reenact') { this.reset(); if (this.playing) this.play(); return; } this.finish(); return; } this.t++; this.frac = 0; this.applyTick(this.t); this.sync(false); if (this.finished && this.mode === 'drill') this.finish(); if (this.dead) this.finish(); },
+  frame(now) {
+    if (this.playing) {
+      const dt = (now - this.last) / 1000; this.last = now;
+      this.frac += dt * this.speed / 0.6;
+      let guard = 0;
+      while (this.frac >= 1 && guard++ < 20 && this.playing) { this.frac -= 1; this.tickForward(); }
+    }
+    view.frame(this.t + Math.min(0.999, this.frac), this);
+    this.raf = requestAnimationFrame((n) => this.frame(n));
+  },
+  finish() {
+    this.pause();
+    const p = this.player; const atk = this.log.filter((l) => l.kind === 'attack' && l.need), aoe = this.log.filter((l) => l.kind === 'aoe');
+    const prayed = atk.filter((l) => l.res === 'prayed').length, dodged = aoe.filter((l) => l.res === 'dodged').length;
+    const taken = this.log.reduce((a, l) => a + l.dmg, 0);
+    const mistakes = this.log.filter((l) => l.res === 'unprayed' || l.res === 'hit');
+    let grade = 'S'; const mh = this.maxHp();
+    if (this.dead) grade = 'dead'; else if (taken > mh * 0.9) grade = 'C'; else if (taken > mh * 0.4) grade = 'B'; else if (taken > 0) grade = 'A';
+    const title = this.dead ? 'Oh dear, you are dead!' : `Rotation survived — grade ${grade}`;
+    const text = `Prayed ${prayed} of ${atk.length} prayable attacks, stepped clear of ${dodged} of ${aoe.length} floor mechanics, took ${taken} damage${this.dead ? ' and died at tick ' + this.t : ''}. ${mistakes.length ? 'Click a mistake to watch the guide play that moment.' : 'Nothing to fix — try it at 2×.'}`;
+    showOverlay(title, text, mistakes.map((l) => ({ text: `${l.label}: ${l.res === 'unprayed' ? `needed ${PRAY_LABEL[l.need]}, had ${PRAY_LABEL[l.had] || 'none'}` : 'stood in it'} (${l.dmg})`, t: l.t, bad: true })),
+      [['Try again', () => { hideOverlay(); this.reset(); this.play(); }], ['Watch the guide', () => { hideOverlay(); this.setMode('reenact'); this.play(); }]]);
+  },
+  // push state to the HUD (and, when `full`, reconcile the 3D actors)
+  sync(full) {
+    if (full) {
+      for (const id of [...view.actorObjs.keys()]) if (id !== 'player' && !this.actors.has(id)) view.removeActor(id);
+      for (const [id, r] of this.actors) { if (!r.alive && !r.dying) { view.removeActor(id); continue; } if (!view.actorObjs.has(id)) view.addActor(r); if (r.hp != null) view.setBar(id, r.hp); }
+      if (!view.actorObjs.has('player')) view.addPlayer(this.player);
+    }
+    view.setPlayerPrayer(this.player.pray);
+    renderHud();
+  },
+};
+
+/* ================================================================== HUD */
+function renderHud() {
+  const s = sim.scene; if (!s) return;
+  $('#tick').innerHTML = `t <b>${sim.t}</b> / ${s.length} <small>${(sim.t * 0.6).toFixed(1)}s</small>`;
+  $('#scrub').value = sim.t;
+  const note = $('#note');
+  if (sim.mode === 'drill') {
+    const v = sim.verdicts.map((x) => `<div style="color:${x.good ? '#2a6b1f' : '#9b1c1c'}">${esc(x.text)}</div>`).join('');
+    note.innerHTML = `<b>Drill</b>read the cue in the chat, pick the prayer (<b>1</b> melee · <b>2</b> missiles · <b>3</b> magic · <b>\`</b> none), click a tile to step off the floor.${v ? '<div style="margin-top:4px">' + v + '</div>' : ''}`;
+  } else note.innerHTML = sim.note ? `<b>t${sim.noteTick}</b>${esc(sim.note)}` : `<b>Reenact</b>the guide plays this one: watch the overhead and the steps, scrub the clock, then switch to <b>Drill</b>.`;
+  $('#chat').innerHTML = sim.chat.slice(-4).map((c) => `<div class="${c.cls}">${esc(c.text)}</div>`).join('');
+  const banner = $('#phaseBanner'); banner.textContent = sim.phase; banner.style.opacity = sim.phase && sim.t - sim.phaseTick < 4 ? 1 : 0;
+  const p = sim.player, mh = sim.maxHp();
+  $('#hpbar').firstElementChild.style.width = `${Math.max(0, Math.min(100, p.hp / mh * 100))}%`;
+  $('#hpnum').textContent = `${Math.max(0, p.hp)} / ${mh}`;
+  $('#prayers').querySelectorAll('.pray').forEach((b) => b.classList.toggle('on', (b.dataset.p || 'none') === (p.pray || 'none')));
+  const bars = $('#bossBars'); bars.innerHTML = '';
+  for (const r of sim.actors.values()) if (r.hp != null && r.alive && (r.def.kind === 'boss' || r.def.kind === 'add')) { const d = el('div', 'bossbar'); d.innerHTML = `<div class="nm"><span>${esc(r.def.label || r.def.id)}</span><span>${r.hp}%</span></div><div class="bar"><i style="width:${r.hp}%"></i></div>`; bars.appendChild(d); }
+  if (sim.mode === 'drill') {
+    const atk = sim.log.filter((l) => l.kind === 'attack' && l.need), aoe = sim.log.filter((l) => l.kind === 'aoe');
+    $('#score').innerHTML = `prayed <em>${atk.filter((l) => l.res === 'prayed').length}</em>/${atk.length} · dodged <em>${aoe.filter((l) => l.res === 'dodged').length}</em>/${aoe.length} · taken <i>${sim.log.reduce((a, l) => a + l.dmg, 0)}</i>`;
+  }
+  syncFood();
+}
+function syncFood() {
+  if (!sim.player) return;
+  const f = sim.player.food.filter((x) => x.qty > 0);
+  const total = f.reduce((a, x) => a + x.qty, 0);
+  const best = f.sort((a, b) => b.heal - a.heal)[0];
+  $('#food').textContent = total ? `🍖 ${total} food · ${best.item.replace(/\(4\)$/, '')} heals ${best.heal} (E)` : '🍖 no food in this setup';
+}
+function showExamine(text) { const x = $('#examine'); x.textContent = text; x.style.display = 'block'; clearTimeout(showExamine.tm); showExamine.tm = setTimeout(() => { x.style.display = 'none'; }, 3500); }
+function showOverlay(title, text, items, btns) {
+  $('#ovTitle').textContent = title; $('#ovText').textContent = text;
+  const ul = $('#ovList'); ul.innerHTML = '';
+  for (const it of items) { const li = el('li', it.bad ? 'bad' : 'good'); li.innerHTML = `<span class="t">t${it.t}</span>${esc(it.text)}`; li.onclick = () => { hideOverlay(); sim.setMode('reenact'); sim.seek(Math.max(0, it.t - 4)); sim.play(); }; ul.appendChild(li); }
+  const bb = $('#ovBtns'); bb.innerHTML = '';
+  for (const [label, fn] of btns) { const b = el('button', 'btn', label); b.onclick = fn; bb.appendChild(b); }
+  $('#overlay').style.display = 'flex';
+}
+function hideOverlay() { $('#overlay').style.display = 'none'; }
+function buildPrayerButtons() {
+  const root = $('#prayers'); root.innerHTML = '';
+  for (const [k, key, label] of [['melee', '1', 'melee'], ['ranged', '2', 'missiles'], ['magic', '3', 'magic'], ['none', '`', 'none']]) {
+    const b = el('button', 'pray'); b.dataset.p = k; b.title = `${PRAY_LABEL[k]} (${key})`;
+    b.appendChild(prayerCanvas(k, 32)); b.appendChild(el('span', null, label));
+    b.onclick = () => { if (sim.mode !== 'drill') { sim.setMode('drill'); } sim.setPrayer(k); };
+    root.appendChild(b);
+  }
+}
+function renderMarks() {
+  const s = sim.scene; const root = $('#marks'); root.innerHTML = '';
+  $('#scrub').max = s.length;
+  for (const ev of s.script) {
+    if (!['attack', 'aoe', 'phase', 'note', 'spawn'].includes(ev.type)) continue;
+    const i = el('i', ev.type + (ev.type === 'attack' ? ' ' + ev.style : ''));
+    i.style.left = `${(ev.t / s.length) * 100}%`;
+    i.title = `t${ev.t} · ${ev.label || ev.name || ev.text || ev.actor?.label || ev.type}`;
+    i.onclick = () => { sim.seek(ev.t); };
+    root.appendChild(i);
+  }
+}
+
+/* ================================================================== the encounter view */
+let viewReady = false;
+function openScene(id) {
+  const e = current; if (!e) return;
+  const scenes = e.scenes && e.scenes.length ? e.scenes : [synthScene(e)];
+  const sc = scenes.find((s) => s.id === id) || scenes[0];
+  $('#sceneTabs').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.s === sc.id));
+  if (!viewReady) { view.init(); viewReady = true; buildPrayerButtons(); sim.frame(performance.now()); }
+  view.onTile = (x, y) => sim.clickTile(x, y);
+  view.onActor = (aid) => {
+    const r = aid === 'player' ? null : sim.actors.get(aid);
+    if (!r) { showExamine('Examine: that is you — hp ' + sim.player.hp + '.'); return; }
+    const lbl = r.def.label || aid;
+    let ex = null;
+    for (const m of e.wiki?.monsters || []) { const st = monsterStats(m); if (st && st.examine && ((m.label || m.page).toLowerCase() === lbl.toLowerCase() || m.page.toLowerCase().includes(lbl.toLowerCase()) || lbl.toLowerCase().includes(m.page.toLowerCase()))) { ex = st.examine; break; } }
+    showExamine(`Examine ${lbl}: ${ex || (r.def.kind === 'team' ? 'a teammate — someone else\'s problem.' : 'no examine on the wiki for this one.')}`);
+  };
+  $('#sceneTitle').innerHTML = `${esc(sc.name)}<small>${esc(sc.subtitle || '')}${sc.synthetic ? '' : ' · one scripted rotation, not a simulation'}</small>`;
+  sim.pause();
+  hideOverlay();
+  view.setArena(sc);
+  view.clearActors();
+  sim.load(sc);
+  renderMarks();
+  const h = `#${e.id}/${sc.id}`;
+  if (location.hash !== h) history.replaceState(null, '', h);
+}
+function renderHeader(e) {
+  const img = $('#encPort'); img.src = `data/sand-table/portraits/${e.id}.png`; img.style.display = ''; img.onerror = () => { img.style.display = 'none'; };
+  $('#encName').textContent = e.name;
+  $('#encAka').textContent = e.aka && e.aka.length ? e.aka.join(' · ') : '';
+  $('#encTag').textContent = e.tagline;
+  $('#encMeta').innerHTML = `${skulls(e.difficulty)}<span class="chip dim">${esc(GROUP_LABEL[e.group] || e.group)}</span><span class="chip dim">${esc(e.region)}</span><span class="chip dim">${esc(e.team)}</span>${e.release ? `<span class="chip dim">${esc(e.release)}</span>` : ''}`;
+  const r = readiness(e); const kcs = kcOf(e) || [];
+  $('#encRight').innerHTML = `<span class="chip ${r === 'ready' ? 'ok' : r === 'blocked' ? 'bad' : 'dim'}"><span class="pip ${r === 'ready' ? 'ok' : r === 'blocked' ? 'bad' : 'unk'}"></span>${r === 'ready' ? 'requirements met' : r === 'blocked' ? 'requirements not met' : 'enter a name to check'}</span>${kcs.map((k) => `<span class="chip"><b>${k.kc.toLocaleString()}</b> ${esc(k.name)} kc</span>`).join('')}`;
+}
+function openEncounter(id, sceneId) {
+  const e = ST.enc[id]; if (!e) { location.hash = ''; return; }
+  current = e; setupIdx = 0;
+  $('#board').classList.add('hidden'); $('#enc').classList.remove('hidden');
+  renderHeader(e); renderBrief(e); renderKit(e); renderLoot(e);
+  const tabs = $('#sceneTabs'); tabs.innerHTML = '';
+  const scenes = e.scenes && e.scenes.length ? e.scenes : [synthScene(e)];
+  for (const s of scenes) { const b = el('button', 'btn', s.name); b.dataset.s = s.id; b.title = s.subtitle || ''; b.onclick = () => openScene(s.id); tabs.appendChild(b); }
+  document.title = `${e.name} — Sand Table`;
+  window.scrollTo(0, 0);
+  openScene(sceneId || scenes[0].id);
+}
+function closeEncounter() {
+  sim.pause(); current = null;
+  $('#enc').classList.add('hidden'); $('#board').classList.remove('hidden');
+  document.title = 'Sand Table — OSRS boss & raid rehearsals in 3D';
+  renderBoard();
+}
+function rerender() {
+  if (!$('#board').classList.contains('hidden')) renderBoard();
+  if (current) { renderHeader(current); renderBrief(current); renderKit(current); }
+}
+function route() {
+  const h = decodeURIComponent(location.hash.replace(/^#/, ''));
+  if (!h) { if (current || $('#board').classList.contains('hidden')) closeEncounter(); return; }
+  const [id, scene] = h.split('/');
+  if (current && current.id === id) { if (scene && sim.scene && sim.scene.id !== scene) openScene(scene); return; }
+  openEncounter(id, scene);
+}
+
+/* ---- controls ---- */
+$('#back').onclick = () => { location.hash = ''; };
+$('#home').onclick = () => { location.hash = ''; };
+$('#left').querySelectorAll('.tabs .btn').forEach((b) => { b.onclick = () => { $('#left').querySelectorAll('.tabs .btn').forEach((x) => x.classList.toggle('on', x === b)); ['brief', 'kit', 'loot'].forEach((k) => $(`#tab-${k}`).classList.toggle('hidden', k !== b.dataset.tab)); }; });
+$('#bPlay').onclick = () => sim.toggle();
+$('#bRestart').onclick = () => { hideOverlay(); sim.reset(); };
+$('#bBack').onclick = () => { sim.pause(); sim.seek(sim.t - 1); };
+$('#bFwd').onclick = () => { sim.pause(); if (sim.t < sim.scene.length) { sim.tickForward(); } };
+$('#bCam').onclick = () => view.resetCam();
+$('#scrub').addEventListener('input', (e) => { sim.pause(); sim.seek(+e.target.value); });
+$('#speed').querySelectorAll('button').forEach((b) => { b.onclick = () => { sim.speed = +b.dataset.s; $('#speed').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); }; });
+$('#mode').querySelectorAll('button').forEach((b) => { b.onclick = () => sim.setMode(b.dataset.m); });
+$('#food').onclick = () => { if (sim.mode === 'drill') sim.eat(false); };
+document.addEventListener('keydown', (e) => {
+  if (!current || e.target.matches('input,textarea,select')) return;
+  const k = e.key;
+  if (k === ' ') { e.preventDefault(); sim.toggle(); }
+  else if (k === 'ArrowRight') { e.preventDefault(); sim.pause(); if (sim.t < sim.scene.length) sim.tickForward(); }
+  else if (k === 'ArrowLeft') { e.preventDefault(); sim.pause(); sim.seek(sim.t - 1); }
+  else if (k === '1' || k === '2' || k === '3' || k === '`' || k === '0' || k === '4') { if (sim.mode !== 'drill') sim.setMode('drill'); sim.setPrayer({ '1': 'melee', '2': 'ranged', '3': 'magic' }[k] || 'none'); if (!sim.playing && !sim.dead && !sim.finished) sim.play(); }
+  else if (k === 'e' || k === 'E') { if (sim.mode === 'drill') sim.eat(false); }
+  else if (k === 'r' || k === 'R') { hideOverlay(); sim.reset(); }
+  else if (k === 'c' || k === 'C') view.resetCam();
+  else if (k === 'Escape') { location.hash = ''; }
+});
+window.addEventListener('hashchange', route);
+
+/* ---- go ---- */
+window.__sandTable = { view, sim, ST };   // a debug handle for the console and the test harness
+Promise.all([loadEncounters(), loadWiki()]).then(() => {
+  renderBoard();
+  route();
+  if (current) { renderBrief(current); renderKit(current); renderLoot(current); }
+  const ld = $('#loading'); ld.style.opacity = 0; setTimeout(() => ld.remove(), 400);
+});
+})();
+</script>
+</body>
+</html>

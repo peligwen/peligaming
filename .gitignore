@@ -4,3 +4,4 @@ node_modules/
 __pycache__/
 .naval-cache/
 .recipes-cache/
+.sand-table-cache/
