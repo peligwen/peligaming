@@ -295,11 +295,17 @@ already on screen — it makes them readable, it does not reveal anything the
 client had not already drawn. One upside of reading the finished frame is
 that whatever other plugins draw on the minimap comes up magnified with it.
 
-### How it's built
+### Where it lives, and how it's built
 
-- `runelite/minimap-loupe/` is a standalone Gradle project, laid out like
-  RuneLite's own [example plugin](https://github.com/runelite/example-plugin)
-  so it can be split out to its own repository unchanged.
+The plugin's source is **not in this repository**. RuneLite's Plugin Hub
+builds a plugin from the root of a git repository it clones, so the project is
+the root of its own —
+[peligwen/minimap-loupe](https://github.com/peligwen/minimap-loupe), a
+standalone Gradle project laid out like RuneLite's own
+[example plugin](https://github.com/runelite/example-plugin), with its own
+tests and CI. Plugin changes go there; this repository builds it and serves
+the result.
+
 - The overlay sits on RuneLite's `ALWAYS_ON_TOP` layer — the one drawn from
   the client's final frame callback — so by the time it runs, the whole
   interface is in the frame buffer. It reads that buffer back through
@@ -311,22 +317,23 @@ that whatever other plugins draw on the minimap comes up magnified with it.
   overlay against a stand-in client whose frame buffer is a real image, which
   pins the magnified pixels to where they belong and proves the shared
   `Graphics2D` is handed back as it was found.
-- `npm run build:plugin` runs those tests, builds the jar, and copies it into
-  `public/plugins/minimap-loupe/` with a `release.json` (version, size, build
-  date, SHA-256) that the download page reads, so the page states what it is
-  actually serving.
+- `npm run build:plugin` (`scripts/build-plugin.mjs`) checks that repository
+  out into `.plugin-src/` (gitignored), runs its tests, builds the jar, and
+  copies it into `public/plugins/minimap-loupe/` with a `release.json`
+  (version, size, build date, SHA-256, and the source commit) that the
+  download page reads, so the page states what it is actually serving and
+  where it came from. Pass `--ref=<tag|branch|commit>` to build something
+  other than `main`, or `--source=<dir>` to build a checkout you already have.
 
 Distribution is sideloading: the jar goes in `~/.runelite/sideloaded-plugins/`
-and the client is started with `--developer-mode`. RuneLite's Plugin Hub —
-one-click installs, no developer mode — builds a plugin from the root of a
-git repository it clones, so the directory is mirrored to
-[peligwen/minimap-loupe](https://github.com/peligwen/minimap-loupe), where it
-*is* the root, by `git subtree split -P runelite/minimap-loupe -b
-minimap-loupe`. It is laid out to the hub's requirements (root-level
+and the client is started with `--developer-mode`. The plugin repository is
+laid out to the Plugin Hub's requirements (root-level
 `runelite-plugin.properties`, `LICENSE` and `icon.png`, `build=standard`,
-Java 11 bytecode, no deprecated API), and the packager's own build has been
-run against it. Edits belong here, not on the mirror: the next split would
-drop them.
+Java 11 bytecode, no deprecated API) and its CI builds the way the hub's
+packager does, so a listing there — one-click installs, no developer mode —
+is a one-file PR to
+[runelite/plugin-hub](https://github.com/runelite/plugin-hub) naming that
+repository and a commit.
 
 ## Other tools
 
@@ -465,9 +472,12 @@ peligaming/
     tools/<game>/         One folder per game; standalone tool HTML + data
     plugins/<name>/       Built game-client plugins, served for download
   tools-src/              React (.jsx) tool sources, bundled by build:tools
-  runelite/<name>/        RuneLite plugin sources (Java/Gradle), built by build:plugin
-  scripts/                Data pipelines and the tool bundler
+  scripts/                Data pipelines, the tool bundler, the plugin build
 ```
+
+Game-client plugins are built from their own repositories rather than kept
+here — see [Minimap Loupe](#-minimap-loupe) — so only the built jar and its
+`release.json` are committed, under `public/plugins/<name>/`.
 
 Deploys are zero-build: `public/` is served verbatim and built tool HTML is
 committed. The only build step is local, when a React tool changes.
@@ -486,12 +496,13 @@ committed. The only build step is local, when a React tool changes.
 
 ### Adding a client plugin
 
-A game-client plugin isn't a page, so it takes a third step: the source lives
-in its own directory (`runelite/<name>/` for RuneLite), a build script puts
-the built artifact and its `release.json` under `public/plugins/<name>/`, and
-a page under `public/tools/<game>/` carries the download and the install
-instructions. `runelite/minimap-loupe/` and `scripts/build-plugin.mjs` are the
-worked example.
+A game-client plugin isn't a page, so it takes a third step. Its source lives
+in its own repository — a RuneLite plugin has to, since the Plugin Hub builds
+from a repository root — and a build script here checks that out, builds it,
+and puts the artifact and its `release.json` under `public/plugins/<name>/`,
+which a page under `public/tools/<game>/` offers for download with the install
+instructions. [peligwen/minimap-loupe](https://github.com/peligwen/minimap-loupe)
+and `scripts/build-plugin.mjs` are the worked example.
 
 ### Local preview
 

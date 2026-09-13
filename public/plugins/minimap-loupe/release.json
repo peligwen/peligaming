@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "file": "minimap-loupe.jar",
   "bytes": 11483,
-  "sha256": "cf753ed1c0fa805adefc209abdf40c920be6756ec5e6d64c8aabf8e1851f8408",
+  "sha256": "fa2d4fa2a9ee86e8c43b6793cb18307062dc01ad8ff3b1171b61cc636e32ee29",
   "built": "2026-09-13",
-  "plugin": "com.peliglot.minimaploupe.MinimapLoupePlugin"
+  "plugin": "com.peliglot.minimaploupe.MinimapLoupePlugin",
+  "source": {
+    "repo": "https://github.com/peligwen/minimap-loupe",
+    "commit": "168da1d8c11c293fa88285b285e1ca91700d307e"
+  }
 }

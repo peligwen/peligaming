@@ -231,9 +231,9 @@
         <div class="meta" id="meta">minimap-loupe.jar</div>
       </div>
       <p class="hint">
-        Built from
-        <a href="https://github.com/peligwen/peligaming/tree/main/runelite/minimap-loupe">runelite/minimap-loupe</a>
-        in this site's repository — MIT, and small enough to read in a sitting.
+        Built here from the plugin's own repository,
+        <a href="https://github.com/peligwen/minimap-loupe">peligwen/minimap-loupe</a>
+        — MIT, and small enough to read in a sitting.
       </p>
     </section>
 
@@ -353,7 +353,8 @@
 
     <footer>
       <span>a peliglot project</span>
-      <a href="https://github.com/peligwen/peligaming">source on GitHub</a>
+      <a href="https://github.com/peligwen/minimap-loupe">plugin source</a>
+      <a href="https://github.com/peligwen/peligaming">site source</a>
       <a href="https://runelite.net">RuneLite</a>
       <span>Not affiliated with Jagex or RuneLite.</span>
     </footer>
@@ -362,14 +363,20 @@
   <script>
     // ---- download metadata ------------------------------------------------
     // release.json is written by scripts/build-plugin.mjs beside the jar, so
-    // the version and checksum on this page are the ones actually served.
+    // the version, checksum and source commit on this page are the ones this
+    // jar was actually built from.
     fetch('/plugins/minimap-loupe/release.json')
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (release) {
         if (!release) return;
         var kb = (release.bytes / 1024).toFixed(1);
+        var source = release.source || {};
+        var built = source.commit
+          ? ' · built ' + release.built + ' from <a href="' + source.repo + '/commit/' + source.commit + '">' +
+            source.commit.slice(0, 7) + '</a>'
+          : ' · built ' + release.built;
         document.getElementById('meta').innerHTML =
-          '<div>' + release.file + ' · v' + release.version + ' · ' + kb + ' KB · built ' + release.built + '</div>' +
+          '<div>' + release.file + ' · v' + release.version + ' · ' + kb + ' KB' + built + '</div>' +
           '<div style="margin-top:4px">SHA-256 <code>' + release.sha256 + '</code></div>';
       })
       .catch(function () { /* the button still works without the details */ });
