@@ -1,0 +1,74 @@
+# CI for the minimap-loupe mirror (peligwen/minimap-loupe), whose root is this
+# project. In the peligaming repository this file sits in a subdirectory, where
+# GitHub does not look for workflows, so it only ever runs on the mirror.
+#
+# It builds the way RuneLite's plugin hub does — Java 11, Gradle 8.10 — and then
+# builds a second time with the hub's own build file against the RuneLite
+# version the hub is currently pinned to, which is what catches a dependency or
+# an API the hub will not have. It does not run the hub's API recorder, so the
+# disallowed-API check still only happens in the plugin-hub PR.
+name: build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10'
+
+      - name: test and build the sideload jar
+        run: gradle --no-daemon test jar
+
+      - name: build it as the plugin hub would
+        run: |
+          set -eux
+          hub_tooling=https://raw.githubusercontent.com/runelite/plugin-hub-tooling/master
+          packager=$hub_tooling/package/src/main/resources/net/runelite/pluginhub/packager
+          version=$(curl -fsSL https://raw.githubusercontent.com/runelite/plugin-hub/master/runelite.version)
+          echo "plugin hub builds against RuneLite $version"
+
+          # build=standard: the packager deletes this project's build files and
+          # substitutes its own, which has the client, lombok and annotations
+          # and nothing else, then jars sourceSets.main (never the tests)
+          mkdir -p /tmp/hub
+          cp -r src runelite-plugin.properties /tmp/hub/
+          curl -fsSL "$packager/standard-build.gradle" -o /tmp/hub/build.gradle
+          curl -fsSL "$packager/standard-settings.gradle" -o /tmp/hub/settings.gradle
+
+          # its build file names no version for net.runelite:client; the hub's
+          # init script pins one, for these three artifacts only — the client's
+          # own net.runelite dependencies (flatlaf, discord, rlawt) carry
+          # versions of their own and must keep them
+          cat >> /tmp/hub/build.gradle <<GRADLE
+
+          configurations.all {
+          	resolutionStrategy.eachDependency { details ->
+          		def pinned = ['client', 'runelite-api', 'http-api']
+          		if (details.requested.group == 'net.runelite' && details.requested.name in pinned) {
+          			details.useVersion '$version'
+          		}
+          	}
+          }
+          GRADLE
+
+          cd /tmp/hub && gradle --no-daemon --console=plain jar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: minimap-loupe-jar
+          path: build/libs/*.jar
