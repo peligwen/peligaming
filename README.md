@@ -319,13 +319,14 @@ that whatever other plugins draw on the minimap comes up magnified with it.
 Distribution is sideloading: the jar goes in `~/.runelite/sideloaded-plugins/`
 and the client is started with `--developer-mode`. RuneLite's Plugin Hub —
 one-click installs, no developer mode — builds a plugin from the root of a
-git repository it clones, so a hub listing would mean splitting
-`runelite/minimap-loupe/` out to its own repository and submitting that.
-`git subtree split` does it from here when the time comes; the directory is
-already laid out to the hub's requirements (root-level
+git repository it clones, so the directory is mirrored to
+[peligwen/minimap-loupe](https://github.com/peligwen/minimap-loupe), where it
+*is* the root, by `git subtree split -P runelite/minimap-loupe -b
+minimap-loupe`. It is laid out to the hub's requirements (root-level
 `runelite-plugin.properties`, `LICENSE` and `icon.png`, `build=standard`,
-Java 11 bytecode, no deprecated API), and its packager's own build has been
-run against it.
+Java 11 bytecode, no deprecated API), and the packager's own build has been
+run against it. Edits belong here, not on the mirror: the next split would
+drop them.
 
 ## Other tools
 

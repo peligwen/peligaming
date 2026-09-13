@@ -4,6 +4,13 @@ A [RuneLite](https://runelite.net) plugin: hold the cursor over the minimap
 and a small circle of it is magnified under the pointer, the way a loupe sits
 on a map.
 
+Developed in [peligwen/peligaming](https://github.com/peligwen/peligaming)
+under `runelite/minimap-loupe/`, and mirrored to
+[peligwen/minimap-loupe](https://github.com/peligwen/minimap-loupe) whose root
+is this project — the shape RuneLite's Plugin Hub builds from. Changes go to
+the first and are split out to the second; a commit made only on the mirror
+would be lost at the next split.
+
 - The lens follows the cursor and shows the patch of map beneath it, enlarged
   110%–800%, in a circle 16–200 px across.
 - It can sit **on the cursor** like a magnifying glass, or be **parked beside
@@ -69,10 +76,10 @@ uses `net.runelite.api.gameval.InterfaceID` rather than the disallowed
 `WidgetInfo`/`WidgetID`. The hub's standard build has been run against it
 locally and produces an 11 KB jar.
 
-What a listing additionally needs is a repository whose *root* is this
-directory — the packager clones a repository and builds from its top level —
-so it would be split out with `git subtree split` and submitted as a one-file
-PR to [runelite/plugin-hub](https://github.com/runelite/plugin-hub).
+The repository whose *root* is this project — which is what the packager
+clones and builds — is the mirror above. A listing is then a one-file PR to
+[runelite/plugin-hub](https://github.com/runelite/plugin-hub): a
+`plugins/minimap-loupe` naming that repository and the commit to build.
 
 ## Layout
 
@@ -86,7 +93,8 @@ PR to [runelite/plugin-hub](https://github.com/runelite/plugin-hub).
 
 ## Licence
 
-MIT, as with the rest of [this repository](https://github.com/peligwen/peligaming).
-Not affiliated with Jagex or RuneLite. It draws only what the client has
+MIT — the same licence as
+[peligaming](https://github.com/peligwen/peligaming), the repository this
+plugin is developed in. Not affiliated with Jagex or RuneLite. It draws only what the client has
 already drawn — no automation, and no information the game did not put on
 screen.
