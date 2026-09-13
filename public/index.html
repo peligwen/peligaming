@@ -245,10 +245,11 @@
           title.className = 'card-title';
           title.textContent = tool.name;
 
-          if (tool.placeholder) {
+          var badgeText = tool.badge || (tool.placeholder ? 'placeholder' : null);
+          if (badgeText) {
             var badge = document.createElement('span');
             badge.className = 'badge';
-            badge.textContent = 'placeholder';
+            badge.textContent = badgeText;
             title.appendChild(badge);
           }
 
@@ -258,7 +259,7 @@
 
           var go = document.createElement('div');
           go.className = 'card-go';
-          go.textContent = 'open →';
+          go.textContent = (tool.action || 'open') + ' →';
 
           card.appendChild(title);
           card.appendChild(desc);

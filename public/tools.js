@@ -18,6 +18,8 @@
 //   name        — card title
 //   description — one-line card subtitle
 //   path        — relative path to the tool page (from the site root)
+//   badge       — optional; a short label beside the title (e.g. "RuneLite plugin")
+//   action      — optional; the card's call to action, "open" by default
 //   placeholder — optional; true marks the card as awaiting real content
 // ---------------------------------------------------------------------------
 
@@ -47,6 +49,13 @@ window.PELIGAMING = {
           name: "Naval Pathfinder",
           description: "Chart sailing routes between ports, wrecks and shoals — around krakens, fetid waters and icy seas, weighed against what your own hull and keel can take — and plot courier-task silk roads: port loops that keep every task slot earning, priced in gp/h and xp/h.",
           path: "tools/runescape/naval-pathfinder.html",
+        },
+        {
+          name: "Minimap Loupe",
+          description: "A RuneLite plugin, not a web tool: put the cursor on the minimap and a small circle of it comes up magnified under the pointer — on the cursor like a glass laid on the map, or parked beside it. Dot clusters become countable without squinting. Download, checksum and install steps on the page.",
+          path: "tools/runescape/minimap-loupe.html",
+          badge: "RuneLite plugin",
+          action: "get it",
         },
         {
           name: "Lingo Cheat Sheet",

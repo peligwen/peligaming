@@ -265,6 +265,64 @@ limit of the design and it is stated on every scene.
   Hiscores lookups go through the site's existing `/api/osrs/hiscores`
   proxy.
 
+## 🔎 Minimap Loupe
+
+A **RuneLite plugin** rather than a web tool: put the cursor on the minimap
+and a small circle of it comes up magnified under the pointer, the way a
+loupe sits on a chart. Dot clusters become countable without leaning into the
+screen.
+
+**Get it: [gaming.peliglot.com/tools/runescape/minimap-loupe](https://gaming.peliglot.com/tools/runescape/minimap-loupe)**
+
+![Minimap Loupe](docs/minimap-loupe.png)
+
+*The lens on the download page's stand-in map — that page's live demo, not a
+screenshot of the game.*
+
+- Magnification 110%–800% in a circle 16–200 px across, smoothed or as hard
+  pixel blocks.
+- The lens can sit **on the cursor** like a glass laid on the map, or be
+  **parked beside the minimap** so the map is never covered by the thing
+  reading it.
+- A rim you can colour or turn off, an optional crosshair on the exact point
+  under the pointer, and an optional hold-to-show key.
+- Works in every interface layout (fixed, both resizable ones, mobile-style)
+  and under both the software and GPU renderers.
+
+The honest limit: the client rasterises the minimap once, at one scale, so
+there is no sharper copy to enlarge. The lens magnifies pixels that are
+already on screen — it makes them readable, it does not reveal anything the
+client had not already drawn. One upside of reading the finished frame is
+that whatever other plugins draw on the minimap comes up magnified with it.
+
+### How it's built
+
+- `runelite/minimap-loupe/` is a standalone Gradle project, laid out like
+  RuneLite's own [example plugin](https://github.com/runelite/example-plugin)
+  so it can be split out to its own repository unchanged.
+- The overlay sits on RuneLite's `ALWAYS_ON_TOP` layer — the one drawn from
+  the client's final frame callback — so by the time it runs, the whole
+  interface is in the frame buffer. It reads that buffer back through
+  `Client#getBufferProvider()`, copies the patch of map under the cursor
+  (masking anything outside the map disc), and redraws it scaled about the
+  point the cursor is on.
+- `Loupe` and `Disc` hold that arithmetic with no client in sight, so
+  `gradle test` can check it headlessly — including a full render of the
+  overlay against a stand-in client whose frame buffer is a real image, which
+  pins the magnified pixels to where they belong and proves the shared
+  `Graphics2D` is handed back as it was found.
+- `npm run build:plugin` runs those tests, builds the jar, and copies it into
+  `public/plugins/minimap-loupe/` with a `release.json` (version, size, build
+  date, SHA-256) that the download page reads, so the page states what it is
+  actually serving.
+
+Distribution is sideloading: the jar goes in `~/.runelite/sideloaded-plugins/`
+and the client is started with `--developer-mode`. RuneLite's Plugin Hub —
+one-click installs, no developer mode — builds a plugin from the root of a
+git repository it clones, so a hub listing would mean splitting
+`runelite/minimap-loupe/` out to its own repository and submitting that.
+`git subtree split` does it from here when the time comes.
+
 ## Other tools
 
 | Game | Tool | What it does |
@@ -273,6 +331,7 @@ limit of the design and it is stated on every scene.
 | RuneScape | Sand Table | Boss and raid rehearsals: the briefing checked against your hiscores, the kit slot by slot, and the fight rebuilt tile by tile in 3D with a tick clock — then a drill that grades your prayers and footwork |
 | RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer |
 | RuneScape | Gielinor Crafting Web | Every craftable item as an explorable 3D recipe web, with per-skill xp lenses |
+| RuneScape | Minimap Loupe | A RuneLite plugin: a magnified circle of the minimap under the cursor |
 | RuneScape | Lingo Cheat Sheet | OSRS Spanish for English speakers: a searchable phrasebook of neutral international Spanish for trading, bossing, the wildy, skilling and clan chat, the game's Spanglish verbs, chat shorthand, and the regional slang that tells you where a player is from; click a phrase to copy it, or flip to chat spelling |
 | Fortnite | Tactical Terrain | The island in 3D — sightlines, dead ground, cover |
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
@@ -399,7 +458,9 @@ peligaming/
     index.html            The tools index (renders from tools.js)
     tools.js              Tool manifest — edit when adding a tool
     tools/<game>/         One folder per game; standalone tool HTML + data
+    plugins/<name>/       Built game-client plugins, served for download
   tools-src/              React (.jsx) tool sources, bundled by build:tools
+  runelite/<name>/        RuneLite plugin sources (Java/Gradle), built by build:plugin
   scripts/                Data pipelines and the tool bundler
 ```
 
@@ -414,7 +475,18 @@ committed. The only build step is local, when a React tool changes.
      entry to the `TOOLS` list in `scripts/build-tools.mjs`, then run
      `npm install` (first time) and `npm run build:tools`. Commit both the
      source and the built HTML.
-2. Add an entry to that game's `tools` array in `public/tools.js`.
+2. Add an entry to that game's `tools` array in `public/tools.js`. A card can
+   carry a `badge` (a short label beside the title) and an `action` (the call
+   to action, `open` by default) — a download page uses both.
+
+### Adding a client plugin
+
+A game-client plugin isn't a page, so it takes a third step: the source lives
+in its own directory (`runelite/<name>/` for RuneLite), a build script puts
+the built artifact and its `release.json` under `public/plugins/<name>/`, and
+a page under `public/tools/<game>/` carries the download and the install
+instructions. `runelite/minimap-loupe/` and `scripts/build-plugin.mjs` are the
+worked example.
 
 ### Local preview
 

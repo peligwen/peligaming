@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minimap Loupe — a RuneLite plugin</title>
+  <meta name="description" content="A RuneLite plugin that magnifies a small circle of the OSRS minimap under your cursor. Download, checksum and install instructions.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔎</text></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-border: #21262d;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --brand: #58a6ff;
+      --accent: #d9a334;
+    }
+
+    body {
+      background: var(--bg);
+      background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(217, 163, 52, 0.10), transparent);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      line-height: 1.55;
+    }
+
+    .wrap { max-width: 860px; margin: 0 auto; padding: 40px 24px 64px; }
+
+    a { color: var(--brand); }
+
+    .back {
+      display: inline-block;
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+    .back:hover { color: var(--text); }
+
+    h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.6px; }
+    h1 .glass { color: var(--accent); }
+
+    .tagline { color: var(--text-dim); margin-top: 8px; max-width: 620px; }
+
+    .pill {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 3px 11px;
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    section { margin-top: 40px; }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--panel-border);
+      margin-bottom: 16px;
+    }
+
+    h3 { font-size: 15px; font-weight: 700; margin: 20px 0 6px; }
+
+    p { margin-bottom: 12px; }
+    p, li { font-size: 14.5px; }
+    ul, ol { margin: 0 0 12px 20px; }
+    li { margin-bottom: 6px; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+
+    /* download */
+
+    .download {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+      justify-content: space-between;
+    }
+
+    .get {
+      display: inline-block;
+      background: var(--accent);
+      color: #1b1400;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      padding: 11px 20px;
+      border-radius: 8px;
+      transition: filter 0.15s;
+    }
+    .get:hover { filter: brightness(1.1); }
+
+    .meta { color: var(--text-dim); font-size: 12.5px; }
+    .meta code { word-break: break-all; }
+
+    code, kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      background: #0b0f14;
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      /* paths and hashes are longer than a phone is wide */
+      overflow-wrap: anywhere;
+    }
+
+    kbd { font-weight: 600; }
+
+    /* demo */
+
+    .demo {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    .stage {
+      position: relative;
+      flex: 0 0 auto;
+      background: #000;
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      overflow: hidden;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .stage canvas { display: block; }
+
+    .controls { flex: 1 1 260px; min-width: 240px; }
+
+    .control { margin-bottom: 14px; }
+
+    .control label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .control label span { color: var(--text); font-variant-numeric: tabular-nums; }
+
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .check input { accent-color: var(--accent); }
+
+    .hint { font-size: 12.5px; color: var(--text-dim); margin-top: 10px; }
+
+    /* settings table */
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--panel-border);
+      font-size: 13.5px;
+      vertical-align: top;
+    }
+    th { color: var(--text-dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    td:first-child { white-space: nowrap; font-weight: 600; }
+
+    .note {
+      border-left: 3px solid var(--accent);
+      padding: 2px 0 2px 14px;
+      color: var(--text-dim);
+      font-size: 13.5px;
+    }
+
+    footer {
+      margin-top: 56px;
+      padding-top: 20px;
+      border-top: 1px solid var(--panel-border);
+      color: var(--text-dim);
+      font-size: 13px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 18px;
+    }
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 560px) {
+      .wrap { padding: 28px 16px 48px; }
+      h1 { font-size: 27px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">← peligaming</a>
+
+    <header>
+      <h1>Minimap <span class="glass">Loupe</span></h1>
+      <p class="tagline">
+        A RuneLite plugin. Put the cursor on the minimap and a small circle of
+        it comes up magnified under the pointer — the way a loupe sits on a
+        chart.
+      </p>
+      <span class="pill">Old School RuneScape · RuneLite · sideloaded</span>
+    </header>
+
+    <section>
+      <h2>Download</h2>
+      <div class="panel download">
+        <div>
+          <a class="get" id="get" href="/plugins/minimap-loupe/minimap-loupe.jar" download>Download the jar</a>
+        </div>
+        <div class="meta" id="meta">minimap-loupe.jar</div>
+      </div>
+      <p class="hint">
+        Built from
+        <a href="https://github.com/peligwen/peligaming/tree/main/runelite/minimap-loupe">runelite/minimap-loupe</a>
+        in this site's repository — MIT, and small enough to read in a sitting.
+      </p>
+    </section>
+
+    <section>
+      <h2>What it looks like</h2>
+      <div class="panel demo">
+        <div class="stage" id="stage">
+          <canvas id="map" width="220" height="220"></canvas>
+        </div>
+        <div class="controls">
+          <div class="control">
+            <label for="zoom">Magnification <span id="zoomOut">250%</span></label>
+            <input type="range" id="zoom" min="110" max="800" step="10" value="250">
+          </div>
+          <div class="control">
+            <label for="radius">Lens radius <span id="radiusOut">56 px</span></label>
+            <input type="range" id="radius" min="16" max="100" step="1" value="56">
+          </div>
+          <label class="check"><input type="checkbox" id="smooth" checked> Smooth</label>
+          <label class="check"><input type="checkbox" id="rim" checked> Show rim</label>
+          <label class="check"><input type="checkbox" id="crosshair"> Show crosshair</label>
+          <p class="hint">
+            Move the pointer over the disc. This is a stand-in map, not the
+            game — but the lens is the same maths at the same defaults, so the
+            settings you like here are the settings to type into RuneLite.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Installing</h2>
+      <p>
+        This plugin is served from here rather than RuneLite's Plugin Hub, so
+        the client loads it as a <em>sideloaded</em> plugin. That takes two
+        things: the jar in the right folder, and a client started in developer
+        mode.
+      </p>
+      <ol>
+        <li>
+          <strong>Put the jar in the sideload folder.</strong> Create it if it
+          isn't there yet:
+          <ul>
+            <li>Windows — <code>%USERPROFILE%\.runelite\sideloaded-plugins\</code></li>
+            <li>macOS / Linux — <code>~/.runelite/sideloaded-plugins/</code></li>
+          </ul>
+        </li>
+        <li>
+          <strong>Start RuneLite in developer mode.</strong> Open the launcher's
+          configuration — the <em>RuneLite (configure)</em> start menu entry on
+          Windows, or <code>/Applications/RuneLite.app/Contents/MacOS/RuneLite --configure</code>
+          on macOS — and add <code>--developer-mode</code> to
+          <em>Client arguments</em>. Launch as normal afterwards.
+        </li>
+        <li>
+          <strong>Turn it on.</strong> The plugin panel now lists
+          <strong>Minimap Loupe</strong>; tick it, and the cog beside it opens
+          the settings below.
+        </li>
+      </ol>
+      <p class="note">
+        Developer mode is RuneLite's own gate on plugins it hasn't reviewed —
+        every sideloaded plugin needs it, not just this one. It changes nothing
+        else about the client. A jar from a Plugin Hub listing would install
+        with one click instead; that's a submission to RuneLite's own
+        repository, and this plugin isn't in it.
+      </p>
+      <p>
+        To update, replace the jar and restart the client. To remove it, delete
+        the jar.
+      </p>
+    </section>
+
+    <section>
+      <h2>Settings</h2>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr><th>Setting</th><th>What it does</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Magnification</td><td>110%–800%. The default 250% is about where a dot cluster becomes countable; past 400% you are looking at large squares.</td></tr>
+            <tr><td>Lens radius</td><td>16–200 px. How big the circle on screen is.</td></tr>
+            <tr><td>Lens position</td><td><em>On the cursor</em>, like a glass laid on the map, or <em>Beside the minimap</em>, parked to its left so the map is never covered.</td></tr>
+            <tr><td>Smooth</td><td>Blend the enlarged pixels, or show them as hard blocks.</td></tr>
+            <tr><td>Show rim / Rim colour / Rim width</td><td>The ring around the lens.</td></tr>
+            <tr><td>Show crosshair</td><td>Marks the exact point under the pointer at the centre of the lens. Most useful with the lens parked.</td></tr>
+            <tr><td>Hold to show</td><td>Bind a key and the lens only comes up while it's held. Leave it unset and the lens is up whenever the cursor is on the map.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>What it can and cannot do</h2>
+      <p>
+        The client draws the minimap once, at one scale, into the frame it puts
+        on screen. There is no sharper copy of it to enlarge — so the lens
+        magnifies <em>pixels that are already on your screen</em>. It makes a
+        crowded cluster of dots or a cramped icon readable. It does not reveal
+        anything the client had not already drawn, and it does not know
+        anything the game did not put on screen.
+      </p>
+      <p>
+        Reading the finished frame does have one nice consequence: whatever
+        other plugins draw on the minimap is in those pixels too, so their dots
+        and markers come up magnified along with the map.
+      </p>
+      <p>
+        Where the circle reaches past the edge of the map it fills with flat
+        dark rather than magnifying the interface around it. And anchored to
+        the cursor the lens is drawn over the very patch it reads — the client
+        repaints the map every frame, so it reads fresh pixels, but parking the
+        lens beside the minimap sidesteps the question entirely.
+      </p>
+    </section>
+
+    <footer>
+      <span>a peliglot project</span>
+      <a href="https://github.com/peligwen/peligaming">source on GitHub</a>
+      <a href="https://runelite.net">RuneLite</a>
+      <span>Not affiliated with Jagex or RuneLite.</span>
+    </footer>
+  </div>
+
+  <script>
+    // ---- download metadata ------------------------------------------------
+    // release.json is written by scripts/build-plugin.mjs beside the jar, so
+    // the version and checksum on this page are the ones actually served.
+    fetch('/plugins/minimap-loupe/release.json')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (release) {
+        if (!release) return;
+        var kb = (release.bytes / 1024).toFixed(1);
+        document.getElementById('meta').innerHTML =
+          '<div>' + release.file + ' · v' + release.version + ' · ' + kb + ' KB · built ' + release.built + '</div>' +
+          '<div style="margin-top:4px">SHA-256 <code>' + release.sha256 + '</code></div>';
+      })
+      .catch(function () { /* the button still works without the details */ });
+
+    // ---- the demo ---------------------------------------------------------
+    // A stand-in minimap and the same lens the plugin draws: copy the patch of
+    // rendered pixels under the cursor, scale it about that point, clip it to
+    // a circle. Everything outside the map disc reads as the same flat dark
+    // the plugin fills with.
+    (function () {
+      var SIZE = 220, MAP_R = 104, OFF_MAP = '#0e0e0e';
+      var view = document.getElementById('map');
+      var ctx = view.getContext('2d');
+      var stage = document.getElementById('stage');
+
+      var zoom = document.getElementById('zoom');
+      var radius = document.getElementById('radius');
+      var smooth = document.getElementById('smooth');
+      var rim = document.getElementById('rim');
+      var crosshair = document.getElementById('crosshair');
+      var zoomOut = document.getElementById('zoomOut');
+      var radiusOut = document.getElementById('radiusOut');
+
+      // the map itself, drawn once at 1:1 like the client rasterises it
+      var base = document.createElement('canvas');
+      base.width = base.height = SIZE;
+      var bctx = base.getContext('2d');
+      var cx = SIZE / 2, cy = SIZE / 2;
+
+      function seeded(seed) {
+        return function () {
+          seed = (seed * 1664525 + 1013904223) % 4294967296;
+          return seed / 4294967296;
+        };
+      }
+
+      function paintMap() {
+        var rand = seeded(20260913);
+        bctx.fillStyle = '#3d3426';
+        bctx.fillRect(0, 0, SIZE, SIZE);
+        // ground: patches of grass, path and water, blocky like the real thing
+        var palette = ['#4a5d33', '#586b3d', '#6b5b3e', '#2e4a63', '#47403a'];
+        for (var i = 0; i < 900; i++) {
+          var x = Math.floor(rand() * SIZE / 4) * 4;
+          var y = Math.floor(rand() * SIZE / 4) * 4;
+          bctx.fillStyle = palette[Math.floor(rand() * palette.length)];
+          bctx.fillRect(x, y, 4 + Math.floor(rand() * 3) * 4, 4 + Math.floor(rand() * 3) * 4);
+        }
+        // walls
+        bctx.strokeStyle = '#8a8a8a';
+        bctx.lineWidth = 1;
+        for (var w = 0; w < 14; w++) {
+          var wx = Math.floor(rand() * SIZE), wy = Math.floor(rand() * SIZE);
+          bctx.beginPath();
+          bctx.moveTo(wx + 0.5, wy + 0.5);
+          bctx.lineTo(wx + 0.5 + (rand() < 0.5 ? 30 : 0), wy + 0.5 + (rand() < 0.5 ? 30 : 0));
+          bctx.stroke();
+        }
+        // the crowd: player dots, an npc cluster, a couple of items — the
+        // things that are one or two pixels across and impossible to count
+        function dot(x, y, color, size) {
+          bctx.fillStyle = color;
+          bctx.fillRect(Math.round(x), Math.round(y), size, size);
+        }
+        for (var d = 0; d < 60; d++) {
+          var a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * (MAP_R - 8);
+          dot(cx + Math.cos(a) * r, cy + Math.sin(a) * r, '#ffffff', 2);
+        }
+        for (var n = 0; n < 26; n++) {
+          var na = rand() * Math.PI * 2, nr = rand() * 26;
+          dot(cx + 34 + Math.cos(na) * nr, cy - 22 + Math.sin(na) * nr, '#ffec3d', 2);
+        }
+        for (var m = 0; m < 8; m++) {
+          dot(cx - 46 + rand() * 30, cy + 30 + rand() * 30, '#e02b2b', 2);
+        }
+        // a clump the eye cannot resolve at 1:1 — the case for the lens
+        for (var c = 0; c < 22; c++) {
+          dot(cx - 8 + (c % 6) * 2, cy + 46 + Math.floor(c / 6) * 2, c % 3 ? '#ffec3d' : '#ffffff', 1);
+        }
+        // mask to the disc
+        bctx.globalCompositeOperation = 'destination-in';
+        bctx.beginPath();
+        bctx.arc(cx, cy, MAP_R, 0, Math.PI * 2);
+        bctx.fill();
+        bctx.globalCompositeOperation = 'source-over';
+      }
+
+      var mouse = null;
+
+      function draw() {
+        ctx.fillStyle = OFF_MAP;
+        ctx.fillRect(0, 0, SIZE, SIZE);
+        ctx.drawImage(base, 0, 0);
+
+        if (!mouse) return;
+        var mx = mouse.x, my = mouse.y;
+        if ((mx - cx) * (mx - cx) + (my - cy) * (my - cy) > MAP_R * MAP_R) return;
+
+        var scale = +zoom.value / 100;
+        var lensR = +radius.value;
+        var half = Math.ceil(lensR / scale) + 1;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(mx, my, lensR, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = OFF_MAP;
+        ctx.fill();
+        ctx.imageSmoothingEnabled = smooth.checked;
+        // scale the patch about the point under the cursor, so that point
+        // lands dead centre in the lens — pixel centres, hence the halves
+        ctx.translate(mx + 0.5 - (half + 0.5) * scale, my + 0.5 - (half + 0.5) * scale);
+        ctx.scale(scale, scale);
+        ctx.drawImage(base, mx - half, my - half, half * 2 + 1, half * 2 + 1,
+          0, 0, half * 2 + 1, half * 2 + 1);
+        ctx.restore();
+
+        if (crosshair.checked) {
+          var arm = Math.max(3, lensR / 8);
+          ctx.strokeStyle = 'rgba(224,192,106,0.82)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(mx - arm, my + 0.5); ctx.lineTo(mx + arm, my + 0.5);
+          ctx.moveTo(mx + 0.5, my - arm); ctx.lineTo(mx + 0.5, my + arm);
+          ctx.stroke();
+        }
+        if (rim.checked) {
+          ctx.strokeStyle = 'rgba(224,192,106,0.82)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(mx, my, lensR, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      function at(event) {
+        var box = view.getBoundingClientRect();
+        return {
+          x: Math.round((event.clientX - box.left) * SIZE / box.width),
+          y: Math.round((event.clientY - box.top) * SIZE / box.height),
+        };
+      }
+
+      stage.addEventListener('pointermove', function (e) { mouse = at(e); draw(); });
+      stage.addEventListener('pointerdown', function (e) { mouse = at(e); draw(); });
+      stage.addEventListener('pointerleave', function () { mouse = null; draw(); });
+
+      [zoom, radius, smooth, rim, crosshair].forEach(function (input) {
+        input.addEventListener('input', function () {
+          zoomOut.textContent = zoom.value + '%';
+          radiusOut.textContent = radius.value + ' px';
+          draw();
+        });
+      });
+
+      paintMap();
+      // something to look at before the pointer arrives: the clump of dots
+      // that is the whole argument for the thing, with the lens clear of the
+      // edge of the map
+      mouse = { x: cx - 2, y: cy + 40 };
+      draw();
+    })();
+  </script>
+</body>
+</html>

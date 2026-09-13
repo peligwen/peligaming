@@ -1,0 +1,76 @@
+# Minimap Loupe
+
+A [RuneLite](https://runelite.net) plugin: hold the cursor over the minimap
+and a small circle of it is magnified under the pointer, the way a loupe sits
+on a map.
+
+- The lens follows the cursor and shows the patch of map beneath it, enlarged
+  110%–800%, in a circle 16–200 px across.
+- It can sit **on the cursor** like a magnifying glass, or be **parked beside
+  the minimap** so the map is never covered by the thing reading it.
+- Smoothing (bilinear) or hard pixel blocks, a rim you can colour or turn off,
+  an optional crosshair marking the exact point under the pointer.
+- Optionally bound to a key: hold it to raise the lens, let go to drop it.
+  Unbound, the lens is up whenever the cursor is over the map.
+
+## What it can and cannot do
+
+The client rasterises the minimap once, at one scale, into the frame buffer.
+There is no second, sharper copy to enlarge — so this magnifies *pixels that
+are already on your screen*. It makes a crowded dot cluster or a cramped icon
+readable; it does not reveal anything the client had not already drawn, and
+past about 400% you are looking at large squares rather than more detail.
+
+Everything it magnifies is read back out of the finished frame, which is also
+why it picks up the minimap drawing other plugins do — their dots and markers
+are in the frame by the time the lens reads it.
+
+Two consequences worth knowing:
+
+- **Off the edge of the map.** The lens only shows map. Where its circle
+  reaches past the edge of the minimap disc it fills with flat dark, rather
+  than magnifying the interface around the map.
+- **The lens and its own output.** Anchored to the cursor, the lens is drawn
+  over the patch it read. The client redraws the minimap every frame, so it
+  reads fresh pixels each time — but if you ever see it magnifying itself,
+  park it beside the minimap, where it never covers what it reads.
+
+## Installing
+
+The built jar is served from
+**[gaming.peliglot.com/tools/runescape/minimap-loupe](https://gaming.peliglot.com/tools/runescape/minimap-loupe)**,
+which has the current download, its checksum, and the click-by-click install.
+The short version: drop the jar in `~/.runelite/sideloaded-plugins/` (on
+Windows, `%USERPROFILE%\.runelite\sideloaded-plugins\`) and start RuneLite
+with `--developer-mode` in the launcher's *Client arguments*. The plugin then
+appears in the sidebar as **Minimap Loupe**.
+
+## Building
+
+Java 11 or newer and Gradle:
+
+```sh
+gradle test      # the lens maths and a headless render of the overlay
+gradle jar       # build/libs/minimap-loupe-<version>.jar — the sideload jar
+gradle run       # a development client with the plugin loaded
+```
+
+From the site repository, `npm run build:plugin` does the same build and
+copies the jar (with its checksum) into `public/plugins/minimap-loupe/`.
+
+## Layout
+
+| | |
+|---|---|
+| `MinimapLoupePlugin` | registers the overlay, and holds the hotkey gate |
+| `MinimapLoupeConfig` | the panel: zoom, radius, anchor, smoothing, rim, crosshair, hotkey |
+| `MinimapLoupeOverlay` | finds the minimap in whichever layout is loaded, reads the frame, paints the lens |
+| `Loupe` | the magnification itself — which pixels to copy, and where to put them |
+| `Disc` | the round map inside the square widget |
+
+## Licence
+
+MIT, as with the rest of [this repository](https://github.com/peligwen/peligaming).
+Not affiliated with Jagex or RuneLite. It draws only what the client has
+already drawn — no automation, and no information the game did not put on
+screen.

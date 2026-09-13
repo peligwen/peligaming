@@ -1,0 +1,55 @@
+// Minimap Loupe — a RuneLite plugin.
+//
+// Kept deliberately close to RuneLite's own example-plugin build so this
+// directory can be split out to a standalone repository (the shape the
+// plugin hub builds) without touching anything.
+//
+//   gradle run         a development client with the plugin loaded
+//   gradle jar         build/libs/minimap-loupe-<version>.jar, the sideload jar
+//
+plugins {
+	id 'java'
+}
+
+repositories {
+	mavenLocal()
+	maven {
+		url = 'https://repo.runelite.net'
+		content {
+			includeGroupByRegex("net\\.runelite.*")
+		}
+	}
+	mavenCentral()
+}
+
+def runeLiteVersion = 'latest.release'
+def pluginMainClass = 'com.peliglot.minimaploupe.MinimapLoupePluginTest'
+
+dependencies {
+	compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
+
+	compileOnly 'org.projectlombok:lombok:1.18.30'
+	annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+	testImplementation 'junit:junit:4.13.2'
+	testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
+	testImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
+}
+
+group = 'com.peliglot'
+version = '1.0.0'
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+	// RuneLite targets Java 11; building on a newer JDK is fine, emitting
+	// newer bytecode is not — the client would refuse to load the plugin.
+	options.release.set(11)
+}
+
+tasks.register('run', JavaExec) {
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = pluginMainClass
+
+	jvmArgs "-ea"
+	args "--developer-mode", "--debug"
+}

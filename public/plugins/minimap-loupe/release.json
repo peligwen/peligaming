@@ -1,0 +1,9 @@
+{
+  "name": "Minimap Loupe",
+  "version": "1.0.0",
+  "file": "minimap-loupe.jar",
+  "bytes": 11483,
+  "sha256": "cf753ed1c0fa805adefc209abdf40c920be6756ec5e6d64c8aabf8e1851f8408",
+  "built": "2026-09-13",
+  "plugin": "com.peliglot.minimaploupe.MinimapLoupePlugin"
+}
