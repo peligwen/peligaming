@@ -58,6 +58,22 @@ gradle run       # a development client with the plugin loaded
 From the site repository, `npm run build:plugin` does the same build and
 copies the jar (with its checksum) into `public/plugins/minimap-loupe/`.
 
+## Plugin Hub readiness
+
+This directory is a complete Plugin Hub submission as it stands: the project
+is at its own root, with `runelite-plugin.properties`, `LICENSE`, `icon.png`
+and `src/main/` where the hub's packager looks for them, `build=standard` (no
+third-party dependencies, so its build file is the hub's own), Java 11
+bytecode, its own package namespace, and no terminally deprecated API — it
+uses `net.runelite.api.gameval.InterfaceID` rather than the disallowed
+`WidgetInfo`/`WidgetID`. The hub's standard build has been run against it
+locally and produces an 11 KB jar.
+
+What a listing additionally needs is a repository whose *root* is this
+directory — the packager clones a repository and builds from its top level —
+so it would be split out with `git subtree split` and submitted as a one-file
+PR to [runelite/plugin-hub](https://github.com/runelite/plugin-hub).
+
 ## Layout
 
 | | |

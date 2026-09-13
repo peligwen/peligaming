@@ -321,7 +321,11 @@ and the client is started with `--developer-mode`. RuneLite's Plugin Hub —
 one-click installs, no developer mode — builds a plugin from the root of a
 git repository it clones, so a hub listing would mean splitting
 `runelite/minimap-loupe/` out to its own repository and submitting that.
-`git subtree split` does it from here when the time comes.
+`git subtree split` does it from here when the time comes; the directory is
+already laid out to the hub's requirements (root-level
+`runelite-plugin.properties`, `LICENSE` and `icon.png`, `build=standard`,
+Java 11 bytecode, no deprecated API), and its packager's own build has been
+run against it.
 
 ## Other tools
 
