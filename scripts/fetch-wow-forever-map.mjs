@@ -4,15 +4,16 @@
 //
 //   * wago.tools — the datamined client database of one Forever build (the
 //     UiMap / UiMapAssignment tables that place every map in the world, the
-//     map art tiles, the subzone overlay textures, the flight nodes and
+//     map art tiles and the explored-area overlays, the flight nodes and
 //     paths, transport paths, points of interest, area groups and spells)
-//   * Wowhead's Forever database — where each banker, auctioneer and flight
-//     master stands (Forever adds NPCs no vanilla dump knows about)
-//   * CMaNGOS classic-db — the vanilla 1.12 spawn table, as a cross-check
-//     and fallback for the same NPCs
+//   * CMaNGOS classic-db (GPLv3) — the vanilla 1.12 spawn table: where each
+//     banker, auctioneer and flight master that already existed stands
+//   * scripts/data/wow-forever/npcs-observed.json — the NPCs Forever adds
+//     or moves, noted in the game itself (README: "Adding an NPC")
 //
-// Everything downloaded is cached in .wow-forever-cache/ so a rebuild only
-// refetches what is missing. Output:
+// No website's database is read: Wowhead's terms bar tools other than a
+// browser, so its data is not used. Everything downloaded is cached in
+// .wow-forever-cache/ so a rebuild only refetches what is missing. Output:
 //
 //   public/tools/wow-forever/data/world-map/world-map.json
 //   public/tools/wow-forever/data/world-map/maps/<uiMapId>.jpg
@@ -22,26 +23,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
-import { execFileSync } from "node:child_process";
 import jpeg from "jpeg-js";
 import { Wago } from "./lib/wago.mjs";
 import { decodeBLP } from "./lib/blp.mjs";
 import { traceMask, simplifyRing, ringArea, closeMask } from "./lib/contour.mjs";
 import { readInsertRows, tableColumns } from "./lib/mysql-dump.mjs";
+import { bundleEdges, bundleGroups } from "./lib/bundle.mjs";
 
 const BUILD = process.argv.find((a) => /^\d+\.\d+\.\d+\.\d+$/.test(a)) || "1.60.1.69913";
-// Wowhead's Forever database reports NPC positions as percentages of the
-// Classic Era map images, and Forever redrew four of those maps (Stormwind
-// with its harbor, Eastern Plaguelands, Mulgore, Redridge) with new bounds —
-// so those percentages are read against the Era bounds, then placed with
-// Forever's own.
-const ERA_BUILD = "1.15.9.69722";
 const FORCE_IMAGES = process.argv.includes("--force-images");
 const CACHE = ".wow-forever-cache";
 const OUT = "public/tools/wow-forever/data/world-map";
+const OBSERVED = "scripts/data/wow-forever/npcs-observed.json";
 const MAPS_OUT = path.join(OUT, "maps");
 fs.mkdirSync(MAPS_OUT, { recursive: true });
-fs.mkdirSync(path.join(CACHE, "wowhead"), { recursive: true });
 
 const FRAME_W = 1002, FRAME_H = 668;     // the Azeroth map's own pixel size
 const FLIGHT_SPEED = 30;                 // yards/second, calibrated against recorded Classic flights
@@ -60,7 +55,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 log(`build ${BUILD}`);
 const T = {};
 for (const name of ["UiMap", "UiMapAssignment", "UiMapArt", "UiMapXMapArt", "UiMapArtTile", "UiMapArtStyleLayer",
-  "TaxiNodes", "TaxiPath", "TaxiPathNode", "AreaTable", "Map", "AreaPOI", "WorldMapOverlay", "WorldMapOverlayTile",
+  "TaxiNodes", "TaxiPath", "TaxiPathNode", "AreaTable", "Map", "AreaPOI", "WorldMapOverlay", "WorldMapOverlayTile", "FactionTemplate",
   "SpellCastingRequirements", "AreaGroupMember", "SpellName", "Spell", "ItemEffect", "ItemXItemEffect", "ItemSparse"]) {
   T[name] = await wago.table(name);
   log(`  ${name}: ${T[name].length} rows`);
@@ -135,24 +130,37 @@ log(`  ${maps.length} maps kept`);
 function toFrame(mapId, x, y) {
   return frameOf(mapId, x, y);
 }
-// Wowhead's per-map percentages -> world (via the Era bounds) -> frame
-const eraAssignments = await new Wago(ERA_BUILD, CACHE).table("UiMapAssignment");
+// the game's own map coordinates (percent across and down a zone map, as
+// C_Map.GetPlayerMapPosition reports them) -> world -> frame
 function mapPercentToFrame(uiMapId, u, v) {
   const m = maps.find((m) => m.id === num(uiMapId));
   if (!m) return null;
-  const era = eraAssignments.find((a) => a.UiMapID === String(uiMapId) && Math.abs(num(a.UiMin_0)) < 1e-6 && Math.abs(num(a.UiMin_1)) < 1e-6);
-  const r = era ? { minX: num(era.Region_0), minY: num(era.Region_1), maxX: num(era.Region_3), maxY: num(era.Region_4) } : m.region;
+  const r = m.region;
   const x = r.maxX - (v / 100) * (r.maxX - r.minX), y = r.maxY - (u / 100) * (r.maxY - r.minY);
   return toFrame(m.mapId, x, y);
 }
 
 // ---------------------------------------------------------------------------
 // 3. Map art: decode the BLP tiles, stitch, write JPEG
+//
+// A zone map's tiles are the *unexplored* art — the washed-out version the
+// game shows before you have been somewhere. Each explored subzone is a
+// separate overlay texture drawn on top at an offset, so the fully explored
+// map is the tiles with every overlay composited over them. A map also
+// shows its neighbours' land around its edges, and only its own overlays
+// exist in its image, so the neighbours' explored areas are borrowed from
+// their maps by world position; otherwise a zone's land would turn dim the
+// moment it crosses out of its own map's frame.
 // ---------------------------------------------------------------------------
 const tilesByArt = new Map();
 for (const t of T.UiMapArtTile) {
   if (!tilesByArt.has(t.UiMapArtID)) tilesByArt.set(t.UiMapArtID, []);
   tilesByArt.get(t.UiMapArtID).push(t);
+}
+const overlayTiles = new Map();
+for (const t of T.WorldMapOverlayTile) {
+  if (!overlayTiles.has(t.WorldMapOverlayID)) overlayTiles.set(t.WorldMapOverlayID, []);
+  overlayTiles.get(t.WorldMapOverlayID).push(t);
 }
 async function stitch(artId, W, H) {
   const out = Buffer.alloc(W * H * 4);
@@ -168,18 +176,76 @@ async function stitch(artId, W, H) {
       }
     }
   }
-  return out;
+  // explored areas over the top; the mask remembers how explored each pixel is
+  const mask = new Uint8Array(W * H);
+  let explored = 0;
+  for (const o of T.WorldMapOverlay.filter((o) => o.UiMapArtID === artId)) {
+    const tw = num(o.TextureWidth), th = num(o.TextureHeight);
+    for (const t of overlayTiles.get(o.ID) || []) {
+      const img = decodeBLP(await wago.file(t.FileDataID));
+      const cx = num(t.ColIndex) * 256, cy = num(t.RowIndex) * 256;
+      const ox = num(o.OffsetX) + cx, oy = num(o.OffsetY) + cy;
+      for (let y = 0; y < img.height && cy + y < th; y++) {
+        const yy = oy + y; if (yy < 0 || yy >= H) continue;
+        for (let x = 0; x < img.width && cx + x < tw; x++) {
+          const xx = ox + x; if (xx < 0 || xx >= W) continue;
+          const si = (y * img.width + x) * 4, di = (yy * W + xx) * 4, a = img.data[si + 3] / 255;
+          if (!a) continue;
+          out[di] = img.data[si] * a + out[di] * (1 - a);
+          out[di + 1] = img.data[si + 1] * a + out[di + 1] * (1 - a);
+          out[di + 2] = img.data[si + 2] * a + out[di + 2] * (1 - a);
+          mask[yy * W + xx] = Math.max(mask[yy * W + xx], img.data[si + 3]);
+        }
+      }
+    }
+    explored++;
+  }
+  return { rgba: out, mask, explored };
 }
-for (const m of maps) {
-  const file = path.join(MAPS_OUT, `${m.id}.jpg`);
-  m.img = `maps/${m.id}.jpg`;
-  if (fs.existsSync(file) && !FORCE_IMAGES) continue;
-  if (!tilesByArt.has(m.art)) { log(`  no art for ${m.name}`); m.img = null; continue; }
-  const rgba = await stitch(m.art, m.imgW, m.imgH);
-  const j = jpeg.encode({ data: rgba, width: m.imgW, height: m.imgH }, 80);
-  fs.writeFileSync(file, j.data);
-  log(`  wrote ${file} (${Math.round(j.data.length / 1024)} KB)`);
+// B's explored pixels painted into A's image wherever A's own overlays leave it unexplored
+function borrow(A, B) {
+  const [ax0, ay0, ax1, ay1] = A.m.rect, [bx0, by0, bx1, by1] = B.m.rect;
+  const AW = A.m.imgW, AH = A.m.imgH, BW = B.m.imgW, BH = B.m.imgH;
+  const fx = (i) => ax0 + ((i + 0.5) * (ax1 - ax0)) / AW, fy = (j) => ay0 + ((j + 0.5) * (ay1 - ay0)) / AH;
+  const i0 = Math.max(0, Math.floor(((bx0 - ax0) / (ax1 - ax0)) * AW)), i1 = Math.min(AW, Math.ceil(((bx1 - ax0) / (ax1 - ax0)) * AW));
+  const j0 = Math.max(0, Math.floor(((by0 - ay0) / (ay1 - ay0)) * AH)), j1 = Math.min(AH, Math.ceil(((by1 - ay0) / (ay1 - ay0)) * AH));
+  let painted = 0;
+  for (let j = j0; j < j1; j++) {
+    const bj = Math.floor(((fy(j) - by0) / (by1 - by0)) * BH); if (bj < 0 || bj >= BH) continue;
+    for (let i = i0; i < i1; i++) {
+      const own = A.mask[j * AW + i]; if (own === 255) continue;
+      const bi = Math.floor(((fx(i) - bx0) / (bx1 - bx0)) * BW); if (bi < 0 || bi >= BW) continue;
+      const a = (B.mask[bj * BW + bi] / 255) * (1 - own / 255); if (!a) continue;
+      const si = (bj * BW + bi) * 4, di = (j * AW + i) * 4;
+      A.rgba[di] = B.rgba[si] * a + A.rgba[di] * (1 - a);
+      A.rgba[di + 1] = B.rgba[si + 1] * a + A.rgba[di + 1] * (1 - a);
+      A.rgba[di + 2] = B.rgba[si + 2] * a + A.rgba[di + 2] * (1 - a);
+      painted++;
+    }
+  }
+  return painted;
 }
+{
+  const todo = maps.filter((m) => { m.img = `maps/${m.id}.jpg`; return FORCE_IMAGES || !fs.existsSync(path.join(MAPS_OUT, `${m.id}.jpg`)); });
+  for (const m of todo) if (!tilesByArt.has(m.art)) { log(`  no art for ${m.name}`); m.img = null; }
+  // zones lend each other their explored areas, so every zone map is stitched before any is written
+  const zones = new Map();
+  for (const m of maps) if (m.kind === "zone" && tilesByArt.has(m.art) && (todo.includes(m) || todo.some((o) => o.kind === "zone" && rectsOverlap(o.rect, m.rect)))) zones.set(m.id, { m, ...(await stitch(m.art, m.imgW, m.imgH)) });
+  for (const m of todo) {
+    if (!m.img) continue;
+    let art, note = "";
+    if (m.kind === "zone") {
+      const A = zones.get(m.id);
+      let borrowed = 0;
+      for (const B of zones.values()) if (B !== A && rectsOverlap(A.m.rect, B.m.rect) && borrow(A, B)) borrowed++;
+      art = A.rgba; note = `, ${A.explored} explored areas, ${borrowed} neighbours borrowed`;
+    } else art = (await stitch(m.art, m.imgW, m.imgH)).rgba;
+    const j = jpeg.encode({ data: art, width: m.imgW, height: m.imgH }, 80);
+    fs.writeFileSync(path.join(MAPS_OUT, `${m.id}.jpg`), j.data);
+    log(`  wrote maps/${m.id}.jpg ${m.name} (${Math.round(j.data.length / 1024)} KB${note})`);
+  }
+}
+function rectsOverlap(a, b) { return a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]; }
 
 // ---------------------------------------------------------------------------
 // 4. Subzone overlays -> shapes
@@ -188,11 +254,6 @@ for (const m of maps) {
 // on its map's art; its alpha channel is the subzone's shape. The union of
 // a map's overlays is the map's land.
 // ---------------------------------------------------------------------------
-const overlayTiles = new Map();
-for (const t of T.WorldMapOverlayTile) {
-  if (!overlayTiles.has(t.WorldMapOverlayID)) overlayTiles.set(t.WorldMapOverlayID, []);
-  overlayTiles.get(t.WorldMapOverlayID).push(t);
-}
 function ringsToFrame(rings, m, tolerancePx) {
   const [x0, y0, x1, y1] = m.rect;
   const sx = (x1 - x0) / m.imgW, sy = (y1 - y0) / m.imgH;
@@ -357,6 +418,12 @@ function thin(line, tol) {
 // carry a delay). The vehicle sails the spline between stops at the
 // gameobject's speed, accelerating and braking at each dock; a change of
 // continent, a teleport flag, or the end of the loop is a jump.
+//
+// Each leg is written as pieces: the stretches the vessel really sails, and
+// the jumps, where the game moves it between continents in an instant. The
+// jumps are what cross the open sea on the world map, so after every route
+// is known they are bundled — jumps that run the same way are drawn along
+// one shared cable that fans out to its own docks at either end.
 // ---------------------------------------------------------------------------
 const TRANSPORTS = {
   241: { name: "The Maiden's Fancy", kind: "boat", faction: "N", stops: ["Ratchet", "Booty Bay"] },
@@ -398,29 +465,64 @@ for (const [pathId, nodes] of pathNodes) {
     segLen.push(sl);
   }
   const stopIdx = ns.map((n, i) => (n.delay > 0 ? i : -1)).filter((i) => i >= 0);
+  if (stopIdx.length < 2) { log(`  transport path ${pathId} has a single stop; skipped`); continue; }
   const legs = [];
   let period = ns.reduce((s, n) => s + n.delay, 0);
+  const framePt = (i) => { const pt = toFrame(ns[i].map, ns[i].p[0], ns[i].p[1]); return pt ? pt.map(r2) : null; };
   for (let s = 0; s < stopIdx.length; s++) {
     const a = stopIdx[s], b = stopIdx[(s + 1) % stopIdx.length];
     let d = 0;
-    const line = [];
+    const pieces = [];
+    let cur = [];
+    const flush = () => { if (cur.length > 1) pieces.push({ line: thin(cur, 0.4) }); cur = []; };
     for (let i = a; ; i = (i + 1) % N) {
-      const pt = toFrame(ns[i].map, ns[i].p[0], ns[i].p[1]);
-      if (pt) line.push(pt.map(r2));
+      const pt = framePt(i);
+      if (pt) cur.push(pt);
       if (i === b) break;
       d += segLen[i];
+      if (jump(i)) {
+        const to = framePt((i + 1) % N);
+        flush();
+        if (pt && to && Math.hypot(to[0] - pt[0], to[1] - pt[1]) > 2) pieces.push({ jump: true, line: [pt, to] });
+      }
     }
+    flush();
     const v = TRANSPORT_SPEED, acc = TRANSPORT_ACCEL;
     const t = d >= v * v / acc ? 2 * v / acc + (d - v * v / acc) / v : 2 * Math.sqrt(d / acc);
-    legs.push({ from: s, to: (s + 1) % stopIdx.length, yards: Math.round(d), seconds: Math.round(t), line: thin(line, 0.4) });
+    legs.push({ from: s, to: (s + 1) % stopIdx.length, yards: Math.round(d), seconds: Math.round(t), pieces });
     period += t;
   }
   const stops = stopIdx.map((i, k) => {
     const n = ns[i];
     const at = toFrame(n.map, n.p[0], n.p[1]);
-    return { name: meta?.stops?.[k] || `Stop ${k + 1}`, at: at ? at.map(r2) : null, map: n.map, world: [r1(n.p[0]), r1(n.p[1])], wait: n.delay };
+    return { name: meta?.stops?.[k] || `Stop ${k + 1}`, at: at ? at.map(r2) : null, zone: at ? zoneOf(at.map(r2)) : null, map: n.map, world: [r1(n.p[0]), r1(n.p[1])], wait: n.delay };
   });
   transports.push({ id: num(pathId), name: meta?.name || `Transport path ${pathId}`, kind: meta?.kind || "transport", faction: meta?.faction || "N", note: meta?.note || null, stops, legs, period: Math.round(period) });
+}
+// cable management: bundle the sea crossings
+{
+  const jumps = [];
+  for (const t of transports) for (const leg of t.legs) for (const p of leg.pieces) {
+    if (!p.jump) continue;
+    const [a, b] = p.line;
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 25) continue;
+    const reversed = b[0] < a[0] || (b[0] === a[0] && b[1] < a[1]); // bundle west -> east, whichever way the vessel goes
+    jumps.push({ p, t, edge: reversed ? [b[0], b[1], a[0], a[1]] : [a[0], a[1], b[0], b[1]], reversed });
+  }
+  const lines = bundleEdges(jumps.map((j) => j.edge), { threshold: 0.55 });
+  const groups = bundleGroups(lines, 7);
+  for (const g of groups) {
+    g.sort((i, k) => jumps[i].t.id - jumps[k].t.id || jumps[i].reversed - jumps[k].reversed);
+    g.forEach((idx, k) => {
+      const j = jumps[idx];
+      const line = thin(lines[idx].map((q) => q.map(r2)), 0.3);
+      j.p.line = j.reversed ? line.reverse() : line;
+      // lanes are spaced from the west->east view of the cable; a vessel drawn the other way sees the mirror image
+      const lane = k - (g.length - 1) / 2;
+      if (lane) j.p.lane = j.reversed ? -lane : lane;
+    });
+  }
+  log(`  ${jumps.length} sea crossings bundled into ${groups.length} cables (${groups.map((g) => g.length).join(", ")} lanes)`);
 }
 // a route whose docks a newer route shares is the old version of that route
 for (const t of transports) {
@@ -432,61 +534,23 @@ log(`  ${transports.length} transports`);
 
 // ---------------------------------------------------------------------------
 // 8. NPCs: bankers, auctioneers, flight masters
+//
+// Two sources, neither of them a website: the vanilla 1.12 spawn table
+// (CMaNGOS classic-db) for every service NPC that already existed, with its
+// faction template read against the client's FactionTemplate table for who
+// it is hostile to; and npcs-observed.json for what Forever adds or moves,
+// noted in the game itself. An observed NPC with a vanilla namesake replaces
+// its vanilla position.
 // ---------------------------------------------------------------------------
-function curl(url) {
-  return execFileSync("curl", ["-sS", "-L", "--max-time", "60", "-A", "Mozilla/5.0 (peligaming data build)", url], { encoding: "utf8", maxBuffer: 50e6 });
+const factionTemplates = new Map(T.FactionTemplate.map((f) => [f.ID, f]));
+function reactionOf(templateId) {
+  const f = factionTemplates.get(String(templateId));
+  if (!f) return null;
+  const friend = num(f.FriendGroup) | num(f.FactionGroup), enemy = num(f.EnemyGroup);
+  const to = (mask) => (enemy & mask ? -1 : friend & mask ? 1 : 0);
+  return [to(2), to(4)]; // [Alliance, Horde]: -1 hostile, 1 friendly, 0 neutral
 }
-function cached(file, producer) {
-  const p = path.join(CACHE, "wowhead", file);
-  if (fs.existsSync(p) && fs.statSync(p).size > 2000) return fs.readFileSync(p, "utf8");
-  const text = producer();
-  fs.writeFileSync(p, text);
-  return text;
-}
-function listview(html) {
-  const i = html.indexOf("new Listview(");
-  const j = html.indexOf('"data":[', i);
-  const k = html.indexOf("[", j);
-  let d = 0, e = k;
-  for (; e < html.length; e++) { const c = html[e]; if (c === "[") d++; else if (c === "]") { d--; if (d === 0) break; } }
-  return JSON.parse(html.slice(k, e + 1));
-}
-const ROLES = { 18: "auctioneer", 19: "banker", 21: "flightmaster" };
-const npcMap = new Map();
-for (const [criterion, role] of Object.entries(ROLES)) {
-  const html = cached(`npcs-${role}.html`, () => curl(`https://www.wowhead.com/forever/npcs?filter=${criterion};1;0`));
-  for (const n of listview(html)) {
-    if (!npcMap.has(n.id)) npcMap.set(n.id, { id: n.id, name: n.name, tag: n.tag || null, roles: [], react: n.react, wowheadZones: n.location || [] });
-    npcMap.get(n.id).roles.push(role);
-  }
-}
-log(`  ${npcMap.size} service NPCs listed on Wowhead`);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const npcs = [];
-for (const n of npcMap.values()) {
-  const file = path.join(CACHE, "wowhead", `npc-${n.id}.html`);
-  let html;
-  if (fs.existsSync(file) && fs.statSync(file).size > 10000) html = fs.readFileSync(file, "utf8");
-  else {
-    html = "";
-    for (let a = 0; a < 3 && html.length < 10000; a++) { try { html = curl(`https://www.wowhead.com/forever/npc=${n.id}`); } catch { html = ""; } if (html.length < 10000) await sleep(3000); }
-    fs.writeFileSync(file, html);
-    await sleep(400);
-  }
-  const m = html.match(/g_mapperData = (\{.*?\});/s);
-  const spots = [];
-  if (m) {
-    let mapper = null;
-    try { mapper = JSON.parse(m[1]); } catch { mapper = null; }
-    for (const entries of Object.values(mapper || {})) for (const e of entries) for (const [u, v] of e.coords) {
-      const at = mapPercentToFrame(e.uiMapId, u, v);
-      if (at) spots.push({ at: at.map(r2), uiMap: e.uiMapId });
-    }
-  }
-  npcs.push({ id: n.id, name: n.name, tag: n.tag, roles: n.roles, react: n.react, spots, source: spots.length ? "wowhead" : null });
-}
-
-// vanilla spawns from classic-db, for the NPCs Wowhead has no position for and as a check on the rest
 {
   const gz = path.join(CACHE, "classicdb.sql.gz");
   if (!fs.existsSync(gz)) { log("  downloading classic-db"); fs.writeFileSync(gz, await wago.fetchWithRetry(CLASSICDB_URL)); }
@@ -497,50 +561,50 @@ for (const n of npcMap.values()) {
   for (const r of readInsertRows(sql, "creature_template")) {
     const f = r[ct.indexOf("NpcFlags")];
     const roles = Object.entries(FLAG).filter(([, bit]) => f & bit).map(([k]) => k);
-    if (roles.length) wanted.set(r[ct.indexOf("Entry")], { name: r[ct.indexOf("Name")], tag: r[ct.indexOf("SubName")], roles });
+    if (roles.length) wanted.set(String(r[ct.indexOf("Entry")]), { name: r[ct.indexOf("Name")], tag: r[ct.indexOf("SubName")] || null, roles, faction: r[ct.indexOf("Faction")] });
   }
   const spawns = new Map();
   for (const r of readInsertRows(sql, "creature")) {
-    const id = r[cr.indexOf("id")];
+    const id = String(r[cr.indexOf("id")]);
     if (!wanted.has(id)) continue;
     const at = toFrame(r[cr.indexOf("map")], r[cr.indexOf("position_x")], r[cr.indexOf("position_y")]);
     if (!at) continue;
     if (!spawns.has(id)) spawns.set(id, []);
     spawns.get(id).push(at.map(r2));
   }
-  let agree = 0, checked = 0, added = 0;
   for (const [id, info] of wanted) {
     const vanilla = spawns.get(id);
     if (!vanilla) continue;
-    let npc = npcs.find((n) => n.id === id);
-    if (npc && npc.spots.length) {
-      checked++;
-      const d = Math.min(...npc.spots.map((s) => Math.min(...vanilla.map((v) => Math.hypot(v[0] - s.at[0], v[1] - s.at[1])))));
-      if (d < 1.5) { agree++; continue; }
-      log(`  ${info.name}: Wowhead ${JSON.stringify(npc.spots.map((s) => s.at))} vs classic-db ${JSON.stringify(vanilla)} differ by ${r2(d)} frame px (${Math.round(d * 47.9)} yd)`);
-      continue;
-    }
-    if (!npc) { npc = { id, name: info.name, tag: info.tag, roles: info.roles, react: null, spots: [], source: null }; npcs.push(npc); }
-    npc.spots = vanilla.map((at) => ({ at, uiMap: null }));
-    npc.source = "classic-db";
-    added++;
+    npcs.push({ id: num(id), name: info.name, tag: info.tag, roles: info.roles, react: reactionOf(info.faction), spots: vanilla.map((at) => ({ at })), source: "classic-db" });
   }
-  log(`  classic-db: ${checked} NPCs cross-checked (${agree} within 70 yd), ${added} placed from vanilla spawns`);
+  log(`  classic-db: ${npcs.length} service NPCs placed from vanilla spawns`);
+}
+{
+  const observed = JSON.parse(fs.readFileSync(OBSERVED, "utf8")).npcs || [];
+  let added = 0, moved = 0;
+  for (const o of observed) {
+    const at = mapPercentToFrame(o.uiMap, o.x, o.y);
+    if (!at) { log(`  observed NPC ${o.name}: map ${o.uiMap} is not on the world map; skipped`); continue; }
+    const spot = { at: at.map(r2) };
+    const existing = npcs.find((n) => n.name === o.name && (!o.tag || n.tag === o.tag));
+    if (existing) { existing.spots = [spot]; existing.source = "observed"; if (o.roles) existing.roles = o.roles; if (o.react) existing.react = o.react; moved++; }
+    else { npcs.push({ id: null, name: o.name, tag: o.tag || null, roles: o.roles || [], react: o.react || null, spots: [spot], source: "observed" }); added++; }
+  }
+  log(`  observed in game: ${added} NPCs added, ${moved} vanilla positions replaced`);
 }
 for (const n of npcs) {
-  if (!n.spots.length) continue;
-  // which zone each spot is in
-  for (const s of n.spots) {
-    const z = maps.filter((m) => m.kind === "zone" || m.kind === "city").filter((m) => inRect(m.rect, s.at)).sort((a, b) => rectArea(a.rect) - rectArea(b.rect));
-    const inside = z.find((m) => m.outline?.some((ring) => pointInRing(ring, s.at)));
-    s.zone = (inside || z[0])?.id || null;
-    delete s.uiMap;
-  }
+  for (const s of n.spots) s.zone = zoneOf(s.at);
 }
 const placed = npcs.filter((n) => n.spots.length);
 log(`  ${placed.length} NPCs placed (${npcs.length - placed.length} without a known position: ${npcs.filter((n) => !n.spots.length).map((n) => n.name).join(", ")})`);
 function inRect([x0, y0, x1, y1], [x, y]) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; }
 function rectArea([x0, y0, x1, y1]) { return (x1 - x0) * (y1 - y0); }
+// the zone or city map a frame point lies in: inside an outline if possible, else the smallest map whose bounds hold it
+function zoneOf(at) {
+  const z = maps.filter((m) => m.kind === "zone" || m.kind === "city").filter((m) => inRect(m.rect, at)).sort((a, b) => rectArea(a.rect) - rectArea(b.rect));
+  const inside = z.find((m) => m.outline?.some((ring) => pointInRing(ring, at)));
+  return (inside || z[0])?.id || null;
+}
 function pointInRing(ring, [x, y]) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -587,14 +651,13 @@ const LEVELS = {
   16591: [36, 44], 16593: [1, 12], 616: [55, 60], 16651: [55, 60],
   1519: [1, 60], 1637: [1, 60], 1537: [1, 60], 1638: [1, 60], 1657: [1, 60], 1497: [1, 60],
 };
-const TERRITORY = { 0: "Alliance", 1: "Horde", 2: "Contested", 3: "Contested", 4: "PvP" };
-const whZones = JSON.parse(cached("zones.json", () => JSON.stringify(listview(curl("https://www.wowhead.com/forever/zones")))));
-const whZoneById = new Map(whZones.map((z) => [z.id, z]));
+// whose land it is: the area's faction group in the client (2 Alliance, 4 Horde, neither = contested)
+const TERRITORY = { 2: "Alliance", 4: "Horde" };
 for (const m of maps) {
   if (m.kind !== "zone" && m.kind !== "city") continue;
-  const wz = whZoneById.get(m.area);
-  m.levels = LEVELS[m.area] || (wz && wz.maxlevel ? [wz.minlevel, wz.maxlevel] : null);
-  m.territory = wz ? TERRITORY[wz.territory] || null : null;
+  m.levels = LEVELS[m.area] || null;
+  if (!m.levels) log(`  no level band for ${m.name} (area ${m.area}); add it to LEVELS`);
+  m.territory = TERRITORY[num(areaById.get(String(m.area))?.FactionGroupMask)] || "Contested";
   m.biomes = BIOMES.filter((b) => b.zones.includes(m.area)).map((b) => b.key);
   m.biomeSubzones = BIOMES.flatMap((b) => b.subzones.filter((s) => s.zone === m.area).map((s) => ({ biome: b.key, area: s.area, name: s.name })));
 }

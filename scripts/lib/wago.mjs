@@ -5,7 +5,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const UA = "peligaming data build (https://github.com/peligwen/peligaming)";
+// Etiquette: wago.tools publishes no usage policy, so this client behaves
+// like a considerate one — it says who it is, fetches one thing at a time,
+// leaves a gap between requests, backs off on 429/5xx, and caches every
+// download so a rebuild of the same build touches the network only for
+// what is missing.
+const UA = "peligaming-map-build/1.0 (+https://github.com/peligwen/peligaming)";
+const GAP_MS = 250;
+let lastRequest = 0;
 
 export class Wago {
   constructor(build, cacheDir) {
@@ -18,13 +25,20 @@ export class Wago {
   async fetchWithRetry(url, tries = 4) {
     let lastErr;
     for (let i = 0; i < tries; i++) {
+      const wait = lastRequest + GAP_MS - Date.now();
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      lastRequest = Date.now();
       try {
         const res = await fetch(url, { headers: { "User-Agent": UA } });
+        if (res.status === 429 || res.status >= 500) {
+          const after = Number(res.headers.get("retry-after")) || 0;
+          throw Object.assign(new Error(`HTTP ${res.status} for ${url}`), { backoff: Math.max(after * 1000, 4000 * (i + 1)) });
+        }
         if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
         return Buffer.from(await res.arrayBuffer());
       } catch (e) {
         lastErr = e;
-        await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+        await new Promise((r) => setTimeout(r, e.backoff || 1500 * (i + 1)));
       }
     }
     throw lastErr;
