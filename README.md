@@ -28,13 +28,13 @@ the game's own map art, with the layers the game does not draw for you.
   Mana per 5 sec in Forest and Grassland areas") are gated on eight area
   groups in the client — Forest & Grassland, Swamp, Wasteland, Snowy,
   Mountainous, Haunted, Cavernous & Underground, Desert — and a zone can be
-  in several (Dun Morogh is Forest, Snowy and Mountainous at once). The
-  biome layer paints every zone by its groups, stripes the ones in more than
-  one, marks the subzone exceptions (Booty Bay counts as Forest & Grassland
-  inside a Stranglethorn that also counts as Mountainous), and lists, per
-  biome and per zone, every effect and item that keys off it: the Darkspear
-  Raiders' seals, the Runes of Perfection and Duty, the Royal Seal of
-  Eldre'Thalas variants, and the rest.
+  in several (Dun Morogh is Forest, Snowy and Mountainous at once). The map
+  shows no biome until you pick one; then only that biome's zones light up,
+  with the subzone exceptions marked (Booty Bay counts as Forest & Grassland
+  inside a Stranglethorn that does not), and the panel lists every effect
+  and item that keys off it: the Darkspear Raiders' seals, the Runes of
+  Perfection and Duty, the Royal Seal of Eldre'Thalas variants, and the
+  rest. An "all biomes, striped" view paints every zone by all its groups.
 - **Flight masters and flight paths.** Every taxi node with its faction,
   every route with its fare and its flight time (the path's length at 30
   yards a second, which matches recorded Classic flights within a few
@@ -43,9 +43,14 @@ the game's own map art, with the layers the game does not draw for you.
 - **Boats, zeppelins and skyships.** Every transport path in the client —
   the vanilla boats and zeppelins plus Forever's new Stormwind Harbor to
   Auberdine ship, the Riverglades to Tanaris ship, the Menethil boat that now
-  calls at Southshore, and the two Zephras Isle skyships — drawn along their
-  real routes across the sea, with sailing time per leg, the wait at each
-  dock, and the full loop.
+  calls at Southshore, and the two Zephras Isle skyships — named by their
+  docks (Ratchet ⇄ Booty Bay, with the vessel as a detail and each dock's
+  zone and continent spelled out), with sailing time per leg, the wait at
+  each dock, and the full loop. The stretches a vessel really sails are
+  drawn solid along its real path; the instant crossings between continents
+  are dashed, and bundled into shared cables that fan out to their docks, so
+  a dozen crossings read as a few lanes rather than a web across the
+  Maelstrom.
 - **Banks and auction houses.** Every banker and auctioneer, coloured by who
   can use them, from zone zoom in.
 - Search across zones, subzones, towns, dungeons, flight masters, ships and
@@ -57,24 +62,70 @@ the game's own map art, with the layers the game does not draw for you.
   everything from the Forever beta client's own data as datamined by
   [wago.tools](https://wago.tools): the UiMap tables that place each map in
   world coordinates, the map art tiles (BLP textures, decoded by
-  `scripts/lib/blp.mjs` and stitched into one JPEG per map), the subzone
-  overlay textures (traced into polygons by `scripts/lib/contour.mjs`),
-  the taxi nodes and paths, the transport paths, points of interest, the
-  area groups behind each biome and the spells and items that require them.
-  Vanilla NPC positions come from the
-  [CMaNGOS classic database](https://github.com/cmangos/classic-db) and
-  Forever's new NPCs from Wowhead's beta database (whose percentages are
-  read against the Classic Era map bounds, since Forever redrew four maps).
-  Downloads are cached in `.wow-forever-cache/`; pass a build number to
-  target a newer beta.
+  `scripts/lib/blp.mjs` and stitched into one JPEG per map, with every
+  "explored area" overlay composited on top, since the tiles alone are the
+  washed-out unexplored art), the same overlays traced into zone and subzone
+  polygons by `scripts/lib/contour.mjs`, the taxi nodes and paths, the
+  transport paths, points of interest, the area groups behind each biome and
+  the spells and items that require them. Downloads are cached in
+  `.wow-forever-cache/`; pass a build number to target a newer beta.
+- NPC positions come from two places, neither of them a website: the
+  vanilla 1.12 spawn table of the
+  [CMaNGOS classic database](https://github.com/cmangos/classic-db) (GPLv3)
+  for every banker, auctioneer and flight master that already existed, with
+  its faction template read against the client's FactionTemplate table for
+  who it is hostile to; and `scripts/data/wow-forever/npcs-observed.json`
+  for what Forever adds or moves, noted in the game itself (below).
 - Sailing times are modelled from each route's spline with the vessels'
   speed and acceleration from the vanilla gameobject data (continent
   crossings and the loop's closing leg are jumps); against the vanilla
-  timetables the model runs within about 5%.
+  timetables the model runs within about 5%. The crossings are bundled by
+  `scripts/lib/bundle.mjs`, a force-directed edge bundling (Holten & van
+  Wijk) that pulls crossings running the same way onto shared cables and
+  spreads the members of a cable into lanes.
 - The app (`public/tools/wow-forever/world-map.html`) is vanilla JS on a
   canvas: the art is drawn coarse to fine as you zoom, each zone clipped to
   its own outline so neighbours never fight, and every layer is vector on
   top.
+
+### Adding an NPC
+
+Forever's new service NPCs, and any the beta moves, are not in the vanilla
+spawn table. Stand next to one in the game, target it, and run this macro:
+
+```
+/run local m=C_Map.GetBestMapForUnit("player") local p=C_Map.GetPlayerMapPosition(m,"player") print(format("%s · map %d · %.2f, %.2f",UnitName("target") or "no target",m,p.x*100,p.y*100))
+```
+
+It prints the NPC's name, the zone map's id and your position on that map,
+which is within a step or two of the NPC's. Add an entry to
+`scripts/data/wow-forever/npcs-observed.json`:
+
+```json
+{ "name": "Auctioneer Wabang", "roles": ["auctioneer"], "react": [-1, 1], "uiMap": 1411, "x": 52.3, "y": 45.1 }
+```
+
+`roles` is any of `banker`, `auctioneer`, `flightmaster`; `react` is
+`[Alliance, Horde]` with `1` friendly, `0` neutral, `-1` hostile. An entry
+whose name matches a vanilla NPC replaces that NPC's position; anything
+else is added. Rebuild with `npm run data:wow-forever`.
+
+### Sources and their terms
+
+- **wago.tools** publishes no usage policy. The build script behaves like a
+  considerate client: it identifies itself (`peligaming-map-build/1.0`, with
+  a link here), fetches one file at a time with a gap between requests,
+  backs off on rate limiting, and caches every download so a rebuild of the
+  same build touches the network only for what is missing. Other community
+  tools draw on the same endpoints the same way.
+- **CMaNGOS classic-db** is GPLv3; the spawn coordinates this map derives
+  from it are credited in the map's own panel and here.
+- **Wowhead** is not used. Its terms bar reaching the site with anything
+  but an ordinary browser and bar derivative works of its content, so the
+  earlier Wowhead-sourced NPC positions were dropped and replaced by the
+  sources above.
+- Blizzard's fan-content terms allow non-commercial fan maps that carry the
+  proper notices, which the map and `LICENSE` do.
 
 ## ⚓ Naval Pathfinder
 

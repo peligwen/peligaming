@@ -1,0 +1,11 @@
+{
+  "_about": [
+    "Service NPCs (bankers, auctioneers, flight masters) that WoW Forever adds, or moves from where vanilla had them.",
+    "The vanilla positions come from the CMaNGOS classic-db spawn table; this file is for what that table cannot know.",
+    "Positions are the game's own map coordinates: percent across (x) and down (y) the zone map named by uiMap.",
+    "Stand at the NPC in game, target it, and run the macro in the README ('Adding an NPC') — it prints a ready-made line.",
+    "roles: any of banker, auctioneer, flightmaster. react: [Alliance, Horde] with 1 friendly, 0 neutral, -1 hostile.",
+    "An entry whose name matches a vanilla NPC replaces that NPC's position; anything else is added."
+  ],
+  "npcs": []
+}
