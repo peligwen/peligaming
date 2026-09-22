@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>World Map — WoW Forever: biomes, flight paths, boats &amp; zeppelins, banks &amp; auctioneers</title>
+<meta name="description" content="Azeroth from the whole world down to a city street, from the game's own map art: every zone's biomes for the zone-bound item effects, flight masters with flight times and a flight planner, boats, zeppelins and skyships with sailing times, and every banker and auctioneer.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗺️</text></svg>">
+<style>
+  :root{
+    --bg:#0b0906; --gold:#e0b95a; --gold-dim:#a68a3f; --parch:#efe4c8; --dim:#a89b7c; --ink:#1a1408;
+    --panel:#1b1509f2; --edge-hi:#6a5630; --edge-lo:#0d0a05; --blue:#5aa9ff; --red:#ff6a5a; --teal:#6fd7c8;
+    --serif:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{background:var(--bg);color:var(--parch);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;font-size:14px;overscroll-behavior:none;}
+  canvas#map{position:fixed;inset:0;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;}
+  canvas#map.grabbing{cursor:grabbing;}
+  .panel{background:var(--panel);border:1px solid var(--edge-hi);box-shadow:0 6px 24px rgba(0,0,0,.6),inset 0 0 0 1px var(--edge-lo);border-radius:6px;}
+  #hdr{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;gap:10px;align-items:center;padding:6px 12px;
+    background:linear-gradient(#2a2113f4,#1b1509f4);border-bottom:1px solid var(--edge-hi);flex-wrap:wrap;}
+  #hdr .home{color:var(--dim);text-decoration:none;font-size:13px;white-space:nowrap;}
+  #hdr .home:hover{color:var(--gold);}
+  #hdr h1{font-family:var(--serif);font-weight:600;font-size:21px;color:var(--gold);letter-spacing:.5px;text-shadow:1px 1px 0 #000;white-space:nowrap;line-height:1;}
+  #hdr .sub{font-size:12px;color:var(--dim);line-height:1.15;max-width:170px;}
+  #crumb{font-family:var(--serif);font-size:14px;color:var(--parch);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34vw;}
+  #crumb span{cursor:pointer;} #crumb span:hover{color:var(--gold);} #crumb i{color:var(--dim);font-style:normal;margin:0 5px;}
+  .search{position:relative;flex:1;min-width:180px;max-width:360px;}
+  .search input{width:100%;font-size:14px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:6px 10px;outline:none;}
+  .search input:focus{border-color:var(--gold);}
+  .search input::placeholder{color:#6f6450;}
+  .drop{position:absolute;top:100%;left:0;right:0;z-index:40;max-height:60vh;overflow-y:auto;display:none;margin-top:3px;}
+  .drop div{padding:5px 10px;cursor:pointer;color:var(--parch);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.5px;}
+  .drop div:hover,.drop div.on{background:#3a2e17;color:#fff;}
+  .drop div small{color:var(--dim);margin-left:6px;font-size:12px;}
+  .drop .kind{display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:7px;vertical-align:-2px;font-size:10px;line-height:14px;text-align:center;color:#000;font-weight:700;}
+  #layers{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+  .chip{font-size:12.5px;color:var(--dim);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:999px;padding:3px 10px;cursor:pointer;user-select:none;white-space:nowrap;display:flex;align-items:center;gap:6px;}
+  .chip .sw{width:9px;height:9px;border-radius:2px;background:currentColor;opacity:.35;}
+  .chip.on{color:var(--parch);border-color:var(--gold-dim);} .chip.on .sw{opacity:1;}
+  .chip:hover{color:#fff;}
+  select{font-size:13px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:4px 6px;outline:none;}
+  #side{position:fixed;top:60px;right:10px;z-index:25;width:300px;max-height:calc(100% - 96px);overflow-y:auto;padding:12px 14px;scrollbar-width:thin;font-size:13.5px;line-height:1.4;}
+  #side h2{font-family:var(--serif);font-weight:600;font-size:19px;color:var(--gold);text-shadow:1px 1px 0 #000;margin:0 0 4px;line-height:1.15;}
+  #side h3{font-family:var(--serif);font-weight:600;font-size:14.5px;color:var(--gold-dim);margin:12px 0 4px;border-bottom:1px solid var(--edge-hi);padding-bottom:2px;letter-spacing:.3px;}
+  #side .kind{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+  #side .close{position:absolute;top:8px;right:10px;color:var(--dim);cursor:pointer;font-size:18px;line-height:1;} #side .close:hover{color:#fff;}
+  #side p{margin:5px 0;color:var(--parch);}
+  #side .dim{color:var(--dim);font-size:12.5px;}
+  #side .note{color:var(--dim);font-size:12px;line-height:1.35;border-left:2px solid var(--edge-hi);padding-left:8px;margin:6px 0;}
+  #side ul{list-style:none;} #side li{padding:3px 0;border-bottom:1px solid #2a2113;}
+  #side li:last-child{border-bottom:0;}
+  #side .row{display:flex;gap:8px;align-items:baseline;} #side .row .n{flex:1;min-width:0;}
+  #side .row .v{color:var(--teal);font-variant-numeric:tabular-nums;white-space:nowrap;} #side .row .c{color:var(--dim);font-size:12px;white-space:nowrap;}
+  .lnk{color:var(--parch);cursor:pointer;text-decoration:underline dotted #6a5630;} .lnk:hover{color:var(--gold);}
+  .bchip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;margin:2px 4px 2px 0;color:#000;font-weight:600;cursor:pointer;border:1px solid #0006;}
+  .bchip:hover{filter:brightness(1.15);} .bchip.off{opacity:.35;}
+  .fac{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:3px;margin-left:4px;vertical-align:1px;}
+  .fac.A{background:#1e4d8a;color:#cfe4ff;} .fac.H{background:#8a2a1e;color:#ffd6cf;} .fac.N{background:#6a5630;color:#ffe9b0;}
+  .btn{display:inline-block;font-size:12.5px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:4px 10px;cursor:pointer;margin:4px 6px 2px 0;}
+  .btn:hover{border-color:var(--gold);color:#fff;} .btn.on{background:#3a2e17;border-color:var(--gold-dim);}
+  .legend .lg{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;} .legend .lg:hover{color:#fff;}
+  .legend .lg .sw{width:14px;height:14px;border-radius:3px;border:1px solid #0008;flex:none;}
+  .legend .lg small{color:var(--dim);margin-left:auto;}
+  .legend .lg.off{opacity:.4;}
+  #tip{position:fixed;z-index:50;display:none;pointer-events:none;padding:6px 10px;max-width:280px;font-size:13px;line-height:1.3;}
+  #tip .t{color:var(--gold);font-family:var(--serif);font-size:15px;} #tip .d{color:var(--dim);font-size:12px;}
+  #readout{position:fixed;right:10px;bottom:8px;z-index:22;font-size:12px;color:var(--dim);background:#0b0906cc;padding:3px 10px;border-radius:10px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  #readout b{color:var(--parch);font-weight:600;}
+  #hint{position:fixed;left:10px;bottom:8px;z-index:22;font-size:12px;color:var(--dim);background:#0b0906cc;padding:3px 10px;border-radius:10px;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #hint b{color:var(--gold);font-weight:600;}
+  #zoomctl{position:fixed;left:10px;bottom:38px;z-index:22;display:flex;flex-direction:column;gap:4px;}
+  #zoomctl button{width:30px;height:30px;font-size:18px;color:var(--parch);background:#1b1509f2;border:1px solid var(--edge-hi);border-radius:4px;cursor:pointer;}
+  #zoomctl button:hover{color:var(--gold);border-color:var(--gold-dim);}
+  #loading{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--dim);}
+  #loading h1{font-family:var(--serif);color:var(--gold);font-weight:600;font-size:28px;}
+  #sideToggle{display:none;position:fixed;right:10px;top:60px;z-index:26;font-size:13px;color:var(--parch);background:#1b1509f2;border:1px solid var(--edge-hi);border-radius:4px;padding:5px 10px;cursor:pointer;}
+  @media (max-width:820px){
+    #hdr{padding:5px 8px;gap:6px;} #hdr .sub,#crumb{display:none;} .search{min-width:120px;}
+    #layers{flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:none;padding-bottom:2px;}
+    #side{width:min(300px,calc(100vw - 20px));top:auto;bottom:38px;max-height:46vh;}
+    #side.hidden{display:none;} #sideToggle{display:block;top:auto;bottom:8px;right:10px;} #readout{display:none;}
+  }
+</style>
+</head>
+<body>
+<canvas id="map"></canvas>
+<header id="hdr">
+  <a class="home" href="../../">← peligaming</a>
+  <h1>World Map</h1>
+  <span class="sub" id="sub">WoW Forever</span>
+  <div id="crumb"></div>
+  <div class="search"><input id="q" type="search" autocomplete="off" placeholder="Search zones, towns, flight masters, banks, boats…"><div id="qdrop" class="drop panel"></div></div>
+  <div id="layers"></div>
+  <select id="faction" title="Show what one faction can use"><option value="">Both factions</option><option value="A">Alliance</option><option value="H">Horde</option></select>
+</header>
+<aside id="side" class="panel"></aside>
+<div id="sideToggle">Details</div>
+<div id="tip" class="panel"></div>
+<div id="readout"></div>
+<div id="hint"><b>Scroll</b> to zoom · <b>drag</b> to pan · <b>click</b> anything to read about it</div>
+<div id="zoomctl"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button></div>
+<div id="loading"><h1>World Map</h1><div id="loadmsg">Unrolling the map…</div></div>
+
+<script>
+(function () {
+"use strict";
+const DATA_URL = "data/world-map/world-map.json";
+const $ = (id) => document.getElementById(id);
+const canvas = $("map"), ctx = canvas.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+
+// ---- state -----------------------------------------------------------------
+const LAYERS = [
+  { key: "biomes", name: "Biomes", color: "#5fae4a" },
+  { key: "flights", name: "Flight masters", color: "#ffd25a" },
+  { key: "routes", name: "Flight paths", color: "#ffd25a" },
+  { key: "transports", name: "Boats & zeppelins", color: "#6fd7ff" },
+  { key: "banks", name: "Banks", color: "#e0b95a" },
+  { key: "auction", name: "Auction houses", color: "#9fe36f" },
+  { key: "places", name: "Towns & dungeons", color: "#efe4c8" },
+];
+const state = {
+  view: { cx: 501, cy: 334, z: 1 },
+  layers: { biomes: true, flights: true, routes: false, transports: true, banks: true, auction: true, places: true },
+  faction: "",
+  biomeFocus: null,      // biome key or null
+  hover: null, sel: null,
+  plan: { from: null, to: null, result: null },
+  legacyTransports: false,
+};
+let D = null;            // the dataset
+let mapsById = new Map(), nodesById = new Map(), routesFrom = new Map(), biomesByKey = new Map();
+let hits = [];           // hit-test targets rebuilt every frame
+let dirty = true, animating = false;
+const images = new Map();      // map.id -> HTMLImageElement
+const masked = new Map();      // map.id -> masked canvas (LRU)
+const MASK_LRU = 22;
+const patterns = new Map();
+
+// ---- helpers ---------------------------------------------------------------
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmtTime = (s) => { s = Math.round(s); const m = Math.floor(s / 60), r = s % 60; return m ? `${m}:${String(r).padStart(2, "0")}` : `${r}s`; };
+const fmtMoney = (c) => { const g = Math.floor(c / 10000), s = Math.floor((c % 10000) / 100), cp = c % 100; const p = []; if (g) p.push(g + "g"); if (s || g) p.push(s + "s"); if (cp || (!g && !s)) p.push(cp + "c"); return p.join(" "); };
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const facName = { A: "Alliance", H: "Horde", N: "Neutral" };
+const facColor = { A: "#5aa9ff", H: "#ff6a5a", N: "#ffd25a" };
+const toScreen = (fx, fy) => [(fx - state.view.cx) * state.view.z + W / 2, (fy - state.view.cy) * state.view.z + H / 2];
+const toFrame = (sx, sy) => [(sx - W / 2) / state.view.z + state.view.cx, (sy - H / 2) / state.view.z + state.view.cy];
+const topBar = () => $("hdr").offsetHeight || 0;
+const fitZoom = () => Math.min(W / D.frame.width, (H - topBar()) / D.frame.height) * 0.98;
+const usable = (f) => !state.faction || !f || f === "N" || f === state.faction;
+const npcUsable = (n) => !state.faction || !n.react || (state.faction === "A" ? n.react[0] : n.react[1]) !== -1;
+function pointInRing(ring, x, y) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+const inRect = (r, x, y) => x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3];
+function centroid(ring) {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0, n = ring.length; i < n; i++) {
+    const [x1, y1] = ring[i], [x2, y2] = ring[(i + 1) % n];
+    const f = x1 * y2 - x2 * y1; a += f; cx += (x1 + x2) * f; cy += (y1 + y2) * f;
+  }
+  if (!a) return ring[0];
+  return [cx / (3 * a), cy / (3 * a)];
+}
+function zoneAt(fx, fy) {
+  let best = null;
+  for (const m of D.maps) {
+    if (m.kind !== "zone" && m.kind !== "city") continue;
+    if (!inRect(m.rect, fx, fy)) continue;
+    if (m.outline && m.outline.length) { if (m.outline.some((r) => pointInRing(r, fx, fy))) { if (!best || m.kind === "city") best = m; } }
+    else if (m.kind === "city" && !best) best = m;
+  }
+  return best;
+}
+function subzoneAt(m, fx, fy) {
+  if (!m || !m.subzones) return null;
+  for (const s of m.subzones) if (s.poly && s.poly.some((r) => pointInRing(r, fx, fy))) return s;
+  return null;
+}
+
+// ---- data ------------------------------------------------------------------
+async function load() {
+  D = await (await fetch(DATA_URL)).json();
+  $("sub").textContent = `WoW Forever · beta build ${D.build}`;
+  for (const m of D.maps) {
+    mapsById.set(m.id, m);
+    if (m.outline && m.outline.length) m.center = centroid(m.outline[0]);
+    else m.center = [(m.rect[0] + m.rect[2]) / 2, (m.rect[1] + m.rect[3]) / 2];
+    m.area2 = (m.rect[2] - m.rect[0]) * (m.rect[3] - m.rect[1]);
+  }
+  for (const n of D.taxi.nodes) { nodesById.set(n.id, n); routesFrom.set(n.id, []); }
+  for (const r of D.taxi.routes) routesFrom.get(r.from)?.push(r);
+  for (const b of D.biomes) biomesByKey.set(b.key, b);
+  for (const t of D.transports) t.center = t.stops[0]?.at;
+  buildSearch();
+  buildLayers();
+  readHash();
+  if (!state.view.hashed) { state.view.z = fitZoom(); state.view.cx = D.frame.width / 2; state.view.cy = D.frame.height / 2 - topBar() / 2 / state.view.z; }
+  showAbout();
+  if (window.innerWidth <= 820) side.classList.add("hidden"); // phones: the map first, details on demand
+  $("loading").style.display = "none";
+  requestDraw();
+}
+
+// ---- images ----------------------------------------------------------------
+function imageFor(m) {
+  if (!m.img) return null;
+  let img = images.get(m.id);
+  if (!img) {
+    img = new Image();
+    img.onload = () => requestDraw();
+    img.src = "data/world-map/" + m.img;
+    images.set(m.id, img);
+  }
+  return img.complete && img.naturalWidth ? img : null;
+}
+function maskedFor(m, img, soft) {
+  const key = m.id + (soft ? ":soft" : ":clip");
+  let c = masked.get(key);
+  if (c) { masked.delete(key); masked.set(key, c); return c; }
+  const Wi = img.naturalWidth, Hi = img.naturalHeight;
+  c = document.createElement("canvas"); c.width = Wi; c.height = Hi;
+  const g = c.getContext("2d");
+  g.drawImage(img, 0, 0);
+  g.globalCompositeOperation = "destination-in";
+  const [x0, y0, x1, y1] = m.rect;
+  const sx = Wi / (x1 - x0), sy = Hi / (y1 - y0);
+  try { g.filter = m.kind === "zone" ? "blur(3px)" : "blur(18px)"; } catch (e) { /* no filter support: hard edges */ }
+  g.fillStyle = "#000"; g.strokeStyle = "#000"; g.lineJoin = "round";
+  if (!soft && m.kind === "zone" && m.outline && m.outline.length) {
+    g.beginPath();
+    for (const ring of m.outline) { ring.forEach(([x, y], i) => { const px = (x - x0) * sx, py = (y - y0) * sy; if (i) g.lineTo(px, py); else g.moveTo(px, py); }); g.closePath(); }
+    g.fill(); g.lineWidth = 16; g.stroke();
+  } else {
+    const inset = m.kind === "continent" ? 40 : 26;
+    g.fillRect(inset, inset, Wi - inset * 2, Hi - inset * 2);
+  }
+  masked.set(key, c);
+  if (masked.size > MASK_LRU) masked.delete(masked.keys().next().value);
+  return c;
+}
+function drawMapImage(m, alpha, mode) {
+  const img = imageFor(m);
+  if (!img) return;
+  const [x0, y0, x1, y1] = m.rect;
+  const [sx0, sy0] = toScreen(x0, y0), [sx1, sy1] = toScreen(x1, y1);
+  if (sx1 < -50 || sy1 < -50 || sx0 > W + 50 || sy0 > H + 50) return;
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(mode ? maskedFor(m, img, mode === "soft") : img, sx0, sy0, sx1 - sx0, sy1 - sy0);
+  ctx.globalAlpha = 1;
+}
+function biomePattern(keys, strong) {
+  const id = keys.join("+") + (strong ? "!" : "");
+  let p = patterns.get(id);
+  if (p) return p;
+  const c = document.createElement("canvas"); c.width = c.height = 14 * keys.length;
+  const g = c.getContext("2d");
+  const cols = keys.map((k) => biomesByKey.get(k).color);
+  if (keys.length === 1) { g.fillStyle = cols[0]; g.fillRect(0, 0, c.width, c.height); }
+  else {
+    // diagonal bands, one per biome
+    g.translate(c.width / 2, c.height / 2); g.rotate(-Math.PI / 4); g.translate(-c.width, -c.height);
+    const band = 14;
+    for (let i = -6; i < 12; i++) { g.fillStyle = cols[((i % keys.length) + keys.length) % keys.length]; g.fillRect(-c.width, i * band, c.width * 4, band); }
+  }
+  p = ctx.createPattern(c, "repeat");
+  patterns.set(id, p);
+  return p;
+}
+
+// ---- drawing ---------------------------------------------------------------
+function requestDraw() { dirty = true; if (!animating) { animating = true; requestAnimationFrame(frame); } }
+function frame() { animating = false; if (dirty) { dirty = false; draw(); } }
+function fade(z, a, b) { return clamp((z - a) / (b - a), 0, 1); }
+function path(ring, close) {
+  ring.forEach(([x, y], i) => { const [sx, sy] = toScreen(x, y); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
+  if (close) ctx.closePath();
+}
+function label(text, sx, sy, size, color, opts = {}) {
+  ctx.font = `${opts.weight || 600} ${size}px ${opts.serif === false ? '"Segoe UI",system-ui,sans-serif' : 'var(--serif)'}`.replace("var(--serif)", '"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif');
+  ctx.textAlign = opts.align || "center"; ctx.textBaseline = opts.base || "middle";
+  try { ctx.letterSpacing = (opts.spacing || 0) + "px"; } catch (e) { /* older browsers */ }
+  ctx.lineWidth = Math.max(2, size / 4); ctx.strokeStyle = "rgba(10,7,3,.85)"; ctx.lineJoin = "round";
+  ctx.strokeText(text, sx, sy); ctx.fillStyle = color; ctx.fillText(text, sx, sy);
+  try { ctx.letterSpacing = "0px"; } catch (e) { /* ignore */ }
+}
+function visibleRect(pad) { const [x0, y0] = toFrame(-pad, -pad), [x1, y1] = toFrame(W + pad, H + pad); return [x0, y0, x1, y1]; }
+const rectsOverlap = (a, b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+
+function draw() {
+  if (!D) return;
+  const z = state.view.z;
+  hits = [];
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#0b0906"; ctx.fillRect(0, 0, W, H);
+  const vis = visibleRect(80);
+
+  // 1. art, coarse to fine
+  const world = D.maps.find((m) => m.kind === "world");
+  if (world) drawMapImage(world, 1, null);
+  const conts = D.maps.filter((m) => m.kind === "continent");
+  const zones = D.maps.filter((m) => m.kind === "zone").sort((a, b) => b.area2 - a.area2);
+  const cities = D.maps.filter((m) => m.kind === "city");
+  const aCont = fade(z, 1.5, 2.4), aZone = fade(z, 3.6, 5.2), aCity = fade(z, 16, 24);
+  if (aCont > 0) for (const m of conts) if (rectsOverlap(m.rect, vis)) drawMapImage(m, aCont, "soft");
+  // each zone's map paints its surroundings too: lay those down softly first, then every zone clipped to its own outline on top
+  if (aZone > 0) { for (const m of zones) if (rectsOverlap(m.rect, vis)) drawMapImage(m, aZone, "soft"); for (const m of zones) if (rectsOverlap(m.rect, vis)) drawMapImage(m, aZone, "clip"); }
+  if (aCity > 0) for (const m of cities) if (rectsOverlap(m.rect, vis)) drawMapImage(m, aCity, "soft");
+
+  // insets
+  for (const m of D.maps) if (m.note && m.kind === "zone" && rectsOverlap(m.rect, vis)) {
+    const [sx0, sy0] = toScreen(m.rect[0], m.rect[1]), [sx1, sy1] = toScreen(m.rect[2], m.rect[3]);
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = "rgba(224,185,90,.7)"; ctx.lineWidth = 1.2; ctx.strokeRect(sx0, sy0, sx1 - sx0, sy1 - sy0); ctx.setLineDash([]);
+    if (z < 6) label("inset · Skywall", (sx0 + sx1) / 2, sy1 + 9, 10, "#e0b95a", { serif: false, weight: 500 });
+  }
+
+  // 2. biomes
+  if (state.layers.biomes) {
+    const focus = state.biomeFocus;
+    for (const m of zones) {
+      if (!m.outline || !m.outline.length || !rectsOverlap(m.rect, vis)) continue;
+      const keys = focus ? (m.biomes.includes(focus) ? [focus] : []) : m.biomes;
+      const dimmed = focus && !keys.length;
+      ctx.beginPath(); for (const ring of m.outline) path(ring, true);
+      if (keys.length) { ctx.fillStyle = biomePattern(keys); ctx.globalAlpha = (focus ? 0.55 : 0.34) * (1 - 0.55 * fade(z, 6, 14)); ctx.fill(); }
+      else if (dimmed) { ctx.fillStyle = "#000"; ctx.globalAlpha = 0.45; ctx.fill(); }
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1; ctx.strokeStyle = "rgba(20,14,6,.55)"; ctx.stroke();
+      // subzone exceptions of the focused biome
+      if (focus && m.subzones) for (const ex of m.biomeSubzones.filter((b) => b.biome === focus)) {
+        const s = m.subzones.find((s) => s.area === ex.area);
+        if (!s || !s.poly) continue;
+        ctx.beginPath(); for (const ring of s.poly) path(ring, true);
+        ctx.fillStyle = biomesByKey.get(focus).color; ctx.globalAlpha = 0.6; ctx.fill(); ctx.globalAlpha = 1;
+        ctx.setLineDash([4, 3]); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // zone hover / selection outline
+  const hl = state.hover && state.hover.type === "zone" ? state.hover.obj : state.sel && state.sel.type === "zone" ? state.sel.obj : null;
+  if (hl && hl.outline) { ctx.beginPath(); for (const ring of hl.outline) path(ring, true); ctx.lineWidth = 2; ctx.strokeStyle = "#ffe9b0"; ctx.stroke(); }
+
+  // 3. transports
+  if (state.layers.transports) {
+    for (const t of D.transports) {
+      if (t.supersededBy && !state.legacyTransports) continue;
+      const on = (state.sel && state.sel.obj === t) || (state.hover && state.hover.obj === t);
+      const dimF = !usable(t.faction);
+      const col = t.kind === "boat" ? "#6fd7ff" : t.kind === "zeppelin" ? "#ff8f6f" : "#ffd86f";
+      ctx.lineWidth = on ? 3 : 1.8; ctx.strokeStyle = col; ctx.globalAlpha = dimF ? 0.25 : on ? 1 : 0.75;
+      ctx.setLineDash(on ? [] : [7, 5]);
+      for (const leg of t.legs) { ctx.beginPath(); path(leg.line, false); ctx.stroke(); }
+      ctx.setLineDash([]);
+      for (const s of t.stops) {
+        if (!s.at) continue;
+        const [sx, sy] = toScreen(s.at[0], s.at[1]);
+        ctx.beginPath(); ctx.arc(sx, sy, on ? 5 : 3.5, 0, Math.PI * 2); ctx.fillStyle = "#0b0906"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = col; ctx.stroke();
+        hits.push({ x: sx, y: sy, r: 8, type: "transport", obj: t, stop: s });
+      }
+      // a hit line along the route: sample points
+      for (const leg of t.legs) for (let i = 0; i < leg.line.length; i += 2) { const [sx, sy] = toScreen(leg.line[i][0], leg.line[i][1]); hits.push({ x: sx, y: sy, r: 6, type: "transport", obj: t, weak: true }); }
+      if (on) for (const leg of t.legs) {
+        const mid = leg.line[Math.floor(leg.line.length / 2)]; const [sx, sy] = toScreen(mid[0], mid[1]);
+        label(fmtTime(leg.seconds), sx, sy - 8, 11, col, { serif: false });
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // 4. flight paths
+  const selNode = state.sel && state.sel.type === "node" ? state.sel.obj : null;
+  const hovNode = state.hover && state.hover.type === "node" ? state.hover.obj : null;
+  if (state.layers.routes && z >= 1.2) {
+    ctx.lineWidth = 1; ctx.strokeStyle = "#ffd25a"; ctx.globalAlpha = 0.22;
+    for (const r of D.taxi.routes) {
+      const a = nodesById.get(r.from), b = nodesById.get(r.to);
+      if (!usable(a.faction) || !usable(b.faction)) continue;
+      ctx.beginPath(); path(r.line, false); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  for (const n of [hovNode, selNode]) if (n && state.layers.flights) {
+    for (const r of routesFrom.get(n.id) || []) {
+      const b = nodesById.get(r.to); if (!usable(b.faction)) continue;
+      ctx.lineWidth = n === selNode ? 2.2 : 1.6; ctx.strokeStyle = n === selNode ? "#ffe9b0" : "#ffd25a"; ctx.globalAlpha = 0.9;
+      ctx.beginPath(); path(r.line, false); ctx.stroke(); ctx.globalAlpha = 1;
+      const [sx, sy] = toScreen(b.at[0], b.at[1]);
+      label(fmtTime(r.seconds), sx, sy - 11, 11, "#ffe9b0", { serif: false });
+    }
+  }
+  if (state.plan.result) {
+    const p = state.plan.result;
+    ctx.lineWidth = 3.5; ctx.strokeStyle = "#8fe3ff"; ctx.globalAlpha = 0.95;
+    for (const r of p.routes) { ctx.beginPath(); path(r.line, false); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  // 5. places
+  const subzoneNames = new Set();
+  if (z >= 8) for (const m of zones) if (rectsOverlap(m.rect, vis) && m.subzones) for (const s of m.subzones) subzoneNames.add(s.name);
+  if (state.layers.places) {
+    for (const p of D.pois) {
+      const minZ = p.kind === "capital" ? 1.1 : p.kind === "town" ? 3.2 : 9;
+      if (z < minZ) continue;
+      const [sx, sy] = toScreen(p.at[0], p.at[1]);
+      if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) continue;
+      if (p.kind === "capital") { ctx.beginPath(); ctx.arc(sx, sy, 4.5, 0, Math.PI * 2); ctx.fillStyle = "#efe4c8"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "#1a1408"; ctx.stroke(); }
+      else { ctx.beginPath(); ctx.arc(sx, sy, p.kind === "town" ? 2.6 : 1.8, 0, Math.PI * 2); ctx.fillStyle = p.kind === "town" ? "#efe4c8" : "#c9bb9a"; ctx.fill(); }
+      if (!subzoneNames.has(p.name) && (p.kind === "capital" || (p.kind === "town" && z >= 5.5) || z >= 14)) label(p.name, sx, sy + (p.kind === "capital" ? 13 : 10), p.kind === "capital" ? 12 : 10.5, "#efe4c8", { serif: false, weight: 500 });
+      hits.push({ x: sx, y: sy, r: 7, type: "poi", obj: p });
+    }
+    if (z >= 3) for (const d of D.instances) {
+      const [sx, sy] = toScreen(d.at[0], d.at[1]);
+      if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) continue;
+      ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2); ctx.fillStyle = d.kind === "raid" ? "#c77dff" : "#8fa3ff"; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = "#1a1408"; ctx.stroke();
+      ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
+      if (z >= 6) label(d.name, sx, sy + 11, 10.5, d.kind === "raid" ? "#e3c5ff" : "#cfd8ff", { serif: false, weight: 500 });
+      hits.push({ x: sx, y: sy, r: 7, type: "instance", obj: d });
+    }
+  }
+
+  // 6. zone and subzone names
+  if (z >= 1.15 && z < 9) for (const m of zones) {
+    if (!rectsOverlap(m.rect, vis) || !m.center) continue;
+    const [sx, sy] = toScreen(m.center[0], m.center[1]);
+    const size = z < 1.6 ? 8.5 : clamp(9 + z * 1.2, 10, 15);
+    label(m.name.toUpperCase(), sx, sy, size, "#f6ead0", { spacing: z < 1.6 ? 0.4 : 1.5, weight: 700 });
+    if (m.levels && z >= 2.2) label(`${m.levels[0]}–${m.levels[1]}`, sx, sy + size * 0.95, size * 0.75, "#d8c89f", { serif: false, weight: 500 });
+  }
+  if (z >= 8) for (const m of zones) {
+    if (!rectsOverlap(m.rect, vis) || !m.subzones) continue;
+    for (const s of m.subzones) { const [sx, sy] = toScreen(s.at[0], s.at[1]); if (sx < -60 || sy < -30 || sx > W + 60 || sy > H + 30) continue; label(s.name, sx, sy, 11, "#e8dcbd", { weight: 600 }); }
+  }
+
+  // 7. NPC markers
+  const showNpc = z >= 5.5;
+  if (showNpc) for (const n of D.npcs) {
+    const isBank = n.roles.includes("banker"), isAH = n.roles.includes("auctioneer");
+    if (!(isBank && state.layers.banks) && !(isAH && state.layers.auction)) continue;
+    if (!npcUsable(n)) continue;
+    for (const s of n.spots) {
+      const [sx, sy] = toScreen(s.at[0], s.at[1]);
+      if (sx < -20 || sy < -20 || sx > W + 20 || sy > H + 20) continue;
+      const on = (state.sel && state.sel.obj === n) || (state.hover && state.hover.obj === n);
+      drawGlyph(isBank && state.layers.banks ? "bank" : "auction", sx, sy, on ? 8 : 6.5, npcAccessColor(n));
+      hits.push({ x: sx, y: sy, r: 9, type: "npc", obj: n, spot: s });
+      break; // one marker per NPC at this scale; the spots are within a few yards of each other
+    }
+  }
+
+  // 8. flight masters
+  if (state.layers.flights && z >= 1.05) for (const n of D.taxi.nodes) {
+    if (!usable(n.faction)) continue;
+    const [sx, sy] = toScreen(n.at[0], n.at[1]);
+    if (sx < -20 || sy < -20 || sx > W + 20 || sy > H + 20) continue;
+    const on = n === selNode || n === hovNode || state.plan.from === n || state.plan.to === n;
+    drawGlyph("flight", sx, sy, on ? 8.5 : z < 3 ? 5 : 6.5, facColor[n.faction]);
+    if (z >= 5 || on) label(n.name, sx, sy - (on ? 14 : 11), 10.5, facColor[n.faction], { serif: false, weight: 600 });
+    hits.push({ x: sx, y: sy, r: 10, type: "node", obj: n });
+  }
+
+  // selection ring
+  if (state.sel && state.sel.at) { const [sx, sy] = toScreen(state.sel.at[0], state.sel.at[1]); ctx.beginPath(); ctx.arc(sx, sy, 13, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = "#ffe9b0"; ctx.stroke(); }
+  updateCrumb();
+}
+function npcAccessColor(n) {
+  if (!n.react) return "#ffd25a";
+  const a = n.react[0] !== -1, h = n.react[1] !== -1;
+  return a && h ? "#ffd25a" : a ? "#5aa9ff" : h ? "#ff6a5a" : "#aaa";
+}
+function drawGlyph(kind, x, y, r, color) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.lineWidth = 1.4; ctx.strokeStyle = "#0b0906";
+  if (kind === "flight") {
+    // a wing pair on a disc
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-r * 0.75, 0.1 * r); ctx.quadraticCurveTo(-r * 0.3, -r * 0.7, 0, -r * 0.1); ctx.quadraticCurveTo(r * 0.3, -r * 0.7, r * 0.75, 0.1 * r);
+    ctx.quadraticCurveTo(r * 0.3, -r * 0.15, 0, r * 0.45); ctx.quadraticCurveTo(-r * 0.3, -r * 0.15, -r * 0.75, 0.1 * r);
+    ctx.fillStyle = "#1a1408"; ctx.fill();
+  } else if (kind === "bank") {
+    // a strongbox
+    ctx.beginPath(); ctx.roundRect(-r, -r * 0.8, r * 2, r * 1.6, r * 0.25); ctx.fillStyle = color; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#1a1408"; ctx.fillRect(-r, -r * 0.2, r * 2, r * 0.22); ctx.beginPath(); ctx.arc(0, r * 0.05, r * 0.28, 0, Math.PI * 2); ctx.fill();
+  } else {
+    // a gavel: diamond head on a handle
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); ctx.fillStyle = color; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#1a1408"; ctx.fillRect(-r * 0.55, -r * 0.14, r * 1.1, r * 0.28);
+  }
+  ctx.restore();
+}
+
+// ---- interaction -----------------------------------------------------------
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR; canvas.style.width = W + "px"; canvas.style.height = H + "px";
+  requestDraw();
+}
+window.addEventListener("resize", resize);
+resize();
+
+function zoomAt(sx, sy, factor) {
+  const [fx, fy] = toFrame(sx, sy);
+  const z = clamp(state.view.z * factor, D ? fitZoom() * 0.8 : 0.5, 140);
+  state.view.z = z;
+  state.view.cx = fx - (sx - W / 2) / z; state.view.cy = fy - (sy - H / 2) / z;
+  requestDraw(); writeHash();
+}
+canvas.addEventListener("wheel", (e) => { e.preventDefault(); if (!D) return; zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0016))); }, { passive: false });
+let drag = null;
+const pointers = new Map();
+canvas.addEventListener("pointerdown", (e) => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  canvas.setPointerCapture(e.pointerId);
+  if (pointers.size === 1) drag = { x: e.clientX, y: e.clientY, cx: state.view.cx, cy: state.view.cy, moved: false };
+  else drag = null;
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (!D) return;
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (drag && drag.pinch) { zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / drag.pinch); }
+    drag = { pinch: d, moved: true };
+    return;
+  }
+  if (drag && !drag.pinch && pointers.size === 1) {
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    if (drag.moved) { state.view.cx = drag.cx - dx / state.view.z; state.view.cy = drag.cy - dy / state.view.z; canvas.classList.add("grabbing"); requestDraw(); }
+    return;
+  }
+  hover(e.clientX, e.clientY);
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  canvas.classList.remove("grabbing");
+  if (drag && !drag.moved && !drag.pinch && e.type === "pointerup") click(e.clientX, e.clientY);
+  if (drag && drag.moved) writeHash();
+  drag = pointers.size ? drag : null;
+}
+canvas.addEventListener("pointerup", endPointer);
+canvas.addEventListener("pointercancel", endPointer);
+canvas.addEventListener("pointerleave", () => { if (state.hover) { state.hover = null; $("tip").style.display = "none"; requestDraw(); } });
+
+function hitAt(sx, sy) {
+  let best = null, bestD = 1e9;
+  for (const h of hits) {
+    const d = Math.hypot(h.x - sx, h.y - sy);
+    if (d <= h.r && (d < bestD || (best && best.weak && !h.weak))) { best = h; bestD = d; }
+  }
+  if (best) return best;
+  const [fx, fy] = toFrame(sx, sy);
+  const m = zoneAt(fx, fy);
+  return m ? { type: "zone", obj: m, sub: subzoneAt(m, fx, fy) } : null;
+}
+function hover(sx, sy) {
+  if (!D) return;
+  const h = hitAt(sx, sy);
+  const tip = $("tip");
+  const [fx, fy] = toFrame(sx, sy);
+  const zone = h && h.type === "zone" ? h.obj : zoneAt(fx, fy);
+  readout(zone, fx, fy);
+  const changed = (h && h.obj) !== (state.hover && state.hover.obj) || (h && h.sub) !== (state.hover && state.hover.sub);
+  state.hover = h;
+  canvas.style.cursor = h && h.type !== "zone" ? "pointer" : "grab";
+  if (h) {
+    tip.innerHTML = tipHtml(h);
+    tip.style.display = "block";
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = clamp(sx + 14, 4, W - tw - 4) + "px"; tip.style.top = clamp(sy + 14, 4, H - th - 4) + "px";
+  } else tip.style.display = "none";
+  if (changed) requestDraw();
+}
+function readout(zone, fx, fy) {
+  const el = $("readout");
+  if (!zone) { el.textContent = ""; return; }
+  const [x0, y0, x1, y1] = zone.rect;
+  const u = ((fx - x0) / (x1 - x0)) * 100, v = ((fy - y0) / (y1 - y0)) * 100;
+  el.innerHTML = `<b>${esc(zone.name)}</b> ${u.toFixed(1)}, ${v.toFixed(1)}`;
+}
+function tipHtml(h) {
+  const o = h.obj;
+  if (h.type === "zone") {
+    const bio = o.biomes.map((k) => biomesByKey.get(k).name).join(" · ");
+    return `<div class="t">${esc(o.name)}</div><div class="d">${h.sub ? esc(h.sub.name) + " · " : ""}${o.levels ? `levels ${o.levels[0]}–${o.levels[1]} · ` : ""}${esc(o.territory || "")}</div>${bio ? `<div>${esc(bio)}</div>` : ""}`;
+  }
+  if (h.type === "node") {
+    const routes = (routesFrom.get(o.id) || []).filter((r) => usable(nodesById.get(r.to).faction));
+    return `<div class="t">${esc(o.name)}</div><div class="d">Flight master · ${facName[o.faction]} · ${esc(o.zone || "")}</div><div>${routes.length} destination${routes.length === 1 ? "" : "s"} — click for times</div>`;
+  }
+  if (h.type === "transport") {
+    return `<div class="t">${esc(o.name)}</div><div class="d">${o.kind} · ${facName[o.faction]}</div><div>${o.stops.map((s) => esc(s.name)).join(" ⇄ ")}</div>${h.stop ? `<div class="d">${esc(h.stop.name)}: waits ${h.stop.wait}s at the dock</div>` : ""}`;
+  }
+  if (h.type === "npc") {
+    const zone = mapsById.get(h.spot.zone);
+    return `<div class="t">${esc(o.name)}</div><div class="d">${esc(o.tag || o.roles.join(", "))} · ${zone ? esc(zone.name) : ""}</div><div>${accessText(o)}</div>`;
+  }
+  if (h.type === "poi") return `<div class="t">${esc(o.name)}</div><div class="d">${o.kind}</div>`;
+  if (h.type === "instance") return `<div class="t">${esc(o.name)}</div><div class="d">${o.kind}${o.players ? ` · ${o.players} players` : ""}</div>`;
+  return "";
+}
+function accessText(n) {
+  if (!n.react) return "";
+  const a = n.react[0] !== -1, h = n.react[1] !== -1;
+  return a && h ? "Open to both factions" : a ? "Alliance only (hostile to Horde)" : h ? "Horde only (hostile to Alliance)" : "";
+}
+function click(sx, sy) {
+  const h = hitAt(sx, sy);
+  if (!h) { select(null); return; }
+  select(h);
+}
+function select(h) {
+  if (!h) { state.sel = null; showAbout(); if (window.innerWidth <= 820) side.classList.add("hidden"); requestDraw(); writeHash(); return; }
+  const at = h.type === "zone" ? null : h.type === "npc" ? h.spot.at : h.type === "transport" ? (h.stop ? h.stop.at : null) : h.obj.at;
+  state.sel = { type: h.type, obj: h.obj, at, sub: h.sub, stop: h.stop };
+  showPanel(state.sel);
+  requestDraw();
+}
+function flyTo(fx, fy, z) {
+  const start = { ...state.view }, t0 = performance.now(), dur = 550;
+  const target = { cx: fx, cy: fy, z: z || state.view.z };
+  function step(now) {
+    const k = clamp((now - t0) / dur, 0, 1), e = 1 - Math.pow(1 - k, 3);
+    state.view.cx = start.cx + (target.cx - start.cx) * e; state.view.cy = start.cy + (target.cy - start.cy) * e;
+    state.view.z = start.z * Math.pow(target.z / start.z, e);
+    requestDraw();
+    if (k < 1) requestAnimationFrame(step); else writeHash();
+  }
+  requestAnimationFrame(step);
+}
+function focusMap(m) {
+  const w = m.rect[2] - m.rect[0], h = m.rect[3] - m.rect[1];
+  const z = Math.min((W - 340) / w, (H - 80) / h) * 0.9;
+  flyTo((m.rect[0] + m.rect[2]) / 2 + (170 / z), (m.rect[1] + m.rect[3]) / 2, z);
+}
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.key === "+" || e.key === "=") zoomAt(W / 2, H / 2, 1.4);
+  else if (e.key === "-") zoomAt(W / 2, H / 2, 1 / 1.4);
+  else if (e.key === "Escape") { select(null); state.plan = { from: null, to: null, result: null }; }
+  else if (e.key === "/") { e.preventDefault(); $("q").focus(); }
+  else if (e.key.startsWith("Arrow")) { const d = 60 / state.view.z; if (e.key === "ArrowLeft") state.view.cx -= d; if (e.key === "ArrowRight") state.view.cx += d; if (e.key === "ArrowUp") state.view.cy -= d; if (e.key === "ArrowDown") state.view.cy += d; requestDraw(); writeHash(); }
+});
+$("zin").onclick = () => zoomAt(W / 2, H / 2, 1.5);
+$("zout").onclick = () => zoomAt(W / 2, H / 2, 1 / 1.5);
+$("faction").onchange = (e) => { state.faction = e.target.value; state.plan.result = state.plan.from && state.plan.to ? planFlight(state.plan.from, state.plan.to) : null; if (state.sel) showPanel(state.sel); else showAbout(); requestDraw(); writeHash(); };
+$("sideToggle").onclick = () => $("side").classList.toggle("hidden");
+
+// ---- layers & breadcrumb ---------------------------------------------------
+function buildLayers() {
+  const box = $("layers"); box.innerHTML = "";
+  for (const l of LAYERS) {
+    const c = document.createElement("span"); c.className = "chip" + (state.layers[l.key] ? " on" : ""); c.style.color = state.layers[l.key] ? l.color : "";
+    c.innerHTML = `<span class="sw"></span>${l.name}`;
+    c.onclick = () => { state.layers[l.key] = !state.layers[l.key]; buildLayers(); requestDraw(); writeHash(); };
+    box.appendChild(c);
+  }
+}
+function updateCrumb() {
+  const m = zoneAt(state.view.cx, state.view.cy);
+  const z = state.view.z;
+  const parts = [`<span data-m="947">Azeroth</span>`];
+  const cont = m ? mapsById.get(m.parent) : D.maps.find((c) => c.kind === "continent" && inRect(c.rect, state.view.cx, state.view.cy));
+  if (cont && z > 1.4) parts.push(`<span data-m="${cont.id}">${esc(cont.name)}</span>`);
+  if (m && z > 3) parts.push(`<span data-m="${m.id}">${esc(m.name)}</span>`);
+  const html = parts.join("<i>›</i>");
+  const el = $("crumb");
+  if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; el.querySelectorAll("span").forEach((s) => { s.onclick = () => { const mm = mapsById.get(+s.dataset.m); if (mm.kind === "world") flyTo(D.frame.width / 2, D.frame.height / 2 - topBar() / 2 / fitZoom(), fitZoom()); else focusMap(mm); }; }); }
+}
+
+// ---- side panel ------------------------------------------------------------
+const side = $("side");
+function panelHtml(inner) { side.innerHTML = `<span class="close" title="Close">×</span>${inner}`; side.querySelector(".close").onclick = () => { select(null); }; wire(side); }
+function wire(root) {
+  root.querySelectorAll("[data-zone]").forEach((el) => { el.onclick = () => { const m = mapsById.get(+el.dataset.zone); focusMap(m); select({ type: "zone", obj: m }); }; });
+  root.querySelectorAll("[data-node]").forEach((el) => { el.onclick = () => { const n = nodesById.get(+el.dataset.node); flyTo(n.at[0], n.at[1], Math.max(state.view.z, 6)); select({ type: "node", obj: n }); }; });
+  root.querySelectorAll("[data-biome]").forEach((el) => { el.onclick = () => { state.biomeFocus = state.biomeFocus === el.dataset.biome ? null : el.dataset.biome; state.layers.biomes = true; buildLayers(); if (state.sel) showPanel(state.sel); else showAbout(); requestDraw(); writeHash(); }; });
+  root.querySelectorAll("[data-sub]").forEach((el) => { el.onclick = () => { const [x, y] = el.dataset.sub.split(",").map(Number); flyTo(x, y, Math.max(state.view.z, 12)); }; });
+  root.querySelectorAll("[data-transport]").forEach((el) => { el.onclick = () => { const t = D.transports.find((t) => t.id === +el.dataset.transport); const s = t.stops[0]; flyTo(s.at[0], s.at[1], Math.max(state.view.z, 2.5)); select({ type: "transport", obj: t }); }; });
+  root.querySelectorAll("[data-plan]").forEach((el) => { el.onclick = () => { const n = nodesById.get(+el.dataset.node2); state.plan[el.dataset.plan] = n; if (state.plan.from && state.plan.to) state.plan.result = planFlight(state.plan.from, state.plan.to); showPanel(state.sel || { type: "node", obj: n }); requestDraw(); }; });
+  root.querySelectorAll("[data-clearplan]").forEach((el) => { el.onclick = () => { state.plan = { from: null, to: null, result: null }; if (state.sel) showPanel(state.sel); else showAbout(); requestDraw(); }; });
+  root.querySelectorAll("[data-legacy]").forEach((el) => { el.onclick = () => { state.legacyTransports = !state.legacyTransports; showAbout(); requestDraw(); }; });
+  root.querySelectorAll("[data-goto]").forEach((el) => { el.onclick = () => { const [x, y, z] = el.dataset.goto.split(",").map(Number); flyTo(x, y, z); }; });
+}
+function biomeChips(keys, focusable) {
+  return keys.map((k) => { const b = biomesByKey.get(k); return `<span class="bchip${state.biomeFocus && state.biomeFocus !== k ? " off" : ""}" style="background:${b.color}" data-biome="${k}" title="Click to light up every ${esc(b.name)} zone">${esc(b.name)}</span>`; }).join("") + (focusable ? "" : "");
+}
+function legendHtml() {
+  return `<div class="legend">${D.biomes.map((b) => `<div class="lg${state.biomeFocus && state.biomeFocus !== b.key ? " off" : ""}" data-biome="${b.key}"><span class="sw" style="background:${b.color}"></span>${esc(b.name)}<small>${b.zones.length} zones</small></div>`).join("")}</div>
+  <p class="dim">Click a biome to light up its zones. A zone striped in two colours counts as both.</p>`;
+}
+function showAbout() {
+  side.classList.remove("hidden");
+  const focus = state.biomeFocus ? biomesByKey.get(state.biomeFocus) : null;
+  let html = `<h2>Azeroth, forever</h2><div class="kind">WoW Forever · beta build ${esc(D.build)}</div>
+  <p>The world map at every scale, from the game's own art. Zoom in for the zone maps, then the cities.</p>
+  <h3>Biomes</h3>${legendHtml()}`;
+  if (focus) html += biomeDetail(focus);
+  html += `<h3>Layers</h3>
+  <p class="dim"><b style="color:#ffd25a">Flight masters</b> show every taxi node with its fares and flight times (click one, then <i>plan a flight</i> to another). <b style="color:#6fd7ff">Boats</b>, <b style="color:#ff8f6f">zeppelins</b> and <b style="color:#ffd86f">skyships</b> are drawn along their real paths with sailing times and dock waits. <b style="color:#e0b95a">Banks</b> and <b style="color:#9fe36f">auction houses</b> appear from zone zoom in.</p>
+  <p class="dim"><span class="lnk" data-legacy>${state.legacyTransports ? "Hide" : "Show"} the vanilla routes Forever replaced</span></p>
+  <h3>Transports</h3><ul>${D.transports.filter((t) => !t.supersededBy || state.legacyTransports).map((t) => `<li class="row"><span class="n lnk" data-transport="${t.id}">${esc(t.name)}</span><span class="c">${t.kind}</span><span class="fac ${t.faction}">${t.faction}</span></li>`).join("")}</ul>
+  <h3>About the data</h3>
+  <p class="note">Map art, zone bounds, flight nodes and paths, transport paths, points of interest, area groups and item effects come from the Forever beta client's own data (via wago.tools). Vanilla NPC positions come from the CMaNGOS classic database; Forever's new NPCs from Wowhead's beta database. Flight times are the path length at 30 yards/second, which matches recorded Classic flights within a few seconds; sailing times are modelled from the route with the vessel's speed and acceleration and are within about 5% of the vanilla timetables. Beta data changes: rebuild with <code>npm run data:wow-forever</code>.</p>`;
+  panelHtml(html);
+}
+function biomeDetail(b) {
+  const zones = [...new Set(b.zones.map((a) => D.maps.find((m) => m.area === a)).filter(Boolean))].sort((x, y) => x.name.localeCompare(y.name));
+  const names = new Set(zones.map((m) => m.area));
+  const missing = b.zones.filter((a) => !names.has(a)).length;
+  let html = `<h3>${esc(b.name)}</h3><p class="dim">${b.effects.length} item effect${b.effects.length === 1 ? "" : "s"} key off this biome.</p>
+  <ul>${zones.map((m) => `<li class="row"><span class="n lnk" data-zone="${m.id}">${esc(m.name)}</span><span class="c">${m.levels ? m.levels.join("–") : ""}</span></li>`).join("")}</ul>`;
+  if (b.subzones.length) html += `<p class="dim" style="margin-top:6px">Also counted, inside zones that are not: ${b.subzones.map((s) => `${esc(s.name)} (${esc(s.zoneName)})`).join(", ")}.</p>`;
+  if (b.instances.length) html += `<p class="dim">Instances: ${b.instances.map((i) => esc(i.name)).join(", ")}.</p>`;
+  if (missing || b.unknown.length) html += `<p class="dim">${missing + b.unknown.length} more area${missing + b.unknown.length === 1 ? "" : "s"} in the group are not on the world map (battlegrounds, or areas the beta hides).</p>`;
+  html += `<h3>What works here</h3><ul>${b.effects.map((e) => {
+    const items = e.items.filter((i) => i.name);
+    const title = items.length ? items.map((i) => `${esc(i.name)}${i.slot ? ` <span class="c">(${i.slot}${i.requires ? `, lvl ${i.requires}` : ""})</span>` : ""}`).join(", ") : `${esc(e.name)} <span class="c">(item name hidden in the beta)</span>`;
+    return `<li><div>${title}</div><div class="dim">${esc(e.text)}</div></li>`;
+  }).join("")}</ul>`;
+  return html;
+}
+function showPanel(sel) {
+  side.classList.remove("hidden");
+  const o = sel.obj;
+  if (sel.type === "zone") {
+    const nodes = D.taxi.nodes.filter((n) => inRect(o.rect, n.at[0], n.at[1]) && (!o.outline || o.outline.some((r) => pointInRing(r, n.at[0], n.at[1]))));
+    const npcs = D.npcs.filter((n) => n.spots.some((s) => s.zone === o.id));
+    const banks = npcs.filter((n) => n.roles.includes("banker")), ahs = npcs.filter((n) => n.roles.includes("auctioneer"));
+    const effects = D.biomes.filter((b) => o.biomes.includes(b.key)).flatMap((b) => b.effects.map((e) => ({ ...e, biome: b })));
+    let html = `<h2>${esc(o.name)}</h2><div class="kind">${o.kind}${o.levels ? ` · levels ${o.levels[0]}–${o.levels[1]}` : ""}${o.territory ? ` · ${esc(o.territory)}` : ""}</div>`;
+    if (o.note) html += `<p class="note">${esc(o.note)}</p>`;
+    html += `<h3>Biomes</h3>${o.biomes.length ? `<p>${biomeChips(o.biomes)}</p>` : `<p class="dim">${o.kind === "city" ? "Cities take the biome of the areas around them where the beta lists them; this one is in no group." : "Not in any biome group in the beta data."}</p>`}`;
+    if (o.biomeSubzones.length) html += `<p class="dim">Exceptions inside: ${o.biomeSubzones.map((s) => `${esc(s.name)} also counts as ${esc(biomesByKey.get(s.biome).name)}`).join("; ")}.</p>`;
+    if (effects.length) html += `<h3>Item effects that work here</h3><ul>${effects.map((e) => { const items = e.items.filter((i) => i.name); return `<li><div>${items.length ? items.map((i) => esc(i.name)).join(", ") : esc(e.name)} <span class="bchip" style="background:${e.biome.color};font-size:10px;padding:0 6px" data-biome="${e.biome.key}">${esc(e.biome.name)}</span></div><div class="dim">${esc(e.text)}</div></li>`; }).join("")}</ul>`;
+    if (nodes.length) html += `<h3>Flight masters</h3><ul>${nodes.map((n) => `<li class="row"><span class="n lnk" data-node="${n.id}">${esc(n.name)}</span><span class="fac ${n.faction}">${n.faction}</span></li>`).join("")}</ul>`;
+    if (banks.length || ahs.length) html += `<h3>Services</h3><ul>${banks.map((n) => `<li class="row"><span class="n">${esc(n.name)}</span><span class="c">bank</span></li>`).join("")}${ahs.map((n) => `<li class="row"><span class="n">${esc(n.name)}</span><span class="c">auctioneer</span></li>`).join("")}</ul>`;
+    if (o.subzones && o.subzones.length) html += `<h3>Places</h3><p class="dim">${o.subzones.map((s) => `<span class="lnk" data-sub="${s.at[0]},${s.at[1]}">${esc(s.name)}</span>`).join(" · ")}</p>`;
+    panelHtml(html);
+  } else if (sel.type === "node") {
+    const routes = (routesFrom.get(o.id) || []).map((r) => ({ r, to: nodesById.get(r.to) })).filter((x) => usable(x.to.faction)).sort((a, b) => a.r.seconds - b.r.seconds);
+    let html = `<h2>${esc(o.name)}</h2><div class="kind">Flight master · ${facName[o.faction]}${o.zone ? ` · ${esc(o.zone)}` : ""}</div>`;
+    html += `<p><span class="btn${state.plan.from === o ? " on" : ""}" data-plan="from" data-node2="${o.id}">Fly from here</span><span class="btn${state.plan.to === o ? " on" : ""}" data-plan="to" data-node2="${o.id}">Fly to here</span></p>`;
+    html += planHtml();
+    html += `<h3>Direct flights</h3><ul>${routes.map(({ r, to }) => `<li class="row"><span class="n lnk" data-node="${to.id}">${esc(to.name)}<span class="fac ${to.faction}">${to.faction}</span></span><span class="v">${fmtTime(r.seconds)}</span><span class="c">${fmtMoney(r.cost)}</span></li>`).join("")}</ul>
+    <p class="dim">Times are the flight path's length at 30 yards a second; fares are the base cost before reputation discounts.</p>`;
+    panelHtml(html);
+  } else if (sel.type === "transport") {
+    const col = o.kind === "boat" ? "#6fd7ff" : o.kind === "zeppelin" ? "#ff8f6f" : "#ffd86f";
+    let html = `<h2 style="color:${col}">${esc(o.name)}</h2><div class="kind">${o.kind} · ${facName[o.faction]}</div>`;
+    if (o.note) html += `<p class="note">${esc(o.note)}</p>`;
+    if (o.supersededBy) { const n = D.transports.find((t) => t.id === o.supersededBy); html += `<p class="note">A vanilla route. In Forever its docks are served by <span class="lnk" data-transport="${n.id}">${esc(n.name)}</span>.</p>`; }
+    html += `<h3>Timetable</h3><ul>${o.legs.map((l) => `<li class="row"><span class="n">${esc(o.stops[l.from].name)} → ${esc(o.stops[l.to].name)}</span><span class="v">${fmtTime(l.seconds)}</span><span class="c">${Math.round(l.yards)} yd</span></li>`).join("")}</ul>
+    <p>Waits <b>${o.stops.map((s) => s.wait + "s").filter((v, i, a) => a.indexOf(v) === i).join(" / ")}</b> at each dock. Full loop <b>${fmtTime(o.period)}</b>, so the longest wait for it is one loop.</p>
+    <p class="dim">Sailing time is modelled from the route: the vessel accelerates at 1 yd/s² to 30 yd/s and brakes to a stop at each dock. Against the vanilla timetables it runs within about 5%.</p>`;
+    panelHtml(html);
+  } else if (sel.type === "npc") {
+    const zone = mapsById.get(sel.spot.zone);
+    const sub = zone ? subzoneAt(zone, sel.spot.at[0], sel.spot.at[1]) : null;
+    let html = `<h2>${esc(o.name)}</h2><div class="kind">${esc(o.tag || o.roles.join(" · "))}</div>
+    <p>${zone ? `<span class="lnk" data-zone="${zone.id}">${esc(zone.name)}</span>${sub ? ` · ${esc(sub.name)}` : ""}` : ""}</p>
+    <p>${accessText(o)}</p>
+    <p class="dim">${o.roles.map((r) => ({ banker: "Bank", auctioneer: "Auction house", flightmaster: "Flight master" }[r])).join(" · ")}${o.source === "wowhead" ? " · position from Wowhead's beta database" : ""}</p>`;
+    panelHtml(html);
+  } else if (sel.type === "poi") {
+    panelHtml(`<h2>${esc(o.name)}</h2><div class="kind">${o.kind}</div>`);
+  } else if (sel.type === "instance") {
+    panelHtml(`<h2>${esc(o.name)}</h2><div class="kind">${o.kind}${o.players ? ` · ${o.players} players` : ""}</div><p class="dim">Entrance as the game places it on the world map.</p>`);
+  }
+}
+
+// ---- flight planner --------------------------------------------------------
+function planFlight(from, to) {
+  const dist = new Map([[from.id, 0]]), prev = new Map(), done = new Set();
+  const pq = [[0, from.id]];
+  while (pq.length) {
+    pq.sort((a, b) => a[0] - b[0]);
+    const [d, id] = pq.shift();
+    if (done.has(id)) continue; done.add(id);
+    if (id === to.id) break;
+    for (const r of routesFrom.get(id) || []) {
+      const n = nodesById.get(r.to); if (!usable(n.faction)) continue;
+      const nd = d + r.seconds;
+      if (nd < (dist.get(r.to) ?? Infinity)) { dist.set(r.to, nd); prev.set(r.to, r); pq.push([nd, r.to]); }
+    }
+  }
+  if (!dist.has(to.id)) return { none: true, from, to };
+  const routes = []; let cur = to.id;
+  while (cur !== from.id) { const r = prev.get(cur); routes.unshift(r); cur = r.from; }
+  return { from, to, routes, seconds: dist.get(to.id), cost: routes.reduce((s, r) => s + r.cost, 0) };
+}
+function planHtml() {
+  const p = state.plan;
+  if (!p.from && !p.to) return `<p class="dim">Pick a start and a destination to plan a flight across the network.</p>`;
+  let html = `<h3>Flight plan</h3><p>${p.from ? `<span class="lnk" data-node="${p.from.id}">${esc(p.from.name)}</span>` : "<span class='dim'>start?</span>"} → ${p.to ? `<span class="lnk" data-node="${p.to.id}">${esc(p.to.name)}</span>` : "<span class='dim'>destination?</span>"} <span class="lnk dim" data-clearplan>clear</span></p>`;
+  const r = p.result;
+  if (r && r.none) html += `<p class="dim">No connection between those two for ${state.faction ? facName[state.faction] : "either faction"}.</p>`;
+  else if (r) html += `<ul>${r.routes.map((x) => `<li class="row"><span class="n">${esc(nodesById.get(x.from).name)} → ${esc(nodesById.get(x.to).name)}</span><span class="v">${fmtTime(x.seconds)}</span><span class="c">${fmtMoney(x.cost)}</span></li>`).join("")}</ul><p><b>${fmtTime(r.seconds)}</b> in the air, <b>${fmtMoney(r.cost)}</b>, ${r.routes.length} leg${r.routes.length === 1 ? "" : "s"}. Shortest by time; the game strings hops into one flight, though its own choice of hops can differ.</p>`;
+  return html;
+}
+
+// ---- search ----------------------------------------------------------------
+let searchIndex = [];
+function buildSearch() {
+  searchIndex = [];
+  for (const m of D.maps) if (m.kind === "zone" || m.kind === "city") {
+    searchIndex.push({ label: m.name, sub: m.kind + (m.levels ? ` · ${m.levels.join("–")}` : ""), kind: "zone", color: "#f6ead0", go: () => { focusMap(m); select({ type: "zone", obj: m }); } });
+    for (const s of m.subzones || []) searchIndex.push({ label: s.name, sub: m.name, kind: "place", color: "#c9bb9a", go: () => { flyTo(s.at[0], s.at[1], Math.max(state.view.z, 12)); select({ type: "zone", obj: m, sub: s }); } });
+  }
+  for (const n of D.taxi.nodes) searchIndex.push({ label: n.name, sub: `flight master · ${n.zone || ""} · ${facName[n.faction]}`, kind: "flight", color: facColor[n.faction], go: () => { flyTo(n.at[0], n.at[1], Math.max(state.view.z, 6)); select({ type: "node", obj: n }); } });
+  for (const t of D.transports) if (!t.supersededBy) searchIndex.push({ label: t.name, sub: t.stops.map((s) => s.name).join(" ⇄ "), kind: t.kind, color: t.kind === "boat" ? "#6fd7ff" : t.kind === "zeppelin" ? "#ff8f6f" : "#ffd86f", go: () => { const s = t.stops[0]; flyTo(s.at[0], s.at[1], Math.max(state.view.z, 2.5)); select({ type: "transport", obj: t }); } });
+  for (const n of D.npcs) { const s = n.spots[0]; const zone = mapsById.get(s.zone); searchIndex.push({ label: n.name, sub: `${n.tag || n.roles.join(", ")} · ${zone ? zone.name : ""}`, kind: n.roles.includes("banker") ? "bank" : n.roles.includes("auctioneer") ? "auction" : "flight", color: npcAccessColor(n), go: () => { flyTo(s.at[0], s.at[1], Math.max(state.view.z, 20)); select({ type: "npc", obj: n, spot: s }); } }); }
+  for (const p of D.pois) searchIndex.push({ label: p.name, sub: p.kind, kind: "place", color: "#efe4c8", go: () => { flyTo(p.at[0], p.at[1], Math.max(state.view.z, 8)); select({ type: "poi", obj: p }); } });
+  for (const d of D.instances) searchIndex.push({ label: d.name, sub: d.kind, kind: "dungeon", color: d.kind === "raid" ? "#c77dff" : "#8fa3ff", go: () => { flyTo(d.at[0], d.at[1], Math.max(state.view.z, 8)); select({ type: "instance", obj: d }); } });
+}
+const q = $("q"), qdrop = $("qdrop");
+let qResults = [], qIdx = -1;
+q.addEventListener("input", () => {
+  const s = q.value.trim().toLowerCase();
+  if (!s) { qdrop.style.display = "none"; return; }
+  const starts = [], contains = [];
+  for (const it of searchIndex) { const l = it.label.toLowerCase(); if (l.startsWith(s)) starts.push(it); else if (l.includes(s) || it.sub.toLowerCase().includes(s)) contains.push(it); }
+  const rank = { zone: 0, flight: 1, boat: 2, zeppelin: 2, airship: 2, bank: 3, auction: 3, dungeon: 4, place: 5 };
+  const byRank = (a, b) => (rank[a.kind] ?? 9) - (rank[b.kind] ?? 9);
+  qResults = starts.sort(byRank).concat(contains.sort(byRank)).slice(0, 14); qIdx = -1;
+  qdrop.innerHTML = qResults.map((it, i) => `<div data-i="${i}"><span class="kind" style="background:${it.color}">${it.kind[0].toUpperCase()}</span>${esc(it.label)}<small>${esc(it.sub)}</small></div>`).join("") || `<div class="dim">nothing by that name</div>`;
+  qdrop.style.display = "block";
+  qdrop.querySelectorAll("div[data-i]").forEach((d) => { d.onmousedown = (e) => { e.preventDefault(); pick(+d.dataset.i); }; });
+});
+function pick(i) { const it = qResults[i]; if (!it) return; qdrop.style.display = "none"; q.value = it.label; q.blur(); it.go(); }
+q.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") { qIdx = Math.min(qIdx + 1, qResults.length - 1); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { qIdx = Math.max(qIdx - 1, 0); e.preventDefault(); }
+  else if (e.key === "Enter") { pick(qIdx < 0 ? 0 : qIdx); return; }
+  else return;
+  qdrop.querySelectorAll("div[data-i]").forEach((d, i) => d.classList.toggle("on", i === qIdx));
+});
+q.addEventListener("blur", () => setTimeout(() => { qdrop.style.display = "none"; }, 150));
+q.addEventListener("focus", () => { if (q.value.trim()) q.dispatchEvent(new Event("input")); });
+
+// ---- url state -------------------------------------------------------------
+let hashTimer = null;
+function writeHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => {
+    const v = state.view;
+    const on = LAYERS.filter((l) => state.layers[l.key]).map((l) => l.key).join(",");
+    const parts = [`v=${v.cx.toFixed(1)},${v.cy.toFixed(1)},${v.z.toFixed(2)}`, `l=${on}`];
+    if (state.faction) parts.push(`f=${state.faction}`);
+    if (state.biomeFocus) parts.push(`b=${state.biomeFocus}`);
+    history.replaceState(null, "", "#" + parts.join("&"));
+  }, 200);
+}
+function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("v")) { const [cx, cy, z] = h.get("v").split(",").map(Number); if ([cx, cy, z].every(Number.isFinite)) { state.view = { cx, cy, z, hashed: true }; } }
+  if (h.has("l")) { const on = new Set(h.get("l").split(",")); for (const l of LAYERS) state.layers[l.key] = on.has(l.key); buildLayers(); }
+  if (h.get("f")) { state.faction = h.get("f"); $("faction").value = state.faction; }
+  if (h.get("b") && biomesByKey.has(h.get("b"))) state.biomeFocus = h.get("b");
+}
+
+load().catch((e) => { $("loadmsg").textContent = "The map could not be loaded: " + e.message; console.error(e); });
+})();
+</script>
+</body>
+</html>
