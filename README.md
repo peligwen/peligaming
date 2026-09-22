@@ -7,6 +7,75 @@ deployed as a Cloudflare Worker with static assets.
 Live at **[gaming.peliglot.com](https://gaming.peliglot.com)** · part of the
 [peliglot](https://peliglot.com) family.
 
+## 🗺️ World Map (WoW Forever)
+
+The first tool for **World of Warcraft: Forever**, Blizzard's permanent
+Classic-plus: Azeroth from the whole world down to a city street, drawn from
+the game's own map art, with the layers the game does not draw for you.
+
+**Try it: [gaming.peliglot.com/tools/wow-forever/world-map](https://gaming.peliglot.com/tools/wow-forever/world-map)**
+
+- **One map at every scale.** The world map, the two continents, every zone
+  (Forever's Riverglades, Mount Hyjal and Shen'dralas included, and Zephras
+  Isle as an inset, since it floats in Skywall rather than on Azeroth) and
+  the six capitals, each placed by the client's own coordinate assignments
+  so they stitch into one continuous map: zoom from the Maelstrom to a
+  Stormwind canal and the art switches under you. Zone shapes come from the
+  game's "explored subzone" overlays, so every zone and every subzone is a
+  real outline you can hover, and the in-game coordinates read out as you
+  move.
+- **Biomes.** Forever's zone-bound item effects ("Restores an additional 6
+  Mana per 5 sec in Forest and Grassland areas") are gated on eight area
+  groups in the client — Forest & Grassland, Swamp, Wasteland, Snowy,
+  Mountainous, Haunted, Cavernous & Underground, Desert — and a zone can be
+  in several (Dun Morogh is Forest, Snowy and Mountainous at once). The
+  biome layer paints every zone by its groups, stripes the ones in more than
+  one, marks the subzone exceptions (Booty Bay counts as Forest & Grassland
+  inside a Stranglethorn that also counts as Mountainous), and lists, per
+  biome and per zone, every effect and item that keys off it: the Darkspear
+  Raiders' seals, the Runes of Perfection and Duty, the Royal Seal of
+  Eldre'Thalas variants, and the rest.
+- **Flight masters and flight paths.** Every taxi node with its faction,
+  every route with its fare and its flight time (the path's length at 30
+  yards a second, which matches recorded Classic flights within a few
+  seconds), and a planner that strings hops together the way the game does,
+  by time, for the faction you pick.
+- **Boats, zeppelins and skyships.** Every transport path in the client —
+  the vanilla boats and zeppelins plus Forever's new Stormwind Harbor to
+  Auberdine ship, the Riverglades to Tanaris ship, the Menethil boat that now
+  calls at Southshore, and the two Zephras Isle skyships — drawn along their
+  real routes across the sea, with sailing time per leg, the wait at each
+  dock, and the full loop.
+- **Banks and auction houses.** Every banker and auctioneer, coloured by who
+  can use them, from zone zoom in.
+- Search across zones, subzones, towns, dungeons, flight masters, ships and
+  NPCs; a faction filter; share links that reproduce the view and layers.
+
+### How it's built
+
+- `scripts/fetch-wow-forever-map.mjs` (`npm run data:wow-forever`) builds
+  everything from the Forever beta client's own data as datamined by
+  [wago.tools](https://wago.tools): the UiMap tables that place each map in
+  world coordinates, the map art tiles (BLP textures, decoded by
+  `scripts/lib/blp.mjs` and stitched into one JPEG per map), the subzone
+  overlay textures (traced into polygons by `scripts/lib/contour.mjs`),
+  the taxi nodes and paths, the transport paths, points of interest, the
+  area groups behind each biome and the spells and items that require them.
+  Vanilla NPC positions come from the
+  [CMaNGOS classic database](https://github.com/cmangos/classic-db) and
+  Forever's new NPCs from Wowhead's beta database (whose percentages are
+  read against the Classic Era map bounds, since Forever redrew four maps).
+  Downloads are cached in `.wow-forever-cache/`; pass a build number to
+  target a newer beta.
+- Sailing times are modelled from each route's spline with the vessels'
+  speed and acceleration from the vanilla gameobject data (continent
+  crossings and the loop's closing leg are jumps); against the vanilla
+  timetables the model runs within about 5%.
+- The app (`public/tools/wow-forever/world-map.html`) is vanilla JS on a
+  canvas: the art is drawn coarse to fine as you zoom, each zone clipped to
+  its own outline so neighbours never fight, and every layer is vector on
+  top.
+
 ## ⚓ Naval Pathfinder
 
 A route planner for Old School RuneScape's **Sailing** skill — pick two
@@ -332,6 +401,7 @@ drop them.
 
 | Game | Tool | What it does |
 | --- | --- | --- |
+| WoW Forever | World Map | Azeroth at every scale from the game's own art: biomes for the zone-bound item effects, flight masters with times and a planner, boats and zeppelins with timetables, banks and auctioneers |
 | RuneScape | Sand Table | Boss & raid rehearsals: the briefing, the kit, and the fight rebuilt tile by tile in 3D with a drill mode |
 | RuneScape | Sand Table | Boss and raid rehearsals: the briefing checked against your hiscores, the kit slot by slot, and the fight rebuilt tile by tile in 3D with a tick clock — then a drill that grades your prayers and footwork |
 | RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer |
@@ -525,6 +595,9 @@ Three kinds of things live here under different terms — see
   Table's item icons and monster portraits) is the
   intellectual property of Jagex Limited, used non-commercially under
   [Jagex's Fan Content Policy](https://legal.jagex.com/docs/policies/fan-content-policy).
+  The World Map's map art and the data derived from the World of Warcraft
+  client (`public/tools/wow-forever/data/`) are the intellectual property of
+  Blizzard Entertainment, used non-commercially as fan content.
   Material relating to other games belongs to their respective owners.
 
 > Created using intellectual property belonging to Jagex Limited under the

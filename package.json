@@ -10,6 +10,7 @@
     "data:snapshot": "node scripts/capture-snapshot.mjs",
     "data:ship": "node scripts/fetch-ship-data.mjs",
     "data:bosses": "node scripts/fetch-boss-data.mjs",
+    "data:wow-forever": "node scripts/fetch-wow-forever-map.mjs",
     "check:sand-table": "node scripts/validate-sand-table.mjs",
     "check:model": "node scripts/day-model-check.mjs",
     "check:baskets": "node scripts/basket-check.mjs"
