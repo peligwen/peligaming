@@ -172,39 +172,79 @@ console.log('Device orientation through vertical (Euler wrap, iOS compass offset
   }
   check('browser-style Euler triples rebuild the same camera, β 60°–120°', worst, 0, 1e-4, '°');
 
-  // iOS: relative alpha (arbitrary reference), and a compass heading of the top edge's projection.
-  // Sweep the phone from flat up through vertical and past it while it faces the same way.
+  // iOS: relative alpha (arbitrary reference) plus webkitCompassHeading. Within 60° of flat, face up,
+  // that heading is the top edge's azimuth and 360 − heading is the absolute alpha. Raised, what iOS
+  // reports is not documented — in the field it does not turn around at vertical the way the top
+  // edge's projection would — so the sweeps run against three stories for the raised phone: the top
+  // edge's projection (turns around at vertical), the camera's azimuth (turns around past 120° of
+  // tilt, when iOS would be back to an edge), and the yaw of a consistent Euler triple (never turns).
+  // The held offset must not care which is true.
+  const stories = ['top edge', 'camera', 'yaw'];
+  const iosHeading = (truth, story) => {
+    const { dy, dz } = columns(truth);
+    if (story === 'yaw') return SKY.norm360(360 - decompose(truth).alpha);
+    const v = story === 'camera' && Math.abs(dz[2]) <= 0.5 ? SKY.scale(dz, -1) : dy;
+    return SKY.norm360(Math.atan2(v[0], v[1]) * SKY.R2D);
+  };
   const ref = 137, trueAlpha = 300; // the device's top edge points toward azimuth 60
-  const tracker = SKY.compassTracker();
-  let worstF = 0, worstU = 0, worstUpright = 0, uprightSamples = 0;
-  for (let beta = 10; beta <= 170; beta += 1) {
-    const gamma = 20 * Math.sin(beta * SKY.D2R);
-    const truth = SKY.cameraFromOrientation(trueAlpha, beta, gamma);
-    // what Safari reports: the same rotation relative to its own reference, as a consistent triple
-    const raw = decompose(SKY.cameraFromOrientation(trueAlpha - ref, beta, gamma));
-    // the tilt-compensated heading of the top edge's horizontal projection
-    const { dy } = columns(truth);
-    const heading = SKY.norm360(Math.atan2(dy[0], dy[1]) * SKY.R2D);
-    const offset = tracker.update(raw.alpha, raw.beta, heading);
-    const cam = SKY.cameraFromOrientation(raw.alpha + offset, raw.beta, raw.gamma);
-    const ef = SKY.angle(cam.f, truth.f), eu = SKY.angle(cam.u, truth.u);
-    worstF = Math.max(worstF, ef); worstU = Math.max(worstU, eu);
-    if (beta >= 80 && beta <= 100) { worstUpright = Math.max(worstUpright, ef); uprightSamples++; }
+  const range = (a, b, step = 1) => Array.from({ length: Math.floor((b - a) / step) + 1 }, (_, i) => a + i * step);
+  const sweep = (story, betas, gammaOf, tracker = SKY.compassTracker()) => {
+    let worstF = 0, worstU = 0, worstUpright = 0;
+    for (const beta of betas) {
+      const gamma = gammaOf(beta);
+      const truth = SKY.cameraFromOrientation(trueAlpha, beta, gamma);
+      // what Safari reports: the same rotation relative to its own reference, as a consistent triple
+      const raw = decompose(SKY.cameraFromOrientation(trueAlpha - ref, beta, gamma));
+      const offset = tracker.update(raw.alpha, raw.beta, raw.gamma, iosHeading(truth, story));
+      const cam = SKY.cameraFromOrientation(raw.alpha + offset, raw.beta, raw.gamma);
+      const ef = SKY.angle(cam.f, truth.f), eu = SKY.angle(cam.u, truth.u);
+      worstF = Math.max(worstF, ef); worstU = Math.max(worstU, eu);
+      if (beta >= 80 && beta <= 100) worstUpright = Math.max(worstUpright, ef);
+    }
+    return { worstF, worstU, worstUpright, tracker };
+  };
+  // Flat first, then raised through vertical and on to 170° (the camera 80° above the horizon), rolling a little.
+  for (const story of stories) {
+    const { worstF, worstU, worstUpright, tracker } = sweep(story, range(10, 170), (b) => 20 * Math.sin(b * SKY.D2R));
+    check(`iOS sweep 10°–170°, ${story} story: forward direction error`, worstF, 0, 0.5, '°');
+    check(`iOS sweep 10°–170°, ${story} story: screen-up direction error`, worstU, 0, 0.5, '°');
+    check(`…and through vertical (80°–100°), where the raw triple wraps`, worstUpright, 0, 0.5, '°');
+    check('…calibrated, with the reference yaw recovered', tracker.calibrated() ? tracker.offset() : NaN, ref, 0.01, '°');
   }
-  check('iOS sweep 10°–170°: forward direction error', worstF, 0, 0.5, '°');
-  check('iOS sweep 10°–170°: screen-up direction error', worstU, 0, 0.5, '°');
-  check('…and through vertical (80°–100°), where the raw triple wraps', worstUpright, 0, 0.5, '°');
-  check('the compass counts as calibrated after a flat-ish sample', tracker.calibrated() ? 1 : 0, 1, 0);
-  check('recovered reference yaw', tracker.offset(), ref, 0.01, '°');
-  // the old way — heading pasted in as alpha next to the raw gamma — flips past vertical
+  // Once calibrated, nothing a raised phone reports moves the offset: here the top-edge story feeds
+  // headings 180° round past vertical and the offset does not budge.
+  {
+    const { tracker } = sweep('top edge', range(10, 50), () => 0);
+    const before = tracker.offset();
+    sweep('top edge', range(125, 175, 5), () => 0, tracker);
+    check('past 120° of tilt the compass is not listened to', angDiff(tracker.offset(), before), 0, 1e-9, '°');
+    sweep('top edge', range(60, 120, 5), () => 0, tracker);
+    check('…nor between 60° and 120°', angDiff(tracker.offset(), before), 0, 1e-9, '°');
+  }
+  // Raised from the start and never flat: the heading is taken provisionally, in the AR convention,
+  // while the camera is below 30° of altitude — right under the camera and yaw stories — and the
+  // page keeps asking for a flat moment.
+  for (const story of ['camera', 'yaw']) {
+    const { worstF, tracker } = sweep(story, range(95, 130), () => 0);
+    check(`raised from the start, 95°–130°, ${story} story: forward direction error`, worstF, 0, 0.5, '°');
+    check('…not counted as calibrated', tracker.calibrated() ? 1 : 0, 0, 0);
+  }
+  // Flat means face up: a phone on its side with the screen facing sideways is not flat.
+  {
+    const tracker = SKY.compassTracker();
+    tracker.update(10, 0, 70, 350);
+    check('a phone rolled 70° does not count as flat', tracker.calibrated() ? 1 : 0, 0, 0);
+    tracker.update(10, 20, 20, 350);
+    check('…tilted 20° and rolled 20° does', tracker.calibrated() ? 1 : 0, 1, 0);
+  }
+  // the old way — heading pasted in as alpha next to the raw gamma — turns the view around past
+  // vertical whenever the heading does (the top-edge story, as the first release assumed)
   let flipped = 0;
   for (let beta = 100; beta <= 170; beta += 10) {
     const gamma = 20 * Math.sin(beta * SKY.D2R);
     const truth = SKY.cameraFromOrientation(trueAlpha, beta, gamma);
     const raw = decompose(SKY.cameraFromOrientation(trueAlpha - ref, beta, gamma));
-    const { dy } = columns(truth);
-    const heading = SKY.norm360(Math.atan2(dy[0], dy[1]) * SKY.R2D);
-    const old = SKY.cameraFromOrientation(360 - heading, raw.beta, raw.gamma);
+    const old = SKY.cameraFromOrientation(360 - iosHeading(truth, 'top edge'), raw.beta, raw.gamma);
     if (angDiff(SKY.cameraAzAlt(old).az, SKY.cameraAzAlt(truth).az) > 90) flipped++;
   }
   check('(for the record) pasting the heading into alpha turns the view around past vertical', flipped, 8, 0);

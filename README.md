@@ -530,9 +530,12 @@ positions are good to an arcminute or two, which is far finer than a phone
 can point; and the satellite list is the bright hundred, not the thousands
 of Starlinks. Phone orientation is only as good as the phone's compass —
 expect a few degrees, and use the alignment nudge. An iPhone's compass
-heading only means something while the phone is tilted toward flat, so the
-page samples it then and holds that fix while the phone is upright; tilt
-the phone down for a moment now and then and it re-calibrates.
+heading and Safari's orientation angles only line up while the phone is
+within 60° of flat, face up (raised, the heading stops tracking the top
+edge, and what it does past vertical is undocumented), so the page samples
+the fix while the phone is flat and holds it for as long as the phone is
+raised; point the phone at the ground for a moment now and then and it
+re-calibrates.
 
 ## Other tools
 

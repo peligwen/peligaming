@@ -836,28 +836,35 @@ const SKY = (() => {
     return { f, u, r };
   }
   // Safari's alpha is relative to an arbitrary start, and its webkitCompassHeading
-  // is the tilt-compensated heading of the phone's top edge. The two agree (alpha
-  // = 360 − heading) only while that edge has a decent horizontal component, and
-  // mixing the heading straight into the Euler triple flips the view every time
-  // gamma wraps as the phone passes through vertical — which it does while
-  // pointing at the horizon. So the yaw offset between them is sampled when the
-  // phone is within 60° of flat, smoothed, and held while the phone is upright;
-  // the rotation itself always comes from the browser's own consistent triple.
-  function compassOffsetSample(alphaRaw, betaDeg, heading) {
-    const cB = cos(betaDeg * D2R);
-    return { offset: norm360((cB >= 0 ? 360 - heading : 180 - heading) - alphaRaw), weight: abs(cB) };
+  // is a tilt-compensated heading. While the phone lies within 60° of flat, face
+  // up, that heading is the top edge's and the two agree exactly (alpha = 360 −
+  // heading). Raised, iOS reports something else: it does not turn around at
+  // vertical the way the top edge's projection does (a phone pointed above the
+  // horizon keeps a steady heading in the field), and what it reports past
+  // vertical is not documented. Mixing the heading straight into the Euler triple
+  // also flips the view every time gamma wraps as the phone passes through
+  // vertical. So the yaw offset between alpha and the heading is sampled only
+  // while the phone is face up, smoothed, and held for as long as the phone is
+  // raised; the rotation itself always comes from the browser's own consistent
+  // triple. Until a face-up sample has arrived, the heading is used provisionally
+  // in the AR convention (alpha = 360 − heading) while the camera points below
+  // 30° of altitude, and never past that.
+  function compassOffsetSample(alphaRaw, betaDeg, gammaDeg, heading) {
+    // how far the screen faces up: the device z axis' vertical component (1 flat face up, 0 upright, −1 face down)
+    const faceUp = cos(betaDeg * D2R) * cos(gammaDeg * D2R);
+    return { offset: norm360(360 - heading - alphaRaw), faceUp };
   }
   function compassTracker() {
     let c = 0, s = 0, seen = false, good = false;
     const t = {
-      update(alphaRaw, betaDeg, heading) {
+      update(alphaRaw, betaDeg, gammaDeg, heading) {
         if (heading == null || Number.isNaN(heading) || alphaRaw == null) return t.offset();
-        const { offset, weight } = compassOffsetSample(alphaRaw, betaDeg, heading);
-        const wellPlaced = weight > 0.5;
-        const k = !seen ? 1 : wellPlaced || !good ? 0.04 : 0;
+        const { offset, faceUp } = compassOffsetSample(alphaRaw, betaDeg, gammaDeg, heading);
+        const flat = faceUp > 0.5, cameraLow = faceUp > -0.5;
+        const k = !seen ? 1 : flat || (!good && cameraLow) ? 0.04 : 0;
         if (k > 0) { c = c * (1 - k) + cos(offset * D2R) * k; s = s * (1 - k) + sin(offset * D2R) * k; }
         seen = true;
-        if (wellPlaced) good = true;
+        if (flat) good = true;
         return t.offset();
       },
       offset: () => (seen ? norm360(atan2(s, c) * R2D) : 0),
@@ -1524,7 +1531,7 @@ const SKY = (() => {
       if (ev.webkitCompassHeading != null && !Number.isNaN(ev.webkitCompassHeading)) {
         sensorKind = 'ios';
         const wasCalibrated = compass.calibrated();
-        compassOffset = compass.update(alpha, ev.beta, ev.webkitCompassHeading);
+        compassOffset = compass.update(alpha, ev.beta, ev.gamma, ev.webkitCompassHeading);
         if (!wasCalibrated && compass.calibrated()) refreshUi();
       }
       else if (ev.absolute || sensorEvent === 'deviceorientationabsolute') sensorKind = 'absolute';
