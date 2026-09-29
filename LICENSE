@@ -28,6 +28,12 @@ third-party sources, and they carry different terms:
    project is not endorsed by or affiliated with Jagex or any other game
    publisher.
 
+4. SKY DATA — public/tools/irl/data/sky-pointer/sky.json is built from the
+   data files of d3-celestial (https://github.com/ofrohn/d3-celestial),
+   Copyright (c) 2015, Olaf Frohn, licensed under the BSD 3-Clause License
+   (the full notice is carried in the file's "license" field), together
+   with the public-domain WMM2025 coefficients of NOAA/NCEI.
+
 ---------------------------------------------------------------------------
 
 MIT License

@@ -13,7 +13,9 @@
     "data:wow-forever": "node scripts/fetch-wow-forever-map.mjs",
     "check:sand-table": "node scripts/validate-sand-table.mjs",
     "check:model": "node scripts/day-model-check.mjs",
-    "check:baskets": "node scripts/basket-check.mjs"
+    "check:baskets": "node scripts/basket-check.mjs",
+    "data:sky": "node scripts/fetch-sky-data.mjs",
+    "check:sky": "node scripts/check-sky.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",
