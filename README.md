@@ -529,7 +529,10 @@ horizon really sits about half a degree higher than drawn; the planet
 positions are good to an arcminute or two, which is far finer than a phone
 can point; and the satellite list is the bright hundred, not the thousands
 of Starlinks. Phone orientation is only as good as the phone's compass —
-expect a few degrees, and use the alignment nudge.
+expect a few degrees, and use the alignment nudge. An iPhone's compass
+heading only means something while the phone is tilted toward flat, so the
+page samples it then and holds that fix while the phone is upright; tilt
+the phone down for a moment now and then and it re-calibrates.
 
 ## Other tools
 

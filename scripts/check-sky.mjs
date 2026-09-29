@@ -149,6 +149,67 @@ console.log('Camera & projection');
   check('yaw by +10° turns the camera east', SKY.cameraAzAlt(yawed).az, 133, 1e-9, '°');
 }
 
+// ------------------------------------------------------------------ orientation through vertical
+console.log('Device orientation through vertical (Euler wrap, iOS compass offset)');
+{
+  // A browser reports α ∈ [0,360), β ∈ [−180,180), γ ∈ [−90,90): decompose a rotation the way it would.
+  const columns = (cam) => ({ dx: cam.r, dy: cam.u, dz: SKY.scale(cam.f, -1) });
+  const decompose = (cam) => {
+    const { dx, dy, dz } = columns(cam);
+    const m12 = dy[0], m22 = dy[1], m31 = dx[2], m32 = dy[2], m33 = dz[2];
+    let beta = Math.asin(Math.max(-1, Math.min(1, m32))) * SKY.R2D;
+    let alpha = Math.atan2(-m12, m22) * SKY.R2D, gamma = Math.atan2(-m31, m33) * SKY.R2D;
+    if (gamma >= 90 || gamma < -90) { beta = 180 - beta; alpha += 180; gamma += 180; }
+    const wrap = (x) => ((x + 180) % 360 + 360) % 360 - 180;
+    return { alpha: SKY.norm360(alpha), beta: wrap(beta), gamma: wrap(gamma) };
+  };
+  let worst = 0;
+  for (let beta = 60; beta <= 120; beta += 2) for (const gamma of [-40, -5, 0, 5, 40]) for (const alpha of [10, 200, 350]) {
+    const truth = SKY.cameraFromOrientation(alpha, beta, gamma);
+    const d = decompose(truth);
+    const back = SKY.cameraFromOrientation(d.alpha, d.beta, d.gamma);
+    worst = Math.max(worst, SKY.angle(truth.f, back.f), SKY.angle(truth.u, back.u));
+  }
+  check('browser-style Euler triples rebuild the same camera, β 60°–120°', worst, 0, 1e-4, '°');
+
+  // iOS: relative alpha (arbitrary reference), and a compass heading of the top edge's projection.
+  // Sweep the phone from flat up through vertical and past it while it faces the same way.
+  const ref = 137, trueAlpha = 300; // the device's top edge points toward azimuth 60
+  const tracker = SKY.compassTracker();
+  let worstF = 0, worstU = 0, worstUpright = 0, uprightSamples = 0;
+  for (let beta = 10; beta <= 170; beta += 1) {
+    const gamma = 20 * Math.sin(beta * SKY.D2R);
+    const truth = SKY.cameraFromOrientation(trueAlpha, beta, gamma);
+    // what Safari reports: the same rotation relative to its own reference, as a consistent triple
+    const raw = decompose(SKY.cameraFromOrientation(trueAlpha - ref, beta, gamma));
+    // the tilt-compensated heading of the top edge's horizontal projection
+    const { dy } = columns(truth);
+    const heading = SKY.norm360(Math.atan2(dy[0], dy[1]) * SKY.R2D);
+    const offset = tracker.update(raw.alpha, raw.beta, heading);
+    const cam = SKY.cameraFromOrientation(raw.alpha + offset, raw.beta, raw.gamma);
+    const ef = SKY.angle(cam.f, truth.f), eu = SKY.angle(cam.u, truth.u);
+    worstF = Math.max(worstF, ef); worstU = Math.max(worstU, eu);
+    if (beta >= 80 && beta <= 100) { worstUpright = Math.max(worstUpright, ef); uprightSamples++; }
+  }
+  check('iOS sweep 10°–170°: forward direction error', worstF, 0, 0.5, '°');
+  check('iOS sweep 10°–170°: screen-up direction error', worstU, 0, 0.5, '°');
+  check('…and through vertical (80°–100°), where the raw triple wraps', worstUpright, 0, 0.5, '°');
+  check('the compass counts as calibrated after a flat-ish sample', tracker.calibrated() ? 1 : 0, 1, 0);
+  check('recovered reference yaw', tracker.offset(), ref, 0.01, '°');
+  // the old way — heading pasted in as alpha next to the raw gamma — flips past vertical
+  let flipped = 0;
+  for (let beta = 100; beta <= 170; beta += 10) {
+    const gamma = 20 * Math.sin(beta * SKY.D2R);
+    const truth = SKY.cameraFromOrientation(trueAlpha, beta, gamma);
+    const raw = decompose(SKY.cameraFromOrientation(trueAlpha - ref, beta, gamma));
+    const { dy } = columns(truth);
+    const heading = SKY.norm360(Math.atan2(dy[0], dy[1]) * SKY.R2D);
+    const old = SKY.cameraFromOrientation(360 - heading, raw.beta, raw.gamma);
+    if (angDiff(SKY.cameraAzAlt(old).az, SKY.cameraAzAlt(truth).az) > 90) flipped++;
+  }
+  check('(for the record) pasting the heading into alpha turns the view around past vertical', flipped, 8, 0);
+}
+
 // ------------------------------------------------------------------ Sun, Moon, planets vs Horizons
 console.log('Sun, Moon and planets vs JPL Horizons (geocentric, apparent)');
 if (OFFLINE) console.log('  (skipped: --offline)');
