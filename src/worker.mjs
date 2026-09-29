@@ -40,13 +40,50 @@ const ENDPOINTS = new Map([
 const PERIOD = { "24h": 86400, "1h": 3600, "5m": 300 };
 const LONG_TTL = { "24h": 604800, "1h": 86400, "5m": 86400 }; // 7d, 1d, 1d
 
+// Satellite two-line elements for the Sky Pointer, from CelesTrak. A set
+// changes a few times a day and CelesTrak asks clients not to pull it more
+// than every couple of hours, so the whole site shares one copy per group
+// for six hours.
+const CELESTRAK = "https://celestrak.org/NORAD/elements/gp.php";
+const TLE_GROUPS = new Set(["visual", "stations", "science", "weather", "noaa", "amateur", "cubesat", "last-30-days"]);
+const TLE_TTL = 21600;
+const SKY_UA = "sky-pointer edge proxy @ gaming.peliglot.com (shared cache for all site visitors)";
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (url.pathname.startsWith("/api/osrs/")) return osrs(req, url, ctx);
+    if (url.pathname === "/api/sky/tle") return tle(req, url, ctx);
     return env.ASSETS.fetch(req);
   },
 };
+
+async function tle(req, url, ctx) {
+  if (req.method !== "GET") return new Response("GET only", { status: 405 });
+  const group = url.searchParams.get("group") || "visual";
+  if (!TLE_GROUPS.has(group)) return new Response("unknown group", { status: 404 });
+  const upstream = `${CELESTRAK}?GROUP=${group}&FORMAT=tle`;
+  const cache = caches.default;
+  const cacheKey = new Request(upstream);
+  let res = await cache.match(cacheKey);
+  if (!res) {
+    const up = await fetch(upstream, { headers: { "User-Agent": SKY_UA }, cf: { cacheTtl: TLE_TTL, cacheEverything: true } });
+    if (!up.ok) return new Response("upstream " + up.status, { status: 502 });
+    const text = await up.text();
+    // CelesTrak answers some errors with 200 and a sentence; a real set has line 2s
+    if (!/\n2 /.test(text)) return new Response("upstream sent no elements", { status: 502 });
+    res = new Response(text, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": `public, max-age=${TLE_TTL}`,
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+    ctx.waitUntil(cache.put(cacheKey, res.clone()));
+  }
+  return res;
+}
 
 async function osrs(req, url, ctx) {
   if (req.method !== "GET") return new Response("GET only", { status: 405 });

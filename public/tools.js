@@ -105,5 +105,17 @@ window.PELIGAMING = {
         },
       ],
     },
+    {
+      name: "IRL",
+      icon: "🌍",
+      accent: "#9fb7ff",
+      tools: [
+        {
+          name: "Sky Pointer",
+          description: "Hold your phone up to the night sky and see what it is pointing at: the stars to magnitude 6 in their real colours, the constellation figures, the planets, the Moon with its phase, the Messier objects, and the satellites passing over right now — with a finder arrow to whatever you search for. No phone sensors? Set a place and time and pan and zoom the sky by hand.",
+          path: "tools/irl/sky-pointer.html",
+        },
+      ],
+    },
   ],
 };

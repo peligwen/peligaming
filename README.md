@@ -448,6 +448,89 @@ Java 11 bytecode, no deprecated API), and the packager's own build has been
 run against it. Edits belong here, not on the mirror: the next split would
 drop them.
 
+## 🔭 Sky Pointer
+
+Not a game at all: hold your phone up to the night sky and it shows what
+the phone is pointing at — the stars, the constellation figures, the planets,
+the Moon with its phase, the Messier objects, and the satellites passing
+over right now. No sensors, or no dark sky where you are? Set a place and a
+time and pan and zoom the same sky by hand.
+
+**Try it: [gaming.peliglot.com/tools/irl/sky-pointer](https://gaming.peliglot.com/tools/irl/sky-pointer)**
+
+<img src="docs/sky-pointer.jpg" alt="Sky Pointer" width="400">
+
+- **Point with the phone.** The orientation sensors give the direction the
+  back of the phone faces; the screen becomes a window on the sky in that
+  direction, with a reticle and a readout of the azimuth and altitude and
+  the nearest named thing. It follows the phone's roll too, so the view is
+  right however you hold it. The compass reads magnetic north, so the
+  heading is corrected by the local magnetic declination (NOAA's WMM2025,
+  evaluated in the page for your position and today's date); phone
+  compasses still drift by a few degrees, so a sideways drag nudges the
+  alignment until a star you recognise sits under its dot.
+- **Or by hand.** Drag to pan, pinch or scroll to zoom from a 130° fisheye
+  to a 15° window, arrow keys and +/− on a keyboard. Your location comes
+  from the device or a typed latitude and longitude; the time is now, or
+  any date and time you set, with ±10 min / 1 h / 1 d nudges.
+- **What it draws.** 5,000 stars to magnitude 6 in their real colours
+  (from B−V), sized by brightness, with proper names and Bayer letters as
+  you zoom in; the 88 constellations as figures with names; the Sun; the
+  Moon with its phase and the bright limb turned the right way; the seven
+  planets with their magnitudes and distances; the 110 Messier objects and
+  the brightest clusters and nebulae beyond them, each with its own symbol;
+  a horizon with the ground shaded and the cardinal points; an optional
+  altitude grid. The sky brightens through twilight into day, so a planet
+  you are hunting at dusk is drawn against the sky it is really in.
+- **Satellites.** CelesTrak's "visual" list (the hundred-odd brightest) and
+  the space stations, propagated with SGP4 from the latest two-line
+  elements, each with a short track ahead of it. Bright markers are sunlit
+  satellites in a dark sky — the ones you can actually see; dim ones are in
+  the Earth's shadow or up in daylight. Tap one for its range, height and
+  period.
+- **Find things.** Search any star, planet, constellation, Messier object
+  or satellite; the result says whether it is up. Pick it and a ring marks
+  it on screen, or an arrow at the edge says which way to turn and by how
+  many degrees. Tap anything for a card of what it is: magnitude, colour,
+  designation, phase, distance, coordinates. A night mode turns the whole
+  page red for dark-adapted eyes, and share links reproduce the place, the
+  time, the view and the thing being found.
+
+### How it's built
+
+- `public/tools/irl/sky-pointer.html` is the app: vanilla JS on a canvas,
+  no build step. Its `<script id="sky-engine">` block is pure astronomy —
+  sidereal time, precession from J2000 to the date, the Sun, Moon and
+  planets from Paul Schlyter's low-precision elements (an arcminute or so,
+  with the Moon's parallax applied for your place), the near-earth SGP4 of
+  Spacetrack Report #3 for satellites, the World Magnetic Model for
+  declination, and a stereographic camera that turns DeviceOrientation
+  angles or an azimuth and altitude into a projection where every circle on
+  the sky stays a circle on the screen (which is how the horizon is drawn:
+  as the one circle it projects to, filled on the ground side).
+- `npm run check:sky` (`scripts/check-sky.mjs`) runs that block under Node
+  against reference values: SGP4 against the Spacetrack test case (within
+  10 m), the magnetic model against NOAA's WMM2025 test table, precession
+  against Meeus's worked example, and the Sun, Moon and planets against JPL
+  Horizons, fetched live (all within 2.5′; `--offline` skips that part).
+- `npm run data:sky` (`scripts/fetch-sky-data.mjs`) builds
+  `public/tools/irl/data/sky-pointer/sky.json` from
+  [d3-celestial](https://github.com/ofrohn/d3-celestial)'s data files (the
+  Hipparcos-based star list to magnitude 6, star names, constellation
+  figures and names, the Messier list and the bright deep-sky objects) and
+  NOAA's WMM2025 coefficient file, cached in `.sky-cache/`.
+- `src/worker.mjs` proxies CelesTrak's element sets under `/api/sky/tle`
+  with a six-hour shared edge cache, so the whole site fetches each set a
+  few times a day however many phones are pointed at the sky. Elements are
+  also kept in the browser for six hours, so a second look costs nothing.
+
+The honest limits: no atmospheric refraction, so anything right on the
+horizon really sits about half a degree higher than drawn; the planet
+positions are good to an arcminute or two, which is far finer than a phone
+can point; and the satellite list is the bright hundred, not the thousands
+of Starlinks. Phone orientation is only as good as the phone's compass —
+expect a few degrees, and use the alignment nudge.
+
 ## Other tools
 
 | Game | Tool | What it does |
@@ -462,6 +545,7 @@ drop them.
 | Fortnite | Tactical Terrain | The island in 3D — sightlines, dead ground, cover |
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
 | Skyrim | Alchemy Lab | Best-value potions from your ingredient stock |
+| IRL | Sky Pointer | Point your phone at the night sky: the stars, constellations, planets, Moon, deep-sky objects and satellites in that direction, with a finder for anything you search; or set a place and time and pan by hand |
 
 ### RuneScape data plumbing
 
@@ -583,7 +667,7 @@ peligaming/
   public/                 Everything in here is served as-is
     index.html            The tools index (renders from tools.js)
     tools.js              Tool manifest — edit when adding a tool
-    tools/<game>/         One folder per game; standalone tool HTML + data
+    tools/<game>/         One folder per game (irl/ for the game outside); standalone tool HTML + data
     plugins/<name>/       Built game-client plugins, served for download
   tools-src/              React (.jsx) tool sources, bundled by build:tools
   runelite/<name>/        RuneLite plugin sources (Java/Gradle), built by build:plugin
@@ -650,6 +734,10 @@ Three kinds of things live here under different terms — see
   client (`public/tools/wow-forever/data/`) are the intellectual property of
   Blizzard Entertainment, used non-commercially as fan content.
   Material relating to other games belongs to their respective owners.
+- **Sky data** (`public/tools/irl/data/sky-pointer/sky.json`) is built from
+  [d3-celestial](https://github.com/ofrohn/d3-celestial)'s data files,
+  © 2015 Olaf Frohn, **BSD-3-Clause** (the notice travels inside the file),
+  plus NOAA's public-domain WMM2025 coefficients.
 
 > Created using intellectual property belonging to Jagex Limited under the
 > terms of Jagex's Fan Content Policy. This content is not endorsed by or
