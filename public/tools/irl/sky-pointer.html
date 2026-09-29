@@ -348,7 +348,7 @@
       <span id="alignNote">Alignment nudge: 0°</span>
       <button id="alignReset">Reset</button>
     </div>
-    <p>Phone compasses drift; if the sky sits a few degrees off, drag it sideways while pointing to nudge the alignment, or centre a bright star you can see.</p>
+    <p>Phone compasses drift; if the sky sits a few degrees off, drag it sideways while pointing to nudge the alignment, or centre a bright star you can see. On an iPhone the compass only reads true while the phone is tilted toward flat, so tilt it down for a moment now and then and the heading re-calibrates; upright, it holds the last good fix.</p>
     <h3>View</h3>
     <label>Field of view <span id="fovNote"></span></label>
     <input type="range" id="fovRange" min="15" max="130" step="1">
@@ -835,6 +835,37 @@ const SKY = (() => {
     const f = scale(dz, -1);
     return { f, u, r };
   }
+  // Safari's alpha is relative to an arbitrary start, and its webkitCompassHeading
+  // is the tilt-compensated heading of the phone's top edge. The two agree (alpha
+  // = 360 − heading) only while that edge has a decent horizontal component, and
+  // mixing the heading straight into the Euler triple flips the view every time
+  // gamma wraps as the phone passes through vertical — which it does while
+  // pointing at the horizon. So the yaw offset between them is sampled when the
+  // phone is within 60° of flat, smoothed, and held while the phone is upright;
+  // the rotation itself always comes from the browser's own consistent triple.
+  function compassOffsetSample(alphaRaw, betaDeg, heading) {
+    const cB = cos(betaDeg * D2R);
+    return { offset: norm360((cB >= 0 ? 360 - heading : 180 - heading) - alphaRaw), weight: abs(cB) };
+  }
+  function compassTracker() {
+    let c = 0, s = 0, seen = false, good = false;
+    const t = {
+      update(alphaRaw, betaDeg, heading) {
+        if (heading == null || Number.isNaN(heading) || alphaRaw == null) return t.offset();
+        const { offset, weight } = compassOffsetSample(alphaRaw, betaDeg, heading);
+        const wellPlaced = weight > 0.5;
+        const k = !seen ? 1 : wellPlaced || !good ? 0.04 : 0;
+        if (k > 0) { c = c * (1 - k) + cos(offset * D2R) * k; s = s * (1 - k) + sin(offset * D2R) * k; }
+        seen = true;
+        if (wellPlaced) good = true;
+        return t.offset();
+      },
+      offset: () => (seen ? norm360(atan2(s, c) * R2D) : 0),
+      calibrated: () => good,
+      reset() { c = 0; s = 0; seen = false; good = false; },
+    };
+    return t;
+  }
   // Turn the whole camera about the zenith by deg (positive = clockwise seen from above, i.e. toward the east).
   function yawCamera(cam, deg) {
     if (!deg) return cam;
@@ -865,11 +896,12 @@ const SKY = (() => {
     const z = (4 - r2) / (4 + r2), x = X * (1 + z) / 2, y = Y * (1 + z) / 2;
     return norm(add(add(scale(cam.r, x), scale(cam.u, y)), scale(cam.f, z)));
   }
-  // The horizon (a great circle) on screen: a circle, or a line when the
-  // camera looks straight along it; and which side of it is the ground.
+  // The horizon (a great circle) on screen: a circle (enormous when the camera
+  // looks nearly along the horizon), or a line in the exact case; and which
+  // side of it is the ground.
   function horizonOnScreen(cam, S, cx, cy) {
     const nx = cam.r[2], ny = cam.u[2], nz = cam.f[2]; // zenith in camera coordinates
-    if (abs(nz) > 0.01) {
+    if (abs(nz) > 1e-7) {
       return { kind: 'circle', x: cx + S * 2 * nx / nz, y: cy - S * 2 * ny / nz, radius: S * 2 / abs(nz), groundInside: nz < 0 };
     }
     // tangent-plane approximation near the centre: nx X + ny Y + nz = 0
@@ -895,7 +927,7 @@ const SKY = (() => {
     precessionMatrix, horizonMatrix, altaz, enuFromAltAz, observerVector,
     sunPosition, moonPosition, planetPositions, illumination, AU_KM,
     parseTle, sgp4Init, sgp4, inShadow, magneticField,
-    cameraFromAzAlt, cameraFromOrientation, yawCamera, cameraAzAlt, cameraRoll, scaleForFov, project, unproject, horizonOnScreen, bvColor,
+    cameraFromAzAlt, cameraFromOrientation, compassOffsetSample, compassTracker, yawCamera, cameraAzAlt, cameraRoll, scaleForFov, project, unproject, horizonOnScreen, bvColor,
   };
 })();
   </script>
@@ -934,6 +966,8 @@ const SKY = (() => {
     const labels = [];             // labels to place this frame
     let sensor = null;             // latest orientation { alpha, beta, gamma, absolute, accuracy, t }
     let sensorKind = null;         // 'ios' | 'absolute' | 'relative'
+    const compass = SKY.compassTracker(); // iOS: the yaw between Safari's relative alpha and the compass
+    let compassOffset = 0;
     let smoothCam = null;
     let declination = 0;
     const now = () => (live ? new Date() : fixedTime);
@@ -1009,7 +1043,7 @@ const SKY = (() => {
     }
     function currentCamera() {
       if (mode === 'sensor' && sensor) {
-        let cam = SKY.cameraFromOrientation(sensor.alpha, sensor.beta, sensor.gamma, screenAngle());
+        let cam = SKY.cameraFromOrientation(sensor.alpha + (sensorKind === 'ios' ? compassOffset : 0), sensor.beta, sensor.gamma, screenAngle());
         cam = SKY.yawCamera(cam, (st.useDecl ? declination : 0) + st.azOffset);
         if (!smoothCam) smoothCam = cam;
         else {
@@ -1239,20 +1273,7 @@ const SKY = (() => {
 
       // ---- labels, then the ground over everything below the horizon
       placeLabels();
-      const hz = SKY.horizonOnScreen(cam, S, cx, cy);
-      ctx.fillStyle = dark ? 'rgba(8,12,9,0.78)' : 'rgba(20,30,22,0.7)';
-      ctx.beginPath();
-      if (hz.kind === 'circle') {
-        if (hz.groundInside) { ctx.arc(hz.x, hz.y, hz.radius, 0, 7); ctx.fill(); }
-        else { ctx.rect(-10, -10, W + 20, H + 20); ctx.arc(hz.x, hz.y, hz.radius, 0, 7); ctx.fill('evenodd'); }
-        ctx.strokeStyle = 'rgba(130,190,140,0.8)'; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(hz.x, hz.y, hz.radius, 0, 7); ctx.stroke();
-      } else {
-        const L = 1e5, [x0, y0] = hz.p0, [ax, ay] = hz.along, [gx, gy] = hz.into;
-        ctx.moveTo(x0 - ax * L, y0 - ay * L); ctx.lineTo(x0 + ax * L, y0 + ay * L); ctx.lineTo(x0 + ax * L + gx * L, y0 + ay * L + gy * L); ctx.lineTo(x0 - ax * L + gx * L, y0 - ay * L + gy * L); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = 'rgba(130,190,140,0.8)'; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(x0 - ax * L, y0 - ay * L); ctx.lineTo(x0 + ax * L, y0 + ay * L); ctx.stroke();
-      }
+      drawGround(SKY.horizonOnScreen(cam, S, cx, cy), W, H, dark ? 'rgba(8,12,9,0.78)' : 'rgba(20,30,22,0.7)', 'rgba(130,190,140,0.8)');
       // cardinal points, just above the horizon
       ctx.font = '700 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1312,6 +1333,47 @@ const SKY = (() => {
         if (p && prev) { ctx.moveTo(prev[0], prev[1]); ctx.lineTo(p[0], p[1]); }
         prev = p;
       }
+      ctx.stroke();
+    }
+
+    // The ground is one side of the horizon circle. Near level that circle is
+    // enormous (its radius is S·2/sin(altitude)), and browsers rasterise arcs
+    // that big erratically, so past a few screen diagonals only the stretch of
+    // it near the screen is sampled, and a band along it is filled.
+    function drawGround(hz, W, H, fill, stroke) {
+      ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = 1.5;
+      const diag = Math.hypot(W, H), L = 3 * diag;
+      if (hz.kind === 'line') {
+        const [x0, y0] = hz.p0, [ax, ay] = hz.along, [gx, gy] = hz.into;
+        ctx.beginPath();
+        ctx.moveTo(x0 - ax * L, y0 - ay * L); ctx.lineTo(x0 + ax * L, y0 + ay * L); ctx.lineTo(x0 + ax * L + gx * L, y0 + ay * L + gy * L); ctx.lineTo(x0 - ax * L + gx * L, y0 - ay * L + gy * L); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x0 - ax * L, y0 - ay * L); ctx.lineTo(x0 + ax * L, y0 + ay * L); ctx.stroke();
+        return;
+      }
+      const R = hz.radius;
+      if (R <= 4 * diag) {
+        ctx.beginPath();
+        if (hz.groundInside) { ctx.arc(hz.x, hz.y, R, 0, 7); ctx.fill(); }
+        else { ctx.rect(-10, -10, W + 20, H + 20); ctx.arc(hz.x, hz.y, R, 0, 7); ctx.fill('evenodd'); }
+        ctx.beginPath(); ctx.arc(hz.x, hz.y, R, 0, 7); ctx.stroke();
+        return;
+      }
+      const mx = W / 2, my = H / 2, dist = Math.hypot(mx - hz.x, my - hz.y), D = diag / 2 + 4;
+      if (dist + D < R) { if (hz.groundInside) ctx.fillRect(0, 0, W, H); return; }  // the whole screen is inside the circle
+      if (dist - D > R) { if (!hz.groundInside) ctx.fillRect(0, 0, W, H); return; } // ...or outside it
+      const a0 = Math.atan2(my - hz.y, mx - hz.x);
+      const half = Math.acos(clamp((R * R + dist * dist - D * D) / (2 * R * dist), -1, 1));
+      const N = 48, pts = [];
+      for (let i = 0; i <= N; i++) { const a = a0 - half + (2 * half * i) / N; pts.push([hz.x + R * Math.cos(a), hz.y + R * Math.sin(a), a]); }
+      const into = hz.groundInside ? -L : L; // the band lies on the ground side: inward or outward
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      const [x1, y1, a1] = pts[0], [x2, y2, a2] = pts[N];
+      ctx.lineTo(x2 + into * Math.cos(a2), y2 + into * Math.sin(a2));
+      ctx.lineTo(x1 + into * Math.cos(a1), y1 + into * Math.sin(a1));
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
       ctx.stroke();
     }
 
@@ -1388,8 +1450,9 @@ const SKY = (() => {
       $('#pointing').innerHTML = `${mode === 'sensor' ? 'Pointing' : 'Centre'}: <b>${fmtAz(p.az)}</b>, <b>${p.alt >= 0 ? '+' : ''}${Math.round(p.alt)}°</b>${near}`;
     }
     function refreshUi() {
-      $('#chipMode').innerHTML = mode === 'sensor' ? `📡 <b>sensors</b>${sensorKind === 'relative' ? ' (no compass)' : ''}` : '🖐 <b>manual</b>';
-      $('#chipMode').classList.toggle('warn', mode === 'sensor' && sensorKind === 'relative');
+      const compassNote = sensorKind === 'relative' ? ' (no compass)' : sensorKind === 'ios' && !compass.calibrated() ? ' (tilt flat to calibrate)' : '';
+      $('#chipMode').innerHTML = mode === 'sensor' ? `📡 <b>sensors</b>${compassNote}` : '🖐 <b>manual</b>';
+      $('#chipMode').classList.toggle('warn', mode === 'sensor' && compassNote !== '');
       $('#chipLoc').innerHTML = st.locSource === 'default' ? '📍 <b>set location</b>' : `📍 <b>${fmtLatLon(st.lat, st.lon)}</b>`;
       $('#chipLoc').classList.toggle('warn', st.locSource === 'default');
       $('#chipTime').innerHTML = live ? '🕒 <b>now</b>' : `🕒 <b>${fmtTime(fixedTime)}</b>`;
@@ -1441,7 +1504,7 @@ const SKY = (() => {
       sensorEvent = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
       sensorHandler = onOrientation;
       window.addEventListener(sensorEvent, sensorHandler);
-      mode = 'sensor'; smoothCam = null; sensor = null;
+      mode = 'sensor'; smoothCam = null; sensor = null; compass.reset(); compassOffset = 0;
       clearTimeout(sensorTimer);
       sensorTimer = setTimeout(() => {
         if (mode === 'sensor' && !sensor) { toast('No orientation data is arriving — staying in manual mode.'); disableSensors(); }
@@ -1457,14 +1520,23 @@ const SKY = (() => {
     }
     function onOrientation(ev) {
       if (ev.beta == null || ev.gamma == null) return;
-      let alpha = ev.alpha == null ? 0 : ev.alpha;
-      if (ev.webkitCompassHeading != null && !Number.isNaN(ev.webkitCompassHeading)) { alpha = 360 - ev.webkitCompassHeading; sensorKind = 'ios'; }
+      const alpha = ev.alpha == null ? 0 : ev.alpha;
+      if (ev.webkitCompassHeading != null && !Number.isNaN(ev.webkitCompassHeading)) {
+        sensorKind = 'ios';
+        const wasCalibrated = compass.calibrated();
+        compassOffset = compass.update(alpha, ev.beta, ev.webkitCompassHeading);
+        if (!wasCalibrated && compass.calibrated()) refreshUi();
+      }
       else if (ev.absolute || sensorEvent === 'deviceorientationabsolute') sensorKind = 'absolute';
       else sensorKind = 'relative';
       const first = !sensor;
       sensor = { alpha, beta: ev.beta, gamma: ev.gamma, accuracy: ev.webkitCompassAccuracy, t: performance.now() };
       dirty = true;
-      if (first) { refreshUi(); if (sensorKind === 'relative') toast('No compass: north is wherever the phone faced at start. Drag sideways to align on a star you know.', 5000); }
+      if (first) {
+        refreshUi();
+        if (sensorKind === 'relative') toast('No compass: north is wherever the phone faced at start. Drag sideways to align on a star you know.', 5000);
+        else if (sensorKind === 'ios' && !compass.calibrated()) toast('Tilt the phone toward flat for a moment so the compass can calibrate.', 4000);
+      }
     }
 
     // ------------------------------------------------------------ pointer input
