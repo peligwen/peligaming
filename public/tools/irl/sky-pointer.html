@@ -239,6 +239,16 @@
     .sheet input[type="range"] { width: 100%; }
     .sheet code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
 
+    /* ---- start prompt: a phone is asked for its location and sensors up front ---- */
+    .start { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(4, 6, 14, 0.62); z-index: 7; }
+    .start.open { display: flex; }
+    .start-box { background: var(--panel-solid); border: 1px solid var(--panel-border); border-radius: 14px; padding: 18px 16px; width: 100%; max-width: 360px; display: grid; gap: 10px; }
+    .start-box h2 { margin: 0; font-size: 18px; }
+    .start-box p { margin: 0; font-size: 14px; line-height: 1.4; color: var(--text-dim); }
+    .start-box p.warn { color: #e3b341; }
+    .start-box p:empty { display: none; }
+    .start-box button { width: 100%; padding: 11px; font-size: 15px; }
+
     .toast {
       position: fixed;
       left: 50%;
@@ -366,6 +376,15 @@
     <p>Stars to magnitude 6 with their colours, constellation figures and the Messier objects from <a href="https://github.com/ofrohn/d3-celestial" target="_blank" rel="noopener">d3-celestial</a> (Hipparcos data, BSD-3); the Sun, Moon and planets from low-precision elements (about an arcminute); satellites from <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>; magnetic declination from NOAA's WMM2025. Positions include precession to today's equinox but not refraction, so objects right on the horizon sit a little higher than drawn.</p>
   </section>
 
+  <div class="start" id="start" role="dialog" aria-labelledby="startTitle">
+    <div class="start-box">
+      <h2 id="startTitle">📱 Point your phone at the sky</h2>
+      <p>Sky Pointer draws the sky for where you are and turns the phone into a window on it. It needs your location and the motion sensors — the browser will ask for both.</p>
+      <p class="warn" id="startNote"></p>
+      <button class="primary" id="startGo">📡 Use my location and sensors</button>
+      <button id="startManual">🖐 Pan by hand instead</button>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
   <div id="night"></div>
 
@@ -955,6 +974,7 @@ const SKY = (() => {
       azOffset: 0, useDecl: true,
       layers: { stars: true, lines: true, names: true, planets: true, dsos: true, sats: true, grid: false },
       night: false,
+      start: 'ask',              // on a phone: 'ask' for location and sensors up front, or 'manual' if they said no
     };
     try { const s = JSON.parse(localStorage.getItem(LS) || '{}'); Object.assign(st, s); st.layers = { ...st.layers, ...(s.layers || {}) }; } catch { /* fresh */ }
     const save = () => { try { localStorage.setItem(LS, JSON.stringify(st)); } catch { /* private mode */ } };
@@ -1541,7 +1561,8 @@ const SKY = (() => {
       dirty = true;
       if (first) {
         refreshUi();
-        if (sensorKind === 'relative') toast('No compass: north is wherever the phone faced at start. Drag sideways to align on a star you know.', 5000);
+        if (st.locSource === 'default' && !locating) toast('No location set — the sky is drawn for Greenwich until you tap 📍 Locate me.', 6000);
+        else if (sensorKind === 'relative') toast('No compass: north is wherever the phone faced at start. Drag sideways to align on a star you know.', 5000);
         else if (sensorKind === 'ios' && !compass.calibrated()) toast('Tilt the phone toward flat for a moment so the compass can calibrate.', 4000);
       }
     }
@@ -1808,16 +1829,22 @@ const SKY = (() => {
       setLocation(lat, lon, 'manual');
       toast(`Location set to ${fmtLatLon(st.lat, st.lon)}`);
     });
-    function locate() {
-      if (!navigator.geolocation) { toast('No geolocation here — type your coordinates in Settings.'); return; }
-      toast('Finding your location…', 6000);
+    let locating = false;
+    function locate(quiet = false) {
+      if (!navigator.geolocation) { if (!quiet) toast('No geolocation here — type your coordinates in Settings.'); return; }
+      if (!quiet) toast('Finding your location…', 6000);
+      locating = true;
       navigator.geolocation.getCurrentPosition((pos) => {
+        locating = false;
         setLocation(pos.coords.latitude, pos.coords.longitude, 'gps', (pos.coords.altitude || 0) / 1000);
-        toast(`Location: ${fmtLatLon(st.lat, st.lon)}`);
-      }, (err) => toast(`Location unavailable (${err.message}) — type it in Settings.`), { enableHighAccuracy: false, timeout: 15000, maximumAge: 600000 });
+        if (!quiet) toast(`Location: ${fmtLatLon(st.lat, st.lon)}`);
+      }, (err) => {
+        locating = false;
+        if (!quiet || st.locSource === 'default') toast(`Location unavailable (${err.message}) — type it in Settings.`);
+      }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 600000 });
     }
-    $('#locateBtn').addEventListener('click', locate);
-    $('#locGps').addEventListener('click', locate);
+    $('#locateBtn').addEventListener('click', () => locate());
+    $('#locGps').addEventListener('click', () => locate());
     $('#chipLoc').addEventListener('click', () => { $('#sheet').classList.add('open'); $('#locInput').focus(); });
 
     function setTime(date) {
@@ -1832,7 +1859,11 @@ const SKY = (() => {
     $('#chipMode').addEventListener('click', () => (mode === 'sensor' ? disableSensors() : enableSensors()));
 
     // ------------------------------------------------------------ the rest of the controls
-    $('#sensorBtn').addEventListener('click', () => (mode === 'sensor' ? disableSensors() : enableSensors()));
+    $('#sensorBtn').addEventListener('click', () => {
+      if (mode === 'sensor') { disableSensors(); return; }
+      if (st.start === 'manual') { st.start = 'ask'; save(); }
+      enableSensors();
+    });
     $('#settingsBtn').addEventListener('click', () => { refreshUi(); $('#sheet').classList.toggle('open'); });
     $('#sheetClose').addEventListener('click', () => $('#sheet').classList.remove('open'));
     for (const b of document.querySelectorAll('#layers [data-layer]')) b.addEventListener('click', () => {
@@ -1879,6 +1910,30 @@ const SKY = (() => {
       }
       dirty = true;
     }
+
+    // ------------------------------------------------------------ start prompt on phones
+    // A phone is asked for its location and motion sensors up front: without a location the sky is
+    // drawn for Greenwich, and iOS only grants motion access from a tap, so one tap does both. A
+    // shared link is shown as sent, and "pan by hand" is remembered until they ask for the sensors.
+    const isPhone = navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches && typeof DeviceOrientationEvent !== 'undefined';
+    function startPrompt() {
+      if (!isPhone || st.start === 'manual') return;
+      const h = new URLSearchParams(location.hash.slice(1));
+      if (h.has('az') || h.has('find') || h.has('lat')) return;
+      const needsTap = typeof DeviceOrientationEvent.requestPermission === 'function' || st.locSource === 'default';
+      if (!needsTap) { enableSensors(); if (st.locSource === 'gps') locate(true); return; }
+      $('#startNote').textContent = st.locSource === 'default' ? 'No location is set yet, so the sky is drawn for Greenwich — which is probably not where you are.' : '';
+      $('#startGo').textContent = st.locSource === 'manual' ? '📡 Use the sensors' : '📡 Use my location and sensors';
+      $('#start').classList.add('open');
+    }
+    $('#startGo').addEventListener('click', () => {
+      $('#start').classList.remove('open');
+      st.start = 'ask'; save();
+      enableSensors();                                   // first: iOS wants the motion request inside the tap
+      if (st.locSource !== 'manual') locate(st.locSource === 'gps');
+    });
+    $('#startManual').addEventListener('click', () => { $('#start').classList.remove('open'); st.start = 'manual'; save(); });
+    startPrompt();
 
     refreshUi();
   })();

@@ -468,7 +468,11 @@ time and pan and zoom the same sky by hand.
   heading is corrected by the local magnetic declination (NOAA's WMM2025,
   evaluated in the page for your position and today's date); phone
   compasses still drift by a few degrees, so a sideways drag nudges the
-  alignment until a star you recognise sits under its dot.
+  alignment until a star you recognise sits under its dot. On a phone the
+  page asks for both up front: one tap grants the location and the motion
+  sensors (iOS only allows motion access from a tap), because without a
+  location the sky would be drawn for Greenwich, which is probably not where
+  you are; it says so if you point without one.
 - **Or by hand.** Drag to pan, pinch or scroll to zoom from a 130° fisheye
   to a 15° window, arrow keys and +/− on a keyboard. Your location comes
   from the device or a typed latitude and longitude; the time is now, or
