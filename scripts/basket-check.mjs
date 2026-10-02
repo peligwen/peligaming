@@ -13,7 +13,7 @@ import { FAMILIES, STAGES, PAIRS } from '../tools-src/runescape/baskets.js';
 import { buildCommodities, DAY } from '../tools-src/runescape/basket-model.js';
 
 const API = process.env.OSRS_API || 'https://prices.runescape.wiki/api/v1/osrs';
-const UA = 'job-board basket check (gaming.peliglot.com; a few dozen one-off requests)';
+const UA = 'job-board basket check (peligaming.com; a few dozen one-off requests)';
 const famKey = (process.argv[2] || 'wood').toLowerCase();
 const W = Number(process.argv[3] || 90);
 

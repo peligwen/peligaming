@@ -14,7 +14,7 @@
 import { DAY, completeDays, weekStats, dayFills, cycleOrders, hourProfile, holdout } from '../tools-src/runescape/day-model.js';
 
 const API = process.env.OSRS_API || 'https://prices.runescape.wiki/api/v1/osrs';
-const UA = 'job-board day-model check (gaming.peliglot.com; a few one-off requests)';
+const UA = 'job-board day-model check (peligaming.com; a few one-off requests)';
 const id = Number(process.argv[2] || 4151);
 const qty = Number(process.argv[3] || 70);
 const CAPTURE = 0.5;

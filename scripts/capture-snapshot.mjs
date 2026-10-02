@@ -13,8 +13,8 @@
 
 import { writeFileSync } from 'node:fs';
 
-const BASE = process.env.OSRS_API || 'https://gaming.peliglot.com/api/osrs';
-const UA = 'job-board snapshot capture (gaming.peliglot.com; one-off, 13 requests)';
+const BASE = process.env.OSRS_API || 'https://peligaming.com/api/osrs';
+const UA = 'job-board snapshot capture (peligaming.com; one-off, 13 requests)';
 const KEEP = 400; // most-traded rows to bake
 const DAY = 86400;
 

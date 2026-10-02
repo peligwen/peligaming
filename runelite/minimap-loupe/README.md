@@ -45,7 +45,7 @@ Two consequences worth knowing:
 ## Installing
 
 The built jar is served from
-**[gaming.peliglot.com/tools/runescape/minimap-loupe](https://gaming.peliglot.com/tools/runescape/minimap-loupe)**,
+**[peligaming.com/tools/runescape/minimap-loupe](https://peligaming.com/tools/runescape/minimap-loupe)**,
 which has the current download, its checksum, and the click-by-click install.
 The short version: drop the jar in `~/.runelite/sideloaded-plugins/` (on
 Windows, `%USERPROFILE%\.runelite\sideloaded-plugins\`) and start RuneLite

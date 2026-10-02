@@ -10,5 +10,11 @@
     "binding": "ASSETS",
     "not_found_handling": "404-page"
   },
-  "routes": [{ "pattern": "gaming.peliglot.com", "custom_domain": true }]
+  "routes": [
+    { "pattern": "peligaming.com", "custom_domain": true },
+    // www and the site's old home are attached too, only so the worker can
+    // answer them with a 301 to peligaming.com (see REDIRECT_HOSTS in the worker)
+    { "pattern": "www.peligaming.com", "custom_domain": true },
+    { "pattern": "gaming.peliglot.com", "custom_domain": true }
+  ]
 }

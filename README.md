@@ -4,7 +4,7 @@
 site: an index page plus a folder of standalone single-file HTML tools,
 deployed as a Cloudflare Worker with static assets.
 
-Live at **[gaming.peliglot.com](https://gaming.peliglot.com)** · part of the
+Live at **[peligaming.com](https://peligaming.com)** · part of the
 [peliglot](https://peliglot.com) family.
 
 ## 🗺️ World Map (WoW Forever)
@@ -13,7 +13,7 @@ The first tool for **World of Warcraft: Forever**, Blizzard's permanent
 Classic-plus: Azeroth from the whole world down to a city street, drawn from
 the game's own map art, with the layers the game does not draw for you.
 
-**Try it: [gaming.peliglot.com/tools/wow-forever/world-map](https://gaming.peliglot.com/tools/wow-forever/world-map)**
+**Try it: [peligaming.com/tools/wow-forever/world-map](https://peligaming.com/tools/wow-forever/world-map)**
 
 - **One map at every scale.** The world map, the two continents, every zone
   (Forever's Riverglades, Mount Hyjal and Shen'dralas included, and Zephras
@@ -133,7 +133,7 @@ A route planner for Old School RuneScape's **Sailing** skill — pick two
 points on the world map and it charts the best passage between ports,
 shipwrecks, shoals and charting-task spots.
 
-**Try it: [gaming.peliglot.com/tools/runescape/naval-pathfinder](https://gaming.peliglot.com/tools/runescape/naval-pathfinder)**
+**Try it: [peligaming.com/tools/runescape/naval-pathfinder](https://peligaming.com/tools/runescape/naval-pathfinder)**
 
 ![Naval Pathfinder](docs/naval-pathfinder.jpg)
 
@@ -262,7 +262,7 @@ A bossing and raiding rehearsal tool for Old School RuneScape: every fight's
 **briefing**, its **kit**, and the fight itself rebuilt tile by tile as a 3D
 sand table you scrub through and then drill.
 
-**Try it: [gaming.peliglot.com/tools/runescape/sand-table](https://gaming.peliglot.com/tools/runescape/sand-table)**
+**Try it: [peligaming.com/tools/runescape/sand-table](https://peligaming.com/tools/runescape/sand-table)**
 
 ![Sand Table](docs/sand-table.jpg)
 
@@ -325,7 +325,7 @@ every fight is rebuilt as a tile-scale 3D diorama with a tick clock you
 scrub, then turned around into a drill that grades your prayer switches and
 your footwork.
 
-**Try it: [gaming.peliglot.com/tools/runescape/sand-table](https://gaming.peliglot.com/tools/runescape/sand-table)**
+**Try it: [peligaming.com/tools/runescape/sand-table](https://peligaming.com/tools/runescape/sand-table)**
 
 ![Sand Table](docs/sand-table.jpg)
 
@@ -392,7 +392,7 @@ and a small circle of it comes up magnified under the pointer, the way a
 loupe sits on a chart. Dot clusters become countable without leaning into the
 screen.
 
-**Get it: [gaming.peliglot.com/tools/runescape/minimap-loupe](https://gaming.peliglot.com/tools/runescape/minimap-loupe)**
+**Get it: [peligaming.com/tools/runescape/minimap-loupe](https://peligaming.com/tools/runescape/minimap-loupe)**
 
 ![Minimap Loupe](docs/minimap-loupe.png)
 
@@ -456,7 +456,7 @@ the Moon with its phase, the Messier objects, and the satellites passing
 over right now. No sensors, or no dark sky where you are? Set a place and a
 time and pan and zoom the same sky by hand.
 
-**Try it: [gaming.peliglot.com/tools/irl/sky-pointer](https://gaming.peliglot.com/tools/irl/sky-pointer)**
+**Try it: [peligaming.com/tools/irl/sky-pointer](https://peligaming.com/tools/irl/sky-pointer)**
 
 <img src="docs/sky-pointer.jpg" alt="Sky Pointer" width="400">
 
@@ -722,8 +722,17 @@ python3 -m http.server -d public
 npx wrangler deploy
 ```
 
-Serves at `gaming.peliglot.com` (or `peligaming.<your-subdomain>.workers.dev`
-on a fresh account — adjust the `routes` block in `wrangler.jsonc`).
+Serves at `peligaming.com`. The worker is also attached to
+`www.peligaming.com` and to the site's old home, `gaming.peliglot.com`, and
+answers both with a permanent redirect to the same path on `peligaming.com`,
+so old links keep working. All three are Cloudflare custom domains, declared
+in the `routes` block of `wrangler.jsonc`: `wrangler deploy` creates their
+DNS records and certificates itself. If one of the hostnames already has a
+DNS record, an interactive deploy asks before replacing it, and a
+non-interactive one (CI, a piped shell) replaces it without asking, so check
+the zone first when that matters. On a fresh account, drop the
+`routes` block and the site serves at
+`peligaming.<your-subdomain>.workers.dev` instead.
 
 ## Licensing & attribution
 

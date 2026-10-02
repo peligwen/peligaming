@@ -1,4 +1,4 @@
-// gaming.peliglot.com worker: serves the static tools, and proxies the OSRS
+// peligaming.com worker: serves the static tools, and proxies the OSRS
 // data APIs under /api/osrs/* so the whole site shares ONE edge cache —
 // fifty open tabs cost the upstream one request per cache window instead of
 // fifty — and so requests carry the descriptive User-Agent the wiki asks
@@ -14,7 +14,7 @@ const UPSTREAM = "https://prices.runescape.wiki/api/v1/osrs";
 const OFFICIAL = "https://oldschool.runescape.wiki/w/Module:GEPrices/data.json?action=raw";
 // Jagex's public hiscores (per-player level and xp by skill; no auth exists).
 const HISCORES = "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json";
-const UA = "job-board edge proxy @ gaming.peliglot.com (shared cache for all site visitors)";
+const UA = "job-board edge proxy @ peligaming.com (shared cache for all site visitors)";
 
 // per-endpoint edge-cache TTLs (seconds), matched to how often the data moves
 const ENDPOINTS = new Map([
@@ -47,11 +47,23 @@ const LONG_TTL = { "24h": 604800, "1h": 86400, "5m": 86400 }; // 7d, 1d, 1d
 const CELESTRAK = "https://celestrak.org/NORAD/elements/gp.php";
 const TLE_GROUPS = new Set(["visual", "stations", "science", "weather", "noaa", "amateur", "cubesat", "last-30-days"]);
 const TLE_TTL = 21600;
-const SKY_UA = "sky-pointer edge proxy @ gaming.peliglot.com (shared cache for all site visitors)";
+const SKY_UA = "sky-pointer edge proxy @ peligaming.com (shared cache for all site visitors)";
+
+// The site's one home. The worker is also attached to www.peligaming.com and
+// to its old home, gaming.peliglot.com; a request to either is answered with a
+// permanent redirect to the same path here, so old links, bookmarks and share
+// links keep working and search engines learn the move. Only these named
+// hosts redirect — `wrangler dev` and the workers.dev preview serve the site
+// as themselves.
+const CANONICAL_HOST = "peligaming.com";
+const REDIRECT_HOSTS = new Set(["www.peligaming.com", "gaming.peliglot.com"]);
 
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
+    if (REDIRECT_HOSTS.has(url.hostname)) {
+      return Response.redirect(`https://${CANONICAL_HOST}${url.pathname}${url.search}`, 301);
+    }
     if (url.pathname.startsWith("/api/osrs/")) return osrs(req, url, ctx);
     if (url.pathname === "/api/sky/tle") return tle(req, url, ctx);
     return env.ASSETS.fetch(req);
