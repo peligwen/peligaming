@@ -54,7 +54,9 @@ const SKY_UA = "sky-pointer edge proxy @ peligaming.com (shared cache for all si
 // permanent redirect to the same path here, so old links, bookmarks and share
 // links keep working and search engines learn the move. Only these named
 // hosts redirect — `wrangler dev` and the workers.dev preview serve the site
-// as themselves.
+// as themselves. (`assets.run_worker_first` in wrangler.jsonc is what lets the
+// worker see requests for the pages at all; without it only /api/* and 404s
+// would ever reach this code.)
 const CANONICAL_HOST = "peligaming.com";
 const REDIRECT_HOSTS = new Set(["www.peligaming.com", "gaming.peliglot.com"]);
 
