@@ -311,6 +311,7 @@
         <div><b>BRAKE</b> · <b>PREROT</b> · <b>ROTOR BRAKE</b> · <b>ENGINE</b> — toggle switches</div><div><kbd>B</kbd> · <kbd>P</kbd> · <kbd>R</kbd> · <kbd>I</kbd> · <kbd>Space</kbd> holds the brakes</div>
         <div><b>VIEW</b> cockpit / chase · <b>MAP</b> &amp; jobs · <b>RESET</b></div><div><kbd>C</kbd> · <kbd>M</kbd> · <kbd>Backspace</kbd></div>
         <div><b>Look</b> — drag the view, or turn the phone (📱)</div><div>mouse drag · ⌖ recentres</div>
+        <div><b>Zoom</b> — scroll or pinch the view: the cockpit narrows its field of view, the chase camera comes closer</div><div>wheel · pinch · <kbd>−</kbd>/<kbd>=</kbd> · <kbd>0</kbd> resets</div>
       </div>
       <h2>Settings</h2>
       <label><input type="checkbox" id="setAssist" checked> Flight assist — damps the rotor head and holds attitude while the stick is centred (a stability augmentation; the aerodynamics are unchanged). Off, the bare machine needs your hand on the stick at all times, as a real gyro does.</label>
@@ -319,13 +320,14 @@
       <label>Wind <select id="setWind"><option value="calm">calm</option><option value="light" selected>light (3–6 kt)</option><option value="breezy">breezy (8–14 kt)</option><option value="gusty">gusty (12–20 kt)</option></select></label>
       <label>Time of day <select id="setTime"><option value="morning">morning</option><option value="noon" selected>midday</option><option value="evening">evening</option></select></label>
       <label>Detail <select id="setQuality"><option value="low">low (older phones)</option><option value="medium" selected>medium</option><option value="high">high</option></select></label>
+      <label>Ground <select id="setGround"><option value="imagery" selected>aerial imagery (USDA NAIP, public domain; 7 MB, not at low detail)</option><option value="cover">land cover colours</option></select></label>
       <div class="row">
         <button class="primary" id="btnStartRamp">Start on the ramp</button>
         <button id="btnStartRunway">Quick start: lined up, rotor spun</button>
         <button id="btnStartAir">Quick start: airborne over the airport</button>
         <button id="btnCloseHelp">Close</button>
       </div>
-      <p style="margin-top:14px;font-size:12px">The flight model follows both blades of the teetering rotor around the azimuth with blade-element aerodynamics, so autorotation, blowback, retreating-blade stall, rotor unloading and the vertical descent are what the maths does rather than scripted; the airframe carries a pusher engine, a stabilizer and rudder in the propwash, and tricycle gear. Terrain is USGS 3DEP; streets, buildings, land cover, businesses and houses are © OpenStreetMap contributors (ODbL). No street traffic is modelled — the streets are yours.</p>
+      <p style="margin-top:14px;font-size:12px">The flight model follows both blades of the teetering rotor around the azimuth with blade-element aerodynamics, so autorotation, blowback, retreating-blade stall, rotor unloading and the vertical descent are what the maths does rather than scripted; the airframe carries a pusher engine, a stabilizer and rudder in the propwash, and tricycle gear. Terrain is USGS 3DEP and the aerial imagery is USDA NAIP via the USGS National Map (both public domain); streets, buildings, land cover, businesses and houses are © OpenStreetMap contributors (ODbL). No street traffic is modelled — the streets are yours.</p>
     </div>
   </div>
 
@@ -461,11 +463,11 @@
       fuselage: { flatPlate: 0.55, pos: [0, -0.15, 0], damp: [18, 26, 28] },
       stab: { area: 0.42, span: 1.5, incidence: -3.0 * D2R, pos: [-2.05, 0.10, 0], slip: 0.85 },
       fin: { area: 0.45, ar: 1.5, pos: [-2.15, 0.45, 0], rudderMax: 25 * D2R, rudderEff: 0.55, slip: 0.9 },
-      gear: [
-        { name: 'nose', pos: [0.95, -0.78, 0], wheel: true, steer: true, brake: 0 },
-        { name: 'left', pos: [-0.25, -0.78, -0.80], wheel: true, brake: 1 },
-        { name: 'right', pos: [-0.25, -0.78, 0.80], wheel: true, brake: 1 },
-        { name: 'tail', pos: [-2.25, -0.40, 0], wheel: false },
+      gear: [ // big wheels on long legs: the streets are the runway
+        { name: 'nose', pos: [1.10, -0.98, 0], wheel: true, steer: true, brake: 0 },
+        { name: 'left', pos: [-0.25, -0.98, -0.95], wheel: true, brake: 1 },
+        { name: 'right', pos: [-0.25, -0.98, 0.95], wheel: true, brake: 1 },
+        { name: 'tail', pos: [-2.28, -0.58, 0], wheel: false },
         { name: 'prop', pos: [-1.05, -0.36, 0], wheel: false, strike: true },
       ],
       gearK: 26000, gearC: 1700, tyreK: 40000, tyreC: 900, steerMax: 22 * D2R,
@@ -530,7 +532,7 @@
     // Put the aircraft on the ground at x, z facing heading (degrees), still.
     function place(s, env, x, z, headingDeg, opts = {}) {
       const h = env.surface(x, z).h;
-      s.pos = [x, h + 0.78 + 0.02, z];
+      s.pos = [x, h + 0.98 + 0.02, z];
       s.vel = [0, 0, 0]; s.omega = [0, 0, 0];
       s.q = qfromEuler(headingDeg * D2R, 0, 0);
       s.rotor.psi = 0; s.rotor.omega = (opts.rotorRpm || 0) * TAU / 60; s.rotor.beta = 0; s.rotor.betaDot = 0; s.rotor.vi = 0; s.rotor.stopHits = 0;
@@ -978,7 +980,7 @@
 
     // ------------------------------------------------------------ settings & persistence
     const STORE = 'gyro-courier';
-    const settings = Object.assign({ assist: true, look: true, metric: false, wind: 'light', time: 'noon', quality: isPhone ? 'medium' : 'high', sound: false, camera: 'cockpit' },
+    const settings = Object.assign({ assist: true, look: true, metric: false, wind: 'light', time: 'noon', quality: isPhone ? 'medium' : 'high', ground: 'imagery', sound: false, camera: 'cockpit' },
       (() => { try { return JSON.parse(localStorage.getItem(STORE + ':settings') || '{}'); } catch { return {}; } })());
     const log = Object.assign({ deliveries: 0, earnings: 0, crashes: 0, flightTime: 0, best: null, recent: [] },
       (() => { try { return JSON.parse(localStorage.getItem(STORE + ':log') || '{}'); } catch { return {}; } })());
@@ -1264,6 +1266,9 @@
           uHalf: { value: new THREE.Vector2(halfX(), halfZ()) },
           uOrigin: { value: new THREE.Vector2(0, 0) }, uSpacing: { value: 10 },
           uPalette: { value: palette.flat() },
+          uImg0: { value: null }, uImgBox0: { value: new THREE.Vector4(0, 0, 1, 1) }, // the aerial imagery: the whole box, and the city closer
+          uImg1: { value: null }, uImgBox1: { value: new THREE.Vector4(0, 0, 1, 1) }, uImgCity: { value: 0 },
+          uImgOn: { value: 0 },
           uSun: { value: sunDir.clone() }, uSunColor: { value: new THREE.Color(0xffffff) }, uSkyColor: { value: new THREE.Color(0x4f8fe0) },
           uTime: { value: 0 }, uCam: { value: new THREE.Vector3() },
           fogColor: { value: new THREE.Color() }, fogNear: { value: 1 }, fogFar: { value: 2 },
@@ -1292,6 +1297,7 @@
         fragmentShader: `
           precision highp float;
           uniform sampler2D uCover; uniform vec4 uCv; uniform vec2 uHalf; uniform float uPalette[36];
+          uniform sampler2D uImg0; uniform vec4 uImgBox0; uniform sampler2D uImg1; uniform vec4 uImgBox1; uniform float uImgCity; uniform float uImgOn;
           uniform vec3 uSun; uniform vec3 uSunColor; uniform vec3 uSkyColor; uniform float uTime; uniform vec3 uCam;
           uniform vec3 fogColor; uniform float fogNear; uniform float fogFar;
           in vec3 vWorld; in vec3 vNormal; in float vSkirt;
@@ -1299,6 +1305,8 @@
           float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
           float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
             return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+          // an octave of noise, centred on zero, that fades out once a pixel spans a good part of its wavelength (so it cannot alias)
+          float octave(vec2 p, float freq, float fw) { return (noise(p * freq) - 0.5) * (1.0 - smoothstep(0.2, 0.6, fw * freq)); }
           vec3 pal(int c) { return vec3(uPalette[c * 3], uPalette[c * 3 + 1], uPalette[c * 3 + 2]); }
           int classAt(ivec2 i) { i = clamp(i, ivec2(0), ivec2(int(uCv.x) - 1, int(uCv.y) - 1)); return int(texelFetch(uCover, i, 0).r * 255.0 + 0.5); }
           void main() {
@@ -1310,20 +1318,30 @@
             vec3 col = mix(mix(pal(c00), pal(c10), fs.x), mix(pal(c01), pal(c11), fs.x), fs.y);
             float water = mix(mix(c00 == 2 ? 1.0 : 0.0, c10 == 2 ? 1.0 : 0.0, fs.x), mix(c01 == 2 ? 1.0 : 0.0, c11 == 2 ? 1.0 : 0.0, fs.x), fs.y);
             float pave = mix(mix(c00 == 8 ? 1.0 : 0.0, c10 == 8 ? 1.0 : 0.0, fs.x), mix(c01 == 8 ? 1.0 : 0.0, c11 == 8 ? 1.0 : 0.0, fs.x), fs.y);
-            // texture: fine grain and a broad mottle, less on pavement and water
-            float n1 = noise(vWorld.xz * 0.35), n2 = noise(vWorld.xz * 0.035), n3 = noise(vWorld.xz * 0.004);
-            float grain = (n1 - 0.5) * 0.10 + (n2 - 0.5) * 0.14 + (n3 - 0.5) * 0.10;
+            // texture: fine grain and a broad mottle, less on pavement and water; each octave fades before it can shimmer
+            float fw = fwidth(vWorld.x) + fwidth(vWorld.z); // about the ground a pixel spans, in metres
+            float o1 = octave(vWorld.xz, 0.35, fw), o2 = octave(vWorld.xz, 0.035, fw), o3 = octave(vWorld.xz, 0.004, fw);
+            float n1 = o1 + 0.5;
+            float grain = o1 * 0.10 + o2 * 0.14 + o3 * 0.10;
             col *= 1.0 + grain * (1.0 - 0.8 * pave) * (1.0 - water);
             // rock on steep slopes, a little paler up high
             float slope = 1.0 - vNormal.y;
             col = mix(col, vec3(0.46, 0.43, 0.39) * (0.9 + 0.2 * n1), smoothstep(0.18, 0.42, slope) * (1.0 - water) * (1.0 - pave));
             col *= 1.0 + 0.10 * clamp((vWorld.y - 250.0) / 400.0, 0.0, 1.0);
-            // light
+            // the aerial imagery, where it is loaded: the whole box, and the city at twice the detail blended in over its margin
+            vec2 uv0 = (vWorld.xz - uImgBox0.xy) * uImgBox0.zw, uv1 = (vWorld.xz - uImgBox1.xy) * uImgBox1.zw;
+            vec3 img0 = texture(uImg0, uv0).rgb, img1 = texture(uImg1, uv1).rgb; // sampled whatever the branch, so the mip level is well defined
+            vec2 edge1 = min(uv1, 1.0 - uv1) / uImgBox1.zw; // metres in from the city layer's edge
+            float inCity = uImgCity * smoothstep(0.0, 400.0, min(edge1.x, edge1.y));
+            vec3 img = mix(img0, img1, inCity) * (1.0 + o1 * 0.08); // the finest grain keeps it from going flat right under the wheels
+            float imgOn = uImgOn * (1.0 - water * 0.6);
+            col = mix(col, img, imgOn);
+            // light: the imagery carries its own shading already, so it takes less of the sun
             vec3 n = normalize(vNormal);
             float diff = max(dot(n, normalize(uSun)), 0.0);
-            vec3 lit = col * (0.42 * uSkyColor * 0.55 + 0.35 + diff * 0.95 * uSunColor);
+            vec3 lit = col * mix(0.42 * uSkyColor * 0.55 + 0.35 + diff * 0.95 * uSunColor, 0.56 * uSkyColor * 0.55 + 0.52 + diff * 0.55 * uSunColor, imgOn);
             if (water > 0.01) {
-              vec3 wcol = vec3(0.16, 0.33, 0.50);
+              vec3 wcol = mix(vec3(0.16, 0.33, 0.50), img * 0.85, uImgOn);
               float rip = noise(vWorld.xz * 0.6 + uTime * 0.25) * 0.5 + noise(vWorld.xz * 2.3 - uTime * 0.4) * 0.5;
               vec3 wn = normalize(vec3((rip - 0.5) * 0.08, 1.0, (noise(vWorld.xz * 1.7 + uTime * 0.3) - 0.5) * 0.08));
               vec3 v = normalize(uCam - vWorld);
@@ -1368,6 +1386,7 @@
         if (spacing * N > 90000) break;
         const mat = terrainMat.clone();
         mat.uniforms.uHeight = terrainMat.uniforms.uHeight; mat.uniforms.uCover = terrainMat.uniforms.uCover;
+        for (const k of ['uImg0', 'uImgBox0', 'uImg1', 'uImgBox1', 'uImgCity', 'uImgOn']) mat.uniforms[k] = terrainMat.uniforms[k]; // shared, so the imagery arrives for every level at once
         mat.uniforms.uSpacing.value = spacing;
         const mesh = new THREE.Mesh(L === 0 ? square : ring, mat);
         mesh.frustumCulled = false; mesh.renderOrder = 0;
@@ -1375,8 +1394,59 @@
         terrainLevels.push({ mesh, mat, spacing });
       }
     }
+    // ---- the aerial imagery: USDA NAIP, public domain, two layers composited from their chunks into mipmapped textures
+    const imagery = { on: 0, want: 0, loaded: false, loading: false, failed: false, layers: [] };
+    async function loadImagery() {
+      const I = W.meta.imagery;
+      if (!I || imagery.loading || imagery.loaded || imagery.failed) return;
+      imagery.loading = true;
+      const maxTex = renderer.capabilities.maxTextureSize, aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      try {
+        for (const L of I.layers) {
+          const full = [L.cols * L.chunk[0], L.rows * L.chunk[1]];
+          let scale = settings.quality === 'high' || L.name !== 'overview' ? 1 : 0.5; // the overview at half size on phones
+          while (full[0] * scale > maxTex || full[1] * scale > maxTex) scale /= 2;
+          const c = document.createElement('canvas'); c.width = Math.round(full[0] * scale); c.height = Math.round(full[1] * scale);
+          const g = c.getContext('2d');
+          for (let r = 0; r < L.rows; r++) for (let col = 0; col < L.cols; col++) {
+            const url = DATA + L.file.replace('{c}', col).replace('{r}', r);
+            let im;
+            if (typeof createImageBitmap === 'function') { const res = await fetch(url); if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`); im = await createImageBitmap(await res.blob()); }
+            else im = await loadImage(url);
+            g.drawImage(im, Math.round(col * L.chunk[0] * scale), Math.round(r * L.chunk[1] * scale), Math.round(L.chunk[0] * scale), Math.round(L.chunk[1] * scale));
+            if (im.close) im.close();
+          }
+          const tex = new THREE.CanvasTexture(c);
+          tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false; tex.generateMipmaps = true;
+          tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = aniso;
+          tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+          tex.onUpdate = () => { c.width = c.height = 1; }; // the canvas has done its job once the texture is on the GPU
+          imagery.layers.push({ name: L.name, tex, min: L.min, max: L.max, px: L.px, size: [c.width, c.height] });
+        }
+        const U = terrainMat.uniforms;
+        for (const L of imagery.layers) {
+          const box = new THREE.Vector4(L.min[0], L.min[1], 1 / (L.max[0] - L.min[0]), 1 / (L.max[1] - L.min[1]));
+          if (L.name === 'overview') { U.uImg0.value = L.tex; U.uImgBox0.value.copy(box); }
+          else { U.uImg1.value = L.tex; U.uImgBox1.value.copy(box); U.uImgCity.value = 1; }
+        }
+        imagery.loaded = true;
+        console.log(`gyro-courier: aerial imagery ${imagery.layers.map((L) => `${L.name} ${L.size[0]}×${L.size[1]}`).join(', ')}`);
+      } catch (e) {
+        imagery.failed = true; imagery.want = 0;
+        console.warn('gyro-courier: the aerial imagery did not load; the land cover stands in', e);
+      }
+      imagery.loading = false;
+    }
+    function applyGround() {
+      const want = settings.ground !== 'cover' && settings.quality !== 'low';
+      imagery.want = want && !imagery.failed ? 1 : 0;
+      if (want) loadImagery();
+    }
     function updateTerrain(cx, cz, t) {
       const fog = scene.fog;
+      const target = imagery.loaded ? imagery.want : 0;
+      if (imagery.on !== target) { imagery.on = clamp(imagery.on + Math.sign(target - imagery.on) * 0.6 * (t - (imagery.t || t)), 0, 1); terrainMat.uniforms.uImgOn.value = imagery.on; }
+      imagery.t = t;
       for (const L of terrainLevels) {
         const snap = L.spacing * 2;
         L.mat.uniforms.uOrigin.value.set(Math.round(cx / snap) * snap, Math.round(cz / snap) * snap);
@@ -1422,11 +1492,14 @@
           float av = abs(vUv.y);
           float edge = smoothstep(0.86, 1.0, av);
           col *= 1.0 - 0.12 * edge;
+          float fx = fwidth(vUv.x), fy = fwidth(av); // what a pixel spans along and across the ribbon
           if (vMark > 0.5 && vMark < 2.5) { // a dashed yellow centre line, white edges on the bigger roads
-            float d = step(fract(vUv.x / vDash), 0.5);
-            if (av < 0.045 && d > 0.5) col = vec3(0.86, 0.72, 0.25);
-            if (vMark > 1.5 && av > 0.90 && av < 0.95) col = vec3(0.85);
-          } else if (vMark > 2.5 && vMark < 3.5) { if (av < 0.05) col = vec3(0.85, 0.70, 0.20); }
+            float dashes = clamp(1.0 - fx / vDash, 0.0, 1.0); // far away the dashes dissolve into a half-tone line
+            float d = mix(0.5, step(fract(vUv.x / vDash), 0.5), dashes);
+            float centre = (1.0 - smoothstep(0.045 - fy, 0.045 + fy, av)) * clamp(0.09 / fy, 0.0, 1.0);
+            col = mix(col, vec3(0.86, 0.72, 0.25), centre * d);
+            if (vMark > 1.5) col = mix(col, vec3(0.85), (smoothstep(0.90 - fy, 0.90 + fy, av) - smoothstep(0.95 - fy, 0.95 + fy, av)) * clamp(0.05 / fy, 0.0, 1.0));
+          } else if (vMark > 2.5 && vMark < 3.5) { col = mix(col, vec3(0.85, 0.70, 0.20), (1.0 - smoothstep(0.05 - fy, 0.05 + fy, av)) * clamp(0.1 / fy, 0.0, 1.0)); }
           float fogF = smoothstep(fogNear, fogFar, length(vWorld - uCam));
           gl_FragColor = vec4(mix(col, fogColor, fogF), 1.0);
         }`,
@@ -1739,10 +1812,43 @@
       const g = aircraft.group, P = GYRO.P;
       const M = (c) => new THREE.MeshLambertMaterial({ color: c });
       const frame = M(0x2b2f36), red = M(0xc0392b), blue = M(0x2f6fd1), skin = M(0xd9b48c), white = M(0xf2f2f2), black = M(0x111111), grey = M(0x9aa0a6), tyre = M(0x1a1a1a);
-      const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); g.add(m); return m; };
-      box(3.1, 0.07, 0.07, frame, -0.5, -0.5, 0);          // keel
-      box(0.07, 1.85, 0.07, frame, -0.05, 0.42, 0);         // mast
-      box(0.9, 0.05, 0.05, frame, 0.5, -0.48, 0);           // forward keel
+      const alu = new THREE.MeshPhongMaterial({ color: 0xb4bac2, specular: 0x606468, shininess: 50 }); // the airframe's tubes
+      const F = { members: [], balls: [], boxes: [] }; aircraft.frame = F; // what is where, in the body frame, for the contiguity check
+      const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); g.add(m); F.boxes.push({ c: [x, y, z], s: [w, h, d] }); return m; };
+      // Members between nodes, so the frame is one welded thing: a tube or a flat bar from a to b, and a ball at a joint.
+      const unitTube = new THREE.CylinderGeometry(1, 1, 1, 10, 1), unitBar = new THREE.BoxGeometry(1, 1, 1), unitBall = new THREE.SphereGeometry(1, 8, 6);
+      const yAxis = new THREE.Vector3(0, 1, 0), dir = new THREE.Vector3();
+      const inBody = (p, parent) => (parent && parent !== g ? [p[0] + parent.position.x, p[1] + parent.position.y, p[2] + parent.position.z] : p);
+      const member = (geo, a, b, sx, sz, mat, parent, free) => {
+        const m = new THREE.Mesh(geo, mat || alu);
+        dir.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = dir.length();
+        m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+        m.quaternion.setFromUnitVectors(yAxis, dir.normalize()); m.scale.set(sx, L, sz);
+        (parent || g).add(m);
+        F.members.push({ a: inBody(a, parent), b: inBody(b, parent), r: Math.max(sx, sz), free: !!free });
+        return m;
+      };
+      const tube = (a, b, r, mat, parent, free) => member(unitTube, a, b, r, r, mat, parent, free);
+      const bar = (a, b, w, t, mat, parent, free) => member(unitBar, a, b, w, t, mat, parent, free);
+      const ball = (p, r, mat, parent) => { const m = new THREE.Mesh(unitBall, mat || alu); m.position.set(p[0], p[1], p[2]); m.scale.setScalar(r); (parent || g).add(m); F.balls.push({ p: inBody(p, parent), r }); return m; };
+      // the keel, the mast and the tail post: the three spars everything hangs on
+      const KEEL = -0.50, TAIL = -2.35;
+      tube([TAIL, KEEL, 0], [1.08, KEEL, 0], 0.036);                       // keel
+      tube([-0.05, KEEL, 0], [-0.05, P.rotor.hub[1], 0], 0.036);           // mast
+      tube([TAIL, KEEL, 0], [TAIL, 0.86, 0], 0.03);                        // tail post
+      tube([-1.45, KEEL, 0], [TAIL, 0.34, 0], 0.024);                      // tail brace
+      tube([TAIL, KEEL, 0], [-2.28, -0.58, 0], 0.024, alu, g, true);       // tail skid
+      for (const z of [-1, 1]) {
+        tube([-0.05, 0.74, 0], [-0.25, -0.60, z * 0.86], 0.022);           // mast braces down to the gear
+        tube([-0.62, KEEL, 0], [-0.62, -0.18, z * 0.2], 0.02);             // engine bed, off the keel
+        tube([-1.08, KEEL, 0], [-1.08, -0.18, z * 0.2], 0.02);
+        tube([-1.1, -0.18, z * 0.2], [-0.6, -0.18, z * 0.2], 0.022);       // engine rails
+        tube([0.5, KEEL, 0], [0.48, -0.26, z * 0.2], 0.018);               // seat legs
+        ball([-0.62, -0.18, z * 0.2], 0.028); ball([-1.08, -0.18, z * 0.2], 0.028);
+      }
+      tube([-0.05, 0.45, 0], [-0.6, 0.27, 0], 0.02);                       // engine tie to the mast
+      tube([-0.05, 0.30, -0.25], [-0.05, 0.30, 0.25], 0.02);               // seat-back cross tube
+      for (const p of [[-0.05, KEEL, 0], [TAIL, KEEL, 0], [-1.45, KEEL, 0], [-0.62, KEEL, 0], [-1.08, KEEL, 0], [0.5, KEEL, 0], [1.08, KEEL, 0], [-0.05, 0.74, 0], [-0.05, 0.45, 0], [TAIL, 0.34, 0], [TAIL, 0.86, 0]]) ball(p, 0.042);
       box(0.5, 0.08, 0.5, red, 0.25, -0.22, 0);             // seat
       box(0.08, 0.55, 0.5, red, 0.02, 0.05, 0);             // seat back
       const pilot = new THREE.Group(); g.add(pilot); aircraft.parts.pilot = pilot;
@@ -1753,8 +1859,15 @@
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), white); head.position.set(0.28, 0.58, 0); pilot.add(head);
       const visor = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.2), black); visor.position.set(0.39, 0.57, 0); pilot.add(visor);
       pb(0.1, 0.1, 0.1, skin, 0.5, 0.05, 0.2); pb(0.1, 0.1, 0.1, skin, 0.5, 0.05, -0.2); // hands
-      box(0.5, 0.45, 0.5, black, -0.85, 0.08, 0);           // engine
-      box(0.9, 0.16, 0.16, M(0x3a3f47), -0.7, 0.35, 0);     // exhaust/cowl
+      pb(0.22, 0.07, 0.12, black, 1.0, -0.6, 0.14); pb(0.22, 0.07, 0.12, black, 1.0, -0.6, -0.14); // feet, on the pedals
+      tube([1.02, KEEL, 0], [1.02, -0.63, 0], 0.02); tube([1.02, -0.63, -0.16], [1.02, -0.63, 0.16], 0.015); // the pedal post and bar, off the keel
+      for (const z of [-0.14, 0.14]) bar([0.94, -0.67, z], [1.1, -0.59, z], 0.14, 0.02, frame, g, true); // rudder pedals
+      box(0.5, 0.45, 0.5, black, -0.85, 0.05, 0);           // engine, on its rails
+      box(0.3, 0.12, 0.42, M(0x3a3f47), -0.8, 0.33, 0);     // cylinder heads
+      tube([-0.62, 0.2, 0.24], [-1.0, -0.06, 0.3], 0.028, M(0x5a5f66));                 // exhaust
+      member(unitTube, [-1.12, -0.08, 0.3], [-0.75, -0.08, 0.3], 0.06, 0.06, M(0x5a5f66), g, true); // muffler
+      tube([-1.1, 0.12, 0], [-1.17, 0.12, 0], 0.05, black);  // prop hub
+      F.balls.push({ p: [-1.17, 0.12, 0], r: 0.06 }); // the propeller's boss
       box(0.08, 0.06, 0.9, frame, 0.2, 0.0, 0);             // control bar
       // propeller
       const prop = new THREE.Group(); prop.position.set(-1.12, 0.12, 0); g.add(prop); aircraft.parts.prop = prop;
@@ -1762,15 +1875,15 @@
       const propDisc = new THREE.Mesh(new THREE.CircleGeometry(0.84, 24), new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }));
       propDisc.rotation.y = Math.PI / 2; propDisc.visible = false; prop.add(propDisc); aircraft.parts.propDisc = propDisc;
       const propBlades = prop.children.filter((c) => c !== propDisc); aircraft.parts.propBlades = propBlades;
-      // tail
-      box(1.5, 0.06, 0.06, frame, -1.7, -0.3, 0);           // boom
-      box(0.3, 0.025, 1.5, white, -2.05, 0.1, 0);           // stabilizer
-      box(0.35, 0.72, 0.03, red, -2.1, 0.42, 0);            // fin
-      const rudder = new THREE.Group(); rudder.position.set(-2.28, 0.4, 0); g.add(rudder); aircraft.parts.rudder = rudder;
-      const rm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.6, 0.03), white); rm.position.x = -0.15; rudder.add(rm);
+      // tail: the stabilizer and the fin on the post, the rudder hinged behind it
+      box(0.42, 0.025, 1.5, white, -2.2, 0.1, 0);           // stabilizer
+      box(0.38, 0.74, 0.03, red, -2.18, 0.46, 0);           // fin
+      const rudder = new THREE.Group(); rudder.position.set(TAIL, 0.44, 0); g.add(rudder); aircraft.parts.rudder = rudder;
+      const rm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.66, 0.03), white); rm.position.x = -0.16; rudder.add(rm);
+      const rs = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.03), red); rs.position.set(-0.26, 0.3, 0); rudder.add(rs); // a trim tab's worth of colour
       // rotor head and blades
       const head2 = new THREE.Group(); head2.position.set(P.rotor.hub[0], P.rotor.hub[1], P.rotor.hub[2]); head2.rotation.order = 'ZXY'; g.add(head2); aircraft.parts.head = head2;
-      const hub = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.2), frame); head2.add(hub);
+      const hub = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.2), frame); head2.add(hub); F.boxes.push({ c: P.rotor.hub.slice(), s: [0.2, 0.14, 0.2] });
       const az = new THREE.Group(); head2.add(az); aircraft.parts.azimuth = az;
       const teeter = new THREE.Group(); teeter.position.y = 0.08; az.add(teeter); aircraft.parts.teeter = teeter;
       const bladeMat = new THREE.MeshLambertMaterial({ color: 0xc9ced4, emissive: 0x3a3e44, transparent: true, opacity: 1 });
@@ -1798,22 +1911,35 @@
         for (let k = 0; k < S; k++) idx.push(last + k, last + ((k + 1) % S), tip);
         const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
         g.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0xc0392b, side: THREE.DoubleSide })));
+        F.boxes.push({ c: [1.34, 0.05, 0], s: [0.72, 0.66, 0.66] }); // the fairing, roughly
         // the panel sits in the open end, leaning back toward the pilot
         const pp = new THREE.Group(); pp.position.set(0.99, 0.05, 0); pp.rotation.z = 0.24; g.add(pp);
         const plate = new THREE.Mesh(new THREE.CircleGeometry(0.325, 40), new THREE.MeshBasicMaterial({ map: buildInstruments() }));
         plate.rotation.y = -Math.PI / 2; pp.add(plate);
         aircraft.parts.panel = plate;
       }
-      // gear
-      const wheel = (x, y, z, r) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.12, 12), tyre); m.rotation.x = Math.PI / 2; m.position.set(x, y, z); return m; };
-      const nose = new THREE.Group(); nose.position.set(0.95, -0.42, 0); g.add(nose); aircraft.parts.nose = nose;
-      const nw = wheel(0, -0.16, 0, 0.2); nose.add(nw);
-      const nstrut = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.05), frame); nstrut.position.y = -0.0; nose.add(nstrut);
-      for (const z of [-0.8, 0.8]) {
-        g.add(wheel(-0.25, -0.58, z, 0.22));
-        const strut = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.9), frame); strut.position.set(-0.25, -0.35, z / 2); strut.rotation.x = Math.atan2(0.25, 0.8) * Math.sign(z); g.add(strut);
+      // gear: fat tyres on a sprung bar either side and a trailing fork in front, sized for the streets
+      const wheel = (parent, x, y, z, r, w) => {
+        const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 18), tyre); t.rotation.x = Math.PI / 2; t.position.set(x, y, z); parent.add(t);
+        F.boxes.push({ c: inBody([x, y, z], parent), s: [2 * r, 2 * r, w] }); (F.tyres || (F.tyres = [])).push({ p: inBody([x, y, z], parent), r });
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.52, r * 0.52, w + 0.02, 12), grey); rim.rotation.x = Math.PI / 2; rim.position.set(x, y, z); parent.add(rim);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.14, r * 0.14, w + 0.08, 8), frame); hub.rotation.x = Math.PI / 2; hub.position.set(x, y, z); parent.add(hub);
+        return t;
+      };
+      const G = P.gear.find((q) => q.name === 'nose'), GL = P.gear.find((q) => q.name === 'left');
+      const nose = new THREE.Group(); nose.position.set(1.0, KEEL, 0); g.add(nose); aircraft.parts.nose = nose; // steers about the keel's nose end
+      const NR = 0.30, nx = G.pos[0] - 1.0, ny = G.pos[1] + NR - KEEL; // the wheel's centre in the group
+      for (const z of [-0.13, 0.13]) tube([0, 0, z], [nx, ny, z], 0.022, alu, nose); // the fork, trailing
+      tube([0, 0, -0.13], [0, 0, 0.13], 0.03, alu, nose);
+      tube([0, 0, 0], [0, 0.2, 0], 0.03, alu, nose); // the steering head
+      wheel(nose, nx, ny, 0, NR, 0.17);
+      const MR = 0.34, my = GL.pos[1] + MR, mz = Math.abs(GL.pos[2]), mx = GL.pos[0];
+      for (const z of [-1, 1]) {
+        bar([mx, KEEL + 0.04, 0], [mx, my + 0.02, z * (mz - 0.05)], 0.10, 0.035, M(0xd0d4d8)); // the spring bar, out and down from the keel
+        tube([mx, my, z * (mz - 0.12)], [mx, my, z * (mz + 0.02)], 0.03, frame); // the axle stub
+        wheel(g, mx, my, z * mz, MR, 0.21);
       }
-      box(0.3, 0.05, 0.05, frame, -2.25, -0.38, 0);          // tail skid
+      ball([mx, KEEL, 0], 0.05);
       box(0.02, 0.4, 0.02, frame, 0.02, 0.45, 0.0);          // stick
       scene.add(g);
       // the shadow on the ground
@@ -2008,9 +2134,12 @@
         if (k === 'y') clearTrim();
         if (k === 'f') { settings.assist = !settings.assist; $('#setAssist').checked = settings.assist; saveSettings(); refreshButtons(); toast(`Flight assist ${settings.assist ? 'on' : 'off'}`); }
         if (k === 'Backspace') { ev.preventDefault(); startOnRamp(); }
+        if (k === '0') look.setZoom(1);
         if (k === 'Escape') { closeOverlays(); }
         if (k === ' ') ev.preventDefault();
       }
+      if (k === '=' || k === '+') look.setZoom(look.zoom * 1.12);
+      if (k === '-' || k === '_') look.setZoom(look.zoom / 1.12);
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(k)) ev.preventDefault();
     });
     addEventListener('keyup', (ev) => { const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key; keys.delete(k); });
@@ -2095,9 +2224,14 @@
 
     // ---- looking around: offsets from the aircraft's own axes, by drag or by the phone's sensors
     // yaw is positive to the right and pitch positive upward, whichever camera uses them
-    const look = { yaw: 0, pitch: 0, mode: 'manual', ref: null, smooth: null, handler: null, event: null };
+    const look = { yaw: 0, pitch: 0, zoom: 1, mode: 'manual', ref: null, smooth: null, handler: null, event: null };
     sim.look = look;
     look.recenter = () => { look.yaw = 0; look.pitch = 0; look.ref = null; look.smooth = null; };
+    // zoom: the cockpit narrows its field of view, the chase camera comes closer; scroll, pinch or the keys
+    look.setZoom = (z) => {
+      look.zoom = clamp(z, 0.5, 4);
+      toast(sim.firstPerson ? `Zoom ${look.zoom.toFixed(1)}× · ${Math.round(cockpitFov())}° view` : `Zoom ${look.zoom.toFixed(1)}× · camera ${chaseDist().toFixed(0)} m back`, 900);
+    };
     function screenAngle() {
       if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
       if (typeof window.orientation === 'number') return (window.orientation + 360) % 360;
@@ -2149,23 +2283,41 @@
     $('#btnRecenter').addEventListener('click', () => look.recenter());
     // drag to look
     {
-      const el = $('#view'); let drag = null, lastTap = 0;
+      const el = $('#view'); let drag = null, lastTap = 0, pinch = null; const pts = new Map();
+      const span = () => { const [a, b] = [...pts.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
       el.addEventListener('pointerdown', (ev) => {
+        pts.set(ev.pointerId, [ev.clientX, ev.clientY]); el.setPointerCapture(ev.pointerId);
+        if (pts.size >= 2) { // a second finger: a pinch, not a drag and not a tap
+          drag = null; lastTap = 0; el.classList.remove('dragging');
+          pinch = { d0: span(), z0: look.zoom };
+          ev.preventDefault(); return;
+        }
         const now = performance.now();
         if (now - lastTap < 320) { look.recenter(); lastTap = 0; } else lastTap = now;
-        drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, moved: 0 }; el.setPointerCapture(ev.pointerId); el.classList.add('dragging');
+        drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, moved: 0 }; el.classList.add('dragging');
         if (onViewTap) onViewTap(ev, 'down');
       });
       el.addEventListener('pointermove', (ev) => {
+        if (pts.has(ev.pointerId)) pts.set(ev.pointerId, [ev.clientX, ev.clientY]);
+        if (pinch) { if (pts.size >= 2 && pinch.d0 > 10) look.setZoom((pinch.z0 * span()) / pinch.d0); ev.preventDefault(); return; }
         if (!drag || ev.pointerId !== drag.id) return;
         const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; drag.x = ev.clientX; drag.y = ev.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
-        const k = 0.0045;
+        const k = 0.0045 / (sim.firstPerson ? look.zoom : 1); // a finer hand when zoomed in
         look.yaw += dx * k; look.pitch -= dy * k; // drag right: look right; drag down: look down
         look.yaw = clamp(look.yaw, -Math.PI, Math.PI); look.pitch = clamp(look.pitch, -1.4, 1.4);
         if (look.mode === 'sensor' && look.smooth) { look.smooth[0] = look.yaw; look.ref = null; look.smooth = null; look.mode = 'manual'; disableSensors(); refreshButtons(); }
       });
-      const up = (ev) => { if (drag && ev.pointerId === drag.id) { if (drag.moved < 8 && onViewTap) onViewTap(ev, 'tap'); drag = null; el.classList.remove('dragging'); } };
+      const up = (ev) => {
+        pts.delete(ev.pointerId);
+        if (pinch && pts.size < 2) pinch = null; // the finger left behind does not start a drag
+        if (drag && ev.pointerId === drag.id) { if (drag.moved < 8 && onViewTap) onViewTap(ev, 'tap'); drag = null; el.classList.remove('dragging'); }
+      };
       el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+      el.addEventListener('wheel', (ev) => {
+        const d = ev.deltaMode === 1 ? ev.deltaY * 33 : ev.deltaMode === 2 ? ev.deltaY * 400 : ev.deltaY; // lines and pages to pixels
+        look.setZoom(look.zoom * Math.pow(1.0015, -d)); // a wheel notch is about a sixth
+        ev.preventDefault();
+      }, { passive: false });
     }
     let onViewTap = null; // set by the HUD for the minimap
 
@@ -2188,15 +2340,17 @@
         let d = ((e.heading - camTmp.chaseYaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
         camTmp.chaseYaw += d * Math.min(1, dt * 2.5);
         // the camera orbits the other way from the look (it swings left to look right), so dragging turns the view like the cockpit does
-        const yaw = camTmp.chaseYaw + look.yaw, el = clamp(0.28 - look.pitch, -0.6, 1.4), dist = 11;
+        const yaw = camTmp.chaseYaw + look.yaw, el = clamp(0.28 - look.pitch, -0.6, 1.4), dist = chaseDist();
         const cx = s.pos[0] - Math.sin(yaw) * Math.cos(el) * dist, cz = s.pos[2] + Math.cos(yaw) * Math.cos(el) * dist, cy = s.pos[1] + Math.sin(el) * dist + 1.0;
         const groundH = surface(cx, cz).h + 1.2;
         camera.position.set(cx, Math.max(cy, groundH), cz);
         camera.lookAt(s.pos[0], s.pos[1] + 0.6, s.pos[2]);
       }
-      camera.fov = sim.firstPerson ? (innerWidth < innerHeight ? 80 : 68) : 60;
+      camera.fov = sim.firstPerson ? cockpitFov() : 60;
       camera.updateProjectionMatrix();
     }
+    const cockpitFov = () => clamp((innerWidth < innerHeight ? 80 : 68) / look.zoom, 12, 110);
+    const chaseDist = () => clamp(11 / look.zoom, 3.5, 30);
 
     // ---- sound: an engine note, the rotor's beat, the wind
     const sound = { enabled: false, ctx: null };
@@ -2406,7 +2560,19 @@
 
     // ---- deliveries
     const quest = { phase: null, job: null, target: null, holdT: 0, startT: 0, offers: [] };
-    sim.quest = quest; sim.env = env; sim.place = (x, z, hdg, opts) => GYRO.place(sim.state, env, x, z, hdg, opts); sim.surface = surface;
+    sim.quest = quest; sim.env = env; sim.place = (x, z, hdg, opts) => GYRO.place(sim.state, env, x, z, hdg, opts); sim.surface = surface; sim.settings = settings; sim.imagery = imagery;
+    sim.gear = () => GYRO.P.gear.filter((q) => q.wheel).map((q) => { // each contact point against the nearest modelled tyre's bottom
+      const t = aircraft.frame.tyres.reduce((best, w) => (Math.hypot(w.p[0] - q.pos[0], w.p[2] - q.pos[2]) < Math.hypot(best.p[0] - q.pos[0], best.p[2] - q.pos[2]) ? w : best));
+      return { name: q.name, dx: +(t.p[0] - q.pos[0]).toFixed(3), dy: +(t.p[1] - t.r - q.pos[1]).toFixed(3), dz: +(t.p[2] - q.pos[2]).toFixed(3) };
+    });
+    sim.frameCheck = () => { // every member's ends must land on a joint, another member or a part, unless it is a free end by design (a skid, a pedal)
+      const F = aircraft.frame, d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      const segDist = (p, a, b) => { const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2; const t = L2 > 0 ? clamp(((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1] + (p[2] - a[2]) * ab[2]) / L2, 0, 1) : 0; return d(p, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t]); };
+      const supported = (p, self) => F.balls.some((B) => d(p, B.p) <= B.r + 0.05) || F.boxes.some((X) => [0, 1, 2].every((k) => Math.abs(p[k] - X.c[k]) <= X.s[k] / 2 + 0.05)) || F.members.some((M) => M !== self && segDist(p, M.a, M.b) <= M.r + 0.05);
+      const loose = [];
+      for (const M of F.members) { if (M.free) continue; for (const p of [M.a, M.b]) if (!supported(p, M)) loose.push(p.map((v) => +v.toFixed(2))); }
+      return { members: F.members.length, loose: loose.length, looseEnds: loose };
+    };
     const ITEMS = { food: ['a hot order', 'two pizzas', 'a catering tray', 'a bag of takeout'], cafe: ['a crate of coffee', 'a box of pastries'], drink: ['a case of beer', 'a keg', 'a crate of wine'], sweets: ['a tub of ice cream (hurry)', 'a birthday cake'], pharmacy: ['a prescription', 'a cold-chain vaccine box'], medical: ['lab samples', 'a case of medical supplies', 'a transplant cooler'], papers: ['a pouch of signed contracts', 'a bank deposit', 'a sealed court file'], auto: ['a box of car parts', 'a tyre', 'a battery'], flowers: ['a bouquet', 'a wedding arrangement'], parts: ['a box of hardware', 'a server drive', 'a replacement phone'], groceries: ['a crate of groceries', 'a week\'s shopping'], gifts: ['a parcel of books', 'a gift box', 'a board game'], fashion: ['a garment bag', 'a pair of boots'], pets: ['a sack of dog food', 'a cat carrier (empty, thankfully)'], luggage: ['a forgotten suitcase', 'a guest\'s luggage'], parcel: ['a parcel', 'a small crate', 'an envelope that must not get wet'] };
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
     function dist2(a, b) { return Math.hypot(a.x - b.x, a.z - b.z); }
@@ -2641,6 +2807,8 @@
     $('#setWind').addEventListener('change', (ev) => { settings.wind = ev.target.value; saveSettings(); applyWind(); toast(`Wind now ${Math.round(sim.state.wind.dir)}° at ${Math.round(sim.state.wind.speed / KT)} kt`); });
     $('#setTime').addEventListener('change', (ev) => { settings.time = ev.target.value; saveSettings(); applyTime(); });
     $('#setQuality').addEventListener('change', (ev) => { settings.quality = ev.target.value; saveSettings(); toast('Detail applies after a reload'); });
+    $('#setGround').value = settings.ground;
+    $('#setGround').addEventListener('change', (ev) => { settings.ground = ev.target.value; saveSettings(); applyGround(); });
 
     // ---- sizing
     function resize() {
@@ -2695,6 +2863,7 @@
         await loadWorld(); lap('world loaded');
         bucketWorld(); lap('bucketed');
         buildSky(); buildTerrain(); lap('terrain'); buildAirport(); buildTrees(); buildAircraft(); buildMarker(); lap('scene built');
+        sim.terrainMat = terrainMat;
         applyTime(); applyWind();
         const A = W.meta.airport;
         GYRO.place(sim.state, env, A.start.x, A.start.z, A.start.heading);
@@ -2703,6 +2872,7 @@
         for (let i = 0; i < 12; i++) updateTiles(A.start.x, A.start.z); lap('first tiles');
         renderer.render(scene, camera); lap('first frame');
         $('#loading').classList.add('hide');
+        applyGround(); // the aerial imagery comes in behind the first frame
         refreshButtons();
         $('#ovHelp').classList.add('show');
         if (settings.sound) { /* sound needs a tap; the button will start it */ }
