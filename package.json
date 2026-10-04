@@ -15,7 +15,9 @@
     "check:model": "node scripts/day-model-check.mjs",
     "check:baskets": "node scripts/basket-check.mjs",
     "data:sky": "node scripts/fetch-sky-data.mjs",
-    "check:sky": "node scripts/check-sky.mjs"
+    "check:sky": "node scripts/check-sky.mjs",
+    "data:gyro": "node scripts/fetch-gyro-courier.mjs",
+    "check:gyro": "node scripts/check-gyro.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",
