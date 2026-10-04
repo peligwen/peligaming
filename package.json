@@ -17,7 +17,8 @@
     "data:sky": "node scripts/fetch-sky-data.mjs",
     "check:sky": "node scripts/check-sky.mjs",
     "data:gyro": "node scripts/fetch-gyro-courier.mjs",
-    "check:gyro": "node scripts/check-gyro.mjs"
+    "check:gyro": "node scripts/check-gyro.mjs",
+    "check:airline": "node scripts/check-airline.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",

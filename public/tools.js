@@ -111,6 +111,11 @@ window.PELIGAMING = {
       accent: "#9fb7ff",
       tools: [
         {
+          name: "Airline Comfort Visualizer",
+          description: "Play god with a Boeing 737 MAX 8 at 15,000 feet: pitch, roll and yaw it up to 45°, drop it into downdrafts, dial up the chop, and watch what the physics does — and does not do — to a cabin of simulated passengers, the drinks on their trays, the bags in the bins and the cart in the aisle, from outside and from the front of the aisle looking aft. The aeroplane keeps its own aerodynamics (a dive builds speed, a pull bleeds it to the stall, a bank loads everyone straight down), and the seat-belt sign is yours. No words anywhere: just icons and instruments.",
+          path: "tools/irl/airline-comfort.html",
+        },
+        {
           name: "Gyro Courier",
           description: "Fly a single-seat open-frame gyrocopter over Chattanooga and Lovell Field (KCHA), with a flight model that follows both blades of the teetering rotor around the azimuth — autorotation, blowback, retreating-blade stall, rotor unloading and the vertical descent fall out of the maths — and run deliveries from the city's businesses to its houses, landing on the empty streets. Touch sticks, a phone that looks around when you turn it, cockpit and chase views, real terrain and OpenStreetMap streets and buildings.",
           path: "tools/irl/gyro-courier.html",

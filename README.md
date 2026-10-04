@@ -541,6 +541,131 @@ the fix while the phone is flat and holds it for as long as the phone is
 raised; point the phone at the ground for a moment now and then and it
 re-calibrates.
 
+## ✈️ Airline Comfort Visualizer
+
+A Boeing 737 MAX 8 at 15,000 feet, and you are the weather. Pitch it, roll
+it and yaw it up to 45°, drop it into a downdraft, dial up the chop, and watch
+what the physics does — and does not do — to the cabin: a hundred and sixty
+simulated passengers, buckled and not, a few on their feet in the aisle, the
+drinks on their trays, the bags in the overhead bins, the attendant and the
+cart. From outside, and from the front of the aisle looking aft. There is no
+text anywhere on the page: the controls are icons and the readouts are
+instruments, so it reads the same in any language.
+
+**Try it: [peligaming.com/tools/irl/airline-comfort](https://peligaming.com/tools/irl/airline-comfort)**
+
+![Airline Comfort Visualizer](docs/airline-comfort.jpg)
+
+The unspoken point is the one that calms a nervous flyer: an aeroplane in
+rough air is not falling, and what moves the cabin is acceleration, not
+attitude.
+
+- **The aeroplane.** A mid-weight MAX 8 (70 t, 127 m² of wing) at 150 m/s
+  true, about 230 kt indicated, trimmed for level flight and then left to its
+  aerodynamics: lift from the angle between the body and the air it is
+  actually moving through, induced and parasite drag, side force from
+  sideslip, a thrust that was set for the cruise and is never touched again,
+  gravity. Pitch down and the speed builds (and the barber pole comes down the
+  tape); pull up and the speed bleeds, the buffet starts a few degrees before
+  the stall, and a 737 held at 45° nose-up mushes down at three-quarters of a
+  g with the wing let go. Bank and the lift tilts: the aeroplane turns at the
+  rate the bank buys and the cabin is loaded *straight down* into the seats,
+  1.4 g at 45°, with the slip ball centred and nothing sliding sideways. Yaw
+  and the fuselage shoulders the air — half a g to the side at the centre,
+  more at the tail, where the angular acceleration adds — until the flight
+  path comes round to the nose and the shove fades.
+- **The god's hand** has an airliner's own authority and no more: 20°/s in
+  roll, 4°/s in pitch, 8°/s in yaw, with the accelerations to match. That is
+  why a pitch-down is a push-over the cabin feels at zero g, and a pitch-up a
+  pull at 1.8 g: pitching 150 m/s of aeroplane at 4°/s *is* a g of load,
+  either way.
+- **Air pockets** are what they really are: vertical gusts. The three jolt
+  buttons are a 9 m/s downdraft (0.6 g: stomachs drop, nobody leaves the
+  seat), a 30 m/s one (a third of a g negative: every unbuckled passenger
+  rises until their head finds the bin, every drink leaves its cup, the cart
+  leaves the floor — and the buckled rise five centimetres into the belt)
+  and a 15 m/s updraft (1.7 g: pressed into the seats, knees buckling in the
+  aisle). Each has the certification shape, half a cosine wave up to the peak
+  and back, 1.6 s long at this speed. The right-hand pad's vertical axis is
+  continuous turbulence, Dryden-flavoured: slow swells the aeroplane's own
+  heave rides out and fast chop it cannot, with a little rolling and yawing
+  thrown in; light chop at the bottom of the scale, a severe ride at the top.
+- **The cabin** is a rigid box riding on the centre of mass, and every loose
+  thing in it moves under the specific force at its own place in the box: the
+  aeroplane's acceleration, the angular acceleration times the arm, the
+  centripetal term, gravity, all in the frame of the walls it will hit. A
+  seated passenger is a torso on a damped spring above the hips, stopped by
+  the seat back and the armrests, and a body that leaves the pan the moment
+  the seat stops pushing up: into the belt, or, unbuckled, up to the bin.
+  Someone standing in the aisle is an inverted pendulum with a balance loop a
+  quarter of a second late, who grabs a seat back past a tenth of a g,
+  crouches past 1.4 g, and goes down when a push outruns the loop, or up when
+  the floor stops pushing. A drink is a damped oscillator whose rest tilt is
+  the direction of the specific force — flat to the cup in a steady bank,
+  sloshing only when the force *changes* — that spills at the rim, slides
+  when the push beats friction, and lifts off the tray, liquid first, at
+  zero g. The bins are latched (a tenth of them not quite): a jar toward the
+  aisle, a heavy load, a load that lets go, or a bag landing on the door from
+  inside opens an unlatched one, and anything that rises over the lip and
+  drifts past the door plane is in the cabin. The cart holds to a third of a g
+  on its brake and rolls at anything over its castors' resistance; a cart
+  that gets away takes down whoever is in the aisle.
+- **The seat-belt sign** is your one lever over the people. Lit, the walkers
+  go back to their rows and sit, the seated buckle up (most of them: a few
+  always ignore it), the attendant parks the cart at the aft galley and
+  straps in. Off, a third unbuckle, a few at a time get up and walk to the
+  lavatory at the back and home again, and the attendant works the aisle
+  with the cart, a few rows at a time.
+- **The views.** Outside: an orbit around the aeroplane (drag to orbit, wheel
+  or pinch to zoom) in a sky with a cloud deck below, cumulus at our own
+  level sliding past at airspeed, and farmland 15,000 feet down; the aeroplane
+  is pinned at the origin and the world moves past it, so it never gets any
+  closer to the ground however long the dive. Inside: the front of the aisle,
+  head on a spring, looking aft (drag to look around), the wing out of the
+  windows, the lit strips, the signs, the bins pivoting open.
+- **The instruments.** An attitude indicator with the god's commanded
+  attitude as a magenta chevron and a slip ball under it; an airspeed tape
+  with the stall and the barber pole and no numbers; a g meter from −1 to +3
+  with the needle and the recent extremes; and a flash at the edges of the
+  view when a head meets a bin or someone goes down.
+- **The controls.** The left pad is pitch (up for nose up) and roll, the
+  right pad is yaw sideways and turbulence upward; both stay where they are
+  left, and a double tap recentres. Between them: wings level (twice to
+  reset the flight), the seat-belt sign, turbulence on and off, and the three
+  jolts. Arrows, <kbd>Q</kbd>/<kbd>E</kbd>, <kbd>Space</kbd>, <kbd>J</kbd>,
+  <kbd>U</kbd>, <kbd>T</kbd>, <kbd>B</kbd>, <kbd>C</kbd> and <kbd>R</kbd> do
+  the same from a keyboard.
+
+### How it's built
+
+- `public/tools/irl/airline-comfort.html` is the app: vanilla JS and three.js
+  (the copy vendored at `public/tools/irl/lib/`), no build step. Its
+  `<script id="cabin-engine">` block is the model, pure maths with no DOM,
+  which is why `npm run check:airline` (`scripts/check-airline.mjs`) can fly
+  it under Node: level flight, a 45° bank, a 20° dive, a 45° pull to the
+  stall, a 30° yaw, the three jolts, a minute of light chop and a minute of
+  severe, and the seat-belt sign, fifty-odd checks against what an airliner
+  and its cabin should do.
+- The aeroplane is a point mass with a quaternion attitude: lift linear to
+  the stall and a gentle break past it, induced and parasite drag plus the
+  bluff-body drag of a stalled airframe, side force linear in sideslip plus
+  the fuselage's cross-flow at large angles, and the god's hand as an
+  attitude loop with rate and acceleration limits per axis, the yaw command
+  laid on a heading reference that turns at the coordinated rate for the
+  current bank. The cabin bodies integrate at 120 Hz in the body frame with
+  the full specific force at each point, Coriolis included.
+- The exterior is lofted from sections (a fuselage with the MAX's drooped
+  nose and upswept tail, wings with the kink and the split-scimitar
+  winglets, LEAP-1B nacelles ahead of the wing, the tail), the cabin is
+  boxes, and the people, seats, cups, bags and belts are instanced meshes.
+
+The honest limits: no pitching or yawing moments of its own (the god holds
+the attitude; a real 737's stability and the autopilot would be fighting the
+gusts and you), the heave response but not the structural modes, a
+single-mode slosh, people as particles with a few rules rather than bodies
+with limbs, and a cabin that stays pressurised and in one piece whatever you
+do to it.
+
 ## 🚁 Gyro Courier
 
 A flight simulator, and a courier game: a single-seat open-frame
@@ -675,6 +800,7 @@ is 7 m cells, so a narrow street through a forest is a narrow landing.
 | Fortnite | Tactical Terrain | The island in 3D — sightlines, dead ground, cover |
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
 | Skyrim | Alchemy Lab | Best-value potions from your ingredient stock |
+| IRL | Airline Comfort Visualizer | Play god with a 737 MAX 8 at 15,000 ft — pitch, roll, yaw, downdrafts, chop — and watch what the physics does and does not do to a cabin of simulated passengers, drinks, bags and the cart, from outside and from the aisle; no text, just icons and instruments |
 | IRL | Gyro Courier | Fly an ultralight gyrocopter over Chattanooga with a blade-element rotor model, and run deliveries from businesses to houses, landing on the streets |
 | IRL | Sky Pointer | Point your phone at the night sky: the stars, constellations, planets, Moon, deep-sky objects and satellites in that direction, with a finder for anything you search; or set a place and time and pan by hand |
 

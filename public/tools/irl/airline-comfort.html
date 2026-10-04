@@ -1,0 +1,1705 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Airline Comfort Visualizer — a 737 MAX 8 in rough air, from outside and from the aisle</title>
+  <meta name="description" content="Play god with a Boeing 737 MAX 8 at 15,000 feet: pitch, roll and yaw it up to 45°, hit it with downdrafts and turbulence, and watch what the physics does — and does not do — to the passengers, the drinks, the bags and the overhead bins, from outside and from inside the cabin looking down the aisle. No words: just the plane.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✈️</text></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0d1117;
+      --panel: rgba(22, 27, 34, 0.88);
+      --panel-solid: #161b22;
+      --panel-border: #30363d;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --brand: #58a6ff;
+      --accent: #f2c94c;
+      --good: #3fb950;
+      --warn: #e3b341;
+      --bad: #f85149;
+      --panel-h: 168px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+    }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+      overscroll-behavior: none; touch-action: none;
+    }
+    button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px; cursor: pointer; touch-action: none; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+    button:hover { border-color: var(--brand); }
+    button svg { display: block; width: 100%; height: 100%; }
+    button:focus { outline: none; }
+    button:focus-visible { outline: 2px solid var(--brand); }
+
+    #view, #hud { position: fixed; left: 0; top: 0; width: 100%; height: calc(100% - var(--panel-h) - var(--safe-bottom)); display: block; }
+    #view { touch-action: none; cursor: grab; background: #6f9fd8; }
+    #view.dragging { cursor: grabbing; }
+    #hud { pointer-events: none; }
+
+    /* ---- top row: the way home, the view and the reset ---- */
+    .top {
+      position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 6px; pointer-events: none;
+      padding: calc(8px + var(--safe-top)) calc(10px + var(--safe-right)) 0 calc(10px + var(--safe-left));
+    }
+    .top > * { pointer-events: auto; }
+    .top a, .top button { width: 40px; height: 40px; padding: 8px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text); background: var(--panel); border: 1px solid var(--panel-border); }
+    .top a:hover { border-color: var(--brand); }
+    .top a svg { width: 100%; height: 100%; display: block; }
+    .spacer { flex: 1; pointer-events: none; }
+
+    /* ---- the god's panel ---- */
+    #panel {
+      position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--panel-h) + var(--safe-bottom));
+      padding: 8px calc(8px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(8px + var(--safe-left));
+      background: linear-gradient(rgba(13, 17, 23, 0.85), rgba(13, 17, 23, 0.97)); border-top: 1px solid var(--panel-border);
+      display: grid; grid-template-columns: 154px 1fr 154px; gap: 8px; align-items: stretch; touch-action: none;
+    }
+    .pad { position: relative; border-radius: 14px; background: rgba(22, 27, 34, 0.9); border: 1px solid var(--panel-border); touch-action: none; overflow: hidden; }
+    .pad svg.face { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .pad .knob {
+      position: absolute; width: 50px; height: 50px; margin: -25px 0 0 -25px; left: 50%; top: 50%; border-radius: 50%; pointer-events: none;
+      background: radial-gradient(circle at 35% 35%, #8fb9ff, #2f6fd1 65%, #1b3f80); border: 2px solid rgba(255,255,255,0.35); box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pad .knob svg { width: 30px; height: 30px; }
+    .pad.right .knob { background: radial-gradient(circle at 35% 35%, #ffe28a, #d9a334 65%, #7a5a14); }
+    .mid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; gap: 6px; min-width: 0; min-height: 0; }
+    .mid button { padding: 6px 10px; min-width: 0; min-height: 0; position: relative; }
+    .mid button svg { max-height: 100%; margin: 0 auto; width: auto; }
+    .mid button.on { border-color: var(--accent); }
+    .mid button .lamp { position: absolute; right: 7px; top: 7px; width: 8px; height: 8px; border-radius: 50%; background: #2a2f36; box-shadow: inset 0 1px 1px rgba(0,0,0,0.7); }
+    .mid button.on .lamp { background: var(--accent); box-shadow: 0 0 7px var(--accent); }
+    .mid button.pulse { border-color: var(--bad); }
+    .mid button.danger:hover { border-color: var(--bad); }
+    @media (max-width: 700px) {
+      :root { --panel-h: 150px; }
+      #panel { grid-template-columns: 132px 1fr 132px; gap: 6px; }
+      .pad .knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+      .mid button { padding: 4px 6px; }
+    }
+    @media (max-width: 520px) {
+      :root { --panel-h: 172px; }
+      #panel { grid-template-columns: 104px 1fr 104px; gap: 6px; }
+      .mid { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); gap: 4px; }
+      .mid button { padding: 3px 5px; border-radius: 8px; }
+      .mid button .lamp { right: 4px; top: 4px; width: 6px; height: 6px; }
+      .pad .knob { width: 38px; height: 38px; margin: -19px 0 0 -19px; }
+      .pad .knob svg { width: 24px; height: 24px; }
+    }
+    @media (max-height: 420px) { :root { --panel-h: 128px; } .pad .knob { width: 40px; height: 40px; margin: -20px 0 0 -20px; } }
+  </style>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <canvas id="hud"></canvas>
+
+  <div class="top">
+    <a href="../../" aria-label="peligaming"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-6h4v6"/></svg></a>
+    <span class="spacer"></span>
+    <button id="btnView" aria-label="outside view or cabin view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="icoView"><path d="M2.5 16.5 10 13V5.5a2 2 0 0 1 4 0V13l7.5 3.5V19L14 17.5V20l2 1.5V23l-4-1-4 1v-1.5l2-1.5v-2.5L2.5 19z"/></svg></button>
+    <button id="btnRecenter" aria-label="recenter the view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+  </div>
+
+  <div id="panel">
+    <div class="pad left" id="padAtt" aria-label="pitch and roll">
+      <svg class="face" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <line x1="50" y1="6" x2="50" y2="94" stroke="rgba(255,255,255,0.10)" stroke-width="0.7"/>
+        <line x1="6" y1="50" x2="94" y2="50" stroke="rgba(255,255,255,0.10)" stroke-width="0.7"/>
+        <g stroke="rgba(255,255,255,0.22)" stroke-width="0.8" fill="none">
+          <path d="M50 7 l3 5 h-6z"/><path d="M50 93 l3 -5 h-6z"/>
+          <path d="M7 50 l5 -3 v6z"/><path d="M93 50 l-5 -3 v6z"/>
+        </g>
+      </svg>
+      <div class="knob"><svg viewBox="0 0 24 24" fill="#0b1b36"><path d="M2.5 16.5 10 13V5.5a2 2 0 0 1 4 0V13l7.5 3.5V19L14 17.5V20l2 1.5V23l-4-1-4 1v-1.5l2-1.5v-2.5L2.5 19z"/></svg></div>
+    </div>
+    <div class="mid">
+      <button id="btnLevel" aria-label="wings level, nose on the horizon"><svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16h12M33 16h12"/><path d="M18 16h12"/><path d="M24 9v14"/><circle cx="24" cy="16" r="3" fill="currentColor" stroke="none"/><path d="M12 7l-2.5 2.5M36 7l2.5 2.5"/></svg></button>
+      <button id="btnBelt" aria-label="fasten seat belts sign"><span class="lamp"></span><svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="6" r="3.2"/><path d="M14 30v-9a6 6 0 0 1 6-6h1a6 6 0 0 1 6 6v9"/><path d="M27 21h7a4 4 0 0 1 4 4v5"/><path d="M9 20l12 8M33 20l-12 8"/><rect x="18.5" y="22" width="5" height="5" rx="1" fill="currentColor" stroke="none"/></svg></button>
+      <button id="btnTurb" aria-label="continuous turbulence"><span class="lamp"></span><svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10c4-5 8-5 12 0s8 5 12 0 8-5 12 0"/><path d="M4 18c4-5 8-5 12 0s8 5 12 0 8-5 12 0"/><path d="M4 26c4-5 8-5 12 0s8 5 12 0 8-5 12 0"/></svg></button>
+      <button id="btnJolt1" aria-label="a small downdraft"><svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a6 6 0 0 1 6-6 7 7 0 0 1 13 2 5 5 0 0 1 2 9.5H14A4.5 4.5 0 0 1 12 15z"/><path d="M24 23v6M21 26.5l3 3 3-3"/></svg></button>
+      <button id="btnJolt2" class="danger" aria-label="a severe downdraft"><svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12a7 7 0 0 1 7-7 9 9 0 0 1 17 2.5A6 6 0 0 1 34 19H11a5 5 0 0 1-3-7z"/><path d="M16 22v8M13 26.5l3 3.5 3-3.5"/><path d="M24 21v9M21 26.5l3 3.5 3-3.5"/><path d="M32 22v8M29 26.5l3 3.5 3-3.5"/></svg></button>
+      <button id="btnJolt3" aria-label="an updraft"><svg viewBox="0 0 48 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 24a6 6 0 0 1 6 -6 7 7 0 0 1 13 -2 5 5 0 0 1 2 -9.5H14A4.5 4.5 0 0 1 12 24z" transform="translate(0 2) scale(1 -1) translate(0 -32)"/><path d="M24 9V3M21 5.5l3-3 3 3"/></svg></button>
+    </div>
+    <div class="pad right" id="padYaw" aria-label="yaw, and the roughness of the air">
+      <svg class="face" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <line x1="50" y1="6" x2="50" y2="94" stroke="rgba(255,255,255,0.10)" stroke-width="0.7"/>
+        <line x1="6" y1="50" x2="94" y2="50" stroke="rgba(255,255,255,0.10)" stroke-width="0.7"/>
+        <g stroke="rgba(255,255,255,0.22)" stroke-width="0.8" fill="none">
+          <path d="M7 50 l5 -3 v6z"/><path d="M93 50 l-5 -3 v6z"/>
+          <path d="M44 8c2-3 10-3 12 0M42 13c3-4 13-4 16 0M40 18c4-5 16-5 20 0" />
+        </g>
+      </svg>
+      <div class="knob"><svg viewBox="0 0 24 24" fill="#3a2a05"><path d="M2.5 16.5 10 13V5.5a2 2 0 0 1 4 0V13l7.5 3.5V19L14 17.5V20l2 1.5V23l-4-1-4 1v-1.5l2-1.5v-2.5L2.5 19z"/></svg></div>
+    </div>
+  </div>
+
+  <script id="cabin-engine">
+  // ======================================================================
+  // AIRLINER — a Boeing 737 MAX 8 in the hands of a god, and the cabin
+  // that has to live with it.
+  //
+  // A pure function of state and time, no DOM: the page steps it every
+  // frame and scripts/check-airline.mjs runs it under Node. Everything is
+  // SI; angles are radians. World: x east, y up, z south (three.js).
+  // Body: x forward, y up, z right; the identity attitude faces east.
+  //
+  // The god sets an attitude — pitch and roll against the horizon, and a
+  // heading offset from the heading the flight path would be following —
+  // and the hand that moves the aeroplane to it has an airliner's own
+  // control authority (rates and accelerations), no more. Everything else
+  // is aerodynamics: lift from the angle between the body and the air it
+  // is actually moving through, drag, side force from sideslip, a thrust
+  // that was trimmed for level flight and is never touched again, and
+  // gravity. Pitch down and the speed builds; pull up and it bleeds, then
+  // the wing stalls; bank and the lift tilts and the aeroplane turns at
+  // the rate that bank buys, loading everyone straight down into their
+  // seats; yaw and the fuselage shoulders the air until the flight path
+  // comes round to the nose. "Air pockets" are what they really are:
+  // vertical gusts that change the angle of attack for a second or two.
+  //
+  // The cabin is a rigid box riding on the aeroplane's centre of mass.
+  // Every loose thing in it — a passenger out of their seat, a cup on a
+  // tray, a bag on a shelf, a cart in the aisle — moves under the specific
+  // force at its own place in that box: the aeroplane's acceleration, the
+  // angular acceleration times the arm, the centripetal term, and gravity,
+  // all expressed in the frame of the walls it will hit.
+  // ======================================================================
+  const AIRLINER = (() => {
+    'use strict';
+    const D2R = Math.PI / 180, R2D = 180 / Math.PI, G = 9.80665, TAU = Math.PI * 2;
+    const KT = 0.514444, FT = 0.3048;
+
+    // ---------------------------------------------------------- vectors & quaternions
+    const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    const scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const norm = (a) => Math.hypot(a[0], a[1], a[2]);
+    const unit = (a) => { const n = norm(a); return n > 1e-12 ? scale(a, 1 / n) : [0, 0, 0]; };
+    const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+    const wrap = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+    const qmul = (a, b) => [
+      a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+      a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+      a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+      a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+    ];
+    const qaxis = (axis, ang) => { const s = Math.sin(ang / 2); return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(ang / 2)]; };
+    const qnorm = (q) => { const n = Math.hypot(q[0], q[1], q[2], q[3]) || 1; return [q[0] / n, q[1] / n, q[2] / n, q[3] / n]; };
+    const qconj = (q) => [-q[0], -q[1], -q[2], q[3]];
+    function qrot(q, v) {
+      const x = q[0], y = q[1], z = q[2], w = q[3];
+      const ix = w * v[0] + y * v[2] - z * v[1], iy = w * v[1] + z * v[0] - x * v[2], iz = w * v[2] + x * v[1] - y * v[0], iw = -x * v[0] - y * v[1] - z * v[2];
+      return [ix * w + iw * -x + iy * -z - iz * -y, iy * w + iw * -y + iz * -x - ix * -z, iz * w + iw * -z + ix * -y - iy * -x];
+    }
+    const qinv = (q, v) => qrot(qconj(q), v);
+    // heading clockwise from north, pitch up, roll right-wing-down
+    const qfromEuler = (heading, pitch, roll) => qmul(qmul(qaxis([0, 1, 0], Math.PI / 2 - heading), qaxis([0, 0, 1], pitch)), qaxis([1, 0, 0], roll));
+    function qtoEuler(q) {
+      const f = qrot(q, [1, 0, 0]), u = qrot(q, [0, 1, 0]), r = qrot(q, [0, 0, 1]);
+      return { heading: (Math.atan2(f[0], -f[2]) + TAU) % TAU, pitch: Math.asin(clamp(f[1], -1, 1)), roll: Math.atan2(-r[1], u[1]) };
+    }
+    // the rotation that takes q to qt, as a vector in the body frame (axis × angle, shortest way)
+    function qerror(q, qt) {
+      let e = qmul(qconj(qt), q);
+      if (e[3] < 0) e = [-e[0], -e[1], -e[2], -e[3]];
+      const s = Math.hypot(e[0], e[1], e[2]);
+      if (s < 1e-9) return [0, 0, 0];
+      const ang = 2 * Math.atan2(s, e[3]);
+      return [e[0] / s * ang, e[1] / s * ang, e[2] / s * ang];
+    }
+    // a seeded generator, so a check script sees the same cabin every run
+    function rng(seed) {
+      let a = seed >>> 0;
+      const next = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      next.gauss = () => { let u = 0, v = 0; while (u === 0) u = next(); while (v === 0) v = next(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
+      next.range = (a, b) => a + (b - a) * next();
+      next.int = (n) => Math.floor(next() * n);
+      return next;
+    }
+
+    // ---------------------------------------------------------- the aeroplane
+    const P = {
+      mass: 70000,            // kg, a mid-weight MAX 8 (MTOW 82 t, empty 45 t)
+      S: 127, span: 35.9,     // wing area m², span m (with the winglets)
+      CL0: 0.30, CLa: 5.0,    // lift at zero body angle (incidence and camber), lift slope per rad
+      aStall: 14 * D2R,       // flaps up
+      CD0: 0.021, k: 0.040,   // parasite drag, induced drag factor (AR 10, e 0.8)
+      CYb: 0.7, CYc: 0.7,     // side force: linear with sideslip, then cross-flow on the fuselage
+      CDb: 0.6,               // drag from sideslip (the fuselage broadside)
+      alt: 15000 * FT, rho: 0.771, rho0: 1.225, a: 322, // 15,000 ft: density, sea-level density, speed of sound
+      V0: 150,                // m/s true, about 230 kt indicated: a typical speed at 15,000 ft
+      Vmo: 340 * KT, Mmo: 0.82, // indicated; the barber pole
+      // the god's hand has an airliner's control authority: these are roughly a 737's full-deflection rates
+      rate: [20 * D2R, 8 * D2R, 4 * D2R], acc: [30 * D2R, 10 * D2R, 6 * D2R], // roll (x), yaw (y), pitch (z)
+      gainAtt: 1.2, tauRate: 0.35, maxAngle: 45 * D2R,
+      // the cabin, in the body frame (metres from the centre of mass)
+      cabin: {
+        xFront: 15.5, xRear: -13.5, floor: -1.0, height: 2.2, binBottom: 1.6, seatPan: 0.45, seatTop: 1.15, tray: 0.68, halfW: 1.77, aisleHalf: 0.25,
+        rows: 31, pitch: 0.787, row0x: 13.5, seatZ: [-1.35, -0.91, -0.47, 0.47, 0.91, 1.35],
+        headSeated: 0.80, headStanding: 1.62, headR: 0.11,
+      },
+    };
+
+    // ---------------------------------------------------------- gusts
+    // One discrete gust is the certification shape: half a cosine wave up to
+    // the peak and back, 1.6 s long at this speed (120 m to the peak).
+    function gustAt(s) {
+      let w = 0, v = 0;
+      for (const j of s.jolts) {
+        const t = s.t - j.t0;
+        if (t >= 0 && t <= j.T) w += j.w * 0.5 * (1 - Math.cos(TAU * t / j.T));
+      }
+      w += s.turb.w; v += s.turb.v;
+      return { w, v }; // w up, v to the right of the flight path, m/s
+    }
+    // Continuous turbulence: Dryden-flavoured. Two cascaded first-order
+    // filters on white noise give the vertical and lateral gusts their
+    // spectrum (scale length 300 m), a faster filter gives the chop, and a
+    // small rolling and yawing disturbance stands in for the gust gradient
+    // across the span. σ_w: 0 to 12 m/s with the slider, squared so the low
+    // end is fine: light chop around 0.4, moderate at 0.6, severe at 0.8,
+    // and the top of the scale is the violent kind.
+    function stepTurb(s, dt) {
+      const T = s.turb, I = s.turb.intensity, sig = 12 * I * I;
+      const V = Math.max(60, s.info.V || P.V0);
+      const tau1 = 300 / V, tau2 = 0.4;
+      const a1 = Math.exp(-dt / tau1), a2 = Math.exp(-dt / tau2);
+      const k1 = Math.sqrt(1 - a1 * a1), k2 = Math.sqrt(1 - a2 * a2);
+      // w1 and v1 are unit-variance first-order noise; w2 and v2 are those low-passed again (std 0.70), so the sum below has about unit variance
+      T.w1 = a1 * T.w1 + k1 * s.rand.gauss(); T.w2 = a1 * T.w2 + (1 - a1) * T.w1;
+      T.v1 = a1 * T.v1 + k1 * s.rand.gauss(); T.v2 = a1 * T.v2 + (1 - a1) * T.v1;
+      T.c1 = a2 * T.c1 + k2 * s.rand.gauss(); T.c2 = a2 * T.c2 + k2 * s.rand.gauss();
+      // most of the energy in the chop: the aeroplane's own heave rides out the slow swells (its time constant is about two seconds) but not the fast ones
+      T.w = sig * (0.9 * T.w2 + 0.75 * T.c1);
+      T.v = sig * 0.7 * (0.9 * T.v2 + 0.5 * T.c2);
+      T.p = a2 * T.p + k2 * s.rand.gauss(); T.r = a2 * T.r + k2 * s.rand.gauss();
+    }
+
+    // ---------------------------------------------------------- aerodynamics & the hand
+    function stepAircraft(s, dt) {
+      const C = P.cabin, q = s.q;
+      // the air the aeroplane is moving through
+      const g = gustAt(s);
+      const velH = [s.vel[0], 0, s.vel[2]];
+      const fwdH = unit(velH[0] || velH[2] ? velH : qrot(q, [1, 0, 0]));
+      const rightH = [-fwdH[2], 0, fwdH[0]]; // to the right of the flight path (world x east, z south)
+      const gustW = add(scale([0, 1, 0], g.w), scale(rightH, g.v));
+      const relW = sub(s.vel, gustW);        // the aeroplane's velocity through the air, world frame
+      const relB = qinv(q, relW);            // ... in the body frame
+      const V = Math.max(1, norm(relB));
+      const u = relB[0], wb = relB[1], vb = relB[2];
+      const alpha = Math.atan2(-wb, Math.max(1, u));     // relative wind from below → positive
+      const beta = Math.asin(clamp(vb / V, -1, 1));       // relative wind from the right → positive
+      const qbar = 0.5 * P.rho * V * V;
+      // lift: linear to the stall, then the wing lets go — a gentle break
+      // down to a flat-plate-ish plateau, so a stalled aeroplane mushes
+      let CL;
+      const aEff = alpha;
+      if (Math.abs(aEff) <= P.aStall) CL = P.CL0 + P.CLa * aEff;
+      else {
+        const sgn = Math.sign(aEff), over = Math.abs(aEff) - P.aStall;
+        const CLs = P.CL0 * sgn + P.CLa * P.aStall * sgn;
+        CL = CLs * (0.55 + 0.45 * Math.exp(-over / (6 * D2R))) * Math.cos(over);
+      }
+      const stallDepth = clamp((Math.abs(alpha) - P.aStall * 0.85) / (P.aStall * 0.3), 0, 1); // buffet begins just before the stall
+      // past the stall the whole airframe is a bluff body to the flow: cross-flow drag that is nothing below the stall and a flat plate's well above it
+      const sa = Math.sin(alpha), bluff = 1.2 * sa * sa * (1 - Math.exp(-Math.pow(Math.abs(alpha) / P.aStall, 4)));
+      const CD = P.CD0 + P.k * CL * CL + P.CDb * Math.sin(beta) * Math.sin(beta) + 0.12 * stallDepth + bluff;
+      const CY = -(P.CYb * Math.sin(beta) * Math.cos(beta) + P.CYc * Math.sin(beta) * Math.abs(Math.sin(beta)));
+      const L = CL * qbar * P.S, D = CD * qbar * P.S, Y = CY * qbar * P.S;
+      // lift is the body's up made perpendicular to the relative wind (so it leans forward of body-up by the angle of attack); drag is along the wind
+      const vhat = unit(relB);
+      const liftB = unit(sub([0, 1, 0], scale(vhat, vhat[1])));
+      const dragB = scale(vhat, -1);
+      let FB = add(add(scale(liftB, L), scale(dragB, D)), [P.thrust, 0, Y]);
+      // stall buffet: the separated wake shakes the airframe
+      if (stallDepth > 0) {
+        const sh = stallDepth * 0.8 * s.rand.gauss();
+        FB = add(FB, [0, sh * 0.25 * P.mass, 0]);
+      }
+      // high-speed buffet past the barber pole
+      const ias = V * Math.sqrt(P.rho / P.rho0), mach = V / P.a;
+      const over = Math.max(0, (ias - P.Vmo) / (20 * KT), (mach - P.Mmo) / 0.04);
+      if (over > 0) FB = add(FB, [0, Math.min(1, over) * 0.12 * P.mass * s.rand.gauss(), 0]);
+      const FW = add(qrot(q, FB), [0, -P.mass * G, 0]);
+      const aW = scale(FW, 1 / P.mass);
+      // the god's hand: an attitude the aeroplane is driven to, at an airliner's own rates
+      const eul = qtoEuler(q);
+      const psiVel = Math.atan2(relW[0], -relW[2]);
+      // the heading the flight path turns at in this bank, as a coordinated turn would — the reference the yaw command is laid on
+      const turnRate = G * Math.tan(clamp(eul.roll, -1.2, 1.2)) / Math.max(60, V);
+      s.psiRef += turnRate * dt;
+      s.psiRef += wrap(psiVel - s.cmd.yaw - s.psiRef) * dt / 20; // and it drifts slowly back onto the flight path
+      const qt = qfromEuler(s.psiRef + s.cmd.yaw, s.cmd.pitch, s.cmd.roll);
+      const err = qerror(q, qt);
+      const omegaDes = [0, 0, 0], alphaDot = [0, 0, 0];
+      for (let i = 0; i < 3; i++) {
+        omegaDes[i] = clamp(-P.gainAtt * err[i], -P.rate[i], P.rate[i]);
+        let ad = clamp((omegaDes[i] - s.omega[i]) / P.tauRate, -P.acc[i], P.acc[i]);
+        if (i === 0) ad += s.turb.p * s.turb.intensity * s.turb.intensity * 0.18 + stallDepth * 0.6 * s.rand.gauss();
+        if (i === 1) ad += s.turb.r * s.turb.intensity * s.turb.intensity * 0.08;
+        alphaDot[i] = ad;
+      }
+      // integrate
+      for (let i = 0; i < 3; i++) s.omega[i] += alphaDot[i] * dt;
+      const wn = norm(s.omega);
+      if (wn > 1e-9) s.q = qnorm(qmul(q, qaxis(scale(s.omega, 1 / wn), wn * dt)));
+      s.vel = add(s.vel, scale(aW, dt));
+      s.pos = add(s.pos, scale(s.vel, dt));
+      s.alphaDot = alphaDot;
+      // the specific force at the centre of mass, body frame: what a seat there pushes with
+      const aB = qinv(s.q, aW), gB = qinv(s.q, [0, -G, 0]);
+      s.fcg = sub(aB, gB);
+      const i = s.info;
+      i.V = V; i.ias = ias; i.mach = mach; i.alpha = alpha; i.beta = beta; i.CL = CL;
+      i.n = s.fcg[1] / G; i.ny = s.fcg[2] / G; i.nx = s.fcg[0] / G;
+      i.pitch = eul.pitch; i.roll = eul.roll; i.heading = eul.heading;
+      i.gamma = Math.asin(clamp(s.vel[1] / Math.max(1, norm(s.vel)), -1, 1));
+      i.stall = stallDepth; i.overspeed = over; i.gustW = g.w; i.gustV = g.v;
+      i.turnRate = turnRate;
+      // the min and max load since the last reset of the memory
+      if (i.n < i.nMin) i.nMin = i.n; if (i.n > i.nMax) i.nMax = i.n;
+    }
+
+    // the specific force at a point r of the cabin (body frame): f = f_cg + ω̇×r + ω×(ω×r).
+    // A free body there accelerates at -f (relative to the cabin), less the Coriolis term 2ω×v.
+    function specificForce(s, r, out) {
+      const w = s.omega, ad = s.alphaDot;
+      const wxr = cross(w, r), wxwxr = cross(w, wxr), adxr = cross(ad, r);
+      out[0] = s.fcg[0] + adxr[0] + wxwxr[0]; out[1] = s.fcg[1] + adxr[1] + wxwxr[1]; out[2] = s.fcg[2] + adxr[2] + wxwxr[2];
+      return out;
+    }
+
+    // ---------------------------------------------------------- the cabin: layout
+    const C = P.cabin;
+    const rowX = (i) => C.row0x - i * C.pitch;
+    const FLOOR = C.floor, PAN = C.floor + C.seatPan, TRAY = C.floor + C.tray, BIN = C.floor + C.binBottom, CEIL = C.floor + C.height;
+    const SHELF = BIN + 0.05, BINTOP = CEIL - 0.05, BINDOOR = 0.55, BINWALL = C.halfW - 0.1;
+    const LAV_X = C.xRear + 1.0, GALLEY_F = C.xFront - 0.9, GALLEY_R = C.xRear + 1.0;
+
+    function createState(seed = 7) {
+      const rand = rng(seed);
+      const s = {
+        t: 0, rand,
+        q: qfromEuler(Math.PI / 2, 0, 0), omega: [0, 0, 0], alphaDot: [0, 0, 0],
+        vel: [P.V0, 0, 0], pos: [0, P.alt, 0], psiRef: Math.PI / 2,
+        fcg: [0, G, 0],
+        cmd: { pitch: 0, roll: 0, yaw: 0 },
+        jolts: [],
+        turb: { intensity: 0, w: 0, v: 0, w1: 0, w2: 0, v1: 0, v2: 0, c1: 0, c2: 0, p: 0, r: 0 },
+        beltSign: false, signT: 0,
+        info: { V: P.V0, n: 1, ny: 0, nx: 0, nMin: 1, nMax: 1 },
+        events: { headHits: 0, falls: 0, spills: 0, cupsDown: 0, bagsOut: 0, binsOpen: 0, thuds: 0 },
+        pax: [], cups: [], bins: [], bags: [], drops: [],
+        cart: { x: GALLEY_R + 0.9, vx: 0, y: 0, vy: 0, brake: true, parked: true, loose: false },
+        attendant: null,
+      };
+      // trim: thrust equals drag in level flight at V0; the pitch that carries the weight
+      const qbar = 0.5 * P.rho * P.V0 * P.V0;
+      const CL = P.mass * G / (qbar * P.S);
+      const alpha0 = (CL - P.CL0) / P.CLa;
+      P.thrust = (P.CD0 + P.k * CL * CL) * qbar * P.S;
+      P.alphaTrim = alpha0;
+      s.cmd.pitch = alpha0; s.trimPitch = alpha0;
+      s.q = qfromEuler(Math.PI / 2, alpha0, 0);
+      // passengers: a full-ish cabin
+      for (let r = 0; r < C.rows; r++) for (let k = 0; k < 6; k++) {
+        if (rand() > 0.86) continue;
+        const p = {
+          id: s.pax.length, row: r, seat: k, x: rowX(r), z: C.seatZ[k], col: rand.int(8), size: rand.range(0.9, 1.1),
+          mode: 'seated', belt: true, wants: 'sit', y: 0, vy: 0, sway: [0, 0], swayV: [0, 0],
+          px: 0, tx: 0, lean: [0, 0], grab: false, crouch: 0,
+          p: [0, 0, 0], v: [0, 0, 0], timer: rand.range(3, 40), hit: 0, obedient: rand() > 0.08,
+        };
+        s.pax.push(p);
+      }
+      // a few are already up, a third have the belt off
+      for (const p of s.pax) if (rand() < 0.33) p.belt = false;
+      // the attendant, with the cart, at the forward galley
+      s.attendant = { id: -1, row: -1, seat: -1, x: GALLEY_R, z: 0, col: 8, size: 1, mode: 'standing', belt: false, wants: 'serve', y: 0, vy: 0, sway: [0, 0], swayV: [0, 0], px: GALLEY_R + 0.9 - 0.9, tx: GALLEY_R, lean: [0, 0], grab: false, crouch: 0, p: [0, 0, 0], v: [0, 0, 0], timer: 2, hit: 0, obedient: true, serving: 1, stopT: 3 };
+      // cups on the trays of a third of the seated
+      for (const p of s.pax) {
+        if (rand() > 0.36) continue;
+        s.cups.push({ owner: p.id, x: p.x + C.pitch - 0.45, z: p.z, p: [rand.range(-0.08, 0.08), rand.range(-0.05, 0.05)], v: [0, 0], fill: rand.range(0.45, 0.9), slosh: [0, 0], sloshV: [0, 0], mode: 'tray', spill: 0, stain: 0, p3: [0, 0, 0], v3: [0, 0, 0], kind: rand.int(3) });
+      }
+      // the bins, two rows each, a side each; a tenth are not quite latched; one or two bags in each
+      for (let side = -1; side <= 1; side += 2) for (let i = 0; i < C.rows; i += 2) {
+        const x = (rowX(i) + rowX(Math.min(i + 1, C.rows - 1))) / 2, len = 2 * C.pitch - 0.04;
+        const b = { side, x, len, latched: rand() > 0.12, open: 0, bags: [] };
+        s.bins.push(b);
+        const n = 1 + (rand() < 0.6 ? 1 : 0);
+        for (let j = 0; j < n; j++) {
+          const w = rand.range(0.4, 0.55), h = rand.range(0.22, 0.32), d = rand.range(0.3, 0.4);
+          const bag = { bin: s.bins.length - 1, size: [w, h, d], p: [x + (j - (n - 1) / 2) * 0.62 + rand.range(-0.05, 0.05), SHELF + h / 2, side * (BINDOOR + d / 2 + rand.range(0.05, 0.5))], v: [0, 0, 0], mode: 'bin', col: rand.int(5) };
+          s.bags.push(bag); b.bags.push(s.bags.length - 1);
+        }
+      }
+      stepCabinBehaviour(s, 0);
+      return s;
+    }
+
+    // ---------------------------------------------------------- the cabin: who is doing what
+    // The seat-belt sign is the one lever the god has over the people. Lit,
+    // the walkers go back to their rows and sit, the seated buckle up (most
+    // of them: a few always ignore it), the attendant parks the cart and
+    // straps in. Off, a third unbuckle, up to four are up and about at a time
+    // — to the lavatory at the back and home again — and the attendant works
+    // the aisle with the cart, a few rows at a time.
+    function stepCabinBehaviour(s, dt) {
+      const walking = s.pax.filter((p) => p.mode !== 'seated').length;
+      for (const p of s.pax) {
+        p.timer -= dt;
+        if (s.beltSign) {
+          if (p.mode === 'seated' && !p.belt && p.timer <= 0) { if (p.obedient) p.belt = true; p.timer = s.rand.range(4, 12); }
+          if (p.mode === 'standing' || p.mode === 'walking') p.wants = 'sit';
+        } else {
+          if (p.mode === 'seated' && p.timer <= 0) {
+            p.timer = s.rand.range(8, 40);
+            if (p.belt && s.rand() < 0.35) p.belt = false;
+            else if (walking < 4 && s.rand() < 0.25 && !s.cart.loose) { p.wants = 'walk'; p.tx = LAV_X; p.mode = 'standing'; p.px = p.x; p.belt = false; p.y = 0; p.lean = [0, 0]; p.timer = s.rand.range(4, 9); }
+          }
+          if ((p.mode === 'standing' || p.mode === 'walking') && p.wants === 'walk' && Math.abs(p.px - p.tx) < 0.2) {
+            if (p.timer <= 0) { p.wants = 'sit'; p.tx = p.x; }
+          }
+        }
+        if ((p.mode === 'standing' || p.mode === 'walking') && p.wants === 'sit') {
+          p.tx = p.x;
+          if (Math.abs(p.px - p.x) < 0.2) { p.mode = 'seated'; p.y = 0; p.vy = 0; p.sway = [0, 0]; p.swayV = [0, 0]; p.timer = s.rand.range(2, 6); }
+        }
+      }
+      // the attendant's day
+      const a = s.attendant, cart = s.cart;
+      a.timer -= dt;
+      if (s.beltSign) {
+        a.wants = 'park'; cart.brake = true;
+        const home = GALLEY_R + 0.9;
+        if (a.mode === 'standing' || a.mode === 'walking') {
+          a.tx = Math.abs(cart.x - home) < 0.3 ? GALLEY_R : cart.x + 0.9;
+          if (Math.abs(cart.x - home) > 0.3 && Math.abs(a.px - (cart.x + 0.9)) < 0.3 && !cart.loose) { cart.brake = false; cart.pushed = -1; } else cart.pushed = 0;
+          if (Math.abs(cart.x - home) < 0.3 && Math.abs(a.px - GALLEY_R) < 0.35) a.mode = 'strapped';
+        }
+      } else {
+        if (a.mode === 'strapped') { a.mode = 'standing'; a.px = GALLEY_R; }
+        if (a.mode === 'standing' || a.mode === 'walking') {
+          if (!cart.loose) {
+            if (a.stopT > 0) { a.stopT -= dt; cart.brake = true; cart.pushed = 0; a.tx = cart.x - 0.9 * (a.serving || 1); }
+            else {
+              const dir = a.serving || 1;
+              const goal = a.goal || (a.goal = cart.x + dir * 3 * C.pitch);
+              if (dir < 0 && goal < GALLEY_R + 1.5) a.goal = GALLEY_R + 1.5;
+              if (dir > 0 && goal > GALLEY_F - 1.6) a.goal = GALLEY_F - 1.6;
+              a.tx = cart.x - 0.9 * dir; cart.brake = false; cart.pushed = dir;
+              if (Math.abs(cart.x - a.goal) < 0.15) { a.stopT = s.rand.range(5, 9); a.goal = null; if (a.goal === null && ((dir < 0 && cart.x < GALLEY_R + 1.6) || (dir > 0 && cart.x > GALLEY_F - 1.7))) a.serving = -dir; }
+            }
+          } else { a.tx = a.px; cart.pushed = 0; }
+        }
+      }
+    }
+
+    // ---------------------------------------------------------- the cabin: bodies
+    const F = [0, 0, 0], R = [0, 0, 0];
+    // what a free body at r feels, as its acceleration relative to the cabin
+    function relAcc(s, x, y, z) { R[0] = x; R[1] = y; R[2] = z; specificForce(s, R, F); return [-F[0], -F[1], -F[2]]; }
+    // the walls a loose thing of radius r at (x, z) meets
+    function boundsAt(x, z, r) {
+      const overSeats = Math.abs(z) > C.aisleHalf + 0.1;
+      return {
+        yMin: (overSeats ? FLOOR + C.seatTop - 0.25 : FLOOR) + r,
+        yMax: (Math.abs(z) > 0.42 ? BIN : CEIL) - r,
+        zMax: C.halfW - 0.15 - r, xMin: C.xRear + 0.4 + r, xMax: C.xFront - 0.4 + r,
+      };
+    }
+    // a particle against the cabin: returns the impact speed on the ceiling, floor or walls this step
+    function freeBody(s, p, v, r, dt, e = 0.15) {
+      const a = relAcc(s, p[0], p[1], p[2]);
+      const cor = cross(s.omega, v);
+      v[0] += (a[0] - 2 * cor[0]) * dt; v[1] += (a[1] - 2 * cor[1]) * dt; v[2] += (a[2] - 2 * cor[2]) * dt;
+      p[0] += v[0] * dt; p[1] += v[1] * dt; p[2] += v[2] * dt;
+      const b = boundsAt(p[0], p[2], r);
+      let hitUp = 0, hitDown = 0, hitSide = 0;
+      if (p[1] > b.yMax) { p[1] = b.yMax; if (v[1] > 0) { hitUp = v[1]; v[1] = -e * v[1]; v[0] *= 0.7; v[2] *= 0.7; } }
+      if (p[1] < b.yMin) { p[1] = b.yMin; if (v[1] < 0) { hitDown = -v[1]; v[1] = -e * v[1]; v[0] *= 0.6; v[2] *= 0.6; } }
+      if (p[2] > b.zMax) { p[2] = b.zMax; if (v[2] > 0) { hitSide = v[2]; v[2] = -e * v[2]; } }
+      if (p[2] < -b.zMax) { p[2] = -b.zMax; if (v[2] < 0) { hitSide = -v[2]; v[2] = -e * v[2]; } }
+      if (p[0] > b.xMax) { p[0] = b.xMax; if (v[0] > 0) { hitSide = Math.max(hitSide, v[0]); v[0] = -e * v[0]; } }
+      if (p[0] < b.xMin) { p[0] = b.xMin; if (v[0] < 0) { hitSide = Math.max(hitSide, -v[0]); v[0] = -e * v[0]; } }
+      // resting contact: static friction holds it still under anything less than 0.4 of the load; sliding, it slows
+      const resting = Math.abs(p[1] - b.yMin) < 1e-6 && Math.abs(v[1]) < 0.05;
+      if (resting) {
+        v[1] = 0;
+        const down = -a[1], ah = Math.hypot(a[0], a[2]), sp = Math.hypot(v[0], v[2]);
+        if (sp < 0.03 && ah < 0.4 * down) { v[0] = 0; v[2] = 0; }
+        else { const f = Math.max(0, 1 - Math.min(1, 0.3 * down * dt / Math.max(sp, 1e-3))); v[0] *= f; v[2] *= f; }
+      }
+      return { hitUp, hitDown, hitSide, resting: resting && Math.hypot(v[0], v[2]) < 0.03 };
+    }
+
+    // A seated passenger: the seat pushes up as long as the load is downward.
+    // When it isn't — a downdraft, a push-over — the body rises off the pan:
+    // five centimetres into the belt, or until the head finds the bin.
+    // Above the hips the torso sways as a damped spring on the horizontal
+    // specific force, stopped by the seat back and the armrests.
+    function stepSeated(s, p, dt) {
+      const a = relAcc(s, p.x, PAN + 0.45 + p.y, p.z);
+      const down = -a[1];
+      if (p.y <= 0 && down >= 0) { p.y = 0; p.vy = 0; }
+      else {
+        p.vy += a[1] * dt; p.y += p.vy * dt;
+        if (p.belt) { if (p.y > 0.05) { p.y = 0.05; if (p.vy > 0) p.vy = 0; } }
+        else {
+          const top = PAN + p.y + 0.95 * p.size, lid = BIN;
+          if (top > lid && p.vy > 0) { p.y -= top - lid; if (p.vy > 0.6) { s.events.headHits++; p.hit = 1; } p.vy = -0.15 * p.vy; }
+        }
+        if (p.y <= 0) { p.y = 0; if (p.vy < -1.2) s.events.thuds++; p.vy = 0; }
+      }
+      const w0 = 7.5, z = 0.55, k = p.belt ? 0.42 : 0.6;
+      for (let i = 0; i < 2; i++) {
+        const ah = i === 0 ? a[0] : a[2];
+        p.swayV[i] += (k * ah - w0 * w0 * p.sway[i] - 2 * z * w0 * p.swayV[i]) * dt;
+        p.sway[i] += p.swayV[i] * dt;
+      }
+      const lim = p.belt ? 0.3 : 0.42;
+      if (p.sway[0] > lim) { p.sway[0] = lim; p.swayV[0] = Math.min(0, p.swayV[0]); }
+      if (p.sway[0] < -0.07) { p.sway[0] = -0.07; p.swayV[0] = Math.max(0, p.swayV[0]); }
+      if (p.sway[1] > 0.26) { p.sway[1] = 0.26; p.swayV[1] = Math.min(0, p.swayV[1]); }
+      if (p.sway[1] < -0.26) { p.sway[1] = -0.26; p.swayV[1] = Math.max(0, p.swayV[1]); }
+      if (p.hit > 0) p.hit = Math.max(0, p.hit - dt * 0.6);
+    }
+
+    // Someone on their feet in the aisle is an inverted pendulum with a
+    // balance loop: they lean into whatever the floor is doing, a quarter
+    // of a second late. A push the loop cannot keep up with puts them on
+    // the floor; a floor that stops pushing up puts them on the ceiling.
+    // Past a tenth of a g they stop and grab a seat back, which buys them
+    // twice the margin; past 1.4 g the knees go.
+    function stepStanding(s, p, dt, cart) {
+      const a = relAcc(s, p.px, FLOOR + 1.0, 0);
+      const down = -a[1];
+      if (down < 2.0) { // the floor is falling away: airborne
+        p.mode = 'free'; p.p = [p.px, FLOOR + 1.0, 0]; p.v = [0, 0, 0]; p.timer = 0; s.events.falls++; return;
+      }
+      const req = [a[0] / down, a[2] / down];
+      const mag = Math.hypot(req[0], req[1]);
+      p.grab = mag > 0.1 || (p.id === -1 && !cart.loose);
+      const tau = 0.25;
+      for (let i = 0; i < 2; i++) p.lean[i] += (req[i] - p.lean[i]) * Math.min(1, dt / tau);
+      const ex = req[0] - p.lean[0], ez = req[1] - p.lean[1];
+      const thresh = (p.grab ? 0.42 : 0.22) * (p.mode === 'strapped' ? 4 : 1);
+      if (Math.hypot(ex / 1.3, ez) > thresh) {
+        p.mode = 'free'; p.p = [p.px, FLOOR + 1.0, 0]; p.v = [1.5 * ex / (Math.hypot(ex, ez) || 1), 0.3, 1.5 * ez / (Math.hypot(ex, ez) || 1)]; p.timer = 0; s.events.falls++; return;
+      }
+      p.crouch = clamp((down - 13) / 7, 0, 1);
+      // a runaway cart through the aisle
+      if (cart.loose && Math.abs(cart.x - p.px) < 0.75 && Math.abs(cart.vx) > 0.6 && p.id !== -1) {
+        p.mode = 'free'; p.p = [p.px, FLOOR + 1.0, 0]; p.v = [cart.vx * 0.8, 1.0, 0]; p.timer = 0; s.events.falls++; return;
+      }
+      // walking, when the floor allows it
+      const canWalk = !p.grab && p.crouch < 0.3 && p.mode !== 'strapped';
+      const dx = p.tx - p.px;
+      if (canWalk && Math.abs(dx) > 0.05) { p.mode = 'walking'; const v = p.id === -1 ? 0.45 : 0.8; p.px += clamp(dx, -v * dt, v * dt); }
+      else if (p.mode === 'walking') p.mode = 'standing';
+    }
+
+    // on the floor (or across the seats) after a fall: up again after a while, unless the floor leaves again
+    function stepDown(s, p, dt) {
+      const a = relAcc(s, p.p[0], p.p[1], p.p[2]);
+      if (-a[1] < 1.0) { p.mode = 'free'; p.v = [0, 0, 0]; return; }
+      p.timer -= dt;
+      if (p.timer <= 0) {
+        if (Math.abs(p.p[2]) < C.aisleHalf + 0.15) { p.mode = 'standing'; p.px = clamp(p.p[0], C.xRear + 1, C.xFront - 1); p.lean = [0, 0]; p.crouch = 0; }
+        else { // across the seats: back into the aisle first
+          p.mode = 'standing'; p.px = clamp(p.p[0], C.xRear + 1, C.xFront - 1); p.lean = [0, 0]; p.crouch = 0;
+        }
+        if (p.id !== -1 && p.wants !== 'walk') p.wants = 'sit';
+      }
+    }
+
+    function stepFree(s, p, dt) {
+      const h = freeBody(s, p.p, p.v, 0.35, dt, 0.12);
+      if (h.hitUp > 0.8) { s.events.headHits++; p.hit = 1; }
+      if (h.hitDown > 1.0) s.events.thuds++;
+      if (h.resting) { p.mode = 'down'; p.timer = s.rand.range(2.0, 3.5); p.v = [0, 0, 0]; }
+      if (p.hit > 0) p.hit = Math.max(0, p.hit - dt * 0.6);
+    }
+
+    function stepPerson(s, p, dt, cart) {
+      switch (p.mode) {
+        case 'seated': stepSeated(s, p, dt); break;
+        case 'standing': case 'walking': case 'strapped': stepStanding(s, p, dt, cart); break;
+        case 'free': stepFree(s, p, dt); break;
+        case 'down': stepDown(s, p, dt); break;
+      }
+    }
+
+    // The cart: 90 kg on four castors. The brake holds it to a third of a g
+    // along the aisle; off the brake it rolls at anything over the castors'
+    // resistance, and the attendant walks with it. A cart that gets away is
+    // loose until it stops; it rides up off the floor when the floor stops
+    // pushing, like everything else.
+    function stepCart(s, cart, a, dt) {
+      const ac = relAcc(s, cart.x, FLOOR + 0.5 + cart.y, 0);
+      const down = -ac[1];
+      if (cart.y <= 0 && down >= 0) { cart.y = 0; cart.vy = 0; }
+      else {
+        cart.vy += ac[1] * dt; cart.y += cart.vy * dt;
+        const lid = CEIL - 1.0;
+        if (cart.y > lid) { cart.y = lid; if (cart.vy > 0) { if (cart.vy > 0.5) s.events.thuds++; cart.vy = -0.1 * cart.vy; } }
+        if (cart.y <= 0) { cart.y = 0; if (cart.vy < -1) s.events.thuds++; cart.vy = 0; }
+      }
+      const onFloor = cart.y <= 0 && down > 0;
+      const mu = cart.brake ? 0.3 : 0.015;
+      const push = onFloor && cart.pushed && !cart.loose ? cart.pushed * 0.45 : 0; // the attendant walks it at 0.45 m/s
+      if (onFloor) {
+        const fr = mu * down;
+        if (Math.abs(cart.vx) > 0.02) {
+          cart.vx += (ac[0] - fr * Math.sign(cart.vx)) * dt;
+          if (push && Math.abs(ac[0]) < fr + 1.5) cart.vx += (push - cart.vx) * Math.min(1, dt / 0.3);
+        } else {
+          cart.vx = 0;
+          if (Math.abs(ac[0]) > fr) cart.vx += (ac[0] - fr * Math.sign(ac[0])) * dt;
+          else if (push) cart.vx = push * 0.3;
+        }
+        // loose: moving and not with the attendant
+        const withA = Math.abs(Math.abs(a.px - cart.x) - 0.9) < 0.5 && (a.mode === 'standing' || a.mode === 'walking');
+        if (!cart.loose && Math.abs(cart.vx) > 0.9 && !(push && withA)) cart.loose = true;
+        if (cart.loose && Math.abs(cart.vx) < 0.05) { cart.loose = false; cart.brake = true; }
+      } else {
+        cart.vx += ac[0] * dt;
+        if (Math.abs(cart.vx) > 0.5) cart.loose = true;
+      }
+      cart.x += cart.vx * dt;
+      const lo = GALLEY_R + 0.9, hi = GALLEY_F - 0.6;
+      if (cart.x < lo) { cart.x = lo; if (cart.vx < -1) s.events.thuds++; cart.vx = 0; }
+      if (cart.x > hi) { cart.x = hi; if (cart.vx > 1) s.events.thuds++; cart.vx = 0; }
+    }
+
+    // A cup on a tray table. Its liquid is a damped oscillator whose rest
+    // tilt is the direction of the specific force — so in a steady bank the
+    // surface stays flat to the cup, and only a change in the force
+    // sloshes it. It spills when the tilt reaches the rim; the cup slides
+    // when the horizontal push beats friction, and goes over the edge of
+    // the tray; and when the downward force runs out the whole lot lifts
+    // off the tray together and the liquid leaves the cup.
+    const CUP_R = 0.035, CUP_H = 0.09;
+    function emitDrops(s, x, y, z, v, n, spread) {
+      for (let i = 0; i < n && s.drops.length < 500; i++) {
+        s.drops.push({ p: [x + s.rand.range(-0.02, 0.02), y, z + s.rand.range(-0.02, 0.02)], v: [v[0] + spread * s.rand.gauss(), v[1] + spread * s.rand.gauss(), v[2] + spread * s.rand.gauss()], life: 2.5 });
+      }
+    }
+    function stepCup(s, c, dt) {
+      if (c.mode === 'floor') return;
+      if (c.mode === 'free') {
+        const h = freeBody(s, c.p3, c.v3, 0.045, dt, 0.1);
+        if (c.fill > 0 && (h.hitUp > 0.3 || h.hitDown > 0.3 || h.hitSide > 0.3)) { emitDrops(s, c.p3[0], c.p3[1], c.p3[2], c.v3, 12, 0.8); c.spill += c.fill; c.fill = 0; }
+        if (h.resting) { c.mode = 'floor'; s.events.cupsDown++; if (c.fill > 0) { c.spill += c.fill; c.fill = 0; } }
+        return;
+      }
+      const x = c.x + c.p[0], z = c.z + c.p[1], y = TRAY + CUP_H / 2;
+      const a = relAcc(s, x, y, z);
+      const down = -a[1];
+      // the tray stops pushing up: cup and contents lift together
+      if (down < 0.4) {
+        c.mode = 'free'; c.p3 = [x, y, z]; c.v3 = [c.v[0], 0.05, c.v[1]];
+        if (c.fill > 0.05) { emitDrops(s, x, y + 0.05, z, [c.v[0], 0.4 - down, c.v[1]], Math.round(16 * c.fill), 0.35); c.spill += c.fill * 0.8; c.fill *= 0.2; s.events.spills++; c.stain = 1; }
+        return;
+      }
+      // slosh: the first mode of a 7 cm cup, ~3.6 Hz, lightly damped
+      const w0 = Math.sqrt(Math.max(1, down) * 1.84 / CUP_R), zeta = 0.12;
+      for (let i = 0; i < 2; i++) {
+        const req = (i === 0 ? a[0] : a[2]) / down;
+        c.sloshV[i] += (w0 * w0 * (req - c.slosh[i]) - 2 * zeta * w0 * c.sloshV[i]) * dt;
+        c.slosh[i] += c.sloshV[i] * dt;
+      }
+      const tilt = Math.hypot(c.slosh[0], c.slosh[1]);
+      const freeboard = (1 - c.fill) * CUP_H;
+      if (c.fill > 0 && tilt * CUP_R > freeboard) {
+        const rate = Math.min(1.5, (tilt * CUP_R - freeboard) / CUP_H * 3);
+        const d = rate * dt;
+        if (c.spillT == null || s.t - c.spillT > 0.25) { s.events.spills++; c.spillT = s.t; }
+        c.fill = Math.max(0, c.fill - d); c.spill += d; c.stain = Math.min(1, c.stain + d * 3);
+        const dir = [c.slosh[0] / (tilt || 1), c.slosh[1] / (tilt || 1)];
+        if (s.rand() < 10 * dt) emitDrops(s, x + dir[0] * CUP_R, TRAY + CUP_H, z + dir[1] * CUP_R, [dir[0] * 0.2, 0.1, dir[1] * 0.2], 2, 0.15);
+      }
+      // sliding on the tray
+      const muS = 0.35, muK = 0.3;
+      const ah = Math.hypot(a[0], a[2]), moving = Math.hypot(c.v[0], c.v[1]) > 0.005;
+      if (moving || ah > muS * down) {
+        const sp = Math.hypot(c.v[0], c.v[1]) || 1;
+        const fx = moving ? -muK * down * c.v[0] / sp : -muK * down * a[0] / (ah || 1);
+        const fz = moving ? -muK * down * c.v[1] / sp : -muK * down * a[2] / (ah || 1);
+        c.v[0] += (a[0] + fx) * dt; c.v[1] += (a[2] + fz) * dt;
+        if (!moving && Math.hypot(c.v[0], c.v[1]) < 0.002) { c.v[0] = 0; c.v[1] = 0; }
+        if (moving && (c.v[0] * (c.v[0] - (a[0] + fx) * dt) < 0) && ah < muS * down) c.v[0] = 0;
+        if (moving && (c.v[1] * (c.v[1] - (a[2] + fz) * dt) < 0) && ah < muS * down) c.v[1] = 0;
+        c.p[0] += c.v[0] * dt; c.p[1] += c.v[1] * dt;
+      } else { c.v[0] = 0; c.v[1] = 0; }
+      // over the edge of the tray
+      if (Math.abs(c.p[0]) > 0.19 - CUP_R * 0.5 || Math.abs(c.p[1]) > 0.125 - CUP_R * 0.5) {
+        c.mode = 'free'; c.p3 = [x, y, z]; c.v3 = [c.v[0], 0, c.v[1]];
+        s.events.spills++; c.stain = 1;
+      }
+    }
+
+    // The bins: a latched door holds whatever the bag does. An unlatched one
+    // is jarred open by a sideways shove toward the aisle, by a heavy load,
+    // by a load that lets go, or by a bag landing on it from inside. Once
+    // open, anything that rises over the lip and drifts past the door plane
+    // is in the cabin.
+    function stepBin(s, b, i, dt) {
+      const x = b.x, y = (SHELF + BINTOP) / 2, z = b.side * (BINDOOR + 0.5);
+      const a = relAcc(s, x, y, z);
+      const down = -a[1], toAisle = -b.side * a[2];
+      if (!b.latched && b.open < 1) {
+        const jar = toAisle > 2.5 || down > 14.7 || down < 2.0;
+        if (jar && !b.opening) { b.opening = true; s.events.binsOpen++; }
+      }
+      if (b.opening) b.open = Math.min(1, b.open + dt / 0.45);
+      // the bags in it
+      for (const bi of b.bags) {
+        const g = s.bags[bi];
+        if (g.mode !== 'bin') continue;
+        const ab = relAcc(s, g.p[0], g.p[1], g.p[2]);
+        const cor = cross(s.omega, g.v);
+        for (let k = 0; k < 3; k++) { g.v[k] += (ab[k] - 2 * cor[k]) * dt; g.p[k] += g.v[k] * dt; }
+        const [w, h, d] = g.size;
+        // the shelf, the top, the back wall, the ends
+        if (g.p[1] < SHELF + h / 2) { g.p[1] = SHELF + h / 2; if (g.v[1] < 0) { g.v[1] = -0.1 * g.v[1]; g.v[0] *= 0.5; g.v[2] *= 0.5; } }
+        if (g.p[1] > BINTOP - h / 2) { g.p[1] = BINTOP - h / 2; if (g.v[1] > 0) { if (g.v[1] > 0.5) s.events.thuds++; g.v[1] = -0.1 * g.v[1]; } }
+        const zi = Math.abs(g.p[2]), zWall = BINWALL - d / 2, zDoor = BINDOOR + d / 2;
+        if (zi > zWall) { g.p[2] = b.side * zWall; g.v[2] *= -0.1; }
+        if (g.p[0] > x + b.len / 2 - w / 2) { g.p[0] = x + b.len / 2 - w / 2; g.v[0] *= -0.1; }
+        if (g.p[0] < x - b.len / 2 + w / 2) { g.p[0] = x - b.len / 2 + w / 2; g.v[0] *= -0.1; }
+        if (zi < zDoor) {
+          const overLip = g.p[1] - h / 2 > SHELF + 0.08;
+          if (b.open > 0.5 && overLip) { g.mode = 'free'; s.events.bagsOut++; }
+          else {
+            if (!b.latched && !b.opening && -b.side * g.v[2] > 1.2) { b.opening = true; s.events.binsOpen++; }
+            g.p[2] = b.side * zDoor; g.v[2] *= -0.1;
+          }
+        }
+        // resting on the shelf: static friction, then sliding friction
+        if (Math.abs(g.p[1] - (SHELF + h / 2)) < 1e-6 && Math.abs(g.v[1]) < 0.05) {
+          g.v[1] = 0;
+          const down = -ab[1], ah = Math.hypot(ab[0], ab[2]), sp = Math.hypot(g.v[0], g.v[2]);
+          if (sp < 0.03 && ah < 0.4 * down) { g.v[0] = 0; g.v[2] = 0; }
+          else { const f = Math.max(0, 1 - Math.min(1, 0.3 * down * dt / Math.max(sp, 1e-3))); g.v[0] *= f; g.v[2] *= f; }
+        }
+      }
+    }
+    function stepBag(s, g, dt) {
+      if (g.mode !== 'free') return;
+      const h = freeBody(s, g.p, g.v, 0.2, dt, 0.1);
+      if (h.hitDown > 0.8) s.events.thuds++;
+      if (h.resting) { g.mode = 'floor'; }
+    }
+    function stepDrops(s, dt) {
+      const a = [-s.fcg[0], -s.fcg[1], -s.fcg[2]];
+      for (let i = s.drops.length - 1; i >= 0; i--) {
+        const d = s.drops[i];
+        d.life -= dt;
+        for (let k = 0; k < 3; k++) { d.v[k] += a[k] * dt; d.p[k] += d.v[k] * dt; }
+        const b = boundsAt(d.p[0], d.p[2], 0.005);
+        const yMin = Math.abs(d.p[2]) > C.aisleHalf + 0.1 ? TRAY : FLOOR;
+        if (d.p[1] < yMin || d.p[1] > b.yMax || d.life <= 0) { s.drops[i] = s.drops[s.drops.length - 1]; s.drops.pop(); }
+      }
+    }
+
+    // ---------------------------------------------------------- one step of everything
+    const H = 1 / 120;
+    function step(s, dtFrame) {
+      let dt = Math.min(0.1, dtFrame);
+      while (dt > 1e-9) {
+        const h = Math.min(H, dt); dt -= h;
+        s.t += h;
+        stepTurb(s, h);
+        stepAircraft(s, h);
+        stepCabinBehaviour(s, h);
+        for (const p of s.pax) stepPerson(s, p, h, s.cart);
+        stepPerson(s, s.attendant, h, s.cart);
+        stepCart(s, s.cart, s.attendant, h);
+        for (const c of s.cups) stepCup(s, c, h);
+        for (let i = 0; i < s.bins.length; i++) stepBin(s, s.bins[i], i, h);
+        for (const g of s.bags) stepBag(s, g, h);
+        stepDrops(s, h);
+        s.jolts = s.jolts.filter((j) => s.t - j.t0 <= j.T);
+      }
+    }
+    // a god's inputs
+    function command(s, pitch, roll, yaw) {
+      s.cmd.pitch = clamp(pitch, -P.maxAngle, P.maxAngle); s.cmd.roll = clamp(roll, -P.maxAngle, P.maxAngle); s.cmd.yaw = clamp(yaw, -P.maxAngle, P.maxAngle);
+    }
+    // a vertical gust: w up (m/s), the certification shape, 1.6 s long
+    function jolt(s, w, T = 1.6) { s.jolts.push({ t0: s.t, w, T }); }
+    function levelOff(s) { s.cmd.pitch = s.trimPitch; s.cmd.roll = 0; s.cmd.yaw = 0; }
+    function resetFlight(s) {
+      s.q = qfromEuler(Math.PI / 2, s.trimPitch, 0); s.omega = [0, 0, 0]; s.alphaDot = [0, 0, 0];
+      s.vel = [P.V0, 0, 0]; s.psiRef = Math.PI / 2; s.jolts = []; levelOff(s); s.info.nMin = 1; s.info.nMax = 1;
+    }
+    function readout(s) {
+      const i = s.info, up = s.pax.filter((p) => p.mode !== 'seated').length;
+      return { t: s.t, V: i.V, ias: i.ias, n: i.n, ny: i.ny, nx: i.nx, alpha: i.alpha, beta: i.beta, pitch: i.pitch, roll: i.roll, heading: i.heading, gamma: i.gamma, stall: i.stall, overspeed: i.overspeed, up, unbuckled: s.pax.filter((p) => p.mode === 'seated' && !p.belt).length, events: { ...s.events } };
+    }
+    return { P, C, G, KT, FT, D2R, R2D, FLOOR, PAN, TRAY, BIN, CEIL, SHELF, BINTOP, BINDOOR, BINWALL, GALLEY_F, GALLEY_R, LAV_X, CUP_R, CUP_H, rowX, createState, step, command, jolt, levelOff, resetFlight, readout, specificForce, qfromEuler, qtoEuler, qrot, qinv, qmul, qaxis, add, sub, scale, dot, cross, norm, unit, clamp };
+  })();
+  </script>
+
+  <script type="module">
+    // ======================================================================
+    // The page: the aeroplane seen from outside and from the aisle, the
+    // sky it flies in, the god's panel, and the instruments.
+    // ======================================================================
+    import * as THREE from './lib/three.module.min.js';
+
+    const $ = (sel) => document.querySelector(sel);
+    const A = AIRLINER, C = A.C;
+    const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+    const isPhone = navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
+
+    const STORE = 'airline-comfort';
+    const settings = Object.assign({ camera: 'outside' }, (() => { try { return JSON.parse(localStorage.getItem(STORE + ':settings') || '{}'); } catch { return {}; } })());
+    const saveSettings = () => { try { localStorage.setItem(STORE + ':settings', JSON.stringify(settings)); } catch { /* private mode */ } };
+
+    const sim = { state: A.createState((Date.now() / 1000) | 0), time: 0, turbOn: false, turbLevel: 0.45, cabinView: settings.camera === 'cabin' };
+    window.__sim = sim;
+
+    // ------------------------------------------------------------ renderer, scene, camera
+    const canvas = $('#view'), hud = $('#hud'), hctx = hud.getContext('2d');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isPhone, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, isPhone ? 1.5 : 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0xb9cfe6, 0.000055);
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 60000);
+
+    // the aeroplane rides at the origin; the world is what moves
+    const aircraft = new THREE.Group(); scene.add(aircraft);
+    const exterior = new THREE.Group(); aircraft.add(exterior);
+    const interior = new THREE.Group(); aircraft.add(interior);
+
+    // ------------------------------------------------------------ light
+    const sun = new THREE.DirectionalLight(0xfff2dc, 2.6); sun.position.set(-0.45, 0.8, -0.35).multiplyScalar(1000); scene.add(sun);
+    const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x6b7a8c, 0.9); scene.add(hemi);
+    const cabinLights = [];
+    for (let x = -11; x <= 13; x += 6) { const l = new THREE.PointLight(0xfff1dd, 0, 9, 1.6); l.position.set(x, A.CEIL - 0.1, 0); interior.add(l); cabinLights.push(l); }
+    const cabinAmbient = new THREE.AmbientLight(0xfff4e6, 0); interior.add(cabinAmbient);
+
+    // ------------------------------------------------------------ the sky
+    function buildSky() {
+      const geo = new THREE.SphereGeometry(40000, 32, 16);
+      const mat = new THREE.ShaderMaterial({
+        side: THREE.BackSide, depthWrite: false, fog: false,
+        uniforms: { sunDir: { value: sun.position.clone().normalize() } },
+        vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: `varying vec3 vDir; uniform vec3 sunDir;
+          void main(){
+            float h = vDir.y;
+            vec3 zenith = vec3(0.16, 0.36, 0.78), horizon = vec3(0.74, 0.83, 0.93), below = vec3(0.55, 0.63, 0.72);
+            vec3 c = h > 0.0 ? mix(horizon, zenith, pow(min(1.0, h * 1.6), 0.55)) : mix(horizon, below, min(1.0, -h * 6.0));
+            float s = max(0.0, dot(vDir, sunDir));
+            c += vec3(1.0, 0.92, 0.75) * (pow(s, 600.0) * 1.6 + pow(s, 12.0) * 0.18);
+            gl_FragColor = vec4(c, 1.0);
+          }`,
+      });
+      scene.add(new THREE.Mesh(geo, mat));
+    }
+
+    // a soft round puff for the clouds
+    function puffTexture(size = 128) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = size; const g = cv.getContext('2d');
+      const grd = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.45, 'rgba(255,255,255,0.85)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grd; g.fillRect(0, 0, size, size);
+      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+    }
+    // the deck far below: a repeating field of blotches, two layers for depth
+    function deckTexture(size = 1024, seed = 3) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = size; const g = cv.getContext('2d');
+      let a = seed; const r = () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; };
+      g.clearRect(0, 0, size, size);
+      for (let i = 0; i < 900; i++) {
+        const x = r() * size, y = r() * size, rad = 12 + r() * 60, al = 0.25 + r() * 0.5;
+        const grd = g.createRadialGradient(x, y, 0, x, y, rad);
+        grd.addColorStop(0, `rgba(255,255,255,${al})`); grd.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = grd;
+        // wrap by drawing the neighbours too
+        for (const dx of [-size, 0, size]) for (const dy of [-size, 0, size]) { g.save(); g.translate(dx, dy); g.fillRect(x - rad, y - rad, rad * 2, rad * 2); g.restore(); }
+      }
+      const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
+    }
+    // farmland, 15,000 feet down
+    function groundTexture(size = 1024) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = size; const g = cv.getContext('2d');
+      let a = 11; const r = () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; };
+      g.fillStyle = '#6d7f4c'; g.fillRect(0, 0, size, size);
+      const n = 18, cell = size / n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        const h = 70 + r() * 40, s = 25 + r() * 30, l = 28 + r() * 22;
+        g.fillStyle = `hsl(${h} ${s}% ${l}%)`; g.fillRect(i * cell, j * cell, cell, cell);
+        if (r() < 0.25) { g.fillStyle = `hsl(${30 + r() * 20} 35% ${35 + r() * 15}%)`; g.fillRect(i * cell + r() * cell * 0.5, j * cell + r() * cell * 0.5, cell * 0.5, cell * 0.5); }
+      }
+      g.strokeStyle = 'rgba(210,205,190,0.55)'; g.lineWidth = 2;
+      for (let i = 0; i <= n; i += 3) { g.beginPath(); g.moveTo(i * cell, 0); g.lineTo(i * cell, size); g.stroke(); g.beginPath(); g.moveTo(0, i * cell); g.lineTo(size, i * cell); g.stroke(); }
+      g.strokeStyle = 'rgba(70,110,160,0.8)'; g.lineWidth = 5; g.beginPath();
+      for (let x = 0; x <= size; x += 16) { const y = size * 0.55 + Math.sin(x / size * 6.28) * 90 + Math.sin(x / size * 19) * 25; if (x === 0) g.moveTo(x, y); else g.lineTo(x, y); }
+      g.stroke();
+      for (let k = 0; k < 6; k++) { const x = r() * size, y = r() * size, w = 20 + r() * 60; g.fillStyle = 'rgba(160,160,165,0.7)'; g.fillRect(x, y, w, w * (0.5 + r())); }
+      const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
+    }
+
+    const env = { puffs: [], deck: null, deck2: null, ground: null, origin: null, tile: 3000 };
+    function buildEnvironment() {
+      buildSky();
+      const alt = sim.state.pos[1];
+      env.origin = sim.state.pos.slice();
+      // the ground
+      const gt = groundTexture(); gt.repeat.set(16, 16);
+      env.ground = new THREE.Mesh(new THREE.PlaneGeometry(env.tile * 16, env.tile * 16), new THREE.MeshLambertMaterial({ map: gt }));
+      env.ground.rotation.x = -Math.PI / 2; env.ground.position.y = -alt; scene.add(env.ground);
+      // the deck of cloud, 2,500 m down, and a thinner one above it
+      const dt1 = deckTexture(1024, 3); dt1.repeat.set(12, 12);
+      env.deck = new THREE.Mesh(new THREE.PlaneGeometry(env.tile * 12, env.tile * 12), new THREE.MeshBasicMaterial({ map: dt1, transparent: true, depthWrite: false, opacity: 0.95 }));
+      env.deck.rotation.x = -Math.PI / 2; env.deck.position.y = -2500; scene.add(env.deck);
+      const dt2 = deckTexture(1024, 9); dt2.repeat.set(7, 7);
+      env.deck2 = new THREE.Mesh(new THREE.PlaneGeometry(env.tile * 14, env.tile * 14), new THREE.MeshBasicMaterial({ map: dt2, transparent: true, depthWrite: false, opacity: 0.5 }));
+      env.deck2.rotation.x = -Math.PI / 2; env.deck2.position.y = -1700; scene.add(env.deck2);
+      // cumulus at our own level, drifting past
+      const tex = puffTexture();
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.9, color: 0xffffff });
+      const matS = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.8, color: 0xdde6f0 });
+      let seed = 5; const r = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      for (let i = 0; i < 26; i++) {
+        const g = new THREE.Group();
+        const cx = (r() - 0.5) * 9000, cz = (r() - 0.5) * 9000, cy = -300 + (r() - 0.3) * 1500, big = 180 + r() * 420;
+        const n = 5 + Math.floor(r() * 6);
+        for (let k = 0; k < n; k++) {
+          const sp = new THREE.Sprite(k % 3 === 0 ? matS : mat);
+          const sx = (r() - 0.5) * big * 1.6, sy = (r() - 0.5) * big * 0.5, sz = (r() - 0.5) * big * 1.6, sc = big * (0.6 + r() * 0.7);
+          sp.position.set(sx, sy, sz); sp.scale.set(sc, sc * 0.7, 1); g.add(sp);
+        }
+        g.position.set(cx, cy, cz); scene.add(g); env.puffs.push(g);
+      }
+    }
+    // the aeroplane is pinned: the world slides past it by its own motion
+    const envTmp = new THREE.Vector3();
+    function updateEnvironment(s) {
+      const dx = s.pos[0] - env.origin[0], dy = s.pos[1] - env.origin[1], dz = s.pos[2] - env.origin[2];
+      const T = env.tile;
+      const wrapT = (v, period) => ((v % period) + period) % period - period / 2;
+      env.ground.position.set(wrapT(-dx, T), -env.origin[1] - dy, wrapT(-dz, T));
+      env.deck.position.set(wrapT(-dx, T), -2500 - dy, wrapT(-dz, T));
+      env.deck2.position.set(wrapT(-dx, T * 2), -1700 - dy, wrapT(-dz, T * 2));
+      for (const g of env.puffs) {
+        if (!g.userData.base) g.userData.base = g.position.clone();
+        const b = g.userData.base;
+        g.position.set(wrapT(b.x - dx, 9000), b.y - dy, wrapT(b.z - dz, 9000));
+      }
+    }
+
+    // ------------------------------------------------------------ geometry helpers
+    // a surface lofted through rings of points (each ring the same length); closed rings wrap around
+    function loft(rings, closedRing = true, capEnds = false) {
+      const n = rings[0].length, m = rings.length, pos = [], idx = [];
+      for (const r of rings) for (const p of r) pos.push(p[0], p[1], p[2]);
+      const segs = closedRing ? n : n - 1;
+      for (let i = 0; i < m - 1; i++) for (let j = 0; j < segs; j++) {
+        const a = i * n + j, b = i * n + (j + 1) % n, c = (i + 1) * n + j, d = (i + 1) * n + (j + 1) % n;
+        idx.push(a, b, c, b, d, c);
+      }
+      if (capEnds) {
+        const centroid = (ri) => [rings[ri].reduce((s, p) => s + p[0], 0) / n, rings[ri].reduce((s, p) => s + p[1], 0) / n, rings[ri].reduce((s, p) => s + p[2], 0) / n];
+        for (const [ri, other] of [[0, 1], [m - 1, m - 2]]) {
+          const c0 = centroid(ri), c1 = centroid(other), out = [c0[0] - c1[0], c0[1] - c1[1], c0[2] - c1[2]];
+          const ci = pos.length / 3; pos.push(c0[0], c0[1], c0[2]);
+          // wind the cap so it faces away from the body
+          const p0 = rings[ri][0], p1 = rings[ri][1 % n];
+          const u = [p0[0] - c0[0], p0[1] - c0[1], p0[2] - c0[2]], v = [p1[0] - c0[0], p1[1] - c0[1], p1[2] - c0[2]];
+          const nrm = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+          const flip = nrm[0] * out[0] + nrm[1] * out[1] + nrm[2] * out[2] < 0;
+          for (let j = 0; j < segs; j++) { const a = ri * n + j, b = ri * n + (j + 1) % n; if (flip) idx.push(ci, b, a); else idx.push(ci, a, b); }
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+      return g;
+    }
+    const ring = (n, fn) => { const r = []; for (let i = 0; i < n; i++) r.push(fn(i / n * Math.PI * 2, i)); return r; };
+    const arc = (n, a0, a1, fn) => { const r = []; for (let i = 0; i <= n; i++) r.push(fn(a0 + (a1 - a0) * i / n, i)); return r; };
+    // an airfoil-ish closed outline of 12 points at chord c, thickness t, leading edge at (x, y), running aft (−x); camber lifts the top
+    function airfoil(x, y, z, c, t, camber = 0.3) {
+      const pts = [];
+      const up = [[0, 0], [0.03, 0.35], [0.1, 0.6], [0.25, 0.9], [0.45, 1.0], [0.7, 0.7], [1.0, 0.05]];
+      const lo = [[1.0, -0.05], [0.7, -0.45], [0.45, -0.6], [0.25, -0.65], [0.1, -0.5], [0.03, -0.3]];
+      for (const [u, v] of up) pts.push([x - u * c, y + v * t * (v > 0 ? 1 : 1) * (1 + camber * (v > 0 ? 0.6 : 0)), z]);
+      for (const [u, v] of lo) pts.push([x - u * c, y + v * t, z]);
+      return pts;
+    }
+    // the same outline standing up: thickness across z, for a fin or a winglet, wound to face outward with the sections climbing in y
+    const vAirfoil = (x, y, z, c, t) => airfoil(x, 0, 0, c, 1, 0).map((p) => [p[0], y, z + p[1] * t]).reverse();
+    function fuselageRing(x, r, yc, n = 28, flatten = 1) {
+      return ring(n, (a) => [x, yc + Math.sin(a) * r * flatten, Math.cos(a) * r]);
+    }
+
+    // ------------------------------------------------------------ the aeroplane, outside
+    const mats = {
+      white: new THREE.MeshStandardMaterial({ color: 0xf4f6f8, roughness: 0.45, metalness: 0.08 }),
+      belly: new THREE.MeshStandardMaterial({ color: 0xb6bec8, roughness: 0.5, metalness: 0.15 }),
+      dark: new THREE.MeshStandardMaterial({ color: 0x1b2230, roughness: 0.35, metalness: 0.2 }),
+      glass: new THREE.MeshStandardMaterial({ color: 0x18222f, roughness: 0.15, metalness: 0.5 }),
+      engine: new THREE.MeshStandardMaterial({ color: 0xd9dde2, roughness: 0.4, metalness: 0.3 }),
+      engineIn: new THREE.MeshStandardMaterial({ color: 0x3a4048, roughness: 0.6, metalness: 0.5, side: THREE.BackSide }),
+      fan: new THREE.MeshStandardMaterial({ color: 0x23272e, roughness: 0.7, metalness: 0.6 }),
+      hot: new THREE.MeshStandardMaterial({ color: 0x5c5a58, roughness: 0.5, metalness: 0.7 }),
+      accent: new THREE.MeshStandardMaterial({ color: 0x1f5fb8, roughness: 0.45, metalness: 0.1 }),
+      accent2: new THREE.MeshStandardMaterial({ color: 0xd8442e, roughness: 0.45, metalness: 0.1 }),
+    };
+    function buildExterior() {
+      const g = exterior;
+      // fuselage: 39.5 m, 3.76 m across, a drooped nose and an upswept tail
+      const stations = [
+        [19.75, 0.05, -0.35], [19.3, 0.45, -0.3], [18.6, 0.95, -0.2], [17.7, 1.4, -0.1], [16.6, 1.7, -0.03], [15.3, 1.85, 0], [14, 1.88, 0],
+        [-7, 1.88, 0], [-9.5, 1.84, 0.05], [-12, 1.68, 0.25], [-14.5, 1.4, 0.55], [-16.5, 1.1, 0.85], [-18.2, 0.75, 1.1], [-19.4, 0.4, 1.3], [-19.75, 0.12, 1.4],
+      ];
+      const rings = stations.map(([x, r, yc]) => fuselageRing(x, r, yc));
+      const fus = new THREE.Mesh(loft(rings, true, true), mats.white); g.add(fus);
+      // the belly in a second colour and a cheatline along the windows: strips laid just outside the skin
+      const strip = (from, to, a0, a1, m, k) => g.add(new THREE.Mesh(loft(stations.slice(from, to).map(([x, r, yc]) => arc(12, a0, a1, (a) => [x, yc + Math.sin(a) * r * k, Math.cos(a) * r * k])), false, false), m));
+      strip(1, stations.length - 1, Math.PI + 0.1, Math.PI * 2 - 0.1, mats.belly, 1.004);
+      strip(4, 13, -0.22, -0.06, mats.accent, 1.006); strip(4, 13, Math.PI + 0.06, Math.PI + 0.22, mats.accent, 1.006);
+      // cockpit windows: dark panels wrapped on the nose
+      const cw = new THREE.Mesh(loft([ring(28, (a) => [17.9, -0.08 + Math.sin(a) * 1.44 * 1.01, Math.cos(a) * 1.44 * 1.01]), ring(28, (a) => [16.9, -0.02 + Math.sin(a) * 1.75 * 1.01, Math.cos(a) * 1.75 * 1.01])].map((r) => r.map((p) => (p[1] > 0.55 && p[1] < 1.35 ? p : [p[0], p[1] * 0 + 1.0, p[2] * 0]))), true, false), mats.glass);
+      g.add(cw);
+      // cabin windows: small dark panes at every half metre
+      const paneGeo = new THREE.BoxGeometry(0.26, 0.38, 0.04);
+      const panes = new THREE.InstancedMesh(paneGeo, mats.glass, 2 * 56);
+      const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(1, 1, 1), Pp = new THREE.Vector3();
+      let k = 0;
+      for (let side = -1; side <= 1; side += 2) for (let i = 0; i < 56; i++) {
+        const x = 14.8 - i * 0.51; if (x < -13.6) continue;
+        const r = 1.88, ang = 0.12; // the windows sit just above the cabin floor line, a little above the centreline
+        Pp.set(x, Math.sin(ang) * r, side * Math.cos(ang) * r);
+        Q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), side > 0 ? -ang : ang + Math.PI);
+        M.compose(Pp, Q, S); panes.setMatrixAt(k++, M);
+      }
+      panes.count = k; g.add(panes);
+      // wing: root at x +6, chord 7.6; a kink at 5.6 m; tip at 17.4 m; 25° sweep; 6° dihedral; the winglets
+      const wingSecs = (side) => [
+        airfoil(6.0, -1.05, side * 1.6, 7.6, 0.95, 0.25),
+        airfoil(5.9, -1.0, side * 1.9, 7.6, 0.92, 0.25),
+        airfoil(6.0 - 5.6 * Math.tan(27 * D2R) + 0.9, -1.0 + 5.6 * 0.105, side * 5.6, 4.6, 0.55, 0.3),
+        airfoil(6.0 - 11.5 * Math.tan(27 * D2R) + 1.2, -1.0 + 11.5 * 0.105, side * 11.5, 2.6, 0.3, 0.3),
+        airfoil(6.0 - 17.4 * Math.tan(27 * D2R) + 1.3, -1.0 + 17.4 * 0.105, side * 17.4, 1.45, 0.14, 0.3),
+      ];
+      for (const side of [-1, 1]) {
+        const secs = wingSecs(side); if (side < 0) secs.forEach((r) => r.reverse());
+        g.add(new THREE.Mesh(loft(secs, true, true), mats.white));
+        // split scimitar winglet: a tall blade up and canted out, a short one down
+        const tip = secs[secs.length - 1]; const tx = 6.0 - 17.4 * Math.tan(27 * D2R) + 1.3, ty = -1.0 + 17.4 * 0.105, tz = side * 17.4;
+        const upBlade = [
+          vAirfoil(tx, ty, tz, 1.45, 0.12), vAirfoil(tx - 0.5, ty + 0.5, tz + side * 0.25, 1.15, 0.09),
+          vAirfoil(tx - 1.2, ty + 1.5, tz + side * 0.55, 0.8, 0.06), vAirfoil(tx - 1.9, ty + 2.45, tz + side * 0.75, 0.45, 0.04),
+        ];
+        const dnBlade = [vAirfoil(tx, ty - 0.95, tz + side * 0.35, 0.5, 0.04), vAirfoil(tx - 0.45, ty - 0.45, tz + side * 0.2, 1.0, 0.07), vAirfoil(tx, ty, tz, 1.45, 0.12)];
+        void tip;
+        g.add(new THREE.Mesh(loft(upBlade, true, true), mats.white));
+        g.add(new THREE.Mesh(loft(dnBlade, true, true), mats.white));
+        // the engine: a LEAP-1B nacelle ahead of and under the wing at 4.9 m
+        const ez = side * 4.9, ey = -1.75, ex = 4.7;
+        const nac = (rr, len, x0) => loft([ring(28, (a) => [x0 + len, ey + Math.sin(a) * rr * 0.93, ez + Math.cos(a) * rr * 0.93]), ring(28, (a) => [x0 + len * 0.8, ey + Math.sin(a) * rr, ez + Math.cos(a) * rr]), ring(28, (a) => [x0 + len * 0.3, ey + Math.sin(a) * rr, ez + Math.cos(a) * rr]), ring(28, (a) => [x0, ey + Math.sin(a) * rr * 0.86, ez + Math.cos(a) * rr * 0.86])], true, false);
+        g.add(new THREE.Mesh(nac(1.05, 3.4, ex - 1.9), mats.engine));
+        g.add(new THREE.Mesh(nac(0.98, 3.3, ex - 1.85), mats.engineIn));
+        const fan = new THREE.Mesh(new THREE.CircleGeometry(0.95, 28), mats.fan); fan.rotation.y = Math.PI / 2; fan.position.set(ex + 1.1, ey, ez); g.add(fan);
+        const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.5, 16), mats.engine); spinner.rotation.z = -Math.PI / 2; spinner.position.set(ex + 1.35, ey, ez); g.add(spinner);
+        const core = new THREE.Mesh(loft([ring(20, (a) => [ex - 1.9, ey - 0.1 + Math.sin(a) * 0.62, ez + Math.cos(a) * 0.62]), ring(20, (a) => [ex - 3.1, ey - 0.15 + Math.sin(a) * 0.42, ez + Math.cos(a) * 0.42]), ring(20, (a) => [ex - 3.6, ey - 0.15 + Math.sin(a) * 0.18, ez + Math.cos(a) * 0.18])], true, true), mats.hot); g.add(core);
+        const pylon = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.1, 0.42), mats.white); pylon.position.set(ex - 0.6, ey + 0.95, ez); g.add(pylon);
+      }
+      // horizontal stabiliser: 14.3 m span, 30° sweep, a little dihedral, on the upswept tail
+      for (const side of [-1, 1]) {
+        const secs = [airfoil(-15.4, 0.95, side * 0.9, 3.6, 0.3, 0), airfoil(-15.4 - 3.5 * Math.tan(30 * D2R), 0.95 + 3.5 * 0.12, side * 4.4, 2.5, 0.2, 0), airfoil(-15.4 - 6.3 * Math.tan(30 * D2R), 0.95 + 6.3 * 0.12, side * 7.15, 1.3, 0.1, 0)];
+        if (side < 0) secs.forEach((r) => r.reverse());
+        g.add(new THREE.Mesh(loft(secs, true, true), mats.white));
+      }
+      // the fin, with its dorsal fillet
+      {
+        const finSec = (x, y, c, t) => vAirfoil(x, y, 0, c, t);
+        const secs = [finSec(-11.6, 0.9, 7.4, 0.55), finSec(-12.6, 1.6, 6.6, 0.5), finSec(-14.8, 4.0, 4.5, 0.36), finSec(-16.9, 6.6, 2.7, 0.22), finSec(-17.9, 7.2, 2.3, 0.18)];
+        g.add(new THREE.Mesh(loft(secs, true, true), mats.accent));
+        const fillet = new THREE.Mesh(loft([finSec(-8.8, 1.7, 1.0, 0.25), finSec(-10.5, 1.75, 3.8, 0.4), finSec(-11.6, 1.9, 6.8, 0.5)], true, true), mats.white); g.add(fillet);
+      }
+      // navigation lights: red left, green right, white on the tail, and a beacon under the belly
+      const lightMat = (c) => new THREE.SpriteMaterial({ map: puffTexture(32), color: c, transparent: true, depthWrite: false });
+      const mk = (c, x, y, z, s) => { const sp = new THREE.Sprite(lightMat(c)); sp.position.set(x, y, z); sp.scale.set(s, s, 1); g.add(sp); return sp; };
+      g.userData.navL = mk(0xff3030, 6.0 - 17.4 * Math.tan(27 * D2R) + 1.0, -1.0 + 17.4 * 0.105 + 0.1, -17.6, 0.6);
+      g.userData.navR = mk(0x30ff60, 6.0 - 17.4 * Math.tan(27 * D2R) + 1.0, -1.0 + 17.4 * 0.105 + 0.1, 17.6, 0.6);
+      g.userData.tail = mk(0xffffff, -19.6, 1.4, 0, 0.7);
+      g.userData.beacon = mk(0xff2020, -2, -1.95, 0, 0.7);
+      g.userData.beaconTop = mk(0xff2020, 1, 1.95, 0, 0.7);
+    }
+
+    // ------------------------------------------------------------ the cabin, inside
+    const imat = {
+      floor: new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.95 }),
+      aisle: new THREE.MeshStandardMaterial({ color: 0x46506a, roughness: 0.95 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xe9ecef, roughness: 0.8 }),
+      wallLo: new THREE.MeshStandardMaterial({ color: 0xcfd6dd, roughness: 0.85 }),
+      bin: new THREE.MeshStandardMaterial({ color: 0xf1f3f5, roughness: 0.7 }),
+      binIn: new THREE.MeshStandardMaterial({ color: 0x9aa3ad, roughness: 0.9, side: THREE.BackSide }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0xf6f7f9, roughness: 0.8 }),
+      strip: new THREE.MeshStandardMaterial({ color: 0xcfe4ff, emissive: 0x9fc8ff, emissiveIntensity: 0.9, roughness: 0.6 }),
+      seat: new THREE.MeshStandardMaterial({ color: 0x27405f, roughness: 0.9 }),
+      seatFrame: new THREE.MeshStandardMaterial({ color: 0x8b949e, roughness: 0.5, metalness: 0.5 }),
+      tray: new THREE.MeshStandardMaterial({ color: 0xbfc6cf, roughness: 0.6 }),
+      belt: new THREE.MeshStandardMaterial({ color: 0x1f2630, roughness: 0.8 }),
+      body: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }),
+      head: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75 }),
+      legs: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }),
+      cup: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }),
+      liquid: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 }),
+      stain: new THREE.MeshBasicMaterial({ color: 0x4a2e14, transparent: true, opacity: 0.75 }),
+      bag: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
+      cart: new THREE.MeshStandardMaterial({ color: 0xb9c0c8, roughness: 0.5, metalness: 0.15 }),
+      cartDark: new THREE.MeshStandardMaterial({ color: 0x2b3038, roughness: 0.6 }),
+      signOff: new THREE.MeshStandardMaterial({ color: 0x333a44, roughness: 0.6 }),
+    };
+    const shirtColors = [0xc84b4b, 0x3f7fd0, 0x3fa05a, 0xe0b24a, 0x8a5fc8, 0x4ab0b8, 0xd47a3a, 0xa0a8b4, 0x1b2a4a].map((c) => new THREE.Color(c));
+    const skinColors = [0xf1c9a5, 0xe0ac7f, 0xc68a5a, 0x8d5a3b, 0x5a3825, 0xf6d7bb, 0xb97a52, 0x6e4530].map((c) => new THREE.Color(c));
+    const legColors = [0x2a3140, 0x4a4f58, 0x6b5b45, 0x2c4a7a, 0x3a3a3a].map((c) => new THREE.Color(c));
+    const bagColors = [0x2b2f36, 0x5a3b2e, 0x8b1d2c, 0x1e4b6e, 0x6d6d6d].map((c) => new THREE.Color(c));
+    const liquidColors = [0x4a2a10, 0xe8a23a, 0x7a1a2e].map((c) => new THREE.Color(c));
+
+    const inst = {}; // the instanced meshes of the cabin
+    const binDoors = []; // one pivot per bin
+    const signs = [];
+    function beltSignTexture() {
+      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64; const g = cv.getContext('2d');
+      g.fillStyle = '#111'; g.fillRect(0, 0, 128, 64);
+      g.strokeStyle = '#ffb347'; g.fillStyle = '#ffb347'; g.lineWidth = 5; g.lineCap = 'round'; g.lineJoin = 'round';
+      g.beginPath(); g.arc(50, 14, 7, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.moveTo(36, 60); g.lineTo(36, 40); g.quadraticCurveTo(36, 26, 50, 26); g.quadraticCurveTo(64, 26, 64, 40); g.lineTo(64, 60); g.stroke();
+      g.beginPath(); g.moveTo(66, 40); g.lineTo(84, 40); g.quadraticCurveTo(94, 40, 94, 50); g.lineTo(94, 60); g.stroke();
+      g.beginPath(); g.moveTo(24, 38); g.lineTo(52, 54); g.moveTo(76, 38); g.lineTo(48, 54); g.stroke();
+      g.fillRect(44, 46, 12, 12);
+      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+    }
+    function buildInterior() {
+      const g = interior;
+      const L = C.xFront - C.xRear, xm = (C.xFront + C.xRear) / 2;
+      const box = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
+      // floor and aisle carpet
+      box(L, 0.06, C.halfW * 2, imat.floor, xm, A.FLOOR - 0.03, 0);
+      box(L, 0.07, C.aisleHalf * 2 + 0.1, imat.aisle, xm, A.FLOOR - 0.03, 0);
+      // bulkheads at both ends, and the galleys and lavatory
+      box(0.12, C.height, C.halfW * 2, imat.wall, C.xFront, A.FLOOR + C.height / 2, 0);
+      box(0.12, C.height, C.halfW * 2, imat.wall, C.xRear, A.FLOOR + C.height / 2, 0);
+      box(1.6, 1.05, 1.2, imat.wallLo, C.xFront - 0.9, A.FLOOR + 0.525, -1.1); // the forward galley: counters either side of the door
+      box(1.6, 1.05, 1.2, imat.wallLo, C.xFront - 0.9, A.FLOOR + 0.525, 1.1);
+      box(1.6, 0.04, 1.2, imat.tray, C.xFront - 0.9, A.FLOOR + 1.07, -1.1);
+      box(1.6, 0.04, 1.2, imat.tray, C.xFront - 0.9, A.FLOOR + 1.07, 1.1);
+      box(1.6, C.height - 0.1, 1.25, imat.wallLo, C.xRear + 0.9, A.FLOOR + (C.height - 0.1) / 2, -1.1);
+      box(1.6, C.height - 0.1, 1.25, imat.wallLo, C.xRear + 0.9, A.FLOOR + (C.height - 0.1) / 2, 1.1);
+      // side walls: a lower panel, the window band with its frames, an upper panel leaning in under the bins
+      for (const side of [-1, 1]) {
+        box(L, 0.95, 0.06, imat.wallLo, xm, A.FLOOR + 0.475, side * (C.halfW - 0.02));
+        const yWin = A.FLOOR + 1.14;
+        box(L, 0.08, 0.06, imat.wall, xm, yWin - 0.23, side * (C.halfW - 0.05));
+        box(L, 0.08, 0.06, imat.wall, xm, yWin + 0.23, side * (C.halfW - 0.08));
+        for (let i = -1; i <= C.rows + 1; i++) { // the mullions between the windows
+          const x = A.rowX(i) + C.pitch / 2;
+          if (x > C.xFront - 0.2 || x < C.xRear + 0.2) continue;
+          box(C.pitch - 0.3, 0.38, 0.06, imat.wall, x, yWin, side * (C.halfW - 0.065));
+        }
+        // a pane of glass in each window
+        const paneGeo = new THREE.PlaneGeometry(0.3, 0.38);
+        const paneMat = new THREE.MeshPhysicalMaterial({ color: 0xb9d4f0, transparent: true, opacity: 0.18, roughness: 0.05, metalness: 0, side: THREE.DoubleSide, depthWrite: false });
+        for (let i = -1; i <= C.rows + 1; i++) { const x = A.rowX(i); if (x > C.xFront - 0.4 || x < C.xRear + 0.4) continue; const p = new THREE.Mesh(paneGeo, paneMat); p.position.set(x, yWin, side * (C.halfW - 0.03)); p.rotation.y = Math.PI / 2; g.add(p); }
+        const upper = box(L, 0.36, 0.06, imat.wall, xm, A.FLOOR + 1.33 + 0.17, side * (C.halfW - 0.14)); upper.rotation.x = side * 0.35;
+        // the bin bottoms (the service units) over the seats, with a lit strip along the aisle edge
+        box(L, 0.05, A.BINWALL - A.BINDOOR + 0.1, imat.ceil, xm, A.BIN - 0.02, side * (A.BINDOOR + (A.BINWALL - A.BINDOOR) / 2));
+        box(L, 0.02, 0.04, imat.strip, xm, A.CEIL - 0.04, side * 0.64);
+      }
+      // the shell behind everything: the sidewalls to the crown and a lid across the whole width, so nothing sees the sky but the windows
+      for (const side of [-1, 1]) box(L, C.height + 0.3, 0.04, imat.wall, xm, A.FLOOR + C.height / 2 + 0.1, side * (C.halfW + 0.03));
+      box(L, 0.05, C.halfW * 2 + 0.1, imat.ceil, xm, A.CEIL + 0.12, 0);
+      // the ceiling over the aisle, a shallow vault of three panels
+      box(L, 0.05, 1.3, imat.ceil, xm, A.CEIL, 0);
+      const vault1 = box(L, 0.05, 0.5, imat.ceil, xm, A.CEIL - 0.12, -0.85); vault1.rotation.x = 0.55;
+      const vault2 = box(L, 0.05, 0.5, imat.ceil, xm, A.CEIL - 0.12, 0.85); vault2.rotation.x = -0.55;
+      // the bins: a bucket each, and a door that pivots down from its top edge
+      const binH = A.BINTOP - A.SHELF + 0.1, binD = A.BINWALL - A.BINDOOR;
+      for (const b of sim.state.bins) {
+        const zc = b.side * (A.BINDOOR + binD / 2), yc = (A.SHELF + A.BINTOP) / 2;
+        const shell = new THREE.Mesh(new THREE.BoxGeometry(b.len, binH, binD), imat.binIn); shell.position.set(b.x, yc, zc); g.add(shell);
+        const back = new THREE.Mesh(new THREE.BoxGeometry(b.len, binH, 0.04), imat.bin); back.position.set(b.x, yc, b.side * (A.BINWALL + 0.02)); g.add(back);
+        const top = new THREE.Mesh(new THREE.BoxGeometry(b.len, 0.04, binD), imat.bin); top.position.set(b.x, A.BINTOP + 0.07, zc); g.add(top);
+        const end1 = new THREE.Mesh(new THREE.BoxGeometry(0.03, binH, binD), imat.bin); end1.position.set(b.x - b.len / 2, yc, zc); g.add(end1);
+        const end2 = end1.clone(); end2.position.x = b.x + b.len / 2; g.add(end2);
+        const pivot = new THREE.Group(); pivot.position.set(b.x, A.BINTOP + 0.05, b.side * A.BINDOOR); g.add(pivot);
+        const door = new THREE.Mesh(new THREE.BoxGeometry(b.len - 0.02, binH, 0.05), imat.bin); door.position.set(0, -binH / 2, 0); pivot.add(door);
+        const lip = new THREE.Mesh(new THREE.BoxGeometry(b.len - 0.02, 0.05, 0.12), imat.bin); lip.position.set(0, -binH + 0.02, b.side * 0.06); pivot.add(lip);
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.03), imat.seatFrame); handle.position.set(0, -binH * 0.62, -b.side * 0.04); pivot.add(handle);
+        binDoors.push({ pivot, side: b.side });
+      }
+      // seat-belt signs under the bins, every third pair of rows, facing the aisle
+      const signTex = beltSignTexture();
+      for (let i = 1; i < C.rows; i += 3) for (const side of [-1, 1]) {
+        const m = new THREE.MeshStandardMaterial({ map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0, roughness: 0.5 });
+        const sgn = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.11), m);
+        sgn.position.set(A.rowX(i), A.BIN - 0.09, side * (A.BINDOOR - 0.06)); sgn.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2; sgn.rotation.x = 0; g.add(sgn);
+        sgn.rotateX(-0.5); signs.push(m);
+      }
+      // seats: pans, backs, headrests, frames, on every row
+      const S = sim.state, nSeats = C.rows * 6;
+      inst.pan = new THREE.InstancedMesh(new THREE.BoxGeometry(0.44, 0.1, 0.46), imat.seat, nSeats);
+      inst.back = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.62, 0.44), imat.seat, nSeats);
+      inst.headrest = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.2, 0.3), imat.seat, nSeats);
+      inst.frame = new THREE.InstancedMesh(new THREE.BoxGeometry(0.36, 0.34, 0.04), imat.seatFrame, nSeats);
+      inst.armrest = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, 0.05, 0.05), imat.seatFrame, nSeats + C.rows * 2);
+      const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), V1 = new THREE.Vector3(1, 1, 1), Pp = new THREE.Vector3();
+      let k = 0, ka = 0;
+      for (let r = 0; r < C.rows; r++) for (let j = 0; j < 6; j++) {
+        const x = A.rowX(r), z = C.seatZ[j];
+        M.compose(Pp.set(x, A.PAN - 0.05, z), Q.identity(), V1); inst.pan.setMatrixAt(k, M);
+        M.compose(Pp.set(x - 0.2, A.PAN + 0.3, z), Q.setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.2), V1); inst.back.setMatrixAt(k, M);
+        M.compose(Pp.set(x - 0.3, A.PAN + 0.68, z), Q.setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.2), V1); inst.headrest.setMatrixAt(k, M);
+        M.compose(Pp.set(x, A.FLOOR + 0.17, z), Q.identity(), V1); inst.frame.setMatrixAt(k, M);
+        M.compose(Pp.set(x, A.PAN + 0.22, z + 0.22), Q.identity(), V1); inst.armrest.setMatrixAt(ka++, M);
+        if (j === 0 || j === 3) { M.compose(Pp.set(x, A.PAN + 0.22, z - 0.22), Q.identity(), V1); inst.armrest.setMatrixAt(ka++, M); }
+        k++;
+      }
+      inst.armrest.count = ka;
+      for (const key of ['pan', 'back', 'headrest', 'frame', 'armrest']) { inst[key].instanceMatrix.needsUpdate = true; g.add(inst[key]); }
+      // the people: head, torso, legs, belt
+      const nP = S.pax.length + 1;
+      inst.head = new THREE.InstancedMesh(new THREE.SphereGeometry(C.headR, 14, 10), imat.head, nP);
+      inst.torso = new THREE.InstancedMesh(new THREE.BoxGeometry(0.26, 0.56, 0.42), imat.body, nP);
+      inst.legs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.46, 0.2, 0.36), imat.legs, nP);
+      inst.shins = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.42, 0.3), imat.legs, nP);
+      inst.belt = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.05, 0.46), imat.belt, nP);
+      for (let i = 0; i < nP; i++) {
+        const p = i < S.pax.length ? S.pax[i] : S.attendant;
+        inst.head.setColorAt(i, skinColors[p.col % skinColors.length]);
+        inst.torso.setColorAt(i, p.id === -1 ? new THREE.Color(0x1b2a4a) : shirtColors[p.col]);
+        inst.legs.setColorAt(i, p.id === -1 ? new THREE.Color(0x1b2a4a) : legColors[p.col % legColors.length]);
+        inst.shins.setColorAt(i, p.id === -1 ? new THREE.Color(0x1b2a4a) : legColors[p.col % legColors.length]);
+      }
+      for (const key of ['head', 'torso', 'legs', 'shins', 'belt']) { inst[key].instanceColor && (inst[key].instanceColor.needsUpdate = true); g.add(inst[key]); }
+      // trays, cups, liquid, stains
+      const nC = S.cups.length;
+      inst.tray = new THREE.InstancedMesh(new THREE.BoxGeometry(0.38, 0.02, 0.4), imat.tray, nC);
+      inst.cup = new THREE.InstancedMesh(new THREE.CylinderGeometry(A.CUP_R, A.CUP_R * 0.8, A.CUP_H, 14), imat.cup, nC);
+      inst.liquid = new THREE.InstancedMesh(new THREE.CircleGeometry(A.CUP_R * 0.92, 14), imat.liquid, nC);
+      inst.stain = new THREE.InstancedMesh(new THREE.CircleGeometry(0.07, 12), imat.stain, nC);
+      for (let i = 0; i < nC; i++) {
+        const c = S.cups[i], own = S.pax[c.owner];
+        M.compose(Pp.set(c.x, A.TRAY - 0.01, c.z), Q.identity(), V1); inst.tray.setMatrixAt(i, M);
+        inst.liquid.setColorAt(i, liquidColors[c.kind]);
+        inst.cup.setColorAt(i, new THREE.Color(c.kind === 0 ? 0xf5f0e6 : 0xffffff));
+      }
+      inst.tray.instanceMatrix.needsUpdate = true;
+      for (const key of ['tray', 'cup', 'liquid', 'stain']) { inst[key].instanceColor && (inst[key].instanceColor.needsUpdate = true); g.add(inst[key]); }
+      // bags
+      inst.bag = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), imat.bag, S.bags.length);
+      for (let i = 0; i < S.bags.length; i++) inst.bag.setColorAt(i, bagColors[S.bags[i].col]);
+      inst.bag.instanceColor.needsUpdate = true; g.add(inst.bag);
+      // the cart
+      const cart = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.3), imat.cart); body.position.y = 0.55; cart.add(body);
+      const topTray = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.04, 0.34), imat.cartDark); topTray.position.y = 1.02; cart.add(topTray);
+      for (const dx of [-0.35, 0.35]) for (const dz of [-0.12, 0.12]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.04, 10), imat.cartDark); w.rotation.x = Math.PI / 2; w.position.set(dx, 0.06, dz); cart.add(w); }
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.3), imat.seatFrame); handle.position.set(0.5, 0.95, 0); cart.add(handle);
+      g.add(cart); inst.cart = cart;
+      // spilled drink in the air
+      const dropGeo = new THREE.BufferGeometry(); dropGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(500 * 3), 3));
+      inst.drops = new THREE.Points(dropGeo, new THREE.PointsMaterial({ color: 0x6b3f1c, size: 0.03, sizeAttenuation: true, transparent: true, opacity: 0.9 }));
+      inst.drops.frustumCulled = false; g.add(inst.drops);
+    }
+
+    // ------------------------------------------------------------ the cabin, each frame
+    const _M = new THREE.Matrix4(), _Q = new THREE.Quaternion(), _S = new THREE.Vector3(), _P = new THREE.Vector3(), _E = new THREE.Euler(), _N = new THREE.Vector3(), _Z = new THREE.Vector3(0, 0, 1), _Y = new THREE.Vector3(0, 1, 0);
+    const setInst = (mesh, i, x, y, z, q, sx = 1, sy = 1, sz = 1) => { _M.compose(_P.set(x, y, z), q || _Q.identity(), _S.set(sx, sy, sz)); mesh.setMatrixAt(i, _M); };
+    const hide = (mesh, i) => { _M.makeScale(0, 0, 0); mesh.setMatrixAt(i, _M); };
+    const qLean = (fwd, side) => _Q.setFromEuler(_E.set(Math.atan2(side, 0.6), 0, -Math.atan2(fwd, 0.6), 'XYZ'));
+    function poseSeated(i, p) {
+      const hx = p.x, hy = A.PAN + p.y, hz = p.z, sx = p.sway[0], sz = p.sway[1], sc = p.size;
+      qLean(sx, sz);
+      setInst(inst.torso, i, hx + 0.06 + sx * 0.5, hy + 0.33 * sc, hz + sz * 0.5, _Q, 1, sc, 1);
+      setInst(inst.head, i, hx + 0.06 + sx, hy + C.headSeated * sc, hz + sz, _Q.identity(), sc, sc, sc);
+      setInst(inst.legs, i, hx + 0.22, hy + 0.08, hz, _Q.identity());
+      setInst(inst.shins, i, hx + 0.4, hy - 0.2, hz, _Q.identity());
+      if (p.belt) setInst(inst.belt, i, hx + 0.1, hy + 0.14, hz, _Q.identity()); else hide(inst.belt, i);
+    }
+    function poseStanding(i, p, t) {
+      const lx = p.lean[0], lz = p.lean[1], c = p.crouch, bob = p.mode === 'walking' ? 0.02 * Math.sin(t * 9 + p.id) : 0;
+      const fy = A.FLOOR - 0.28 * c + bob;
+      qLean(lx * 0.9, lz * 0.9);
+      setInst(inst.torso, i, p.px + lx * 0.85, fy + 1.15, lz * 0.85, _Q);
+      setInst(inst.head, i, p.px + lx * 1.4, fy + C.headStanding, lz * 1.4, _Q.identity(), p.size, p.size, p.size);
+      _Q.setFromEuler(_E.set(Math.atan2(lz, 1.2), 0, -Math.atan2(lx, 1.2), 'XYZ'));
+      setInst(inst.legs, i, p.px + lx * 0.45, fy + 0.72 + 0.1 * c, lz * 0.45, _Q, 0.7, 1.8, 1);
+      setInst(inst.shins, i, p.px + lx * 0.15, fy + 0.26, lz * 0.15, _Q, 1.4, 1.2, 1);
+      hide(inst.belt, i);
+    }
+    function poseFree(i, p, t) {
+      const v = p.v, sp = Math.hypot(v[0], v[2]) + 1e-6;
+      // a body in the air rolls over onto its side, head toward where it is going
+      const ang = Math.min(1.5, 0.5 + 0.6 * Math.hypot(v[0], v[1], v[2]));
+      _N.set(-v[2] / sp, 0, v[0] / sp); _Q.setFromAxisAngle(_N, ang);
+      const ux = Math.sin(ang) * v[0] / sp, uy = Math.cos(ang), uz = Math.sin(ang) * v[2] / sp;
+      const [x, y, z] = p.p;
+      setInst(inst.torso, i, x + ux * 0.1, y + uy * 0.1, z + uz * 0.1, _Q);
+      setInst(inst.head, i, x + ux * 0.55, y + uy * 0.55, z + uz * 0.55, _Q, p.size, p.size, p.size);
+      setInst(inst.legs, i, x - ux * 0.35, y - uy * 0.35, z - uz * 0.35, _Q, 0.7, 1.8, 1);
+      setInst(inst.shins, i, x - ux * 0.75, y - uy * 0.75, z - uz * 0.75, _Q, 1.4, 1.2, 1);
+      hide(inst.belt, i);
+    }
+    function poseDown(i, p) {
+      const [x, y, z] = p.p, dir = p.id % 2 ? 1 : -1;
+      _Q.setFromEuler(_E.set(0, 0, dir * Math.PI / 2 * 0.95, 'XYZ'));
+      setInst(inst.torso, i, x, y - 0.2, z, _Q);
+      setInst(inst.head, i, x + dir * 0.5, y - 0.22, z, _Q.identity(), p.size, p.size, p.size);
+      setInst(inst.legs, i, x - dir * 0.4, y - 0.22, z, _Q.identity(), 1.6, 0.9, 1);
+      setInst(inst.shins, i, x - dir * 0.85, y - 0.24, z, _Q.identity(), 2.2, 0.5, 1);
+      hide(inst.belt, i);
+    }
+    const dropPos = new Float32Array(500 * 3);
+    function updateCabin(s, t) {
+      const n = s.pax.length;
+      for (let i = 0; i <= n; i++) {
+        const p = i < n ? s.pax[i] : s.attendant;
+        if (p.mode === 'seated') poseSeated(i, p);
+        else if (p.mode === 'free') poseFree(i, p, t);
+        else if (p.mode === 'down') poseDown(i, p);
+        else poseStanding(i, p, t);
+      }
+      for (const key of ['head', 'torso', 'legs', 'shins', 'belt']) inst[key].instanceMatrix.needsUpdate = true;
+      // cups
+      for (let i = 0; i < s.cups.length; i++) {
+        const c = s.cups[i];
+        if (c.mode === 'tray') {
+          const x = c.x + c.p[0], z = c.z + c.p[1];
+          setInst(inst.cup, i, x, A.TRAY + A.CUP_H / 2, z, _Q.identity());
+          if (c.fill > 0.02) {
+            _N.set(-c.slosh[0], 1, -c.slosh[1]).normalize(); _Q.setFromUnitVectors(_Z, _N);
+            setInst(inst.liquid, i, x, A.TRAY + 0.004 + c.fill * A.CUP_H * 0.96, z, _Q);
+          } else hide(inst.liquid, i);
+        } else {
+          const [x, y, z] = c.p3;
+          if (c.mode === 'free') { _Q.setFromEuler(_E.set(t * 3 + i, 0, t * 2.2, 'XYZ')); setInst(inst.cup, i, x, y, z, _Q); }
+          else { _Q.setFromEuler(_E.set(0, i, Math.PI / 2, 'XYZ')); setInst(inst.cup, i, x, y - 0.01, z, _Q); }
+          if (c.fill > 0.05 && c.mode === 'free') setInst(inst.liquid, i, x, y, z, _Q.identity(), 0.8, 0.8, 0.8); else hide(inst.liquid, i);
+        }
+        if (c.stain > 0.02) { _Q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2); setInst(inst.stain, i, c.x + 0.04, A.TRAY + 0.003, c.z + 0.02, _Q, 0.5 + c.stain, 0.5 + c.stain, 1); } else hide(inst.stain, i);
+      }
+      for (const key of ['cup', 'liquid', 'stain']) inst[key].instanceMatrix.needsUpdate = true;
+      // bags
+      for (let i = 0; i < s.bags.length; i++) {
+        const g = s.bags[i], [w, h, d] = g.size;
+        if (g.mode === 'free') _Q.setFromEuler(_E.set(g.v[2] * 0.4, 0, -g.v[0] * 0.4, 'XYZ'));
+        else if (g.mode === 'floor') _Q.setFromEuler(_E.set(0, 0.4 * i, 0.15, 'XYZ'));
+        else _Q.identity();
+        setInst(inst.bag, i, g.p[0], g.p[1], g.p[2], _Q, w, h, d);
+      }
+      inst.bag.instanceMatrix.needsUpdate = true;
+      // bin doors
+      for (let i = 0; i < s.bins.length; i++) binDoors[i].pivot.rotation.x = binDoors[i].side * s.bins[i].open * 1.15;
+      // the cart
+      inst.cart.position.set(s.cart.x, A.FLOOR + s.cart.y, 0);
+      inst.cart.rotation.z = s.cart.y > 0 ? 0.15 * Math.sin(t * 2) : 0;
+      // drink in the air
+      const nd = s.drops.length;
+      for (let i = 0; i < nd; i++) { const d = s.drops[i]; dropPos[i * 3] = d.p[0]; dropPos[i * 3 + 1] = d.p[1]; dropPos[i * 3 + 2] = d.p[2]; }
+      inst.drops.geometry.attributes.position.array.set(dropPos.subarray(0, nd * 3)); inst.drops.geometry.attributes.position.needsUpdate = true; inst.drops.geometry.setDrawRange(0, nd);
+      // the signs
+      for (const m of signs) { m.emissiveIntensity = s.beltSign ? 1.6 : 0; m.color.setHex(s.beltSign ? 0xffffff : 0x3a3f47); }
+    }
+
+    // ------------------------------------------------------------ cameras
+    const orbit = { az: 2.45, el: 0.22, dist: 56 };
+    const look = { yaw: 0, pitch: -0.06 };
+    const head = { s: [0, 0], v: [0, 0], y: 0, vy: 0 };
+    const OBS = [A.GALLEY_F + 0.45, A.FLOOR + 1.55, 0];
+    const _F = [0, 0, 0];
+    function updateCamera(s, dt) {
+      if (sim.cabinView) {
+        if (camera.parent !== aircraft) { scene.remove(camera); aircraft.add(camera); }
+        // the observer stands at the front of the aisle holding on, head on a spring to the floor's doings
+        A.specificForce(s, OBS, _F);
+        const ax = -_F[0], az = -_F[2], down = -(-_F[1]);
+        const w0 = 9.0, z = 0.65, k = 0.03;
+        head.v[0] += (k * ax - w0 * w0 * head.s[0] - 2 * z * w0 * head.v[0]) * dt; head.s[0] += head.v[0] * dt;
+        head.v[1] += (k * az - w0 * w0 * head.s[1] - 2 * z * w0 * head.v[1]) * dt; head.s[1] += head.v[1] * dt;
+        const yT = -0.012 * (down / A.G - 1);
+        head.vy += ((yT - head.y) * 60 - 2 * 0.7 * Math.sqrt(60) * head.vy) * dt; head.y += head.vy * dt;
+        camera.position.set(OBS[0] + head.s[0], OBS[1] + head.y, OBS[2] + head.s[1]);
+        // looking aft down the aisle, with the user's own look laid on
+        _E.set(0, Math.PI / 2 + look.yaw, 0, 'YXZ'); _Q.setFromEuler(_E);
+        camera.quaternion.copy(_Q).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), look.pitch - 0.04 * head.s[0]));
+        camera.fov = 80;
+      } else {
+        if (camera.parent !== scene) { aircraft.remove(camera); scene.add(camera); }
+        const ce = Math.cos(orbit.el), x = Math.cos(orbit.az) * ce * orbit.dist, z = Math.sin(orbit.az) * ce * orbit.dist, y = Math.sin(orbit.el) * orbit.dist;
+        camera.position.set(x, y, z); camera.up.set(0, 1, 0); camera.lookAt(0, 0, 0);
+        camera.fov = 60;
+      }
+      camera.updateProjectionMatrix();
+    }
+    function applyView() {
+      interior.visible = sim.cabinView;
+      for (const l of cabinLights) l.intensity = sim.cabinView ? 5 : 0;
+      cabinAmbient.intensity = sim.cabinView ? 0.7 : 0;
+      hemi.intensity = sim.cabinView ? 0.5 : 0.9;
+      sun.intensity = sim.cabinView ? 0.9 : 2.6;
+      scene.fog.density = sim.cabinView ? 0.00004 : 0.000055;
+      // the fuselage is seen from inside only through the windows: its skin faces out, so it is already invisible from within
+      $('#icoView').innerHTML = sim.cabinView
+        ? '<path d="M5 20V10a3 3 0 0 1 3-3h2v8h9v5"/><path d="M7 15h12"/><circle cx="16.5" cy="5.5" r="1.8"/><path d="M14 20v-6h5"/>'
+        : '<path d="M2.5 16.5 10 13V5.5a2 2 0 0 1 4 0V13l7.5 3.5V19L14 17.5V20l2 1.5V23l-4-1-4 1v-1.5l2-1.5v-2.5L2.5 19z"/>';
+      settings.camera = sim.cabinView ? 'cabin' : 'outside'; saveSettings();
+    }
+
+    // ------------------------------------------------------------ the instruments
+    const flash = { red: 0, amber: 0 };
+    let lastHits = 0, lastFalls = 0;
+    function drawHud(s, dt) {
+      const dpr = hud.width / hud.getBoundingClientRect().width || 1;
+      const W = hud.width / dpr, Hh = hud.height / dpr, g = hctx;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, Hh);
+      const i = s.info, small = W < 560;
+      const R = small ? 44 : 60, m = small ? 10 : 16, topPad = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')) || 0) + 54;
+      // the extremes of the load, slowly forgotten
+      i.nMin += (i.n - i.nMin) * Math.min(1, dt / 9); i.nMax += (i.n - i.nMax) * Math.min(1, dt / 9);
+      // ---- attitude indicator
+      const cx = m + R, cy = topPad + R;
+      g.save(); g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
+      g.translate(cx, cy); g.rotate(-i.roll);
+      const ppd = R / 32; // pixels per degree of pitch
+      const dy = i.pitch * R2D * ppd;
+      g.fillStyle = '#3e7ed6'; g.fillRect(-3 * R, -3 * R + dy, 6 * R, 3 * R);
+      g.fillStyle = '#8a5a2b'; g.fillRect(-3 * R, dy, 6 * R, 3 * R);
+      g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(-3 * R, dy); g.lineTo(3 * R, dy); g.stroke();
+      g.lineWidth = 1; g.strokeStyle = 'rgba(255,255,255,0.85)';
+      for (let d = -40; d <= 40; d += 10) { if (!d) continue; const y = dy - d * ppd, w = R * 0.3; g.beginPath(); g.moveTo(-w, y); g.lineTo(w, y); g.stroke(); }
+      for (let d = -35; d <= 35; d += 10) { const y = dy - d * ppd, w = R * 0.14; g.beginPath(); g.moveTo(-w, y); g.lineTo(w, y); g.stroke(); }
+      // where the god wants the nose: a hollow chevron
+      const cdy = dy - s.cmd.pitch * R2D * ppd;
+      g.save(); g.rotate(i.roll - s.cmd.roll); g.strokeStyle = '#ff4fd8'; g.lineWidth = 2; g.beginPath(); g.moveTo(-R * 0.42, cdy + 6); g.lineTo(-R * 0.2, cdy); g.lineTo(0, cdy + 6); g.lineTo(R * 0.2, cdy); g.lineTo(R * 0.42, cdy + 6); g.stroke(); g.restore();
+      g.restore();
+      // the bank scale, the pointer and the fixed aeroplane
+      g.save(); g.translate(cx, cy); g.strokeStyle = '#fff'; g.lineWidth = 2;
+      for (const d of [0, 10, 20, 30, 45, 60]) for (const sgn of d ? [-1, 1] : [1]) { const a = -Math.PI / 2 + sgn * d * D2R, L = d % 30 === 0 ? 10 : 6; g.beginPath(); g.moveTo(Math.cos(a) * (R - 1), Math.sin(a) * (R - 1)); g.lineTo(Math.cos(a) * (R - 1 - L), Math.sin(a) * (R - 1 - L)); g.stroke(); }
+      g.save(); g.rotate(-i.roll); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(0, -R + 2); g.lineTo(-6, -R + 13); g.lineTo(6, -R + 13); g.closePath(); g.fill(); g.restore();
+      g.save(); g.rotate(-s.cmd.roll); g.strokeStyle = '#ff4fd8'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -R + 1); g.lineTo(-6, -R - 9); g.lineTo(6, -R - 9); g.closePath(); g.stroke(); g.restore();
+      g.strokeStyle = '#ffd33d'; g.lineWidth = 3; g.beginPath(); g.moveTo(-R * 0.6, 0); g.lineTo(-R * 0.22, 0); g.lineTo(-R * 0.12, R * 0.12); g.lineTo(0, 0); g.lineTo(R * 0.12, R * 0.12); g.lineTo(R * 0.22, 0); g.lineTo(R * 0.6, 0); g.stroke();
+      g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 2; g.stroke();
+      g.restore();
+      // the slip ball under it: a free mass in a curved tube
+      {
+        const by = cy + R + 14, bw = R * 0.9;
+        g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.roundRect(cx - bw, by - 8, bw * 2, 16, 8); g.fill();
+        g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx - 7, by - 8); g.lineTo(cx - 7, by + 8); g.moveTo(cx + 7, by - 8); g.lineTo(cx + 7, by + 8); g.stroke();
+        const off = clamp(-i.ny * 180, -bw + 8, bw - 8);
+        g.fillStyle = Math.abs(off) > 7 ? '#ffd33d' : '#fff'; g.beginPath(); g.arc(cx + off, by, 6, 0, Math.PI * 2); g.fill();
+      }
+      // ---- airspeed: a tape with the green band and the barber pole; the pointer is the indicated speed
+      {
+        const tx = cx + R + 16, ty = topPad, th = R * 2 + 30, tw = small ? 10 : 14;
+        const vmax = 420 * A.KT, yOf = (v) => ty + th - clamp(v / vmax, 0, 1) * th;
+        const vs = Math.sqrt(2 * A.P.mass * A.G / (A.P.rho0 * A.P.S * (A.P.CL0 + A.P.CLa * A.P.aStall)));
+        g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(tx, ty, tw, th);
+        g.fillStyle = '#f85149'; g.fillRect(tx, yOf(vs * 1.0), tw, yOf(0) - yOf(vs * 1.0));
+        g.fillStyle = '#e3b341'; g.fillRect(tx, yOf(vs * 1.25), tw, yOf(vs * 1.0) - yOf(vs * 1.25));
+        g.fillStyle = '#3fb950'; g.fillRect(tx, yOf(A.P.Vmo), tw, yOf(vs * 1.25) - yOf(A.P.Vmo));
+        g.save(); g.beginPath(); g.rect(tx, yOf(vmax), tw, yOf(A.P.Vmo) - yOf(vmax)); g.clip();
+        for (let y = yOf(vmax) - 8; y < yOf(A.P.Vmo) + 8; y += 8) { g.fillStyle = '#f85149'; g.fillRect(tx, y, tw, 4); g.fillStyle = '#fff'; g.fillRect(tx, y + 4, tw, 4); }
+        g.restore();
+        const py = yOf(i.ias), warn = i.stall > 0 || i.overspeed > 0;
+        g.fillStyle = warn && Math.floor(s.t * 6) % 2 ? '#f85149' : '#fff';
+        g.beginPath(); g.moveTo(tx + tw + 2, py); g.lineTo(tx + tw + 12, py - 7); g.lineTo(tx + tw + 12, py + 7); g.closePath(); g.fill();
+        g.fillRect(tx - 2, py - 1.5, tw + 4, 3);
+      }
+      // ---- the g meter, top right: −1 to +3, a 270° sweep; the needle, and the recent extremes
+      {
+        const gx = W - m - R, gy = topPad + R, a0 = Math.PI * 0.75, span = Math.PI * 1.5, ang = (n) => a0 + clamp((n + 1) / 4, 0, 1) * span;
+        const band = (n1, n2, col) => { g.strokeStyle = col; g.lineWidth = 9; g.beginPath(); g.arc(gx, gy, R - 6, ang(n1), ang(n2)); g.stroke(); };
+        g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.arc(gx, gy, R, 0, Math.PI * 2); g.fill();
+        band(-1, 0.3, '#f85149'); band(0.3, 0.8, '#e3b341'); band(0.8, 1.3, '#3fb950'); band(1.3, 2.0, '#e3b341'); band(2.0, 3, '#f85149');
+        g.strokeStyle = '#fff'; g.lineWidth = 2;
+        for (let n = -1; n <= 3; n += 0.5) { const a = ang(n), L = Number.isInteger(n) ? 9 : 5; g.beginPath(); g.moveTo(gx + Math.cos(a) * (R - 12), gy + Math.sin(a) * (R - 12)); g.lineTo(gx + Math.cos(a) * (R - 12 - L), gy + Math.sin(a) * (R - 12 - L)); g.stroke(); }
+        g.fillStyle = '#fff'; { const a = ang(1); g.beginPath(); g.arc(gx + Math.cos(a) * (R - 26), gy + Math.sin(a) * (R - 26), 3, 0, Math.PI * 2); g.fill(); }
+        for (const [n, col] of [[i.nMin, '#58a6ff'], [i.nMax, '#ff7b72']]) { const a = ang(n); g.strokeStyle = col; g.lineWidth = 3; g.beginPath(); g.moveTo(gx + Math.cos(a) * (R - 2), gy + Math.sin(a) * (R - 2)); g.lineTo(gx + Math.cos(a) * (R - 11), gy + Math.sin(a) * (R - 11)); g.stroke(); }
+        const a = ang(i.n); g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.moveTo(gx - Math.cos(a) * 8, gy - Math.sin(a) * 8); g.lineTo(gx + Math.cos(a) * (R - 14), gy + Math.sin(a) * (R - 14)); g.stroke();
+        g.fillStyle = '#e6edf3'; g.beginPath(); g.arc(gx, gy, 5, 0, Math.PI * 2); g.fill();
+      }
+      // a flash at the edges when a head meets the ceiling, or someone goes down
+      if (s.events.headHits > lastHits) flash.red = 1; if (s.events.falls > lastFalls) flash.amber = Math.max(flash.amber, 0.7);
+      lastHits = s.events.headHits; lastFalls = s.events.falls;
+      for (const [key, col] of [['red', '248,81,73'], ['amber', '227,179,65']]) {
+        if (flash[key] <= 0) continue;
+        const grd = g.createRadialGradient(W / 2, Hh / 2, Math.min(W, Hh) * 0.35, W / 2, Hh / 2, Math.max(W, Hh) * 0.75);
+        grd.addColorStop(0, `rgba(${col},0)`); grd.addColorStop(1, `rgba(${col},${0.55 * flash[key]})`);
+        g.fillStyle = grd; g.fillRect(0, 0, W, Hh);
+        flash[key] = Math.max(0, flash[key] - dt * 2.2);
+      }
+    }
+
+    // ------------------------------------------------------------ the god's panel
+    const padAtt = $('#padAtt'), padYaw = $('#padYaw');
+    const knobs = { att: padAtt.querySelector('.knob'), yaw: padYaw.querySelector('.knob') };
+    const padVal = { att: [0, 0], yaw: [0, 0] }; // −1..1 each axis; stays where it is left
+    function placeKnob(which) {
+      const pad = which === 'att' ? padAtt : padYaw, v = padVal[which], r = pad.getBoundingClientRect();
+      knobs[which].style.left = `${50 + v[0] * 42}%`; knobs[which].style.top = `${50 - v[1] * 42}%`;
+      void r;
+    }
+    function applyPads() {
+      const s = sim.state, maxA = A.P.maxAngle;
+      // the attitude pad: up is nose up, right is right wing down; the yaw pad: right is nose right, up is rougher air
+      A.command(s, s.trimPitch + padVal.att[1] * maxA, padVal.att[0] * maxA, padVal.yaw[0] * maxA);
+      sim.turbLevel = clamp((padVal.yaw[1] + 1) / 2, 0, 1);
+      if (sim.turbLevel > 0.02 && !sim.turbOn) { sim.turbOn = true; refreshButtons(); }
+      if (sim.turbLevel <= 0.02 && sim.turbOn) { sim.turbOn = false; refreshButtons(); }
+      s.turb.intensity = sim.turbOn ? sim.turbLevel : 0;
+    }
+    function setupPad(which, pad) {
+      let active = null, lastTap = 0;
+      const set = (ev) => {
+        const r = pad.getBoundingClientRect();
+        const x = clamp(((ev.clientX - r.left) / r.width - 0.5) / 0.42, -1, 1), y = clamp(-((ev.clientY - r.top) / r.height - 0.5) / 0.42, -1, 1);
+        padVal[which][0] = Math.abs(x) < 0.06 ? 0 : x; padVal[which][1] = Math.abs(y) < 0.06 ? 0 : y;
+        placeKnob(which); applyPads();
+      };
+      pad.addEventListener('pointerdown', (ev) => {
+        if (active !== null) return; active = ev.pointerId; pad.setPointerCapture(ev.pointerId);
+        const now = performance.now();
+        if (now - lastTap < 300) { padVal[which] = [0, which === 'yaw' ? -1 : 0]; placeKnob(which); applyPads(); active = null; return; }
+        lastTap = now; set(ev);
+      });
+      pad.addEventListener('pointermove', (ev) => { if (ev.pointerId === active) set(ev); });
+      const end = (ev) => { if (ev.pointerId === active) active = null; };
+      pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
+    }
+    setupPad('att', padAtt); setupPad('yaw', padYaw);
+    padVal.yaw[1] = -1; placeKnob('att'); placeKnob('yaw');
+
+    function refreshButtons() {
+      $('#btnBelt').classList.toggle('on', sim.state.beltSign);
+      $('#btnTurb').classList.toggle('on', sim.turbOn);
+      $('#btnBelt').setAttribute('aria-pressed', String(sim.state.beltSign));
+      $('#btnTurb').setAttribute('aria-pressed', String(sim.turbOn));
+    }
+    const pulse = (id) => { const b = $(id); b.classList.add('pulse'); setTimeout(() => b.classList.remove('pulse'), 350); };
+    function doLevel() { padVal.att = [0, 0]; padVal.yaw[0] = 0; placeKnob('att'); placeKnob('yaw'); applyPads(); A.levelOff(sim.state); }
+    let levelTap = 0;
+    $('#btnLevel').addEventListener('click', () => { const now = performance.now(); if (now - levelTap < 350) { A.resetFlight(sim.state); head.s = [0, 0]; head.v = [0, 0]; } levelTap = now; doLevel(); });
+    $('#btnBelt').addEventListener('click', () => { sim.state.beltSign = !sim.state.beltSign; refreshButtons(); });
+    $('#btnTurb').addEventListener('click', () => {
+      sim.turbOn = !sim.turbOn;
+      if (sim.turbOn && sim.turbLevel <= 0.02) { padVal.yaw[1] = 0.0; placeKnob('yaw'); }
+      if (!sim.turbOn) { padVal.yaw[1] = -1; placeKnob('yaw'); }
+      applyPads(); refreshButtons();
+    });
+    $('#btnJolt1').addEventListener('click', () => { A.jolt(sim.state, -9); pulse('#btnJolt1'); });
+    $('#btnJolt2').addEventListener('click', () => { A.jolt(sim.state, -30); pulse('#btnJolt2'); });
+    $('#btnJolt3').addEventListener('click', () => { A.jolt(sim.state, 15); pulse('#btnJolt3'); });
+    $('#btnView').addEventListener('click', () => { sim.cabinView = !sim.cabinView; applyView(); });
+    $('#btnRecenter').addEventListener('click', () => { look.yaw = 0; look.pitch = -0.06; orbit.az = 2.45; orbit.el = 0.22; orbit.dist = 56; });
+    for (const b of document.querySelectorAll('button')) b.addEventListener('pointerup', () => b.blur());
+
+    // keys: arrows pitch and roll, Q/E yaw, Space the big jolt, J a small one, U an updraft, T turbulence, B the sign, C the view, R level (twice to reset)
+    addEventListener('keydown', (ev) => {
+      if (ev.repeat && !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'q', 'e', 'Q', 'E', '+', '-', '=', '_'].includes(ev.key)) return;
+      const stepA = 0.08;
+      switch (ev.key) {
+        case 'ArrowUp': padVal.att[1] = clamp(padVal.att[1] + stepA, -1, 1); break;
+        case 'ArrowDown': padVal.att[1] = clamp(padVal.att[1] - stepA, -1, 1); break;
+        case 'ArrowRight': padVal.att[0] = clamp(padVal.att[0] + stepA, -1, 1); break;
+        case 'ArrowLeft': padVal.att[0] = clamp(padVal.att[0] - stepA, -1, 1); break;
+        case 'q': case 'Q': padVal.yaw[0] = clamp(padVal.yaw[0] - stepA, -1, 1); break;
+        case 'e': case 'E': padVal.yaw[0] = clamp(padVal.yaw[0] + stepA, -1, 1); break;
+        case '+': case '=': padVal.yaw[1] = clamp(padVal.yaw[1] + 0.1, -1, 1); break;
+        case '-': case '_': padVal.yaw[1] = clamp(padVal.yaw[1] - 0.1, -1, 1); break;
+        case ' ': $('#btnJolt2').click(); break;
+        case 'j': case 'J': $('#btnJolt1').click(); break;
+        case 'u': case 'U': $('#btnJolt3').click(); break;
+        case 't': case 'T': $('#btnTurb').click(); break;
+        case 'b': case 'B': $('#btnBelt').click(); break;
+        case 'c': case 'C': $('#btnView').click(); break;
+        case 'r': case 'R': $('#btnLevel').click(); break;
+        default: return;
+      }
+      ev.preventDefault();
+      placeKnob('att'); placeKnob('yaw'); applyPads();
+    });
+
+    // ---- dragging the view: orbit outside, look around inside; wheel and pinch to zoom outside
+    {
+      const pts = new Map(); let pinch0 = 0, dist0 = 0;
+      canvas.addEventListener('pointerdown', (ev) => { pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY }); canvas.setPointerCapture(ev.pointerId); canvas.classList.add('dragging'); if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); dist0 = orbit.dist; } });
+      canvas.addEventListener('pointermove', (ev) => {
+        const p = pts.get(ev.pointerId); if (!p) return;
+        const dx = ev.clientX - p.x, dy = ev.clientY - p.y; p.x = ev.clientX; p.y = ev.clientY;
+        if (pts.size === 2) { const [a, b] = [...pts.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch0 > 0) orbit.dist = clamp(dist0 * pinch0 / d, 25, 400); return; }
+        if (sim.cabinView) { look.yaw = clamp(look.yaw - dx * 0.004, -1.6, 1.6); look.pitch = clamp(look.pitch + dy * 0.004, -0.9, 0.9); }
+        else { orbit.az -= dx * 0.006; orbit.el = clamp(orbit.el + dy * 0.006, -0.35, 1.3); }
+      });
+      const end = (ev) => { pts.delete(ev.pointerId); if (!pts.size) canvas.classList.remove('dragging'); };
+      canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
+      canvas.addEventListener('wheel', (ev) => { if (!sim.cabinView) orbit.dist = clamp(orbit.dist * Math.exp(ev.deltaY * 0.0012), 25, 400); ev.preventDefault(); }, { passive: false });
+      canvas.addEventListener('dblclick', () => $('#btnRecenter').click());
+    }
+
+    // ---- sizing
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      renderer.setSize(r.width, r.height, false);
+      camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+      const dpr = Math.min(devicePixelRatio, 2);
+      hud.width = Math.round(r.width * dpr); hud.height = Math.round(r.height * dpr);
+      placeKnob('att'); placeKnob('yaw');
+    }
+    addEventListener('resize', resize);
+    if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(resize, 100));
+
+    // ---- lights on the airframe
+    function updateLights(t) {
+      const u = exterior.userData;
+      const strobe = (t % 1.2) < 0.08 ? 1 : 0.25, beacon = 0.35 + 0.65 * Math.max(0, Math.sin(t * 2.6));
+      u.tail.material.opacity = strobe; u.beacon.material.opacity = beacon; u.beaconTop.material.opacity = beacon;
+    }
+
+    // ---- the loop
+    let last = performance.now();
+    function frame(now) {
+      requestAnimationFrame(frame);
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const s = sim.state;
+      sim.time += dt;
+      A.step(s, dt);
+      aircraft.quaternion.set(s.q[0], s.q[1], s.q[2], s.q[3]);
+      updateEnvironment(s);
+      if (sim.cabinView) updateCabin(s, sim.time);
+      updateLights(sim.time);
+      updateCamera(s, dt);
+      renderer.render(scene, camera);
+      drawHud(s, dt);
+    }
+
+    // ---- go
+    buildEnvironment(); buildExterior(); buildInterior();
+    applyView(); applyPads(); refreshButtons(); resize();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
