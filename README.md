@@ -541,6 +541,115 @@ the fix while the phone is flat and holds it for as long as the phone is
 raised; point the phone at the ground for a moment now and then and it
 re-calibrates.
 
+## 🚁 Gyro Courier
+
+A flight simulator, and a courier game: a single-seat open-frame
+gyrocopter — the engine behind the seat pushing, a free-wheeling two-blade
+rotor overhead doing the lifting — over Chattanooga, Tennessee, around Lovell
+Field (KCHA), with deliveries from the city's businesses to other businesses
+and to its houses. There is no street traffic, so the streets are where you
+land.
+
+**Try it: [peligaming.com/tools/irl/gyro-courier](https://peligaming.com/tools/irl/gyro-courier)**
+
+- **The machine.** A Bensen-class single-seater scaled toward today's 7-metre
+  rotors: 258 kg with the pilot, a 7.2 m teetering rotor on a tall mast, a
+  65 hp two-stroke swinging a 1.65 m fixed-pitch pusher prop, a stabilizer
+  and a rudder in the propwash, tricycle gear with a steerable nosewheel, a
+  prerotator and a rotor brake. It cruises at 50–60 kt on about 30 kW, climbs
+  at 600 ft/min at full power, glides engine-off at 1,200 ft/min (an L/D of
+  about 4), takes off in under 200 m from a 200 rpm prerotation, and descends
+  vertically at 2,100 ft/min with no airspeed at all, the rotor still at
+  380 rpm — which is what the real ones do.
+- **The flight model.** The rotor is not a lift coefficient. Both blades of
+  the teetering rotor are followed around the azimuth in the time domain,
+  each sliced into blade elements whose lift and drag come from the local
+  inflow angle (an airfoil model valid at every angle, forward and reversed
+  flow alike, with stall), so autorotation — the inboard sections driving,
+  the outboard dragging, the rotor speed settling where the torques balance —
+  is emergent, as are blowback, retreating-blade stall, the rotor speeding up
+  under g and slowing when unloaded, and the vertical descent. The teeter
+  angle obeys the flap equation with its centrifugal stiffness and the
+  gyroscopic term from the airframe's rates, so the disc follows the head with
+  the real lag and the real damping and the cross-coupling that goes with it;
+  the induced flow comes from momentum theory with Leishman's vortex-ring fit
+  and a first-order lag; the teeter stops are modelled and a rotor flapped
+  onto them in flight is the end of you. The airframe is a six-degree-of-
+  freedom rigid body with the propeller as a thrust-and-torque map against
+  advance ratio, the engine as a torque curve with an idle governor and a
+  starter, the tail surfaces as finite plates in the slipstream, tyres as
+  bristles that hold still until they slide, and a surface-layer wind with
+  gusts. Everything integrates at 360 Hz. A **flight assist** (on by default;
+  off in the settings) damps the head and holds attitude while the stick is
+  centred, because a phone's self-centring stick cannot be a hand on a real
+  gyro's; the aerodynamics are the same either way, and the bare machine
+  departs hands-off in about twenty seconds, as it should.
+- **The controls.** Two touch sticks in a static panel: the right one the
+  cyclic (self-centring, with an expo curve), the left one throttle up and
+  down (it stays where you leave it) and rudder sideways (it centres). Hold
+  buttons for the wheel brakes and the prerotator; toggles for the engine and
+  the rotor brake; a trim button that makes the stick's current position its
+  new centre. Everything has a key.
+- **Looking around.** Drag the view, or let the phone's orientation sensors
+  turn your head: hold the phone up and turn, and the cockpit view turns with
+  it, relative to the aircraft (a tap recentres). Cockpit and chase views.
+- **The world.** 29 × 23 km around the airport — downtown, the river's bends,
+  Lookout and Signal Mountains, the suburbs out to Collegedale and Hixson —
+  on USGS terrain, with OpenStreetMap's 38,000 streets as draped ribbons
+  (centre lines on the bigger ones, bridges on their decks), 84,000 buildings
+  extruded to their tagged or typical heights, forests and parks and
+  farmland painted from the land cover and planted with trees, the river
+  with a glint on it, and KCHA with both runways marked and numbered, its
+  taxiways, aprons and a windsock. The forest canopy and the buildings are
+  solid; the river is wet.
+- **Deliveries.** The job board offers runs from 2,300 named businesses to
+  other businesses or to 7,400 houses, each with the street point nearest its
+  door; land within 80 m of it, stop, wait three seconds, and fly on. Pay by
+  distance with a bonus for pace; a log of deliveries, earnings, crashes and
+  flight time kept in your browser.
+- **Instruments.** Airspeed, ground speed, vertical speed, altitude above
+  ground and sea level, a heading tape with the delivery's bearing, the rotor
+  gauge with its green arc (300–430 rpm), engine rpm, throttle, g, slip ball,
+  wind, warnings (low rotor, unloaded, overspeed, sink rate), a minimap, and
+  the map with the offers drawn on it.
+
+### How it's built
+
+- `public/tools/irl/gyro-courier.html` is the app: vanilla JS and three.js
+  (vendored at `public/tools/irl/lib/`), no build step. Its
+  `<script id="gyro-engine">` block is the flight model, pure maths with no
+  DOM, which is why `npm run check:gyro` (`scripts/check-gyro.mjs`) can fly
+  it under Node: a test pilot prerotates, takes off, trims level flight at
+  four speeds, glides engine-off, descends vertically, pushes over, lets go
+  of the stick with and without the assist, and lands, and thirty-odd checks
+  hold the numbers to the published ranges for machines of this class.
+- The terrain is a geometry clipmap: seven nested rings of one fixed grid
+  around the camera, their heights read in the vertex shader from a float
+  texture of the same 14 m grid the physics stands on, the land cover read in
+  the fragment shader from a class texture and blended at the cell edges.
+  Streets and buildings are built into 2 km tiles as the aircraft moves, the
+  trees are two instanced meshes re-scattered from the land cover around the
+  camera.
+- `npm run data:gyro` (`scripts/fetch-gyro-courier.mjs`) builds
+  `public/tools/irl/data/gyro-courier/` from the AWS Terrain Tiles (Mapzen
+  Terrarium PNGs; in the US, USGS 3DEP) at zoom 14 averaged onto the 14 m
+  grid, and from OpenStreetMap through the Overpass API (the French mirror
+  first): the heights as Paeth-predicted residual planes, gzipped
+  (`height.bin`); the land cover rasterised from the landuse, natural,
+  leisure, water, aeroway and parking polygons with every road, railway and
+  apron painted in (`cover.bin`); the streets and footprints as per-polyline
+  deltas in half metres (`world.bin`), footprints simplified with
+  Douglas–Peucker; and `world.json` with the index, the airport, the
+  bridges with their deck heights, and every business and sampled house with
+  the nearest landable street point. Downloads are cached in
+  `.gyro-cache/`. © OpenStreetMap contributors, ODbL.
+
+The honest limits: a single rigid teetering rotor with ten blade elements
+and uniform-plus-linear inflow, no blade lag or torsion, no ground effect,
+no rotor wake on the tail; the buildings are boxes at typical heights where
+OSM has none; the trees are placed by hash, not by survey; and the land cover
+is 7 m cells, so a narrow street through a forest is a narrow landing.
+
 ## Other tools
 
 | Game | Tool | What it does |
@@ -555,6 +664,7 @@ re-calibrates.
 | Fortnite | Tactical Terrain | The island in 3D — sightlines, dead ground, cover |
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
 | Skyrim | Alchemy Lab | Best-value potions from your ingredient stock |
+| IRL | Gyro Courier | Fly an ultralight gyrocopter over Chattanooga with a blade-element rotor model, and run deliveries from businesses to houses, landing on the streets |
 | IRL | Sky Pointer | Point your phone at the night sky: the stars, constellations, planets, Moon, deep-sky objects and satellites in that direction, with a finder for anything you search; or set a place and time and pan by hand |
 
 ### RuneScape data plumbing

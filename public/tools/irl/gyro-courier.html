@@ -1,0 +1,2522 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Gyro Courier — an ultralight gyrocopter over Chattanooga</title>
+  <meta name="description" content="Fly a single-seat open-frame gyrocopter over Chattanooga and Lovell Field (KCHA), with a blade-element rotor model, and run deliveries from the city's businesses to its houses — landing on the streets.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚁</text></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0d1117;
+      --panel: rgba(22, 27, 34, 0.88);
+      --panel-solid: #161b22;
+      --panel-border: #30363d;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --brand: #58a6ff;
+      --accent: #f2c94c;
+      --good: #3fb950;
+      --warn: #e3b341;
+      --bad: #f85149;
+      --panel-h: 164px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+    }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
+      overscroll-behavior: none;
+      touch-action: none;
+    }
+    a { color: var(--brand); }
+    button, input, select { font: inherit; color: inherit; }
+    button {
+      background: var(--panel); border: 1px solid var(--panel-border); border-radius: 8px;
+      padding: 8px 12px; cursor: pointer; white-space: nowrap; touch-action: none;
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    button:hover { border-color: var(--brand); }
+    button.primary { background: var(--accent); color: #1b1400; border-color: transparent; font-weight: 700; }
+    button.on { border-color: var(--accent); color: var(--accent); }
+    button.held { background: rgba(242, 201, 76, 0.25); border-color: var(--accent); }
+    button:disabled { opacity: 0.45; cursor: default; }
+    select { background: var(--panel-solid); border: 1px solid var(--panel-border); border-radius: 8px; padding: 6px 8px; }
+    kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; border: 1px solid var(--panel-border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: rgba(255,255,255,0.04); }
+
+    /* ---- the view and the HUD ---- */
+    #view, #hud {
+      position: fixed; left: 0; top: 0; width: 100%;
+      height: calc(100% - var(--panel-h) - var(--safe-bottom));
+      display: block;
+    }
+    #view { touch-action: none; cursor: grab; background: #1b2a3a; }
+    #view.dragging { cursor: grabbing; }
+    #hud { pointer-events: none; }
+
+    /* ---- top chips ---- */
+    .top {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: calc(8px + var(--safe-top)) calc(10px + var(--safe-right)) 0 calc(10px + var(--safe-left));
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap; pointer-events: none;
+    }
+    .top > * { pointer-events: auto; }
+    .back { color: var(--text-dim); text-decoration: none; font-size: 12px; padding: 4px 6px; border-radius: 6px; background: var(--panel); }
+    .back:hover { color: var(--text); }
+    .title { font-weight: 800; font-size: 14px; letter-spacing: -0.2px; padding: 4px 8px; background: var(--panel); border-radius: 6px; }
+    .chip {
+      font-size: 12px; padding: 4px 9px; border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border);
+      color: var(--text-dim); cursor: pointer; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .chip b { color: var(--text); font-weight: 600; }
+    .chip.warn { border-color: var(--warn); color: var(--warn); }
+    .chip.quest { border-color: var(--accent); color: var(--text); max-width: 60vw; }
+    .spacer { flex: 1; pointer-events: none; }
+    .iconbtn { padding: 4px 9px; font-size: 14px; line-height: 1.2; border-radius: 999px; }
+
+    /* ---- the control panel ---- */
+    #panel {
+      position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--panel-h) + var(--safe-bottom));
+      padding: 8px calc(8px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(8px + var(--safe-left));
+      background: linear-gradient(rgba(13, 17, 23, 0.85), rgba(13, 17, 23, 0.97));
+      border-top: 1px solid var(--panel-border);
+      display: grid; grid-template-columns: 150px 1fr 150px; gap: 8px; align-items: stretch;
+      touch-action: none;
+    }
+    .stick {
+      position: relative; border-radius: 14px; background: rgba(22, 27, 34, 0.9); border: 1px solid var(--panel-border);
+      touch-action: none; overflow: hidden;
+    }
+    .stick .label { position: absolute; left: 8px; top: 6px; font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; pointer-events: none; }
+    .stick .label.r { left: auto; right: 8px; }
+    .stick .label.b { top: auto; bottom: 6px; }
+    .stick .label.short { display: none; }
+    .stick .cross { position: absolute; inset: 0; pointer-events: none; }
+    .stick .cross::before, .stick .cross::after { content: ""; position: absolute; background: rgba(255,255,255,0.08); }
+    .stick .cross::before { left: 50%; top: 10%; bottom: 10%; width: 1px; }
+    .stick .cross::after { top: 50%; left: 10%; right: 10%; height: 1px; }
+    .stick .knob {
+      position: absolute; width: 54px; height: 54px; margin: -27px 0 0 -27px; left: 50%; top: 50%;
+      border-radius: 50%; background: radial-gradient(circle at 35% 35%, #8fb9ff, #2f6fd1 65%, #1b3f80);
+      border: 2px solid rgba(255,255,255,0.35); box-shadow: 0 4px 14px rgba(0,0,0,0.45); pointer-events: none;
+    }
+    .stick.left .knob { background: radial-gradient(circle at 35% 35%, #ffe28a, #d9a334 65%, #7a5a14); }
+    .stick .trail { position: absolute; left: 50%; top: 10%; bottom: 10%; width: 6px; margin-left: -3px; border-radius: 3px; background: rgba(255,255,255,0.06); pointer-events: none; }
+    .stick .fill { position: absolute; left: 50%; width: 6px; margin-left: -3px; bottom: 10%; border-radius: 3px; background: linear-gradient(#f2c94c, #d9a334); pointer-events: none; }
+    .buttons { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 6px; min-width: 0; }
+    .buttons button { padding: 4px 6px; font-size: 12px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; border-radius: 10px; line-height: 1.2; }
+    .buttons button small { display: block; font-weight: 400; font-size: 10px; color: var(--text-dim); }
+    .buttons button.on small, .buttons button.held small { color: inherit; }
+    .buttons button.danger.on { border-color: var(--bad); color: var(--bad); }
+
+    /* ---- overlays ---- */
+    .overlay {
+      position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center;
+      background: rgba(13, 17, 23, 0.72); padding: 16px; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+      overflow: auto; touch-action: pan-y;
+    }
+    .overlay.show { display: flex; }
+    .card {
+      background: var(--panel-solid); border: 1px solid var(--panel-border); border-radius: 14px; padding: 18px 20px;
+      max-width: 620px; width: 100%; max-height: calc(100% - 20px); overflow: auto; -webkit-user-select: text; user-select: text;
+    }
+    .card h1 { font-size: 22px; letter-spacing: -0.3px; margin-bottom: 4px; }
+    .card h2 { font-size: 15px; margin: 14px 0 6px; }
+    .card p, .card li { color: var(--text-dim); font-size: 13.5px; }
+    .card ul, .card ol { padding-left: 20px; }
+    .card li { margin: 3px 0; }
+    .card b { color: var(--text); }
+    .card .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
+    .card label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); padding: 4px 0; }
+    .card label input[type="checkbox"] { width: 18px; height: 18px; }
+    .card .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+    .card table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    .card td, .card th { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--panel-border); }
+    .card th { color: var(--text-dim); font-weight: 600; }
+    .card .right { text-align: right; }
+    .job { border: 1px solid var(--panel-border); border-radius: 10px; padding: 10px 12px; margin-top: 8px; cursor: pointer; }
+    .job:hover { border-color: var(--accent); }
+    .job .pay { float: right; color: var(--accent); font-weight: 700; }
+    .job .from, .job .to { color: var(--text); }
+    .job small { color: var(--text-dim); }
+    .pill { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--panel-border); color: var(--text-dim); margin-left: 6px; }
+    #map { width: auto; max-width: 100%; max-height: 50vh; border-radius: 8px; border: 1px solid var(--panel-border); background: #0b0f14; touch-action: none; cursor: grab; display: block; margin: 0 auto; }
+    .toast {
+      position: fixed; left: 50%; bottom: calc(var(--panel-h) + var(--safe-bottom) + 44px); transform: translateX(-50%); z-index: 30;
+      background: var(--panel-solid); border: 1px solid var(--panel-border); border-radius: 10px; padding: 8px 14px;
+      font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; max-width: 90vw; text-align: center;
+    }
+    .toast.show { opacity: 1; }
+    .loading { position: fixed; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; background: var(--bg); }
+    .loading .bar { width: 240px; height: 6px; border-radius: 3px; background: var(--panel-border); overflow: hidden; }
+    .loading .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+    .loading p { color: var(--text-dim); font-size: 13px; }
+    .loading.hide { display: none; }
+
+    @media (max-width: 700px) {
+      :root { --panel-h: 150px; }
+      #panel { grid-template-columns: 128px 1fr 128px; gap: 6px; }
+      .buttons { grid-template-columns: repeat(3, 1fr); gap: 4px; }
+      .buttons button { font-size: 11px; padding: 2px 4px; }
+      .buttons button small { font-size: 9px; }
+      .stick .knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
+      .title { display: none; }
+    }
+    @media (max-width: 520px) {
+      :root { --panel-h: 196px; }
+      #panel { grid-template-columns: 96px 1fr 96px; gap: 6px; }
+      .buttons { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+      .buttons button { font-size: 11px; padding: 2px 3px; letter-spacing: -0.2px; }
+      .buttons button small { font-size: 9px; }
+      .stick .knob { width: 40px; height: 40px; margin: -20px 0 0 -20px; }
+      .stick .label { font-size: 9px; }
+      .stick .label.long { display: none; }
+      .stick .label.short { display: block; }
+      .stick .label.r { left: 8px; right: auto; top: 18px; }
+      .chip.quest { max-width: 52vw; }
+    }
+    @media (max-height: 420px) {
+      :root { --panel-h: 132px; }
+      .stick .knob { width: 42px; height: 42px; margin: -21px 0 0 -21px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <canvas id="hud"></canvas>
+
+  <div class="top">
+    <a class="back" href="../../">← peligaming</a>
+    <span class="title">🚁 Gyro Courier</span>
+    <span class="chip quest" id="chipQuest" title="Deliveries">No job — tap for the job board</span>
+    <span class="chip warn" id="chipWarn" style="display:none"></span>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="btnLook" title="Look around with the phone's sensors">📱</button>
+    <button class="iconbtn" id="btnRecenter" title="Recenter the view (or double-tap the view)">⌖</button>
+    <button class="iconbtn" id="btnSound" title="Sound">🔇</button>
+    <button class="iconbtn" id="btnHelp" title="Help and settings">?</button>
+  </div>
+
+  <div id="panel">
+    <div class="stick left" id="stickL">
+      <span class="label long">throttle ↕</span><span class="label r long">rudder ↔</span><span class="label short">thr ↕ · rud ↔</span><span class="label b" id="thrLabel">0%</span>
+      <div class="cross"></div><div class="trail"></div><div class="fill" id="thrFill" style="height:0"></div><div class="knob"></div>
+    </div>
+    <div class="buttons">
+      <button id="btnEngine" title="Ignition">ENGINE<small>off</small></button>
+      <button id="btnPrerot" title="Hold: the prerotator spins the rotor up on the ground (needs some throttle)">PREROT<small>hold</small></button>
+      <button id="btnBrake" title="Hold: wheel brakes">BRAKE<small>hold</small></button>
+      <button id="btnRotorBrake" class="danger" title="Rotor brake: stops the rotor on the ground">ROTOR BRK<small>off</small></button>
+      <button id="btnTrim" title="Trim: take the stick's current position as the new centre (double-tap to clear)">TRIM<small>set</small></button>
+      <button id="btnCam" title="First or third person">VIEW<small>cockpit</small></button>
+      <button id="btnMap" title="The map and the job board">MAP<small>jobs</small></button>
+      <button id="btnReset" title="Back to the ramp">RESET<small>ramp</small></button>
+    </div>
+    <div class="stick right" id="stickR">
+      <span class="label long">cyclic</span><span class="label r" id="assistLabel">assist</span>
+      <div class="cross"></div><div class="knob"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="loading" id="loading">
+    <div style="font-size:40px">🚁</div>
+    <div style="font-weight:800;font-size:18px">Gyro Courier</div>
+    <div class="bar"><i id="loadBar"></i></div>
+    <p id="loadText">Loading Chattanooga…</p>
+  </div>
+
+  <div class="overlay" id="ovHelp">
+    <div class="card">
+      <h1>🚁 Gyro Courier</h1>
+      <p>A single-seat open-frame gyrocopter — the engine behind your seat pushing, a free-wheeling two-blade rotor overhead doing the lifting — over Chattanooga, Tennessee, around Lovell Field (KCHA). The streets are empty: that is where you land.</p>
+      <h2>How a gyro flies</h2>
+      <p>The rotor is not driven in flight. It spins because air flows <b>up</b> through it, so the disc must always be tilted a little back into the airflow, and it must be kept <b>loaded</b>: a push-over that unloads it slows it, and a slow rotor cannot lift you. Watch the rotor gauge. The prerotator only spins it up on the ground; the takeoff roll brings it to flight speed.</p>
+      <h2>Flying it</h2>
+      <ol>
+        <li><b>ENGINE</b> to start. Hold <b>BRAKE</b>, bring the throttle to about 40%, and hold <b>PREROT</b> until the rotor passes 200 rpm.</li>
+        <li>Line up, full throttle, stick well back. As the rotor passes 300 rpm ease the stick forward; it lifts off around 40–45 kt. Climb at 45–50 kt.</li>
+        <li>Cruise at 50–60 kt. The stick tilts the rotor head: back to slow and climb, forward to speed up. Throttle sets climb and descent. Rudder (the left stick, sideways) keeps the ball centred and steers on the ground.</li>
+        <li>To land: approach at 40 kt, throttle low, flare over the street to walking pace, touch down, hold the stick back, brake. A gyro can land in a few metres; it can even descend vertically with no airspeed (about 2,000 ft/min, rotor spinning).</li>
+        <li>Engine failure is not an emergency: glide at 45–50 kt and flare. <b>Never</b> push the nose over hard, and never let the rotor get slow.</li>
+      </ol>
+      <h2>Controls</h2>
+      <div class="grid2">
+        <div><b>Right stick</b> — cyclic (self-centring)</div><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows</div>
+        <div><b>Left stick</b> — throttle up/down (stays), rudder left/right (centres)</div><div><kbd>Shift</kbd>/<kbd>Ctrl</kbd> throttle · <kbd>Q</kbd>/<kbd>E</kbd> rudder</div>
+        <div><b>TRIM</b> — the stick's current position becomes centre</div><div><kbd>T</kbd> set · double-tap or <kbd>Y</kbd> clear</div>
+        <div><b>BRAKE</b> · <b>PREROT</b> (hold) · <b>ROTOR BRK</b> · <b>ENGINE</b></div><div><kbd>B</kbd> · <kbd>P</kbd> · <kbd>R</kbd> · <kbd>I</kbd></div>
+        <div><b>VIEW</b> cockpit / chase · <b>MAP</b> &amp; jobs · <b>RESET</b></div><div><kbd>C</kbd> · <kbd>M</kbd> · <kbd>Backspace</kbd></div>
+        <div><b>Look</b> — drag the view, or turn the phone (📱)</div><div>mouse drag · ⌖ recentres</div>
+      </div>
+      <h2>Settings</h2>
+      <label><input type="checkbox" id="setAssist" checked> Flight assist — damps the rotor head and holds attitude while the stick is centred (a stability augmentation; the aerodynamics are unchanged). Off, the bare machine needs your hand on the stick at all times, as a real gyro does.</label>
+      <label><input type="checkbox" id="setLook" checked> Look around with the phone's sensors when available</label>
+      <label><input type="checkbox" id="setMetric"> Metric instruments (km/h, m) instead of knots and feet</label>
+      <label>Wind <select id="setWind"><option value="calm">calm</option><option value="light" selected>light (3–6 kt)</option><option value="breezy">breezy (8–14 kt)</option><option value="gusty">gusty (12–20 kt)</option></select></label>
+      <label>Time of day <select id="setTime"><option value="morning">morning</option><option value="noon" selected>midday</option><option value="evening">evening</option></select></label>
+      <label>Detail <select id="setQuality"><option value="low">low (older phones)</option><option value="medium" selected>medium</option><option value="high">high</option></select></label>
+      <div class="row">
+        <button class="primary" id="btnStartRamp">Start on the ramp</button>
+        <button id="btnStartRunway">Quick start: lined up, rotor spun</button>
+        <button id="btnStartAir">Quick start: airborne over the airport</button>
+        <button id="btnCloseHelp">Close</button>
+      </div>
+      <p style="margin-top:14px;font-size:12px">The flight model follows both blades of the teetering rotor around the azimuth with blade-element aerodynamics, so autorotation, blowback, retreating-blade stall, rotor unloading and the vertical descent are what the maths does rather than scripted; the airframe carries a pusher engine, a stabilizer and rudder in the propwash, and tricycle gear. Terrain is USGS 3DEP; streets, buildings, land cover, businesses and houses are © OpenStreetMap contributors (ODbL). No street traffic is modelled — the streets are yours.</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="ovMap">
+    <div class="card" style="max-width:860px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h1 style="font-size:18px">Map &amp; jobs</h1>
+        <span class="pill" id="mapStats"></span>
+        <span class="spacer" style="flex:1"></span>
+        <button id="btnNewJobs">New offers</button>
+        <button id="btnCloseMap">Close</button>
+      </div>
+      <canvas id="map" width="800" height="634"></canvas>
+      <div id="jobs"></div>
+      <div id="log" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ovCrash">
+    <div class="card" style="max-width:460px;text-align:center">
+      <h1 id="crashTitle">💥</h1>
+      <p id="crashText"></p>
+      <div class="row" style="justify-content:center">
+        <button class="primary" id="btnCrashRamp">Back to the ramp</button>
+        <button id="btnCrashHere">Try again from the nearest street</button>
+      </div>
+    </div>
+  </div>
+
+  <script id="gyro-engine">
+  // ======================================================================
+  // GYRO — the flight model of a single-seat open-frame autogyro.
+  //
+  // A pure function of state and time, no DOM: the page steps it every
+  // frame and scripts/check-gyro.mjs flies it under Node. Everything is SI.
+  //
+  // Frames. World: x east, y up, z south (three.js). Body: x forward,
+  // y up, z right; the identity attitude faces east. Hub: the rotor head,
+  // the body frame tilted by the stick. Blade azimuth ψ runs from the tail
+  // (ψ = 0) through the right side (ψ = 90°) — the rotor turns
+  // counter-clockwise seen from above, advancing blade on the right.
+  //
+  // The rotor is simulated in the time domain, not with the usual
+  // closed-form coefficients: both blades of the teetering two-blade rotor
+  // are followed around the azimuth, each sliced into blade elements whose
+  // lift and drag come from the local inflow angle (so autorotation —
+  // the inboard sections driving, the outboard dragging — is emergent, as
+  // are reverse flow on the retreating side, retreating-blade stall and
+  // the loss of rotor speed when the rotor is unloaded). The teeter angle
+  // obeys the flap equation with its centrifugal stiffness and the
+  // gyroscopic term from the airframe's rates, so the disc follows the
+  // head with the real lag and the real damping; the induced flow comes
+  // from momentum theory with the measured vortex-ring correction and a
+  // first-order lag.
+  // ======================================================================
+  const GYRO = (() => {
+    'use strict';
+    const D2R = Math.PI / 180, R2D = 180 / Math.PI, G = 9.80665, TAU = Math.PI * 2;
+    const KT = 0.514444, FT = 0.3048;
+
+    // ---------------------------------------------------------- vectors
+    const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    const scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const norm = (a) => Math.hypot(a[0], a[1], a[2]);
+    const unit = (a) => { const n = norm(a); return n > 1e-12 ? scale(a, 1 / n) : [0, 0, 0]; };
+    const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+    const madd = (acc, v, s) => { acc[0] += v[0] * s; acc[1] += v[1] * s; acc[2] += v[2] * s; };
+
+    // ---------------------------------------------------------- quaternions [x, y, z, w], body → world
+    const qmul = (a, b) => [
+      a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+      a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+      a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+      a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+    ];
+    const qaxis = (axis, ang) => { const s = Math.sin(ang / 2); return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(ang / 2)]; };
+    const qnorm = (q) => { const n = Math.hypot(q[0], q[1], q[2], q[3]) || 1; return [q[0] / n, q[1] / n, q[2] / n, q[3] / n]; };
+    const qconj = (q) => [-q[0], -q[1], -q[2], q[3]];
+    function qrot(q, v) { // rotate v by q
+      const x = q[0], y = q[1], z = q[2], w = q[3];
+      const ix = w * v[0] + y * v[2] - z * v[1], iy = w * v[1] + z * v[0] - x * v[2], iz = w * v[2] + x * v[1] - y * v[0], iw = -x * v[0] - y * v[1] - z * v[2];
+      return [ix * w + iw * -x + iy * -z - iz * -y, iy * w + iw * -y + iz * -x - ix * -z, iz * w + iw * -z + ix * -y - iy * -x];
+    }
+    const qinv = (q, v) => qrot(qconj(q), v);
+    // heading from north clockwise, pitch up, roll right-wing-down (radians)
+    const qfromEuler = (heading, pitch, roll) => qmul(qmul(qaxis([0, 1, 0], Math.PI / 2 - heading), qaxis([0, 0, 1], pitch)), qaxis([1, 0, 0], roll));
+    function qtoEuler(q) {
+      const f = qrot(q, [1, 0, 0]), u = qrot(q, [0, 1, 0]), r = qrot(q, [0, 0, 1]);
+      return { heading: (Math.atan2(f[0], -f[2]) + TAU) % TAU, pitch: Math.asin(clamp(f[1], -1, 1)), roll: Math.atan2(-r[1], u[1]) };
+    }
+    // rotation matrix columns of the hub frame in body coordinates for a head tilted aft by a and right by b
+    function hubBasis(a, b) {
+      // y_h = R_z(a) R_x(b) ŷ, x_h = R_z(a) R_x(b) x̂, z_h = R_z(a) R_x(b) ẑ
+      const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+      // R_x(b): y→(0,cb,sb), z→(0,-sb,cb); then R_z(a): x→(ca,sa,0), y→(-sa,ca,0)
+      const xh = [ca, sa, 0];
+      const yh = [-sa * cb, ca * cb, sb];
+      const zh = [sa * sb, -ca * sb, cb];
+      return { xh, yh, zh };
+    }
+    const toHub = (B, v) => [dot(v, B.xh), dot(v, B.yh), dot(v, B.zh)];
+    const fromHub = (B, v) => [B.xh[0] * v[0] + B.yh[0] * v[1] + B.zh[0] * v[2], B.xh[1] * v[0] + B.yh[1] * v[1] + B.zh[1] * v[2], B.xh[2] * v[0] + B.yh[2] * v[1] + B.zh[2] * v[2]];
+
+    // ---------------------------------------------------------- the aircraft
+    // A single-seat open-frame pusher: keel and mast, the seat in front of
+    // the engine, a tall mast with a teetering two-blade rotor, a tail with a
+    // fixed stabilizer and a rudder in the propwash, tricycle gear with a
+    // steerable nosewheel. The numbers are those of the classic
+    // Bensen-class machines, scaled a little toward today's 7-m rotors.
+    const P = {
+      mass: 258, // kg, with the pilot
+      inertia: [115, 190, 150], // kg·m² about body x (roll), y (yaw), z (pitch)
+      rotor: {
+        R: 3.6, chord: 0.19, blades: 2,
+        theta0: 3.6 * D2R, precone: 2.0 * D2R,
+        bladeMass: 10.5, // kg each; I_b = m R²/3
+        rootCut: 0.14, stations: 10, tipLoss: 0.97,
+        hub: [-0.05, 1.30, 0],
+        tiltFwd: 7.5 * D2R, tiltAft: 12.5 * D2R, tiltLat: 8.5 * D2R, tiltNeutral: 2.0 * D2R, // the head with the stick centred sits a little aft
+        tiltLatOffset: 1.6 * D2R, // ... and a little to the right, against the propeller's torque
+        stop: 10 * D2R, stopK: 30000, stopC: 500,
+        friction: 0.06, // N·m·s/rad, bearings
+        prerotTorque: 110, prerotMaxRpm: 230, prerotPowerShare: 0.6,
+        brakeTorque: 180,
+        cd0: 0.0105, clAlpha: 5.73, alphaStall: 13.5 * D2R,
+        inflowTau: 0.08,
+      },
+      engine: { torquePeak: 190, rpmIdle: 750, rpmMax: 2550, inertia: 0.55, starter: 30, friction: 0.03, startTime: 1.6 }, // at the prop shaft
+      prop: { D: 1.65, ct0: 0.10, cq0: 0.0072, j0: 0.95, pos: [-1.05, 0.12, 0], spin: 1 },
+      fuselage: { flatPlate: 0.55, pos: [0, -0.15, 0], damp: [18, 26, 28] },
+      stab: { area: 0.42, span: 1.5, incidence: -3.0 * D2R, pos: [-2.05, 0.10, 0], slip: 0.85 },
+      fin: { area: 0.45, ar: 1.5, pos: [-2.15, 0.45, 0], rudderMax: 25 * D2R, rudderEff: 0.55, slip: 0.9 },
+      gear: [
+        { name: 'nose', pos: [0.95, -0.78, 0], wheel: true, steer: true, brake: 0 },
+        { name: 'left', pos: [-0.25, -0.78, -0.80], wheel: true, brake: 1 },
+        { name: 'right', pos: [-0.25, -0.78, 0.80], wheel: true, brake: 1 },
+        { name: 'tail', pos: [-2.25, -0.40, 0], wheel: false },
+        { name: 'prop', pos: [-1.05, -0.36, 0], wheel: false, strike: true },
+      ],
+      gearK: 26000, gearC: 1700, tyreK: 40000, tyreC: 900, steerMax: 22 * D2R,
+      eye: [0.30, 0.68, 0],
+      ctlTau: 0.07, // s, the stick's lag
+      // Flight assist (optional): rate damping on the head, and attitude hold
+      // while the stick is centred — a stability augmentation system, not a
+      // change to the aerodynamics. Its authority is a third of the stick.
+      assist: { rateQ: 0.012, rateP: 0.012, holdPitch: 0.02, holdRoll: 0.02, authority: 0.35, deadband: 0.06 },
+      dt: 1 / 360,
+      hardLanding: 3.2, // m/s down at touchdown — more is a crash
+    };
+    P.rotor.Ib = (P.rotor.bladeMass * P.rotor.R * P.rotor.R) / 3;
+    P.rotor.IR = 2 * P.rotor.Ib + 2.5;
+    P.rotor.area = Math.PI * P.rotor.R * P.rotor.R;
+    P.prop.area = (Math.PI * P.prop.D * P.prop.D) / 4;
+
+    const rho0 = 1.225;
+    const airDensity = (h) => rho0 * Math.pow(Math.max(0, 1 - 2.2558e-5 * h), 4.2559);
+
+    // ---------------------------------------------------------- airfoil: NACA 8-H-12-ish, all angles, both flow directions
+    function airfoil(a) {
+      let eff = 1;
+      if (a > Math.PI / 2) { a -= Math.PI; eff = 0.55; } else if (a < -Math.PI / 2) { a += Math.PI; eff = 0.55; }
+      const as = P.rotor.alphaStall, aw = 0.11;
+      const w = clamp((Math.abs(a) - as) / aw + 0.35, 0, 1); // stall blends in just before α_stall
+      const sw = w * w * (3 - 2 * w);
+      const clLin = P.rotor.clAlpha * a * eff, cdLin = P.rotor.cd0 + 0.33 * a * a;
+      const sa = Math.sin(a), ca = Math.cos(a);
+      const clPlate = 1.9 * sa * ca, cdPlate = 1.9 * sa * sa + 0.012;
+      return [clLin * (1 - sw) + clPlate * sw, cdLin * (1 - sw) + cdPlate * sw];
+    }
+    // a finite plate (tail surfaces): lift slope by aspect ratio, the same stall
+    function plate(a, ar) {
+      const cla = (2 * Math.PI * ar) / (ar + 2);
+      let eff = 1;
+      if (a > Math.PI / 2) { a -= Math.PI; eff = 0.6; } else if (a < -Math.PI / 2) { a += Math.PI; eff = 0.6; }
+      const as = 14 * D2R, w = clamp((Math.abs(a) - as) / 0.12 + 0.3, 0, 1), sw = w * w * (3 - 2 * w);
+      const sa = Math.sin(a), ca = Math.cos(a);
+      const clLin = cla * a * eff, cl = clLin * (1 - sw) + 1.8 * sa * ca * sw;
+      const cd = (0.012 + (clLin * clLin) / (Math.PI * ar * 0.8)) * (1 - sw) + (1.8 * sa * sa + 0.02) * sw;
+      return [cl, cd];
+    }
+
+    // ---------------------------------------------------------- state
+    function createState() {
+      return {
+        t: 0,
+        pos: [0, 0, 0], vel: [0, 0, 0], q: [0, 0, 0, 1], omega: [0, 0, 0],
+        rotor: { psi: 0, omega: 0, beta: 0, betaDot: 0, vi: 0, thrust: 0, torque: 0, tiltAft: P.rotor.tiltNeutral, tiltRight: 0, hForce: 0, stopHits: 0, discAlpha: 0 },
+        engine: { omega: 0, on: false, startT: 0, thrust: 0, torque: 0 },
+        input: { lon: 0, lat: 0, rudder: 0, throttle: 0, brake: 0, prerotate: false, rotorBrake: false, ignition: false, trimLon: 0, trimLat: 0, assist: false },
+        ctl: { lon: 0, lat: 0, rudder: 0, sasLon: 0, sasLat: 0, holdPitch: null, holdRoll: null },
+        wind: { dir: 290, speed: 2.5, gust: [0, 0, 0], gustiness: 1 },
+        ground: { contacts: 0, kind: 'pavement', wheels: 0, speed: 0, slip: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]] },
+        crashed: null,
+        acc: 0,
+        info: {},
+        trace: [],
+      };
+    }
+    // Put the aircraft on the ground at x, z facing heading (degrees), still.
+    function place(s, env, x, z, headingDeg, opts = {}) {
+      const h = env.surface(x, z).h;
+      s.pos = [x, h + 0.78 + 0.02, z];
+      s.vel = [0, 0, 0]; s.omega = [0, 0, 0];
+      s.q = qfromEuler(headingDeg * D2R, 0, 0);
+      s.rotor.psi = 0; s.rotor.omega = (opts.rotorRpm || 0) * TAU / 60; s.rotor.beta = 0; s.rotor.betaDot = 0; s.rotor.vi = 0; s.rotor.stopHits = 0;
+      s.engine.omega = opts.engineOn ? P.engine.rpmIdle * TAU / 60 : 0; s.engine.on = !!opts.engineOn; s.engine.startT = 0;
+      s.input.ignition = !!opts.engineOn; s.input.throttle = 0; s.input.brake = 0; s.input.prerotate = false; s.input.rotorBrake = false;
+      s.ctl = { lon: 0, lat: 0, rudder: 0 };
+      s.crashed = null; s.acc = 0;
+      if (opts.airborne) { // in flight at a height and speed
+        s.pos[1] = h + opts.airborne.agl;
+        const f = qrot(s.q, [1, 0, 0]);
+        s.vel = scale(f, opts.airborne.speed);
+        s.rotor.omega = (opts.rotorRpm || 340) * TAU / 60;
+        s.rotor.vi = 1;
+      }
+      readout(s, env);
+    }
+
+    // ---------------------------------------------------------- wind
+    // Steady wind with a surface-layer profile, plus gusts as a filtered
+    // random walk (first-order Dryden-like) so the air breathes.
+    function windAt(s, env, pos) {
+      const w = s.wind;
+      const agl = Math.max(0.5, pos[1] - env.surface(pos[0], pos[2]).h);
+      const prof = clamp(Math.pow(agl / 10, 0.15), 0.55, 1.6);
+      const to = (w.dir + 180) * D2R;
+      const v = w.speed * prof;
+      return [Math.sin(to) * v + w.gust[0], w.gust[1], -Math.cos(to) * v + w.gust[2]];
+    }
+    let gseed = 7;
+    const grand = () => { // a cheap gaussian
+      let s = 0; for (let i = 0; i < 4; i++) { gseed = (gseed * 1664525 + 1013904223) >>> 0; s += gseed / 4294967296; } return (s - 2) * 1.732;
+    };
+    function stepGusts(s, dt) {
+      const w = s.wind, tau = 2.5, sig = (0.12 * w.speed + 0.25) * w.gustiness;
+      for (let i = 0; i < 3; i++) {
+        const si = i === 1 ? sig * 0.45 : sig;
+        w.gust[i] += (-w.gust[i] / tau) * dt + si * Math.sqrt((2 * dt) / tau) * grand();
+      }
+    }
+
+    // ---------------------------------------------------------- the rotor
+    const rotorScratch = { F: [0, 0, 0], M: [0, 0, 0] };
+    function stepRotor(s, env, dt, Vb, rho, out) {
+      const R = P.rotor, r = s.rotor;
+      const B = hubBasis(r.tiltAft, r.tiltRight);
+      const Vh = toHub(B, Vb);                 // hub velocity relative to the air, hub frame (x fwd, y up the shaft, z right)
+      const wh = toHub(B, s.omega);            // airframe rates in the hub frame
+      const gh = toHub(B, qinv(s.q, [0, -G, 0])); // gravity in the hub frame
+      const Om = r.omega, N = R.stations, dr = ((1 - R.rootCut) * R.R) / N, c = R.chord;
+      const Vip = Math.hypot(Vh[0], Vh[2]), Vc = Vh[1];
+      // Glauert's longitudinal inflow gradient: more induced flow aft
+      const chi = Math.atan2(Vip, Math.abs(Vc + r.vi) + 0.01);
+      const kx = clamp(Math.tan(chi / 2), 0, 1);
+      let Fx = 0, Fy = 0, Fz = 0, Q = 0, Mflap = [0, 0];
+      const mb = R.bladeMass, rcg = R.R / 2;
+      for (let b = 0; b < 2; b++) {
+        const psi = r.psi + b * Math.PI, sgn = b === 0 ? 1 : -1;
+        const beta = R.precone + sgn * r.beta, betaDot = sgn * r.betaDot;
+        const cb = Math.cos(beta), sb = Math.sin(beta), cp = Math.cos(psi), sp = Math.sin(psi);
+        const er = [-cp, 0, sp], et = [sp, 0, cp];
+        const nb = [-sb * er[0], cb, -sb * er[2]]; // blade "up"
+        let M = 0;
+        for (let k = 0; k < N; k++) {
+          const x = R.rootCut + ((k + 0.5) * (1 - R.rootCut)) / N, rr = x * R.R;
+          // element position (hub frame) and velocity relative to the air
+          const px = rr * (cb * er[0]), py = rr * sb, pz = rr * (cb * er[2]);
+          const vx = Vh[0] + (wh[1] * pz - wh[2] * py) + Om * rr * et[0] + rr * betaDot * nb[0];
+          const vy = Vh[1] + (wh[2] * px - wh[0] * pz) + rr * betaDot * nb[1];
+          const vz = Vh[2] + (wh[0] * py - wh[1] * px) + Om * rr * et[2] + rr * betaDot * nb[2];
+          const UT = vx * et[0] + vz * et[2];
+          const UP = vx * nb[0] + vy * nb[1] + vz * nb[2] + r.vi * (1 + kx * x * cp);
+          const U2 = UT * UT + UP * UP;
+          if (U2 < 1e-4) continue;
+          const U = Math.sqrt(U2);
+          const phi = Math.atan2(UP, UT), alpha = R.theta0 - phi;
+          let [cl, cd] = airfoil(alpha);
+          if (x > R.tipLoss) cl *= (1 - x) / (1 - R.tipLoss);
+          const qc = 0.5 * rho * U2 * c * dr, dL = qc * cl, dD = qc * cd;
+          const ft = (-dL * UP - dD * UT) / U, fn = (dL * UT - dD * UP) / U;
+          Fx += ft * et[0] + fn * nb[0]; Fy += fn * nb[1]; Fz += ft * et[2] + fn * nb[2];
+          Q += ft * rr * cb;
+          M += fn * rr;
+        }
+        // the blade's weight about the flap hinge (flap-up axis is −e_t)
+        const pcg = [rcg * cb * er[0], rcg * sb, rcg * cb * er[2]];
+        const wg = cross(pcg, scale(gh, mb));
+        M += -(wg[0] * et[0] + wg[2] * et[2]);
+        Mflap[b] = M;
+      }
+      // teeter: (M1 − M2)/(2 I_b) − Ω² β − 2 Ω (ω_h · e_r1), plus the stops
+      const er1 = [-Math.cos(r.psi), 0, Math.sin(r.psi)];
+      const a1 = wh[0] * er1[0] + wh[2] * er1[2];
+      let betaDD = (Mflap[0] - Mflap[1]) / (2 * R.Ib) - Om * Om * r.beta - 2 * Om * a1 - 0.6 * r.betaDot;
+      let stopM = 0;
+      if (Math.abs(r.beta) > R.stop) {
+        const over = r.beta - Math.sign(r.beta) * R.stop;
+        stopM = -R.stopK * over - R.stopC * r.betaDot;
+        betaDD += stopM / (2 * R.Ib);
+        if (Math.abs(r.betaDot) > 2.5 && s.ground.wheels === 0) r.stopHits += dt * 60; // airborne and slamming the stops
+        else if (Math.abs(r.betaDot) > 2.5) r.stopHits += dt * 10;
+      } else r.stopHits = Math.max(0, r.stopHits - dt * 2);
+      r.betaDot += betaDD * dt;
+      r.beta += r.betaDot * dt;
+      // rotor speed: aero torque, the prerotator, the rotor brake, the bearings
+      let Qpre = 0, Qbrake = 0;
+      const eng = s.engine, Oe = eng.omega;
+      const canPre = s.input.prerotate && eng.on && s.ground.wheels > 0 && norm(Vb) < 14 && Om < (R.prerotMaxRpm * TAU) / 60;
+      if (canPre) {
+        const Peng = Math.max(0, eng.torque) * Oe;
+        Qpre = Math.min(R.prerotTorque, (R.prerotPowerShare * Peng) / Math.max(Om, 4));
+      }
+      if (s.input.rotorBrake && Om > 0) Qbrake = -Math.min(R.brakeTorque, (Om * R.IR) / dt);
+      const Qfric = -R.friction * Om;
+      const Qnet = Q + Qpre + Qbrake + Qfric;
+      r.omega = Math.max(0, Om + (Qnet / R.IR) * dt);
+      r.psi = (r.psi + r.omega * dt) % TAU;
+      r.torque = Q; r.prerotTorque = Qpre; r.prerotating = canPre;
+      // induced velocity: momentum theory with Leishman's vortex-ring fit
+      const T = Math.max(0, Fy);
+      const vh = Math.sqrt(T / (2 * rho * R.area));
+      let target = 0;
+      if (vh > 0.02) {
+        let v = r.vi;
+        for (let i = 0; i < 6; i++) v = (vh * vh) / Math.sqrt(Vip * Vip + (Vc + v) * (Vc + v) + 0.01 * vh * vh);
+        const sgl = Vc / vh;
+        if (sgl < 0) {
+          let vAx;
+          if (sgl > -2) vAx = vh * (1.15 - 1.125 * sgl - 1.372 * sgl * sgl - 1.718 * sgl ** 3 - 0.655 * sgl ** 4);
+          else vAx = vh * (-sgl / 2 - Math.sqrt(Math.max(0, (sgl * sgl) / 4 - 1)));
+          const wgt = clamp(1 - Vip / (1.5 * vh), 0, 1);
+          v = v * (1 - wgt) + vAx * wgt;
+        }
+        target = v;
+      }
+      r.vi += ((target - r.vi) * dt) / R.inflowTau;
+      // forces and moments on the airframe (body frame)
+      const Fb = fromHub(B, [Fx, Fy, Fz]);
+      madd(out.F, Fb, 1);
+      madd(out.M, cross(R.hub, Fb), 1);
+      // reactions of the prerotator, the brake and the bearings about the shaft; the teeter stops about the flap axis
+      const shaft = B.yh;
+      madd(out.M, shaft, -(Qpre + Qbrake + Qfric));
+      if (stopM) { const et1 = fromHub(B, [Math.sin(r.psi), 0, Math.cos(r.psi)]); madd(out.M, et1, stopM); }
+      r.thrust = Fy; r.hForce = Math.hypot(Fx, Fz);
+      r.discAlpha = Math.atan2(-Vc, Vip); // the disc's angle to the oncoming air (positive: air from below)
+      r.inflow = Vc + r.vi;
+      return B;
+    }
+
+    // ---------------------------------------------------------- engine and propeller
+    function stepEngine(s, dt, Vb, rho) {
+      const E = P.engine, Pr = P.prop, e = s.engine, inp = s.input;
+      if (inp.ignition && !e.on) { e.on = true; e.startT = 0; }
+      if (!inp.ignition && e.on) e.on = false;
+      const n = e.omega / TAU; // rev/s
+      const Vax = Math.max(0, Vb[0]);
+      const J = n > 1 ? Vax / (n * Pr.D) : 0;
+      const ct = Math.max(-0.02, Pr.ct0 * (1 - J / Pr.j0)), cq = Math.max(0.0008, Pr.cq0 * (1 - 0.45 * (J / Pr.j0) ** 2));
+      const T = ct * rho * n * n * Pr.D ** 4, Qp = cq * rho * n * n * Pr.D ** 5;
+      let Qe = 0;
+      const rpm = e.omega * 60 / TAU;
+      if (e.on) {
+        e.startT += dt;
+        const r = rpm / E.rpmMax;
+        const full = E.torquePeak * clamp(0.45 + 0.65 * r, 0.45, 1.05) * (rpm > E.rpmMax ? Math.max(0, 1 - (rpm - E.rpmMax) / (0.08 * E.rpmMax)) : 1);
+        Qe = full * clamp(inp.throttle, 0, 1);
+        // the idle governor, and the starter for the first moments
+        if (rpm < E.rpmIdle * 1.03) Qe += clamp((E.rpmIdle * 1.03 - rpm) * 0.4, 0, 70);
+        if (e.startT < E.startTime && rpm < E.rpmIdle) Qe += E.starter;
+      }
+      if (s.rotor.prerotating) Qe -= s.rotor.prerotTorque * (s.rotor.omega / Math.max(e.omega, 20)); // the prerotator's share of the power
+      const Qf = -E.friction * e.omega - (e.on ? 0 : 1.5 * Math.sign(e.omega));
+      e.torque = Qe;
+      e.omega = Math.max(0, e.omega + ((Qe - Qp + Qf) / E.inertia) * dt);
+      e.thrust = e.omega > 1 ? T : 0;
+      e.propTorque = Qp;
+      return { T: e.thrust, Qp };
+    }
+
+    // ---------------------------------------------------------- the airframe
+    function substep(s, env, dt) {
+      const out = { F: [0, 0, 0], M: [0, 0, 0] };
+      const inp = s.input;
+      // controls follow the stick with a short lag; the trim offsets the centre
+      const k = clamp(dt / P.ctlTau, 0, 1);
+      let sasLon = 0, sasLat = 0;
+      if (inp.assist && s.ground.wheels === 0) {
+        const A = P.assist, e = qtoEuler(s.q), q = s.omega[2], p = s.omega[0];
+        const centredLon = Math.abs(inp.lon) < A.deadband, centredLat = Math.abs(inp.lat) < A.deadband;
+        if (centredLon) { if (s.ctl.holdPitch == null) s.ctl.holdPitch = clamp(e.pitch, -20 * D2R, 25 * D2R); } else s.ctl.holdPitch = null;
+        if (centredLat) { if (s.ctl.holdRoll == null) s.ctl.holdRoll = clamp(e.roll, -45 * D2R, 45 * D2R) * 0.6; } else s.ctl.holdRoll = null;
+        sasLon = -A.rateQ * q * R2D + (s.ctl.holdPitch != null ? A.holdPitch * (s.ctl.holdPitch - e.pitch) * R2D : 0);
+        sasLat = -A.rateP * p * R2D + (s.ctl.holdRoll != null ? A.holdRoll * (s.ctl.holdRoll - e.roll) * R2D : 0);
+        sasLon = clamp(sasLon, -A.authority, A.authority); sasLat = clamp(sasLat, -A.authority, A.authority);
+      } else { s.ctl.holdPitch = null; s.ctl.holdRoll = null; }
+      s.ctl.sasLon = sasLon; s.ctl.sasLat = sasLat;
+      s.ctl.lon += (clamp(inp.lon + inp.trimLon + sasLon, -1, 1) - s.ctl.lon) * k;
+      s.ctl.lat += (clamp(inp.lat + inp.trimLat + sasLat, -1, 1) - s.ctl.lat) * k;
+      s.ctl.rudder += (clamp(inp.rudder, -1, 1) - s.ctl.rudder) * k;
+      const r = s.rotor;
+      r.tiltAft = P.rotor.tiltNeutral + (s.ctl.lon >= 0 ? s.ctl.lon * (P.rotor.tiltAft - P.rotor.tiltNeutral) : s.ctl.lon * (P.rotor.tiltFwd + P.rotor.tiltNeutral));
+      r.tiltRight = s.ctl.lat * P.rotor.tiltLat + P.rotor.tiltLatOffset;
+
+      const rho = airDensity(s.pos[1]);
+      const wind = windAt(s, env, s.pos);
+      const Vw = sub(s.vel, wind);            // velocity relative to the air, world
+      const Vb = qinv(s.q, Vw);               // ... body frame
+      const om = s.omega;
+
+      // rotor
+      stepRotor(s, env, dt, Vb, rho, out);
+      // engine and propeller
+      const { T: Tp, Qp } = stepEngine(s, dt, Vb, rho);
+      madd(out.F, [1, 0, 0], Tp);
+      madd(out.M, cross(P.prop.pos, [Tp, 0, 0]), 1);
+      madd(out.M, [1, 0, 0], -Qp * P.prop.spin);
+      // the propwash speeds the air over the tail
+      const slip = Math.sqrt(Math.max(0, Vb[0]) ** 2 + Math.max(0, (2 * Tp) / (rho * P.prop.area)));
+      // fuselage drag
+      {
+        const vf = add(Vb, cross(om, P.fuselage.pos)), V = norm(vf);
+        if (V > 0.01) { const F = scale(vf, -0.5 * rho * V * P.fuselage.flatPlate); madd(out.F, F, 1); madd(out.M, cross(P.fuselage.pos, F), 1); }
+        madd(out.M, [om[0] * P.fuselage.damp[0], om[1] * P.fuselage.damp[1], om[2] * P.fuselage.damp[2]], -1);
+      }
+      // horizontal stabilizer
+      {
+        const S = P.stab, v = add(Vb, cross(om, S.pos));
+        const vx = v[0] >= 0 ? Math.max(v[0], v[0] * (1 - S.slip) + slip * S.slip) : v[0], vy = v[1];
+        const V2 = vx * vx + vy * vy;
+        if (V2 > 0.1) {
+          const alpha = S.incidence - Math.atan2(vy, vx);
+          const [cl, cd] = plate(alpha, (S.span * S.span) / S.area);
+          const V = Math.sqrt(V2), qS = 0.5 * rho * V2 * S.area;
+          const wx = -vx / V, wy = -vy / V; // the air's direction
+          const F = [qS * (cl * wy + cd * wx), qS * (-cl * wx + cd * wy), 0];
+          madd(out.F, F, 1); madd(out.M, cross(S.pos, F), 1);
+        }
+      }
+      // fin and rudder
+      {
+        const Fn = P.fin, v = add(Vb, cross(om, Fn.pos));
+        const vx = v[0] >= 0 ? Math.max(v[0], v[0] * (1 - Fn.slip) + slip * Fn.slip) : v[0], vz = v[2];
+        const V2 = vx * vx + vz * vz;
+        if (V2 > 0.1) {
+          const beta = Math.atan2(vz, vx) + Fn.rudderEff * s.ctl.rudder * Fn.rudderMax;
+          const [cl, cd] = plate(beta, Fn.ar);
+          const V = Math.sqrt(V2), qS = 0.5 * rho * V2 * Fn.area;
+          const wx = -vx / V, wz = -vz / V;
+          // "lift" of the fin points to −z for positive beta (air from the right pushes the tail left)
+          const F = [qS * (-cl * wz + cd * wx), 0, qS * (cl * wx + cd * wz)];
+          madd(out.F, F, 1); madd(out.M, cross(Fn.pos, F), 1);
+        }
+      }
+      const gravB = qinv(s.q, [0, -P.mass * G, 0]);
+      // ground contacts
+      let wheels = 0, contacts = 0, kindUnder = 'pavement', worst = 0, crash = null;
+      const steer = s.ctl.rudder * Math.abs(s.ctl.rudder) * P.steerMax; // right pedal, nosewheel right; progressive
+      const under = env.surface(s.pos[0], s.pos[2]);
+      kindUnder = under.kind;
+      for (let gi = 0; gi < P.gear.length; gi++) {
+        const g = P.gear[gi], slipD = s.ground.slip[gi];
+        const pw = add(s.pos, qrot(s.q, g.pos));
+        const sf = env.surface(pw[0], pw[2]);
+        const pen = sf.h - pw[1];
+        if (pen <= 0) { slipD[0] = 0; slipD[1] = 0; continue; }
+        contacts++;
+        if (g.wheel) wheels++;
+        if (sf.kind === 'water') crash = crash || 'ditched in the river';
+        else if (sf.kind === 'forest') crash = crash || 'flew into the trees';
+        else if (sf.kind === 'building') crash = crash || 'hit a building';
+        const nrm = sf.n || [0, 1, 0];
+        const vp = add(s.vel, cross(qrot(s.q, om), qrot(s.q, g.pos)));
+        const vn = dot(vp, nrm);
+        if (vn < -P.hardLanding) crash = crash || (g.strike ? 'prop strike' : 'hard landing');
+        if (g.strike && vn < -1.5) crash = crash || 'prop strike';
+        let N = P.gearK * pen - P.gearC * vn;
+        if (N < 0) N = 0;
+        worst = Math.max(worst, -vn);
+        let F = scale(nrm, N);
+        const vt = sub(vp, scale(nrm, vn)); // tangential velocity
+        const mu = sf.kind === 'pavement' ? 0.85 : sf.kind === 'grass' ? 0.55 : 0.5;
+        const muRoll = sf.kind === 'pavement' ? 0.015 : sf.kind === 'grass' ? 0.06 : 0.09;
+        // A tyre as a bristle: the contact patch deflects like a spring until
+        // the force reaches μN, then slides. Stationary wheels hold still.
+        const bristle = (vel, idx, muMax) => {
+          slipD[idx] += vel * dt;
+          let f = -P.tyreK * slipD[idx] - P.tyreC * vel;
+          const lim = muMax * N;
+          if (f > lim) { f = lim; slipD[idx] = -(lim + P.tyreC * vel) / P.tyreK; }
+          else if (f < -lim) { f = -lim; slipD[idx] = (lim - P.tyreC * vel) / P.tyreK; }
+          return f;
+        };
+        if (g.wheel) {
+          let ax = [1, 0, 0];
+          if (g.steer) ax = [Math.cos(steer), 0, Math.sin(steer)];
+          const axw = qrot(s.q, ax);
+          const axt = unit(sub(axw, scale(nrm, dot(axw, nrm))));
+          const side = unit(cross(nrm, axt));
+          const vroll = dot(vt, axt), vlat = dot(vt, side);
+          madd(F, side, bristle(vlat, 0, mu));
+          const brake = g.brake * clamp(inp.brake, 0, 1);
+          if (brake > 0.02) madd(F, axt, bristle(vroll, 1, mu * 0.75 * brake));
+          else { slipD[1] = 0; madd(F, axt, -N * muRoll * Math.tanh(vroll / 0.1)); }
+        } else {
+          const vtN = norm(vt);
+          if (vtN > 1e-6) madd(F, scale(vt, 1 / vtN), -0.6 * N * Math.tanh(vtN / 0.1));
+        }
+        const Fb = qinv(s.q, F);
+        madd(out.F, Fb, 1); madd(out.M, cross(g.pos, Fb), 1);
+      }
+      // the rotor rim: eight points on the tip path plane, any one in the ground or a building is a strike
+      {
+        const R = P.rotor, B = hubBasis(r.tiltAft, r.tiltRight);
+        for (let i = 0; i < 8; i++) {
+          const ph = (i * TAU) / 8, beta = R.precone + r.beta * Math.cos(ph - r.psi);
+          const ph_ = [-Math.cos(ph) * Math.cos(beta) * R.R, Math.sin(beta) * R.R, Math.sin(ph) * Math.cos(beta) * R.R];
+          const pb = add(R.hub, fromHub(B, ph_));
+          const pw = add(s.pos, qrot(s.q, pb));
+          const sf = env.surface(pw[0], pw[2]);
+          if (pw[1] < sf.h + 0.05 && r.omega > 3) { crash = crash || 'rotor strike'; break; }
+          if (env.obstacle && env.obstacle(pw[0], pw[1], pw[2])) { crash = crash || 'rotor hit a building'; break; }
+        }
+      }
+      if (env.obstacle) {
+        for (const p of [[0.6, 0, 0], [-2.2, 0.3, 0], [0, -0.5, 0], [0, 1.0, 0]]) {
+          const pw = add(s.pos, qrot(s.q, p));
+          if (env.obstacle(pw[0], pw[1], pw[2])) { crash = crash || 'hit a building'; break; }
+        }
+      }
+      if (contacts > 0) {
+        const e = qtoEuler(s.q);
+        if (Math.abs(e.roll) > 55 * D2R) crash = crash || 'rolled over';
+        if (Math.abs(e.pitch) > 50 * D2R) crash = crash || 'nosed over';
+      }
+      if (r.stopHits > 1.5) crash = crash || 'the rotor flapped onto its stops';
+      s.ground.wheels = wheels; s.ground.contacts = contacts; s.ground.kind = kindUnder; s.ground.worstSink = worst;
+
+      // gravity last, kept apart so the load factor reads the specific force
+      const Fspec = out.F.slice();
+      madd(out.F, gravB, 1);
+      // integrate
+      const Fw = qrot(s.q, out.F);
+      const acc = scale(Fw, 1 / P.mass);
+      s.vel = add(s.vel, scale(acc, dt));
+      s.pos = add(s.pos, scale(s.vel, dt));
+      const I = P.inertia;
+      const Iw = [I[0] * om[0], I[1] * om[1], I[2] * om[2]];
+      const gyro = cross(om, Iw);
+      const domega = [(out.M[0] - gyro[0]) / I[0], (out.M[1] - gyro[1]) / I[1], (out.M[2] - gyro[2]) / I[2]];
+      s.omega = add(om, scale(domega, dt));
+      const dq = qmul(s.q, [s.omega[0] * 0.5 * dt, s.omega[1] * 0.5 * dt, s.omega[2] * 0.5 * dt, 0]);
+      s.q = qnorm([s.q[0] + dq[0], s.q[1] + dq[1], s.q[2] + dq[2], s.q[3] + dq[3]]);
+      s.nz = Fspec[1] / (P.mass * G);
+      s.specific = Fspec;
+      s.t += dt;
+      if (crash && !s.crashed) s.crashed = { reason: crash, t: s.t, speed: norm(s.vel), sink: worst };
+      stepGusts(s, dt);
+    }
+
+    // The wreck: after a crash the aircraft sits where it stopped, the rotor
+    // and the engine winding down.
+    function wreckStep(s, env, dt) {
+      s.vel = scale(s.vel, Math.max(0, 1 - 6 * dt));
+      s.omega = scale(s.omega, Math.max(0, 1 - 6 * dt));
+      s.pos = add(s.pos, scale(s.vel, dt));
+      const h = env.surface(s.pos[0], s.pos[2]).h + 0.6;
+      if (s.pos[1] < h) { s.pos[1] = h; s.vel[1] = Math.max(0, s.vel[1]); }
+      s.rotor.omega = Math.max(0, s.rotor.omega - 1.5 * dt);
+      s.rotor.psi = (s.rotor.psi + s.rotor.omega * dt) % TAU;
+      s.engine.omega = Math.max(0, s.engine.omega - 80 * dt);
+      s.engine.on = false; s.engine.thrust = 0;
+      s.t += dt;
+    }
+
+    // Advance by a frame's worth of real time (sub-stepped at P.dt).
+    function step(s, env, dtFrame) {
+      s.acc += Math.min(dtFrame, 0.1);
+      let n = 0;
+      while (s.acc >= P.dt && n < 60) {
+        if (s.crashed) wreckStep(s, env, P.dt); else substep(s, env, P.dt);
+        s.acc -= P.dt; n++;
+      }
+      readout(s, env);
+    }
+
+    // What the instruments show.
+    function readout(s, env) {
+      const e = qtoEuler(s.q);
+      const wind = windAt(s, env, s.pos);
+      const Vw = sub(s.vel, wind), Vb = qinv(s.q, Vw);
+      const tas = norm(Vw);
+      const rho = airDensity(s.pos[1]);
+      const sf = env.surface(s.pos[0], s.pos[2]);
+      const i = s.info;
+      i.tas = tas; i.ias = tas * Math.sqrt(rho / rho0); i.iasKt = i.ias / KT;
+      i.gs = Math.hypot(s.vel[0], s.vel[2]); i.gsKt = i.gs / KT;
+      i.alt = s.pos[1]; i.altFt = s.pos[1] / FT; i.agl = s.pos[1] - sf.h; i.aglFt = i.agl / FT;
+      i.vs = s.vel[1]; i.vsFpm = (s.vel[1] / FT) * 60;
+      i.heading = e.heading * R2D; i.pitch = e.pitch * R2D; i.roll = e.roll * R2D;
+      i.track = i.gs > 0.5 ? ((Math.atan2(s.vel[0], -s.vel[2]) * R2D) + 360) % 360 : i.heading;
+      i.rotorRpm = (s.rotor.omega * 60) / TAU; i.engineRpm = (s.engine.omega * 60) / TAU;
+      i.nz = s.nz == null ? 1 : s.nz;
+      i.uAir = Vb[0]; i.wAir = Vb[1]; i.vAir = Vb[2];
+      i.alphaBody = Vb[0] > 1 ? Math.atan2(-Vb[1], Vb[0]) * R2D : 0;
+      i.slip = tas > 2 ? Math.atan2(Vb[2], Math.max(Vb[0], 0.1)) * R2D : 0;
+      i.discAlpha = s.rotor.discAlpha * R2D;
+      i.thrust = s.rotor.thrust; i.propThrust = s.engine.thrust;
+      i.power = s.engine.torque * s.engine.omega;
+      i.onGround = s.ground.wheels > 0;
+      i.windKt = s.wind.speed / KT; i.windDir = s.wind.dir;
+      i.lowRotor = !i.onGround && i.rotorRpm < 240;
+      i.overspeed = i.rotorRpm > 470;
+      i.unloaded = !i.onGround && i.nz < 0.3 && i.agl > 2;
+      i.flapping = Math.abs(s.rotor.beta) * R2D;
+      return i;
+    }
+
+    return { P, G, KT, FT, D2R, R2D, createState, place, step, readout, airfoil, plate, airDensity, windAt, qfromEuler, qtoEuler, qrot, qinv, qmul, qaxis, hubBasis, fromHub, add, sub, scale, dot, cross, norm, unit };
+  })();
+  </script>
+
+  <script type="module">
+    // ======================================================================
+    // The page: loading the world, the ground the physics stands on, and
+    // the terrain the player sees.
+    // ======================================================================
+    import * as THREE from './lib/three.module.min.js';
+
+    const $ = (sel) => document.querySelector(sel);
+    const DATA = 'data/gyro-courier/';
+    const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+    const { KT, FT } = GYRO;
+    const isPhone = navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
+
+    // ------------------------------------------------------------ settings & persistence
+    const STORE = 'gyro-courier';
+    const settings = Object.assign({ assist: true, look: true, metric: false, wind: 'light', time: 'noon', quality: isPhone ? 'medium' : 'high', sound: false, camera: 'cockpit' },
+      (() => { try { return JSON.parse(localStorage.getItem(STORE + ':settings') || '{}'); } catch { return {}; } })());
+    const log = Object.assign({ deliveries: 0, earnings: 0, crashes: 0, flightTime: 0, best: null, recent: [] },
+      (() => { try { return JSON.parse(localStorage.getItem(STORE + ':log') || '{}'); } catch { return {}; } })());
+    const saveSettings = () => { try { localStorage.setItem(STORE + ':settings', JSON.stringify(settings)); } catch { /* private mode */ } };
+    const saveLog = () => { try { localStorage.setItem(STORE + ':log', JSON.stringify(log)); } catch { /* private mode */ } };
+
+    let toastTimer = 0;
+    function toast(msg, ms = 3200) {
+      const el = $('#toast'); el.textContent = msg; el.classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+    }
+
+    // ------------------------------------------------------------ loading
+    async function fetchBytes(url, onProgress) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+      const total = Number(res.headers.get('Content-Length')) || 0;
+      if (!res.body || !onProgress) return new Uint8Array(await res.arrayBuffer());
+      const reader = res.body.getReader(); const chunks = []; let got = 0;
+      for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); got += value.length; onProgress(got, total); }
+      const out = new Uint8Array(got); let o = 0; for (const c of chunks) { out.set(c, o); o += c.length; }
+      return out;
+    }
+    async function gunzip(bytes) {
+      if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot decompress the world data (no DecompressionStream).');
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+    const loadImage = (url) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('image ' + url)); im.src = url; });
+
+    const W = {}; // the world
+    async function loadWorld() {
+      const bar = $('#loadBar'), text = $('#loadText');
+      const prog = (label) => (got, total) => { text.textContent = `${label} ${(got / 1e6).toFixed(1)}${total ? ' / ' + (total / 1e6).toFixed(1) : ''} MB`; };
+      const steps = 5; let done = 0; const tick = () => { bar.style.width = `${(++done / steps) * 100}%`; };
+      W.meta = JSON.parse(new TextDecoder().decode(await fetchBytes(DATA + 'world.json', prog('Chattanooga'))));
+      tick();
+      const m = W.meta;
+      // heights: paeth-predicted residual planes → metres
+      {
+        const raw = await gunzip(await fetchBytes(DATA + m.height.file, prog('Terrain')));
+        const n = m.height.cols * m.height.rows, cols = m.height.cols;
+        const q = new Int32Array(n), h = new Float32Array(n);
+        for (let k = 0; k < n; k++) {
+          const i = k % cols, j = (k - i) / cols;
+          const a = i ? q[k - 1] : 0, b = j ? q[k - cols] : 0, c = i && j ? q[k - cols - 1] : 0;
+          q[k] = ((raw[k] << 8) | raw[n + k]) - 32768 + (a + b - c);
+          h[k] = m.height.min + q[k] * m.height.step;
+        }
+        W.hm = { cols, rows: m.height.rows, cell: m.height.cell, data: h, min: m.height.min, max: m.height.max };
+        tick();
+      }
+      {
+        const raw = await gunzip(await fetchBytes(DATA + m.cover.file, prog('Land cover')));
+        W.cover = { cols: m.cover.cols, rows: m.cover.rows, cell: m.cover.cell, data: raw, classes: m.cover.classes };
+        W.C = Object.fromEntries(m.cover.classes.map((n, i) => [n, i]));
+        tick();
+      }
+      {
+        const raw = await gunzip(await fetchBytes(DATA + m.bin.file, prog('Streets and buildings')));
+        const sec = (name) => { const s = m.bin.sections[name]; const T = { Int16Array, Uint32Array, Uint16Array, Uint8Array }[s.type]; return new T(raw.buffer, raw.byteOffset + s.offset, s.length); };
+        const undelta = (coords, start, count) => { // per-polyline deltas in half metres → metres
+          const out = new Float32Array(coords.length);
+          for (let i = 0; i < start.length; i++) { let x = 0, z = 0; for (let k = 0; k < count[i]; k++) { const o = (start[i] + k) * 2; x += coords[o]; z += coords[o + 1]; out[o] = x * 0.5; out[o + 1] = z * 0.5; } }
+          return out;
+        };
+        const rs = sec('roadStart'), rn = sec('roadCount');
+        W.roads = { xz: undelta(sec('roadCoords'), rs, rn), start: rs, count: rn, cls: sec('roadClass'), width: sec('roadWidth'), name: sec('roadName'), flags: sec('roadFlags'), n: rs.length };
+        const bs = sec('bldStart'), bn = sec('bldCount');
+        W.bld = { xz: undelta(sec('bldCoords'), bs, bn), start: bs, count: bn, h: sec('bldHeight'), kind: sec('bldKind'), n: bs.length };
+        const ts = sec('railStart'), tn = sec('railCount');
+        W.rails = { xz: undelta(sec('railCoords'), ts, tn), start: ts, count: tn, n: ts.length };
+        tick();
+      }
+      W.minimap = await loadImage(DATA + m.minimap.file);
+      tick();
+      text.textContent = 'Building the city…';
+      await new Promise((r) => setTimeout(r, 20));
+      const t0 = performance.now(); buildIndexes(); console.log(`gyro-courier: indexes in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+    }
+
+    // ------------------------------------------------------------ the ground
+    const halfX = () => W.meta.halfX, halfZ = () => W.meta.halfZ;
+    function heightAt(x, z) {
+      const g = W.hm;
+      const u = clamp((x + halfX()) / g.cell - 0.5, 0, g.cols - 1.001), v = clamp((z + halfZ()) / g.cell - 0.5, 0, g.rows - 1.001);
+      const i = u | 0, j = v | 0, fx = u - i, fy = v - j, k = j * g.cols + i;
+      const a = g.data[k], b = g.data[k + 1], c = g.data[k + g.cols], d = g.data[k + g.cols + 1];
+      return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+    }
+    function coverAt(x, z) {
+      const c = W.cover;
+      const i = ((x + halfX()) / c.cell) | 0, j = ((z + halfZ()) / c.cell) | 0;
+      if (i < 0 || j < 0 || i >= c.cols || j >= c.rows) return 1; // forest beyond the map
+      return c.data[j * c.cols + i];
+    }
+    const insideMap = (x, z) => Math.abs(x) < halfX() - 50 && Math.abs(z) < halfZ() - 50;
+
+    // spatial hashes: bridge decks (the physics must stand on them) and buildings (it must not fly through them)
+    const HASH = 200;
+    const hkey = (x, z) => `${Math.floor(x / HASH)},${Math.floor(z / HASH)}`;
+    const bridgeHash = new Map(), bldHash = new Map();
+    const bldBox = []; // [minx, minz, maxx, maxz, base, top] per building
+    function buildIndexes() {
+      for (const [bi, b] of W.meta.bridges.entries()) {
+        const p = b.p;
+        for (let i = 0; i + 5 < p.length; i += 3) {
+          const keys = new Set();
+          for (let t = 0; t <= 1; t += 0.25) keys.add(hkey(p[i] + (p[i + 3] - p[i]) * t, p[i + 1] + (p[i + 4] - p[i + 1]) * t));
+          for (const k of keys) (bridgeHash.get(k) || bridgeHash.set(k, []).get(k)).push([bi, i]);
+        }
+      }
+      const B = W.bld;
+      for (let i = 0; i < B.n; i++) {
+        let minx = Infinity, minz = Infinity, maxx = -Infinity, maxz = -Infinity, base = Infinity;
+        for (let k = 0; k < B.count[i]; k++) {
+          const o = (B.start[i] + k) * 2, x = B.xz[o], z = B.xz[o + 1];
+          if (x < minx) minx = x; if (x > maxx) maxx = x; if (z < minz) minz = z; if (z > maxz) maxz = z;
+          const h = heightAt(x, z); if (h < base) base = h;
+        }
+        base -= 0.3;
+        bldBox.push(minx, minz, maxx, maxz, base, base + B.h[i] * 0.5);
+        for (let gx = Math.floor(minx / HASH); gx <= Math.floor(maxx / HASH); gx++) for (let gz = Math.floor(minz / HASH); gz <= Math.floor(maxz / HASH); gz++) {
+          const k = `${gx},${gz}`; (bldHash.get(k) || bldHash.set(k, []).get(k)).push(i);
+        }
+      }
+    }
+    function bridgeDeckAt(x, z) {
+      const list = bridgeHash.get(hkey(x, z));
+      if (!list) return null;
+      let best = null;
+      for (const [bi, i] of list) {
+        const b = W.meta.bridges[bi], p = b.p;
+        const ax = p[i], az = p[i + 1], bx = p[i + 3], bz = p[i + 4];
+        const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
+        let t = L2 ? ((x - ax) * dx + (z - az) * dz) / L2 : 0; t = clamp(t, 0, 1);
+        const d = Math.hypot(ax + t * dx - x, az + t * dz - z);
+        if (d <= b.w / 2 + 1.0) { const h = p[i + 2] + (p[i + 5] - p[i + 2]) * t; if (best == null || h > best) best = h; }
+      }
+      return best;
+    }
+    function pointInBuilding(i, x, z) {
+      const B = W.bld, n = B.count[i], s = B.start[i];
+      let inside = false;
+      for (let a = 0, b = n - 1; a < n; b = a++) {
+        const ax = B.xz[(s + a) * 2], az = B.xz[(s + a) * 2 + 1], bx = B.xz[(s + b) * 2], bz = B.xz[(s + b) * 2 + 1];
+        if ((az > z) !== (bz > z) && x < ((bx - ax) * (z - az)) / (bz - az) + ax) inside = !inside;
+      }
+      return inside;
+    }
+    function obstacle(x, y, z) {
+      const list = bldHash.get(hkey(x, z));
+      if (!list) return false;
+      for (const i of list) {
+        const o = i * 6;
+        if (x < bldBox[o] || x > bldBox[o + 2] || z < bldBox[o + 1] || z > bldBox[o + 3] || y > bldBox[o + 5] || y < bldBox[o + 4] - 1) continue;
+        if (pointInBuilding(i, x, z)) return true;
+      }
+      return false;
+    }
+    // One shared answer object: the physics asks thousands of times a second.
+    const surf = { h: 0, kind: 'grass', n: [0, 1, 0] };
+    const KIND = ['grass', 'forest', 'water', 'grass', 'grass', 'grass', 'grass', 'grass', 'pavement', 'bare', 'grass', 'bare'];
+    function surface(x, z) {
+      let h = heightAt(x, z);
+      const cls = coverAt(x, z);
+      let kind = insideMap(x, z) ? KIND[cls] : 'forest';
+      if (kind === 'forest') h += 11; // the canopy
+      const deck = bridgeDeckAt(x, z);
+      if (deck != null && deck > h - 0.5) { h = deck; kind = 'pavement'; surf.n[0] = 0; surf.n[1] = 1; surf.n[2] = 0; }
+      else {
+        const e = 6, hx = heightAt(x + e, z) - heightAt(x - e, z), hz = heightAt(x, z + e) - heightAt(x, z - e);
+        const nx = -hx / (2 * e), nz = -hz / (2 * e), inv = 1 / Math.hypot(nx, 1, nz);
+        surf.n[0] = nx * inv; surf.n[1] = inv; surf.n[2] = nz * inv;
+      }
+      surf.h = h; surf.kind = kind;
+      return surf;
+    }
+    const env = { surface, obstacle };
+
+    // ------------------------------------------------------------ the scene
+    const canvas = $('#view');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: settings.quality !== 'low', powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, settings.quality === 'high' ? 2 : settings.quality === 'medium' ? 1.5 : 1));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(70, 1, 0.3, 48000);
+    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x6b7a55, 0.9);
+    scene.add(sun, hemi);
+    const TIMES = {
+      morning: { el: 22, az: 105, sun: 0xffe2b8, sky: 0x6f9fe0, horizon: 0xf2d7b5, ground: 0x7a7a60, fog: 0xe9d7bf, hemi: 1.0, dir: 1.8 },
+      noon: { el: 62, az: 180, sun: 0xffffff, sky: 0x4f8fe0, horizon: 0xd9e6f2, ground: 0x6b7a55, fog: 0xd3e0ee, hemi: 0.95, dir: 2.3 },
+      evening: { el: 12, az: 262, sun: 0xffb070, sky: 0x5f78b8, horizon: 0xf5b98a, ground: 0x5a5540, fog: 0xe8b996, hemi: 0.85, dir: 1.6 },
+    };
+    let sunDir = new THREE.Vector3(0, 1, 0);
+    function applyTime() {
+      const t = TIMES[settings.time] || TIMES.noon;
+      const el = t.el * D2R, az = t.az * D2R;
+      sunDir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
+      sun.position.copy(sunDir).multiplyScalar(1000); sun.color.set(t.sun); sun.intensity = t.dir;
+      hemi.color.set(t.sky); hemi.groundColor.set(t.ground); hemi.intensity = t.hemi;
+      scene.fog = new THREE.Fog(t.fog, 6000, 26000);
+      if (skyMat) { skyMat.uniforms.uZenith.value.set(t.sky); skyMat.uniforms.uHorizon.value.set(t.horizon); skyMat.uniforms.uSun.value.copy(sunDir); skyMat.uniforms.uSunColor.value.set(t.sun); }
+      if (terrainMat) { terrainMat.uniforms.uSun.value.copy(sunDir); terrainMat.uniforms.uSunColor.value.set(t.sun); terrainMat.uniforms.uSkyColor.value.set(t.sky); }
+    }
+
+    // ---- the sky: a dome shaded by elevation, the sun as a glow
+    let skyMat = null;
+    function buildSky() {
+      skyMat = new THREE.ShaderMaterial({
+        uniforms: { uZenith: { value: new THREE.Color(0x4f8fe0) }, uHorizon: { value: new THREE.Color(0xd9e6f2) }, uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: new THREE.Color(0xffffff) } },
+        vertexShader: `varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position.z = gl_Position.w; }`,
+        fragmentShader: `uniform vec3 uZenith, uHorizon, uSun, uSunColor; varying vec3 vDir;
+          void main() {
+            float y = clamp(vDir.y, -0.1, 1.0);
+            float t = pow(max(y, 0.0), 0.45);
+            vec3 col = mix(uHorizon, uZenith, t);
+            if (vDir.y < 0.0) col = mix(uHorizon, uHorizon * 0.78, clamp(-vDir.y * 8.0, 0.0, 1.0));
+            float s = max(dot(normalize(vDir), normalize(uSun)), 0.0);
+            col += uSunColor * (pow(s, 900.0) * 1.6 + pow(s, 24.0) * 0.22 + pow(s, 4.0) * 0.06);
+            gl_FragColor = vec4(col, 1.0);
+          }`,
+        side: THREE.BackSide, depthWrite: false, fog: false,
+      });
+      const sky = new THREE.Mesh(new THREE.SphereGeometry(40000, 32, 16), skyMat);
+      sky.frustumCulled = false; sky.renderOrder = -10;
+      scene.add(sky);
+      // a few clouds, far up
+      const cloudTex = (() => {
+        const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+        for (let i = 0; i < 9; i++) { const x = 30 + Math.random() * 68, y = 50 + Math.random() * 36, r = 18 + Math.random() * 22; const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, 'rgba(255,255,255,0.9)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 128, 128); }
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+      })();
+      const cm = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.85, depthWrite: false, fog: true });
+      for (let i = 0; i < 36; i++) {
+        const sp = new THREE.Sprite(cm);
+        sp.position.set((Math.random() - 0.5) * 36000, 1700 + Math.random() * 900, (Math.random() - 0.5) * 30000);
+        const sz = 900 + Math.random() * 1400; sp.scale.set(sz, sz * 0.42, 1);
+        scene.add(sp);
+      }
+    }
+
+    // ---- the terrain: nested rings of a fixed grid, heights and cover read from textures
+    let terrainMat = null;
+    const terrainLevels = [];
+    function buildTerrain() {
+      const g = W.hm, c = W.cover;
+      const hTex = new THREE.DataTexture(g.data, g.cols, g.rows, THREE.RedFormat, THREE.FloatType);
+      hTex.magFilter = hTex.minFilter = THREE.NearestFilter; hTex.generateMipmaps = false; hTex.needsUpdate = true;
+      const cTex = new THREE.DataTexture(c.data, c.cols, c.rows, THREE.RedFormat, THREE.UnsignedByteType);
+      cTex.magFilter = cTex.minFilter = THREE.NearestFilter; cTex.generateMipmaps = false; cTex.unpackAlignment = 1; cTex.needsUpdate = true;
+      const palette = [
+        [0.50, 0.58, 0.36], // grass
+        [0.22, 0.36, 0.19], // forest
+        [0.20, 0.36, 0.52], // water
+        [0.56, 0.58, 0.46], // residential (lawns and drives)
+        [0.60, 0.57, 0.50], // commercial
+        [0.56, 0.54, 0.52], // industrial
+        [0.64, 0.60, 0.40], // farmland
+        [0.42, 0.56, 0.32], // park
+        [0.36, 0.36, 0.37], // pavement
+        [0.60, 0.56, 0.46], // bare
+        [0.44, 0.50, 0.32], // scrub
+        [0.40, 0.36, 0.33], // rail
+      ];
+      terrainMat = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
+        uniforms: {
+          uHeight: { value: hTex }, uHm: { value: new THREE.Vector4(g.cols, g.rows, g.cell, 0) },
+          uCover: { value: cTex }, uCv: { value: new THREE.Vector4(c.cols, c.rows, c.cell, 0) },
+          uHalf: { value: new THREE.Vector2(halfX(), halfZ()) },
+          uOrigin: { value: new THREE.Vector2(0, 0) }, uSpacing: { value: 10 },
+          uPalette: { value: palette.flat() },
+          uSun: { value: sunDir.clone() }, uSunColor: { value: new THREE.Color(0xffffff) }, uSkyColor: { value: new THREE.Color(0x4f8fe0) },
+          uTime: { value: 0 }, uCam: { value: new THREE.Vector3() },
+          fogColor: { value: new THREE.Color() }, fogNear: { value: 1 }, fogFar: { value: 2 },
+        },
+        vertexShader: `
+          uniform sampler2D uHeight; uniform vec4 uHm; uniform vec2 uHalf; uniform vec2 uOrigin; uniform float uSpacing;
+          out vec3 vWorld; out vec3 vNormal; out float vSkirt;
+          float hAt(vec2 p) {
+            vec2 g = clamp((p + uHalf) / uHm.z - 0.5, vec2(0.0), vec2(uHm.x - 1.001, uHm.y - 1.001));
+            ivec2 i = ivec2(floor(g)); vec2 f = g - vec2(i);
+            float a = texelFetch(uHeight, i, 0).r, b = texelFetch(uHeight, i + ivec2(1, 0), 0).r, c = texelFetch(uHeight, i + ivec2(0, 1), 0).r, d = texelFetch(uHeight, i + ivec2(1, 1), 0).r;
+            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+          }
+          void main() {
+            vec2 p = uOrigin + position.xz * uSpacing;
+            float h = hAt(p);
+            float e = max(uSpacing, uHm.z);
+            float hx = hAt(p + vec2(e, 0.0)) - hAt(p - vec2(e, 0.0));
+            float hz = hAt(p + vec2(0.0, e)) - hAt(p - vec2(0.0, e));
+            vNormal = normalize(vec3(-hx / (2.0 * e), 1.0, -hz / (2.0 * e)));
+            vSkirt = position.y;
+            if (position.y < -0.5) h -= 90.0;
+            vWorld = vec3(p.x, h, p.y);
+            gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
+          }`,
+        fragmentShader: `
+          precision highp float;
+          uniform sampler2D uCover; uniform vec4 uCv; uniform vec2 uHalf; uniform float uPalette[36];
+          uniform vec3 uSun; uniform vec3 uSunColor; uniform vec3 uSkyColor; uniform float uTime; uniform vec3 uCam;
+          uniform vec3 fogColor; uniform float fogNear; uniform float fogFar;
+          in vec3 vWorld; in vec3 vNormal; in float vSkirt;
+          out vec4 outColor;
+          float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+          float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+          vec3 pal(int c) { return vec3(uPalette[c * 3], uPalette[c * 3 + 1], uPalette[c * 3 + 2]); }
+          int classAt(ivec2 i) { i = clamp(i, ivec2(0), ivec2(int(uCv.x) - 1, int(uCv.y) - 1)); return int(texelFetch(uCover, i, 0).r * 255.0 + 0.5); }
+          void main() {
+            vec2 g = (vWorld.xz + uHalf) / uCv.z - 0.5;
+            ivec2 i = ivec2(floor(g)); vec2 f = g - vec2(i);
+            int c00 = classAt(i), c10 = classAt(i + ivec2(1, 0)), c01 = classAt(i + ivec2(0, 1)), c11 = classAt(i + ivec2(1, 1));
+            // sharpen the blend so streets keep their edges
+            vec2 fs = smoothstep(0.25, 0.75, f);
+            vec3 col = mix(mix(pal(c00), pal(c10), fs.x), mix(pal(c01), pal(c11), fs.x), fs.y);
+            float water = mix(mix(c00 == 2 ? 1.0 : 0.0, c10 == 2 ? 1.0 : 0.0, fs.x), mix(c01 == 2 ? 1.0 : 0.0, c11 == 2 ? 1.0 : 0.0, fs.x), fs.y);
+            float pave = mix(mix(c00 == 8 ? 1.0 : 0.0, c10 == 8 ? 1.0 : 0.0, fs.x), mix(c01 == 8 ? 1.0 : 0.0, c11 == 8 ? 1.0 : 0.0, fs.x), fs.y);
+            // texture: fine grain and a broad mottle, less on pavement and water
+            float n1 = noise(vWorld.xz * 0.35), n2 = noise(vWorld.xz * 0.035), n3 = noise(vWorld.xz * 0.004);
+            float grain = (n1 - 0.5) * 0.10 + (n2 - 0.5) * 0.14 + (n3 - 0.5) * 0.10;
+            col *= 1.0 + grain * (1.0 - 0.8 * pave) * (1.0 - water);
+            // rock on steep slopes, a little paler up high
+            float slope = 1.0 - vNormal.y;
+            col = mix(col, vec3(0.46, 0.43, 0.39) * (0.9 + 0.2 * n1), smoothstep(0.18, 0.42, slope) * (1.0 - water) * (1.0 - pave));
+            col *= 1.0 + 0.10 * clamp((vWorld.y - 250.0) / 400.0, 0.0, 1.0);
+            // light
+            vec3 n = normalize(vNormal);
+            float diff = max(dot(n, normalize(uSun)), 0.0);
+            vec3 lit = col * (0.42 * uSkyColor * 0.55 + 0.35 + diff * 0.95 * uSunColor);
+            if (water > 0.01) {
+              vec3 wcol = vec3(0.16, 0.33, 0.50);
+              float rip = noise(vWorld.xz * 0.6 + uTime * 0.25) * 0.5 + noise(vWorld.xz * 2.3 - uTime * 0.4) * 0.5;
+              vec3 wn = normalize(vec3((rip - 0.5) * 0.08, 1.0, (noise(vWorld.xz * 1.7 + uTime * 0.3) - 0.5) * 0.08));
+              vec3 v = normalize(uCam - vWorld);
+              vec3 hv = normalize(v + normalize(uSun));
+              float spec = pow(max(dot(wn, hv), 0.0), 140.0);
+              float fres = pow(1.0 - max(dot(v, wn), 0.0), 3.0);
+              vec3 wlit = wcol * (0.5 + 0.5 * diff) + uSkyColor * fres * 0.5 + uSunColor * spec * 0.9;
+              lit = mix(lit, wlit, water);
+            }
+            if (vSkirt < -0.5) lit *= 0.8;
+            float fogF = smoothstep(fogNear, fogFar, length(vWorld - uCam));
+            outColor = vec4(mix(lit, fogColor, fogF), 1.0);
+          }`,
+      });
+      // levels: level 0 a full square, the rest rings, all with a skirt around the outside
+      const N = 128, HOLE = 32; // hole half-width in cells
+      const makeLevel = (ring) => {
+        const pos = [], idx = [];
+        const vid = new Map();
+        const vertex = (i, j, skirt) => { const k = `${i},${j},${skirt ? 1 : 0}`; if (!vid.has(k)) { vid.set(k, pos.length / 3); pos.push(i - N / 2, skirt ? -1 : 0, j - N / 2); } return vid.get(k); };
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+          if (ring && i >= N / 2 - HOLE && i < N / 2 + HOLE && j >= N / 2 - HOLE && j < N / 2 + HOLE) continue;
+          const a = vertex(i, j), b = vertex(i + 1, j), c = vertex(i, j + 1), d = vertex(i + 1, j + 1);
+          idx.push(a, c, b, b, c, d);
+        }
+        // the skirt
+        for (let i = 0; i < N; i++) {
+          for (const [x0, z0, x1, z1] of [[i, 0, i + 1, 0], [i + 1, N, i, N], [0, i + 1, 0, i], [N, i, N, i + 1]]) {
+            const a = vertex(x0, z0), b = vertex(x1, z1), c = vertex(x0, z0, true), d = vertex(x1, z1, true);
+            idx.push(a, b, c, b, d, c);
+          }
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setIndex(idx);
+        return geo;
+      };
+      const square = makeLevel(false), ring = makeLevel(true);
+      const base = settings.quality === 'low' ? 14 : settings.quality === 'medium' ? 10 : 8;
+      for (let L = 0; L < 7; L++) {
+        const spacing = base * 2 ** L;
+        if (spacing * N > 90000) break;
+        const mat = terrainMat.clone();
+        mat.uniforms.uHeight = terrainMat.uniforms.uHeight; mat.uniforms.uCover = terrainMat.uniforms.uCover;
+        mat.uniforms.uSpacing.value = spacing;
+        const mesh = new THREE.Mesh(L === 0 ? square : ring, mat);
+        mesh.frustumCulled = false; mesh.renderOrder = 0;
+        scene.add(mesh);
+        terrainLevels.push({ mesh, mat, spacing });
+      }
+    }
+    function updateTerrain(cx, cz, t) {
+      const fog = scene.fog;
+      for (const L of terrainLevels) {
+        const snap = L.spacing * 2;
+        L.mat.uniforms.uOrigin.value.set(Math.round(cx / snap) * snap, Math.round(cz / snap) * snap);
+        L.mat.uniforms.uTime.value = t; L.mat.uniforms.uCam.value.copy(camera.position);
+        L.mat.uniforms.uSun.value.copy(sunDir); L.mat.uniforms.uSunColor.value.copy(sun.color); L.mat.uniforms.uSkyColor.value.copy(hemi.color);
+        if (fog) { L.mat.uniforms.fogColor.value.copy(fog.color); L.mat.uniforms.fogNear.value = fog.near; L.mat.uniforms.fogFar.value = fog.far; }
+      }
+    }
+    // ======================================================================
+    // The city: streets and buildings in tiles around the camera, trees
+    // scattered from the land cover, the airport, and the aircraft itself.
+    // ======================================================================
+    const TILE = 2000;
+    const tkey = (x, z) => `${Math.floor(x / TILE)},${Math.floor(z / TILE)}`;
+    const roadBuckets = new Map(), bldBuckets = new Map(), railBuckets = new Map();
+    function bucketWorld() {
+      const R = W.roads;
+      for (let r = 0; r < R.n; r++) for (let k = 0; k + 1 < R.count[r]; k++) {
+        const o = (R.start[r] + k) * 2, mx = (R.xz[o] + R.xz[o + 2]) / 2, mz = (R.xz[o + 1] + R.xz[o + 3]) / 2;
+        const key = tkey(mx, mz); (roadBuckets.get(key) || roadBuckets.set(key, []).get(key)).push(r, k);
+      }
+      const T = W.rails;
+      for (let r = 0; r < T.n; r++) for (let k = 0; k + 1 < T.count[r]; k++) {
+        const o = (T.start[r] + k) * 2, key = tkey((T.xz[o] + T.xz[o + 2]) / 2, (T.xz[o + 1] + T.xz[o + 3]) / 2);
+        (railBuckets.get(key) || railBuckets.set(key, []).get(key)).push(r, k);
+      }
+      for (let i = 0; i < W.bld.n; i++) {
+        const o = i * 6, key = tkey((bldBox[o] + bldBox[o + 2]) / 2, (bldBox[o + 1] + bldBox[o + 3]) / 2);
+        (bldBuckets.get(key) || bldBuckets.set(key, []).get(key)).push(i);
+      }
+    }
+
+    // ---- ribbons: a strip of quads along a polyline, draped on the ground, with markings in the shader
+    const ribbonMat = new THREE.ShaderMaterial({
+      uniforms: { uSun: { value: new THREE.Vector3(0, 1, 0) }, fogColor: { value: new THREE.Color() }, fogNear: { value: 1 }, fogFar: { value: 2 }, uCam: { value: new THREE.Vector3() } },
+      vertexShader: `attribute float mark; attribute float dash;
+        varying vec3 vColor; varying vec2 vUv; varying float vMark; varying float vDash; varying vec3 vWorld;
+        void main() { vColor = color; vUv = uv; vMark = mark; vDash = dash; vWorld = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `uniform vec3 fogColor; uniform float fogNear, fogFar; uniform vec3 uCam;
+        varying vec3 vColor; varying vec2 vUv; varying float vMark; varying float vDash; varying vec3 vWorld;
+        void main() {
+          vec3 col = vColor;
+          float av = abs(vUv.y);
+          float edge = smoothstep(0.86, 1.0, av);
+          col *= 1.0 - 0.12 * edge;
+          if (vMark > 0.5 && vMark < 2.5) { // a dashed yellow centre line, white edges on the bigger roads
+            float d = step(fract(vUv.x / vDash), 0.5);
+            if (av < 0.045 && d > 0.5) col = vec3(0.86, 0.72, 0.25);
+            if (vMark > 1.5 && av > 0.90 && av < 0.95) col = vec3(0.85);
+          } else if (vMark > 2.5 && vMark < 3.5) { if (av < 0.05) col = vec3(0.85, 0.70, 0.20); }
+          float fogF = smoothstep(fogNear, fogFar, length(vWorld - uCam));
+          gl_FragColor = vec4(mix(col, fogColor, fogF), 1.0);
+        }`,
+      vertexColors: true,
+    });
+    ribbonMat.polygonOffset = true; ribbonMat.polygonOffsetFactor = -2; ribbonMat.polygonOffsetUnits = -2;
+    const ROAD_COL = [[0.27, 0.27, 0.29], [0.29, 0.29, 0.31], [0.31, 0.31, 0.33], [0.33, 0.33, 0.35], [0.35, 0.35, 0.37], [0.37, 0.37, 0.39], [0.37, 0.37, 0.39], [0.41, 0.41, 0.43], [0.42, 0.41, 0.42], [0.50, 0.44, 0.34], [0.46, 0.45, 0.44]];
+    const UNPAVED = [0.52, 0.45, 0.35];
+    // One segment (a → b) of a polyline, mitred against its neighbours, densified for the ground.
+    function pushSegment(out, ax, az, bx, bz, prevDir, nextDir, w, color, mark, dash, u0, lift, deck) {
+      const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz);
+      if (L < 0.01) return u0;
+      const ux = dx / L, uz = dz / L;
+      // the normal at each end: average with the neighbouring segment's, limited so sharp bends don't blow up
+      const nStart = prevDir ? mitre(ux, uz, prevDir[0], prevDir[1]) : [-uz, ux, 1];
+      const nEnd = nextDir ? mitre(nextDir[0], nextDir[1], ux, uz) : [-uz, ux, 1];
+      const n = Math.max(1, Math.ceil(L / 24));
+      const h = (x, z, t) => (deck ? deck[0] + (deck[1] - deck[0]) * t : heightAt(x, z)) + lift;
+      for (let i = 0; i < n; i++) {
+        const t0 = i / n, t1 = (i + 1) / n;
+        const x0 = ax + dx * t0, z0 = az + dz * t0, x1 = ax + dx * t1, z1 = az + dz * t1;
+        const nx0 = nStart[0] * (1 - t0) + nEnd[0] * t0, nz0 = nStart[1] * (1 - t0) + nEnd[1] * t0, s0 = (nStart[2] * (1 - t0) + nEnd[2] * t0) * w / 2;
+        const nx1 = nStart[0] * (1 - t1) + nEnd[0] * t1, nz1 = nStart[1] * (1 - t1) + nEnd[1] * t1, s1 = (nStart[2] * (1 - t1) + nEnd[2] * t1) * w / 2;
+        const h0 = h(x0, z0, t0), h1 = h(x1, z1, t1);
+        const base = out.pos.length / 3;
+        out.pos.push(x0 - nx0 * s0, h0, z0 - nz0 * s0, x0 + nx0 * s0, h0, z0 + nz0 * s0, x1 - nx1 * s1, h1, z1 - nz1 * s1, x1 + nx1 * s1, h1, z1 + nz1 * s1);
+        out.uv.push(u0 + L * t0, -1, u0 + L * t0, 1, u0 + L * t1, -1, u0 + L * t1, 1);
+        for (let k = 0; k < 4; k++) { out.col.push(color[0], color[1], color[2]); out.mark.push(mark); out.dash.push(dash); }
+        out.idx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+      }
+      return u0 + L;
+    }
+    function mitre(ux, uz, px, pz) { // the offset direction between an incoming (p) and outgoing (u) direction, with its length scale
+      const nx = -(uz + pz), nz = ux + px, len = Math.hypot(nx, nz);
+      if (len < 0.3) return [-uz, ux, 1];
+      const mx = nx / len, mz = nz / len;
+      const cosHalf = mx * -uz + mz * ux; // against the segment's own normal
+      return [mx, mz, 1 / Math.max(cosHalf, 0.5)];
+    }
+    function ribbonGeometry(out) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(out.pos, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(out.uv, 2));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(out.col, 3));
+      geo.setAttribute('mark', new THREE.Float32BufferAttribute(out.mark, 1));
+      geo.setAttribute('dash', new THREE.Float32BufferAttribute(out.dash, 1));
+      geo.setIndex(out.idx);
+      return geo;
+    }
+    const newOut = () => ({ pos: [], uv: [], col: [], mark: [], dash: [], idx: [] });
+    function roadDeck(r, k) { // for a bridge segment: the deck heights at its ends, from the bridges list
+      const R = W.roads;
+      if (!(R.flags[r] & 1)) return null;
+      const o = (R.start[r] + k) * 2;
+      const d0 = bridgeDeckAt(R.xz[o], R.xz[o + 1]), d1 = bridgeDeckAt(R.xz[o + 2], R.xz[o + 3]);
+      if (d0 == null || d1 == null) return null;
+      return [d0, d1];
+    }
+    function buildRoadTile(key) {
+      const list = roadBuckets.get(key), out = newOut(), R = W.roads;
+      if (list) for (let i = 0; i < list.length; i += 2) {
+        const r = list[i], k = list[i + 1], o = (R.start[r] + k) * 2, cls = R.cls[r], w = R.width[r] / 10;
+        const color = R.flags[r] & 2 ? UNPAVED : ROAD_COL[cls] || ROAD_COL[6];
+        const prev = k > 0 ? dirOf(R.xz, o - 2, o) : null, next = k + 2 < R.count[r] ? dirOf(R.xz, o + 2, o + 4) : null;
+        const mark = cls <= 4 && w >= 7 ? 2 : cls <= 6 && w >= 6.5 ? 1 : 0;
+        pushSegment(out, R.xz[o], R.xz[o + 1], R.xz[o + 2], R.xz[o + 3], prev, next, w, color, mark, 9, (k * 37) % 9, 0.12 + (cls <= 1 ? 0.06 : 0), roadDeck(r, k));
+      }
+      const T = W.rails, rl = railBuckets.get(key);
+      if (rl) for (let i = 0; i < rl.length; i += 2) {
+        const r = rl[i], k = rl[i + 1], o = (T.start[r] + k) * 2;
+        pushSegment(out, T.xz[o], T.xz[o + 1], T.xz[o + 2], T.xz[o + 3], null, null, 3.2, [0.36, 0.31, 0.28], 0, 1, 0, 0.1, null);
+      }
+      if (!out.pos.length) return null;
+      const mesh = new THREE.Mesh(ribbonGeometry(out), ribbonMat);
+      mesh.renderOrder = 1; mesh.frustumCulled = true;
+      return mesh;
+    }
+    const dirOf = (xz, o0, o1) => { const dx = xz[o1] - xz[o0], dz = xz[o1 + 1] - xz[o0 + 1], L = Math.hypot(dx, dz) || 1; return [dx / L, dz / L]; };
+
+    // ---- buildings: extruded footprints with flat-shaded walls and a roof
+    const KIND_COL = [
+      [[0.82, 0.78, 0.70], [0.40, 0.34, 0.31]], // house
+      [[0.76, 0.70, 0.60], [0.46, 0.43, 0.41]], // apartments
+      [[0.78, 0.76, 0.72], [0.56, 0.56, 0.57]], // commercial
+      [[0.70, 0.72, 0.74], [0.60, 0.62, 0.64]], // industrial
+      [[0.60, 0.66, 0.72], [0.50, 0.53, 0.56]], // office
+      [[0.80, 0.78, 0.72], [0.52, 0.52, 0.52]], // civic
+      [[0.88, 0.85, 0.78], [0.42, 0.38, 0.36]], // church
+      [[0.72, 0.56, 0.48], [0.52, 0.50, 0.49]], // school
+      [[0.75, 0.76, 0.78], [0.66, 0.67, 0.69]], // hangar
+      [[0.74, 0.72, 0.68], [0.50, 0.50, 0.50]], // other
+      [[0.70, 0.68, 0.64], [0.48, 0.48, 0.48]], // garage
+      [[0.80, 0.74, 0.66], [0.55, 0.54, 0.53]], // retail
+    ];
+    const bldMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    function buildBldTile(key) {
+      const list = bldBuckets.get(key);
+      if (!list || !list.length) return null;
+      const pos = [], nor = [], col = [];
+      const B = W.bld;
+      for (const i of list) {
+        const n = B.count[i], s = B.start[i], o6 = i * 6, base = bldBox[o6 + 4], top = bldBox[o6 + 5];
+        const [wc, rc] = KIND_COL[B.kind[i]] || KIND_COL[9];
+        const vary = 0.9 + ((i * 7919) % 100) / 500; // a little variety per building
+        const wall = [wc[0] * vary, wc[1] * vary, wc[2] * vary], roof = [rc[0] * vary, rc[1] * vary, rc[2] * vary];
+        // walls
+        for (let a = 0; a < n; a++) {
+          const b = (a + 1) % n;
+          const ax = B.xz[(s + a) * 2], az = B.xz[(s + a) * 2 + 1], bx = B.xz[(s + b) * 2], bz = B.xz[(s + b) * 2 + 1];
+          const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1;
+          const nx = dz / L, nz = -dx / L; // outward for the clockwise (x east, z south) winding the data uses
+          pos.push(ax, base, az, bx, base, bz, bx, top, bz, ax, base, az, bx, top, bz, ax, top, az);
+          for (let k = 0; k < 6; k++) { nor.push(nx, 0, nz); col.push(wall[0], wall[1], wall[2]); }
+        }
+        // roof
+        const contour = [];
+        for (let a = 0; a < n; a++) contour.push(new THREE.Vector2(B.xz[(s + a) * 2], B.xz[(s + a) * 2 + 1]));
+        let tris;
+        try { tris = THREE.ShapeUtils.triangulateShape(contour, []); } catch { tris = []; }
+        for (const t of tris) {
+          // the triangulation's winding follows the contour; roofs face up either way if we orient by the normal
+          const p0 = contour[t[0]], p1 = contour[t[1]], p2 = contour[t[2]];
+          const cr = (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
+          const [q0, q1, q2] = cr > 0 ? [p0, p2, p1] : [p0, p1, p2];
+          pos.push(q0.x, top, q0.y, q1.x, top, q1.y, q2.x, top, q2.y);
+          for (let k = 0; k < 3; k++) { nor.push(0, 1, 0); col.push(roof[0], roof[1], roof[2]); }
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      const mesh = new THREE.Mesh(geo, bldMat);
+      mesh.renderOrder = 2;
+      return mesh;
+    }
+
+    // ---- tile management: build what is near, drop what is far, one tile a frame
+    const tiles = new Map(); // key → { road, bld }
+    const RADIUS = { low: [5000, 3600], medium: [8000, 5600], high: [11000, 8000] }[settings.quality] || [8000, 5600];
+    function updateTiles(cx, cz) {
+      const tx = Math.floor(cx / TILE), tz = Math.floor(cz / TILE);
+      const reachR = Math.ceil(RADIUS[0] / TILE), reachB = Math.ceil(RADIUS[1] / TILE);
+      let built = 0;
+      // nearest first
+      const want = [];
+      for (let i = -reachR; i <= reachR; i++) for (let j = -reachR; j <= reachR; j++) {
+        const kx = tx + i, kz = tz + j;
+        const mx = (kx + 0.5) * TILE, mz = (kz + 0.5) * TILE;
+        if (Math.abs(mx) > halfX() + TILE || Math.abs(mz) > halfZ() + TILE) continue;
+        const d = Math.hypot(mx - cx, mz - cz);
+        want.push([d, `${kx},${kz}`]);
+      }
+      want.sort((a, b) => a[0] - b[0]);
+      for (const [d, key] of want) {
+        let t = tiles.get(key);
+        if (!t) { t = { road: undefined, bld: undefined }; tiles.set(key, t); }
+        if (t.road === undefined && d < RADIUS[0] && built < 1) { t.road = buildRoadTile(key); if (t.road) scene.add(t.road); built++; }
+        if (t.bld === undefined && d < RADIUS[1] && built < 1) { t.bld = buildBldTile(key); if (t.bld) scene.add(t.bld); built++; }
+        if (built >= 1) break;
+      }
+      // drop the far ones
+      if (Math.random() < 0.05) for (const [key, t] of tiles) {
+        const [kx, kz] = key.split(',').map(Number);
+        const d = Math.hypot((kx + 0.5) * TILE - cx, (kz + 0.5) * TILE - cz);
+        if (d > RADIUS[0] + 3000) {
+          for (const m of [t.road, t.bld]) if (m) { scene.remove(m); m.geometry.dispose(); }
+          tiles.delete(key);
+        } else if (d > RADIUS[1] + 3000 && t.bld) { scene.remove(t.bld); t.bld.geometry.dispose(); t.bld = undefined; }
+      }
+    }
+
+    // ---- trees: two instanced meshes (trunks, crowns) re-scattered as the camera moves
+    const TREES = { low: [1300, 6000], medium: [1900, 14000], high: [2500, 24000] }[settings.quality] || [1900, 14000];
+    let treeCrown, treeTrunk, treeCenter = null;
+    const treeDummy = new THREE.Object3D(), treeColor = new THREE.Color();
+    function buildTrees() {
+      const crown = new THREE.ConeGeometry(0.5, 1, 6, 1); crown.translate(0, 0.5, 0);
+      const trunk = new THREE.CylinderGeometry(0.06, 0.08, 0.3, 5); trunk.translate(0, 0.15, 0);
+      treeCrown = new THREE.InstancedMesh(crown, new THREE.MeshLambertMaterial({ color: 0xffffff }), TREES[1]);
+      treeTrunk = new THREE.InstancedMesh(trunk, new THREE.MeshLambertMaterial({ color: 0x5a4632 }), TREES[1]);
+      treeCrown.frustumCulled = false; treeTrunk.frustumCulled = false;
+      treeCrown.count = 0; treeTrunk.count = 0;
+      scene.add(treeCrown, treeTrunk);
+    }
+    const hash2 = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >> 13)) * 1274126177; h ^= h >> 16; return (h >>> 0) / 4294967296; };
+    function updateTrees(cx, cz, force) {
+      if (!force && treeCenter && Math.hypot(cx - treeCenter[0], cz - treeCenter[1]) < 160) return;
+      treeCenter = [cx, cz];
+      const C = W.C, cell = 24, R = TREES[0];
+      let n = 0;
+      const i0 = Math.floor((cx - R) / cell), i1 = Math.ceil((cx + R) / cell), j0 = Math.floor((cz - R) / cell), j1 = Math.ceil((cz + R) / cell);
+      outer: for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = i * cell, z = j * cell;
+        if (Math.hypot(x - cx, z - cz) > R || !insideMap(x, z)) continue;
+        const cls = coverAt(x + cell / 2, z + cell / 2);
+        let per = 0, scale = 1;
+        if (cls === C.forest) per = 2; else if (cls === C.scrub) { per = 1; scale = 0.5; } else if (cls === C.park) per = hash2(i, j) < 0.5 ? 1 : 0; else if (cls === C.residential) per = hash2(i, j + 7) < 0.33 ? 1 : 0; else if (cls === C.grass || cls === C.farmland) per = hash2(i, j + 3) < 0.08 ? 1 : 0;
+        for (let k = 0; k < per; k++) {
+          const px = x + hash2(i * 3 + k, j) * cell, pz = z + hash2(i, j * 3 + k) * cell;
+          const under = coverAt(px, pz);
+          if (under === C.pavement || under === C.water || under === C.rail) continue;
+          if (obstacle(px, heightAt(px, pz) + 2, pz)) continue;
+          const s = (0.8 + hash2(i + k, j - k) * 0.6) * scale;
+          const h = heightAt(px, pz);
+          treeDummy.position.set(px, h - 0.2, pz);
+          treeDummy.rotation.set(0, hash2(i, j) * 6.28, 0);
+          treeDummy.scale.set(s * 6.5, s * 11, s * 6.5);
+          treeDummy.updateMatrix();
+          treeCrown.setMatrixAt(n, treeDummy.matrix);
+          treeDummy.scale.set(s * 5, s * 10, s * 5); treeDummy.updateMatrix();
+          treeTrunk.setMatrixAt(n, treeDummy.matrix);
+          const g = 0.3 + hash2(i + 11, j + k) * 0.22;
+          treeColor.setRGB(0.16 + g * 0.3, g, 0.12 + g * 0.2);
+          treeCrown.setColorAt(n, treeColor);
+          if (++n >= TREES[1]) break outer;
+        }
+      }
+      treeCrown.count = n; treeTrunk.count = n;
+      treeCrown.instanceMatrix.needsUpdate = true; treeTrunk.instanceMatrix.needsUpdate = true;
+      if (treeCrown.instanceColor) treeCrown.instanceColor.needsUpdate = true;
+    }
+
+    // ---- the airport: runways with their markings, taxiways, a windsock
+    let windsock = null;
+    function buildAirport() {
+      const A = W.meta.airport;
+      for (const rw of [...A.runways, ...(A.otherRunways || [])]) {
+        const [p0, p1] = rw.pts, L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+        const nums = (rw.ref || '').split('/').map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n));
+        const h01 = ((Math.atan2(p1[0] - p0[0], -(p1[1] - p0[1])) * R2D) + 360) % 360;
+        const wrap = (a) => Math.abs(((a + 540) % 360) - 180);
+        let n0 = nums[0], n1 = nums[1];
+        if (nums.length === 2 && wrap(h01 - nums[1] * 10) < wrap(h01 - nums[0] * 10)) { n0 = nums[1]; n1 = nums[0]; }
+        const tex = runwayTexture(L, rw.w, n0, n1);
+        const out = newOut();
+        const dx = p1[0] - p0[0], dz = p1[1] - p0[1], ux = dx / L, uz = dz / L, nx = -uz, nz = ux, w2 = rw.w / 2;
+        const n = Math.ceil(L / 20);
+        for (let i = 0; i < n; i++) {
+          const t0 = i / n, t1 = (i + 1) / n;
+          for (const [t, x, z] of [[t0, p0[0] + dx * t0, p0[1] + dz * t0], [t1, p0[0] + dx * t1, p0[1] + dz * t1]]) {
+            const h = heightAt(x, z) + 0.25;
+            out.pos.push(x - nx * w2, h, z - nz * w2, x + nx * w2, h, z + nz * w2);
+            out.uv.push(t, 0, t, 1);
+          }
+          const b = i * 4;
+          out.idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(out.pos, 3));
+        geo.setAttribute('uv', new THREE.Float32BufferAttribute(out.uv, 2));
+        geo.setIndex(out.idx);
+        const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+        mesh.renderOrder = 1;
+        scene.add(mesh);
+      }
+      const out = newOut();
+      for (const tw of A.taxiways) for (let k = 0; k + 1 < tw.pts.length; k++) {
+        const a = tw.pts[k], b = tw.pts[k + 1];
+        const prev = k > 0 ? dir2(tw.pts[k - 1], a) : null, next = k + 2 < tw.pts.length ? dir2(b, tw.pts[k + 2]) : null;
+        pushSegment(out, a[0], a[1], b[0], b[1], prev, next, Math.min(tw.w, 25), [0.40, 0.40, 0.41], 3, 1, 0, 0.2, null);
+      }
+      if (out.pos.length) { const m = new THREE.Mesh(ribbonGeometry(out), ribbonMat); m.renderOrder = 1; scene.add(m); }
+      // the windsock by the ramp
+      const st = A.start;
+      windsock = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 6, 6), new THREE.MeshLambertMaterial({ color: 0xdddddd }));
+      pole.position.y = 3; windsock.add(pole);
+      const sock = new THREE.Group(); sock.position.y = 6;
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.35, 2.4, 8, 1, true), new THREE.MeshLambertMaterial({ color: 0xff7a1a, side: THREE.DoubleSide }));
+      cone.rotation.z = Math.PI / 2; cone.position.x = 1.2; sock.add(cone);
+      windsock.add(sock); windsock.userData.sock = sock;
+      const sx = st.x + 40 * Math.sin((st.heading + 90) * D2R), sz = st.z - 40 * Math.cos((st.heading + 90) * D2R);
+      windsock.position.set(sx, heightAt(sx, sz), sz);
+      scene.add(windsock);
+    }
+    const dir2 = (a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz) || 1; return [dx / L, dz / L]; };
+    function updateWindsock(dirDeg, speed) {
+      if (!windsock) return;
+      const to = (dirDeg + 180) * D2R; // the sock points downwind
+      windsock.userData.sock.rotation.set(0, -(to - Math.PI / 2), -clamp(1.1 - speed / 7, 0, 1.1), 'YXZ');
+      windsock.userData.sock.rotation.order = 'YZX';
+    }
+    function runwayTexture(L, w, n0, n1) {
+      const c = document.createElement('canvas'); c.width = 2048; c.height = 192; const g = c.getContext('2d');
+      const px = 2048 / L, py = 192 / w; // pixels per metre along and across
+      g.fillStyle = '#3a3b3f'; g.fillRect(0, 0, 2048, 192);
+      const img = g.getImageData(0, 0, 2048, 192); for (let i = 0; i < img.data.length; i += 4) { const v = (Math.random() - 0.5) * 14; img.data[i] += v; img.data[i + 1] += v; img.data[i + 2] += v; } g.putImageData(img, 0, 0);
+      g.fillStyle = '#e8e8e8';
+      // threshold stripes and the centreline
+      const stripes = w >= 40 ? 8 : 6, sw = (w * 0.7) / (stripes * 2 - 1);
+      for (const [x0, sign] of [[6, 1], [L - 6, -1]]) {
+        for (let i = 0; i < stripes; i++) { const yy = (w * 0.15 + i * 2 * sw) * py; g.fillRect(Math.min(x0, x0 + sign * 30) * px, yy, 30 * px, sw * py * 0.9); }
+      }
+      for (let x = 120; x < L - 120; x += 60) g.fillRect(x * px, 96 - 0.9 * py / 2, 30 * px, 0.9 * py);
+      g.fillRect(0, 2, 2048, 0.9 * py); g.fillRect(0, 192 - 2 - 0.9 * py, 2048, 0.9 * py);
+      // the numbers, read by the pilot on approach
+      g.font = `bold ${Math.round(18 * py)}px Arial`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      for (const [n, x, rot] of [[n0, 70, Math.PI / 2], [n1, L - 70, -Math.PI / 2]]) {
+        if (n == null) continue;
+        g.save(); g.translate(x * px, 96); g.rotate(rot); g.scale(1, (px / py) * 1.0); g.fillText(String(n).padStart(2, '0'), 0, 0); g.restore();
+      }
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+      return t;
+    }
+
+    // ---- the aircraft, built from boxes, with the rotor and the propeller driven by the model
+    const aircraft = { group: new THREE.Group(), parts: {} };
+    function buildAircraft() {
+      const g = aircraft.group, P = GYRO.P;
+      const M = (c) => new THREE.MeshLambertMaterial({ color: c });
+      const frame = M(0x2b2f36), red = M(0xc0392b), blue = M(0x2f6fd1), skin = M(0xd9b48c), white = M(0xf2f2f2), black = M(0x111111), grey = M(0x9aa0a6), tyre = M(0x1a1a1a);
+      const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); g.add(m); return m; };
+      box(3.1, 0.07, 0.07, frame, -0.5, -0.5, 0);          // keel
+      box(0.07, 1.85, 0.07, frame, -0.05, 0.42, 0);         // mast
+      box(0.9, 0.05, 0.05, frame, 0.5, -0.48, 0);           // forward keel
+      box(0.5, 0.08, 0.5, red, 0.25, -0.22, 0);             // seat
+      box(0.08, 0.55, 0.5, red, 0.02, 0.05, 0);             // seat back
+      const pilot = new THREE.Group(); g.add(pilot); aircraft.parts.pilot = pilot;
+      const pb = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); pilot.add(m); return m; };
+      pb(0.38, 0.55, 0.42, blue, 0.22, 0.1, 0);              // torso
+      pb(0.55, 0.16, 0.36, M(0x3b4a5a), 0.55, -0.22, 0);     // thighs
+      pb(0.16, 0.42, 0.34, M(0x3b4a5a), 0.86, -0.42, 0);     // shins
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), white); head.position.set(0.28, 0.58, 0); pilot.add(head);
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.2), black); visor.position.set(0.39, 0.57, 0); pilot.add(visor);
+      pb(0.1, 0.1, 0.1, skin, 0.5, 0.05, 0.2); pb(0.1, 0.1, 0.1, skin, 0.5, 0.05, -0.2); // hands
+      box(0.5, 0.45, 0.5, black, -0.85, 0.08, 0);           // engine
+      box(0.9, 0.16, 0.16, M(0x3a3f47), -0.7, 0.35, 0);     // exhaust/cowl
+      box(0.08, 0.06, 0.9, frame, 0.2, 0.0, 0);             // control bar
+      // propeller
+      const prop = new THREE.Group(); prop.position.set(-1.12, 0.12, 0); g.add(prop); aircraft.parts.prop = prop;
+      for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.8, 0.09), black); b.position.y = 0.42; const h = new THREE.Group(); h.rotation.x = (i * 2 * Math.PI) / 3; h.add(b); prop.add(h); }
+      const propDisc = new THREE.Mesh(new THREE.CircleGeometry(0.84, 24), new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }));
+      propDisc.rotation.y = Math.PI / 2; propDisc.visible = false; prop.add(propDisc); aircraft.parts.propDisc = propDisc;
+      const propBlades = prop.children.filter((c) => c !== propDisc); aircraft.parts.propBlades = propBlades;
+      // tail
+      box(1.5, 0.06, 0.06, frame, -1.7, -0.3, 0);           // boom
+      box(0.3, 0.025, 1.5, white, -2.05, 0.1, 0);           // stabilizer
+      box(0.35, 0.72, 0.03, red, -2.1, 0.42, 0);            // fin
+      const rudder = new THREE.Group(); rudder.position.set(-2.28, 0.4, 0); g.add(rudder); aircraft.parts.rudder = rudder;
+      const rm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.6, 0.03), white); rm.position.x = -0.15; rudder.add(rm);
+      // rotor head and blades
+      const head2 = new THREE.Group(); head2.position.set(P.rotor.hub[0], P.rotor.hub[1], P.rotor.hub[2]); head2.rotation.order = 'ZXY'; g.add(head2); aircraft.parts.head = head2;
+      const hub = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.2), frame); head2.add(hub);
+      const az = new THREE.Group(); head2.add(az); aircraft.parts.azimuth = az;
+      const teeter = new THREE.Group(); teeter.position.y = 0.08; az.add(teeter); aircraft.parts.teeter = teeter;
+      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xc9ced4, emissive: 0x3a3e44, transparent: true, opacity: 1 });
+      const R = P.rotor.R, blen = R - 0.3;
+      const b1 = new THREE.Mesh(new THREE.BoxGeometry(blen, 0.03, P.rotor.chord), bladeMat); b1.position.x = -(0.3 + blen / 2); b1.rotation.z = -P.rotor.precone;
+      const b2 = new THREE.Mesh(new THREE.BoxGeometry(blen, 0.03, P.rotor.chord), bladeMat); b2.position.x = 0.3 + blen / 2; b2.rotation.z = P.rotor.precone;
+      const tip1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.035, P.rotor.chord + 0.02), red); tip1.position.x = -R + 0.15; tip1.rotation.z = -P.rotor.precone; b1.add(new THREE.Object3D());
+      teeter.add(b1, b2);
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(R, 48), new THREE.MeshBasicMaterial({ color: 0xdfe4ea, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
+      disc.rotation.x = -Math.PI / 2; disc.visible = false; teeter.add(disc);
+      const rim = new THREE.Mesh(new THREE.RingGeometry(R - 0.3, R, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
+      rim.rotation.x = -Math.PI / 2; rim.visible = false; teeter.add(rim);
+      aircraft.parts.blades = [b1, b2]; aircraft.parts.bladeMat = bladeMat; aircraft.parts.disc = disc; aircraft.parts.rim = rim;
+      // gear
+      const wheel = (x, y, z, r) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.12, 12), tyre); m.rotation.x = Math.PI / 2; m.position.set(x, y, z); return m; };
+      const nose = new THREE.Group(); nose.position.set(0.95, -0.42, 0); g.add(nose); aircraft.parts.nose = nose;
+      const nw = wheel(0, -0.16, 0, 0.2); nose.add(nw);
+      const nstrut = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.05), frame); nstrut.position.y = -0.0; nose.add(nstrut);
+      for (const z of [-0.8, 0.8]) {
+        g.add(wheel(-0.25, -0.58, z, 0.22));
+        const strut = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.9), frame); strut.position.set(-0.25, -0.35, z / 2); strut.rotation.x = Math.atan2(0.25, 0.8) * Math.sign(z); g.add(strut);
+      }
+      box(0.3, 0.05, 0.05, frame, -2.25, -0.38, 0);          // tail skid
+      box(0.02, 0.4, 0.02, frame, 0.02, 0.45, 0.0);          // stick
+      scene.add(g);
+      // the shadow on the ground
+      const sc = document.createElement('canvas'); sc.width = sc.height = 128; const sg = sc.getContext('2d');
+      const rg = sg.createRadialGradient(64, 64, 4, 64, 64, 64); rg.addColorStop(0, 'rgba(0,0,0,0.5)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); sg.fillStyle = rg; sg.fillRect(0, 0, 128, 128);
+      const shadow = new THREE.Mesh(new THREE.CircleGeometry(4.5, 24), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false }));
+      shadow.rotation.x = -Math.PI / 2; shadow.renderOrder = 3; scene.add(shadow); aircraft.shadow = shadow;
+    }
+    const tmpQ = new THREE.Quaternion();
+    function updateAircraft(s, firstPerson, dt) {
+      const g = aircraft.group, p = aircraft.parts, P = GYRO.P;
+      g.position.set(s.pos[0], s.pos[1], s.pos[2]);
+      g.quaternion.set(s.q[0], s.q[1], s.q[2], s.q[3]);
+      p.head.rotation.z = s.rotor.tiltAft; p.head.rotation.x = s.rotor.tiltRight;
+      p.azimuth.rotation.y = s.rotor.psi;
+      p.teeter.rotation.z = -s.rotor.beta;
+      const fast = s.rotor.omega > 12;
+      p.disc.visible = fast; p.rim.visible = fast;
+      p.bladeMat.opacity = fast ? clamp(1 - (s.rotor.omega - 12) / 20, 0.3, 1) : 1;
+      p.disc.material.opacity = clamp((s.rotor.omega - 12) / 30, 0, 1) * 0.14;
+      p.rim.material.opacity = clamp((s.rotor.omega - 12) / 30, 0, 1) * 0.25;
+      p.prop.rotation.x += s.engine.omega * dt;
+      const propFast = s.engine.omega > 40;
+      p.propDisc.visible = propFast; for (const b of p.propBlades) b.visible = !propFast;
+      p.rudder.rotation.y = s.ctl.rudder * P.fin.rudderMax;
+      p.nose.rotation.y = -s.ctl.rudder * Math.abs(s.ctl.rudder) * P.steerMax;
+      p.pilot.visible = !firstPerson;
+      const sh = aircraft.shadow, gh = heightAt(s.pos[0], s.pos[2]), agl = s.pos[1] - gh;
+      sh.position.set(s.pos[0], gh + 0.2, s.pos[2]);
+      sh.material.opacity = clamp(1 - agl / 60, 0, 1) * 0.9;
+      sh.visible = agl < 60;
+    }
+
+    // ---- the delivery marker: a beam of light on the street, a ring on the ground, a floating name
+    const marker = { group: new THREE.Group(), label: null, target: null };
+    function buildMarker() {
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 500, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+      beam.position.y = 250;
+      const ring = new THREE.Mesh(new THREE.RingGeometry(6, 8, 40), new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.4;
+      const ring2 = new THREE.Mesh(new THREE.RingGeometry(78, 80, 64), new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+      ring2.rotation.x = -Math.PI / 2; ring2.position.y = 0.4;
+      marker.group.add(beam, ring, ring2);
+      marker.ring = ring; marker.beam = beam;
+      marker.group.visible = false;
+      scene.add(marker.group);
+    }
+    function setMarker(target) { // {x, z} or null
+      marker.target = target;
+      if (!target) { marker.group.visible = false; return; }
+      const h = surface(target.x, target.z).h;
+      marker.group.position.set(target.x, h, target.z);
+      marker.group.visible = true;
+    }
+    // ======================================================================
+    // Hands and eyes: the sticks and buttons, the keyboard, the two cameras,
+    // looking around by dragging or by turning the phone, and the sound.
+    // ======================================================================
+    const sim = { state: GYRO.createState(), running: false, firstPerson: settings.camera !== 'chase', time: 0 };
+    window.__sim = sim; // reachable from the page's own tests
+
+    // ---- sticks: a knob that follows the finger; cyclic centres on release, throttle stays
+    function makeStick(el, opts) {
+      const knob = el.querySelector('.knob');
+      const st = { x: 0, y: 0, active: null, el };
+      const place = () => {
+        const r = el.getBoundingClientRect(), rx = r.width * 0.36, ry = r.height * 0.36;
+        knob.style.transform = `translate(${st.x * rx}px, ${-st.y * ry}px)`;
+        if (opts.onMove) opts.onMove(st.x, st.y);
+      };
+      const read = (ev) => {
+        const r = el.getBoundingClientRect(), rx = r.width * 0.36, ry = r.height * 0.36;
+        const x = clamp((ev.clientX - (r.left + r.width / 2)) / rx, -1, 1), y = clamp(-(ev.clientY - (r.top + r.height / 2)) / ry, -1, 1);
+        if (opts.stickyY) { st.x = x; st.y = opts.absoluteY ? y : y; } else { st.x = x; st.y = y; }
+        place();
+      };
+      el.addEventListener('pointerdown', (ev) => { if (st.active != null) return; st.active = ev.pointerId; el.setPointerCapture(ev.pointerId); if (opts.stickyY) st.grabY = ev.clientY; read(ev); ev.preventDefault(); });
+      el.addEventListener('pointermove', (ev) => { if (ev.pointerId !== st.active) return; read(ev); ev.preventDefault(); });
+      const release = (ev) => {
+        if (ev.pointerId !== st.active) return;
+        st.active = null;
+        st.x = 0; if (!opts.stickyY) st.y = 0;
+        place();
+      };
+      el.addEventListener('pointerup', release); el.addEventListener('pointercancel', release); el.addEventListener('lostpointercapture', release);
+      st.set = (x, y) => { st.x = x; st.y = y; place(); };
+      place();
+      return st;
+    }
+    const expo = (v) => Math.sign(v) * (0.55 * Math.abs(v) + 0.45 * Math.abs(v) ** 3);
+    const stickR = makeStick($('#stickR'), {});
+    const stickL = makeStick($('#stickL'), { stickyY: true, onMove: (x, y) => { const t = (y + 1) / 2; $('#thrFill').style.height = `${t * 80}%`; $('#thrLabel').textContent = `${Math.round(t * 100)}%`; } });
+    stickL.set(0, -1);
+
+    // ---- keyboard: the same inputs, ramped so a tap is a nudge and a hold is a deflection
+    const keys = new Set();
+    const keyAxes = { lon: 0, lat: 0, rudder: 0 };
+    const holdKeys = {};
+    addEventListener('keydown', (ev) => {
+      if (ev.target && /input|select|textarea/i.test(ev.target.tagName)) return;
+      const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+      keys.add(k);
+      if (!ev.repeat) {
+        if (k === 'i') toggleEngine();
+        if (k === 'r') toggleRotorBrake();
+        if (k === 'c') toggleCamera();
+        if (k === 'm') toggleMap();
+        if (k === 't') setTrim();
+        if (k === 'y') clearTrim();
+        if (k === 'f') { settings.assist = !settings.assist; $('#setAssist').checked = settings.assist; saveSettings(); refreshButtons(); toast(`Flight assist ${settings.assist ? 'on' : 'off'}`); }
+        if (k === 'Backspace') { ev.preventDefault(); startOnRamp(); }
+        if (k === 'Escape') { closeOverlays(); }
+        if (k === ' ') ev.preventDefault();
+      }
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(k)) ev.preventDefault();
+    });
+    addEventListener('keyup', (ev) => { const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key; keys.delete(k); });
+    addEventListener('blur', () => keys.clear());
+    function keyboardInput(dt) {
+      const ramp = (cur, want, rate) => (want > cur ? Math.min(want, cur + rate * dt) : Math.max(want, cur - rate * dt));
+      const has = (...ks) => ks.some((k) => keys.has(k));
+      keyAxes.lon = ramp(keyAxes.lon, (has('s', 'ArrowDown') ? 1 : 0) - (has('w', 'ArrowUp') ? 1 : 0), keys.size ? 2.5 : 5);
+      keyAxes.lat = ramp(keyAxes.lat, (has('d', 'ArrowRight') ? 1 : 0) - (has('a', 'ArrowLeft') ? 1 : 0), 2.5);
+      keyAxes.rudder = ramp(keyAxes.rudder, (has('e') ? 1 : 0) - (has('q') ? 1 : 0), 3);
+      if (has('Shift')) stickL.set(stickL.x, clamp(stickL.y + 0.8 * dt, -1, 1));
+      if (has('Control')) stickL.set(stickL.x, clamp(stickL.y - 0.8 * dt, -1, 1));
+      holdKeys.brake = has('b', ' '); holdKeys.prerot = has('p');
+    }
+
+    // ---- buttons
+    const held = { brake: false, prerot: false };
+    function holdButton(el, name) {
+      const down = (ev) => { held[name] = true; el.classList.add('held'); el.setPointerCapture?.(ev.pointerId); ev.preventDefault(); };
+      const up = () => { held[name] = false; el.classList.remove('held'); };
+      el.addEventListener('pointerdown', down); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+      el.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    }
+    holdButton($('#btnBrake'), 'brake'); holdButton($('#btnPrerot'), 'prerot');
+    function toggleEngine() { const s = sim.state; s.input.ignition = !s.input.ignition; if (s.input.ignition && s.input.throttle > 0.3) toast('Throttle back to start the engine'); refreshButtons(); }
+    function toggleRotorBrake() { const s = sim.state; s.input.rotorBrake = !s.input.rotorBrake; if (s.input.rotorBrake && !s.info.onGround) toast('Rotor brake in flight? That would be the end of you — ignored.'); refreshButtons(); }
+    function toggleCamera() { sim.firstPerson = !sim.firstPerson; settings.camera = sim.firstPerson ? 'cockpit' : 'chase'; saveSettings(); look.recenter(); refreshButtons(); }
+    let trimTap = 0;
+    function setTrim() {
+      const s = sim.state, now = performance.now();
+      if (now - trimTap < 400) { clearTrim(); return; }
+      trimTap = now;
+      s.input.trimLon = clamp(s.input.trimLon + currentLon(), -0.8, 0.8); s.input.trimLat = clamp(s.input.trimLat + currentLat(), -0.6, 0.6);
+      toast(`Trimmed: ${(s.input.trimLon * 100).toFixed(0)}% ${s.input.trimLon >= 0 ? 'aft' : 'forward'}, ${(s.input.trimLat * 100).toFixed(0)}% ${s.input.trimLat >= 0 ? 'right' : 'left'}`);
+      refreshButtons();
+    }
+    function clearTrim() { const s = sim.state; s.input.trimLon = 0; s.input.trimLat = 0; toast('Trim cleared'); refreshButtons(); }
+    const currentLon = () => clamp(expo(-stickR.y) + keyAxes.lon, -1, 1);
+    const currentLat = () => clamp(expo(stickR.x) + keyAxes.lat, -1, 1);
+    $('#btnEngine').addEventListener('click', toggleEngine);
+    $('#btnRotorBrake').addEventListener('click', toggleRotorBrake);
+    $('#btnTrim').addEventListener('click', setTrim);
+    $('#btnCam').addEventListener('click', toggleCamera);
+    $('#btnReset').addEventListener('click', () => startOnRamp());
+    function refreshButtons() {
+      const s = sim.state;
+      const b = (sel, on, small) => { const el = $(sel); el.classList.toggle('on', on); if (small) el.querySelector('small').textContent = small; };
+      b('#btnEngine', s.input.ignition, s.input.ignition ? 'on' : 'off');
+      b('#btnRotorBrake', s.input.rotorBrake, s.input.rotorBrake ? 'ON' : 'off');
+      b('#btnTrim', s.input.trimLon !== 0 || s.input.trimLat !== 0, s.input.trimLon !== 0 || s.input.trimLat !== 0 ? `${Math.round(s.input.trimLon * 100)}%` : 'set');
+      b('#btnCam', false, sim.firstPerson ? 'cockpit' : 'chase');
+      $('#assistLabel').textContent = settings.assist ? 'assist on' : 'assist off';
+      $('#btnLook').classList.toggle('on', look.mode === 'sensor');
+      $('#btnSound').textContent = sound.enabled ? '🔊' : '🔇';
+    }
+    // gather every input source into the model's input each frame
+    function gatherInput(dt) {
+      keyboardInput(dt);
+      const s = sim.state, inp = s.input;
+      inp.lon = currentLon(); inp.lat = currentLat();
+      inp.rudder = clamp(expo(stickL.x) + keyAxes.rudder, -1, 1);
+      inp.throttle = clamp((stickL.y + 1) / 2, 0, 1);
+      inp.brake = held.brake || holdKeys.brake ? 1 : 0;
+      inp.prerotate = held.prerot || holdKeys.prerot;
+      inp.assist = settings.assist;
+      if (sim.override) Object.assign(inp, sim.override); // the page's own tests drive the inputs through here
+    }
+
+    // ---- looking around: offsets from the aircraft's own axes, by drag or by the phone's sensors
+    const look = { yaw: 0, pitch: 0, mode: 'manual', ref: null, smooth: null, handler: null, event: null };
+    look.recenter = () => { look.yaw = 0; look.pitch = 0; look.ref = null; look.smooth = null; };
+    function screenAngle() {
+      if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+      if (typeof window.orientation === 'number') return (window.orientation + 360) % 360;
+      return 0;
+    }
+    // the direction the back of the phone faces, from DeviceOrientation angles (W3C Z-X'-Y'') and the screen's rotation
+    function phoneDirection(alpha, beta, gamma) {
+      const cA = Math.cos(alpha * D2R), sA = Math.sin(alpha * D2R), cB = Math.cos(beta * D2R), sB = Math.sin(beta * D2R), cG = Math.cos(gamma * D2R), sG = Math.sin(gamma * D2R);
+      // device z axis in east/north/up; the view is its opposite
+      const dz = [cA * sG + sA * sB * cG, sA * sG - cA * sB * cG, cB * cG];
+      const f = [-dz[0], -dz[1], -dz[2]];
+      const az = Math.atan2(f[0], f[1]), alt = Math.asin(clamp(f[2], -1, 1));
+      return { az, alt };
+    }
+    async function enableSensors(silent) {
+      if (typeof DeviceOrientationEvent === 'undefined') { if (!silent) toast('This browser has no orientation sensors — drag the view to look around.'); return false; }
+      try {
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          const res = await DeviceOrientationEvent.requestPermission();
+          if (res !== 'granted') { if (!silent) toast('Motion access was refused — drag the view to look around.'); return false; }
+        }
+      } catch (e) { if (!silent) toast(`Could not ask for motion access: ${e.message}`); return false; }
+      disableSensors();
+      look.event = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+      look.handler = (ev) => {
+        if (ev.beta == null || ev.gamma == null) return;
+        const { az, alt } = phoneDirection(ev.alpha == null ? 0 : ev.alpha, ev.beta, ev.gamma);
+        if (look.ref == null) look.ref = az;
+        let yaw = ((az - look.ref + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+        if (!look.smooth) look.smooth = [yaw, alt];
+        else { const k = 0.3; let dy = ((yaw - look.smooth[0] + 3 * Math.PI) % (2 * Math.PI)) - Math.PI; look.smooth[0] += dy * k; look.smooth[1] += (alt - look.smooth[1]) * k; }
+        look.yaw = look.smooth[0]; look.pitch = look.smooth[1];
+        look.gotData = true;
+      };
+      addEventListener(look.event, look.handler);
+      look.mode = 'sensor'; look.gotData = false; look.ref = null; look.smooth = null;
+      setTimeout(() => { if (look.mode === 'sensor' && !look.gotData) { disableSensors(); if (!silent) toast('No orientation data arrives — drag the view to look around.'); refreshButtons(); } }, 2500);
+      refreshButtons();
+      return true;
+    }
+    function disableSensors() {
+      if (look.handler) removeEventListener(look.event, look.handler);
+      look.handler = null; look.mode = 'manual'; look.yaw = 0; look.pitch = 0;
+    }
+    $('#btnLook').addEventListener('click', async () => {
+      if (look.mode === 'sensor') { disableSensors(); toast('Phone look off'); refreshButtons(); return; }
+      if (await enableSensors(false)) toast('Turn the phone to look around; ⌖ recentres', 3000);
+    });
+    $('#btnRecenter').addEventListener('click', () => look.recenter());
+    // drag to look
+    {
+      const el = $('#view'); let drag = null, lastTap = 0;
+      el.addEventListener('pointerdown', (ev) => {
+        const now = performance.now();
+        if (now - lastTap < 320) { look.recenter(); lastTap = 0; } else lastTap = now;
+        drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, moved: 0 }; el.setPointerCapture(ev.pointerId); el.classList.add('dragging');
+        if (onViewTap) onViewTap(ev, 'down');
+      });
+      el.addEventListener('pointermove', (ev) => {
+        if (!drag || ev.pointerId !== drag.id) return;
+        const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; drag.x = ev.clientX; drag.y = ev.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+        const k = 0.0045;
+        look.yaw -= dx * k; look.pitch += dy * k * (sim.firstPerson ? -1 : -1);
+        look.yaw = clamp(look.yaw, -Math.PI, Math.PI); look.pitch = clamp(look.pitch, -1.4, 1.4);
+        if (look.mode === 'sensor' && look.smooth) { look.smooth[0] = look.yaw; look.ref = null; look.smooth = null; look.mode = 'manual'; disableSensors(); refreshButtons(); }
+      });
+      const up = (ev) => { if (drag && ev.pointerId === drag.id) { if (drag.moved < 8 && onViewTap) onViewTap(ev, 'tap'); drag = null; el.classList.remove('dragging'); } };
+      el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+    }
+    let onViewTap = null; // set by the HUD for the minimap
+
+    // ---- cameras
+    const camTmp = { v: new THREE.Vector3(), q: new THREE.Quaternion(), e: new THREE.Euler(), chase: new THREE.Vector3(), chaseYaw: null };
+    function updateCamera(s, dt) {
+      const P = GYRO.P;
+      const bodyQ = camTmp.q.set(s.q[0], s.q[1], s.q[2], s.q[3]);
+      if (sim.firstPerson) {
+        const eye = new THREE.Vector3(P.eye[0], P.eye[1], P.eye[2]).applyQuaternion(bodyQ);
+        camera.position.set(s.pos[0] + eye.x, s.pos[1] + eye.y, s.pos[2] + eye.z);
+        // look: yaw about the body's up, pitch about the body's right, from the body's forward
+        const q = bodyQ.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, look.yaw, 0, 'YXZ'))).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), look.pitch));
+        // the camera looks down its −z; the body looks down +x
+        q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2));
+        camera.quaternion.copy(q);
+      } else {
+        const e = GYRO.qtoEuler(s.q);
+        if (camTmp.chaseYaw == null) camTmp.chaseYaw = e.heading;
+        let d = ((e.heading - camTmp.chaseYaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+        camTmp.chaseYaw += d * Math.min(1, dt * 2.5);
+        const yaw = camTmp.chaseYaw + look.yaw, el = clamp(0.28 + look.pitch, -0.6, 1.4), dist = 11;
+        const cx = s.pos[0] - Math.sin(yaw) * Math.cos(el) * dist, cz = s.pos[2] + Math.cos(yaw) * Math.cos(el) * dist, cy = s.pos[1] + Math.sin(el) * dist + 1.0;
+        const groundH = surface(cx, cz).h + 1.2;
+        camera.position.set(cx, Math.max(cy, groundH), cz);
+        camera.lookAt(s.pos[0], s.pos[1] + 0.6, s.pos[2]);
+      }
+      camera.fov = sim.firstPerson ? (innerWidth < innerHeight ? 80 : 68) : 60;
+      camera.updateProjectionMatrix();
+    }
+
+    // ---- sound: an engine note, the rotor's beat, the wind
+    const sound = { enabled: false, ctx: null };
+    function buildSound() {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      sound.ctx = ctx;
+      const master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination); sound.master = master;
+      const eng = ctx.createOscillator(); eng.type = 'sawtooth'; eng.frequency.value = 40;
+      const eng2 = ctx.createOscillator(); eng2.type = 'square'; eng2.frequency.value = 80;
+      const engF = ctx.createBiquadFilter(); engF.type = 'lowpass'; engF.frequency.value = 600; engF.Q.value = 2;
+      const engG = ctx.createGain(); engG.gain.value = 0;
+      eng.connect(engF); eng2.connect(engF); engF.connect(engG); engG.connect(master); eng.start(); eng2.start();
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const noise = ctx.createBufferSource(); noise.buffer = buf; noise.loop = true;
+      const rotF = ctx.createBiquadFilter(); rotF.type = 'bandpass'; rotF.frequency.value = 180; rotF.Q.value = 1.2;
+      const rotG = ctx.createGain(); rotG.gain.value = 0;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 10; const lfoG = ctx.createGain(); lfoG.gain.value = 0; lfo.connect(lfoG); lfoG.connect(rotG.gain); lfo.start();
+      noise.connect(rotF); rotF.connect(rotG); rotG.connect(master);
+      const windF = ctx.createBiquadFilter(); windF.type = 'lowpass'; windF.frequency.value = 500; const windG = ctx.createGain(); windG.gain.value = 0;
+      noise.connect(windF); windF.connect(windG); windG.connect(master); noise.start();
+      Object.assign(sound, { eng, eng2, engF, engG, rotG, lfo, lfoG, windG });
+    }
+    sound.toggle = async () => {
+      if (!sound.ctx) buildSound();
+      if (sound.ctx.state === 'suspended') await sound.ctx.resume();
+      sound.enabled = !sound.enabled; settings.sound = sound.enabled; saveSettings();
+      sound.master.gain.setTargetAtTime(sound.enabled ? 0.5 : 0, sound.ctx.currentTime, 0.1);
+      refreshButtons();
+    };
+    sound.update = (s) => {
+      if (!sound.enabled || !sound.ctx) return;
+      const t = sound.ctx.currentTime, i = s.info;
+      const engRpm = i.engineRpm * 2.58; // the engine turns faster than the prop
+      const f = Math.max(20, engRpm / 60 * 2);
+      sound.eng.frequency.setTargetAtTime(f, t, 0.05); sound.eng2.frequency.setTargetAtTime(f * 2.01, t, 0.05);
+      sound.engF.frequency.setTargetAtTime(300 + s.input.throttle * 1800, t, 0.1);
+      sound.engG.gain.setTargetAtTime(s.engine.on ? 0.08 + 0.25 * s.input.throttle : 0, t, 0.1);
+      const rot = i.rotorRpm / 60;
+      sound.lfo.frequency.setTargetAtTime(Math.max(0.5, rot * 2), t, 0.1);
+      const rg = clamp(i.rotorRpm / 400, 0, 1) * 0.25;
+      sound.rotG.gain.setTargetAtTime(rg, t, 0.1); sound.lfoG.gain.setTargetAtTime(rg * 0.8, t, 0.1);
+      sound.windG.gain.setTargetAtTime(clamp(i.tas / 40, 0, 1) * 0.25, t, 0.2);
+    };
+    $('#btnSound').addEventListener('click', () => sound.toggle());
+    // ======================================================================
+    // The instruments, the deliveries, the map, and the loop that runs it all.
+    // ======================================================================
+    const hud = $('#hud'), hctx = hud.getContext('2d');
+    const units = () => (settings.metric ? { spd: (ms) => ms * 3.6, spdU: 'km/h', alt: (m) => m, altU: 'm', vs: (ms) => ms * 60, vsU: 'm/min', dist: (m) => (m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m') }
+      : { spd: (ms) => ms / KT, spdU: 'kt', alt: (m) => m / FT, altU: 'ft', vs: (ms) => (ms / FT) * 60, vsU: 'fpm', dist: (m) => (m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m') });
+    const minimapBox = { x: 0, y: 0, w: 0, h: 0 };
+    function drawHud(s, dt) {
+      const Wd = hud.width, Hd = hud.height;
+      const dpr = Math.min(devicePixelRatio, 2);
+      const cw = Wd / dpr, ch = Hd / dpr;
+      hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      hctx.clearRect(0, 0, cw, ch);
+      const i = s.info, U = units();
+      const small = cw < 600, short = ch < 330;
+      const font = (px, w = 600) => { hctx.font = `${w} ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`; };
+      const box = (x, y, w, h, r = 8) => { hctx.beginPath(); hctx.roundRect(x, y, w, h, r); hctx.fillStyle = 'rgba(13,17,23,0.55)'; hctx.fill(); };
+      const text = (t, x, y, align = 'left', color = '#e6edf3') => { hctx.fillStyle = color; hctx.textAlign = align; hctx.textBaseline = 'middle'; hctx.fillText(t, x, y); };
+      const top = ($('.top').offsetHeight || 50) + 8;
+      const leftPad = 10, rightPad = cw - 10;
+      // airspeed and vertical speed (left)
+      {
+        const x = leftPad, y = top, w = short ? 84 : small ? 92 : 112, h = short ? 44 : small ? 52 : 60;
+        box(x, y, w, h);
+        font(short ? 22 : small ? 24 : 30, 800); text(Math.round(U.spd(i.ias)).toString(), x + w - 12, y + h / 2 - 4, 'right');
+        font(11); text(U.spdU, x + w - 12, y + h - 10, 'right', '#8b949e'); text('IAS', x + 10, y + 12, 'left', '#8b949e');
+        const vs = U.vs(i.vs);
+        box(x, y + h + 6, w, short ? 22 : 30);
+        font(short ? 12 : 13, 700); text(`${vs >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(vs / (settings.metric ? 10 : 50)) * (settings.metric ? 10 : 50))}${short ? '' : ' ' + U.vsU}`, x + w / 2, y + h + (short ? 17 : 21), 'center', Math.abs(vs) > (settings.metric ? 400 : 1300) ? '#f85149' : '#e6edf3');
+        if (!short) { box(x, y + h + 42, w, 24); font(12); text(`GS ${Math.round(U.spd(i.gs))}`, x + w / 2, y + h + 54, 'center', '#8b949e'); }
+      }
+      // altitude (right)
+      {
+        const w = short ? 90 : small ? 100 : 120, h = short ? 44 : small ? 52 : 60, x = rightPad - w, y = top;
+        box(x, y, w, h);
+        font(short ? 22 : small ? 24 : 30, 800); text(Math.round(U.alt(i.agl)).toString(), x + w - 12, y + h / 2 - 4, 'right');
+        font(11); text(`${U.altU} AGL`, x + w - 12, y + h - 10, 'right', '#8b949e');
+        box(x, y + h + 6, w, short ? 22 : 30);
+        font(short ? 11 : 12); text(`${Math.round(U.alt(i.alt))} ${U.altU} MSL`, x + w / 2, y + h + (short ? 17 : 21), 'center', '#8b949e');
+        if (!short) {
+          box(x, y + h + 42, w, 24);
+          font(12); text(`${i.nz.toFixed(1)} g`, x + 10, y + h + 54, 'left', Math.abs(i.nz) > 2.5 || i.nz < 0.3 ? '#e3b341' : '#8b949e');
+          text(`${small ? '' : 'wind '}${Math.round(i.windDir)}°/${Math.round(U.spd(s.wind.speed))}`, x + w - 8, y + h + 54, 'right', '#8b949e');
+        }
+      }
+      // heading tape (top centre)
+      {
+        const w = Math.min(cw - (small ? 230 : 280), 420), x = cw / 2 - w / 2, y = top, h = 30;
+        box(x, y, w, h);
+        hctx.save(); hctx.beginPath(); hctx.rect(x, y, w, h); hctx.clip();
+        const pxPerDeg = w / 80;
+        for (let d = -45; d <= 45; d++) {
+          const hd = Math.round(i.heading + d), hh = ((hd % 360) + 360) % 360;
+          if (hh % 5) continue;
+          const px = cw / 2 + (hd - i.heading) * pxPerDeg;
+          hctx.strokeStyle = '#8b949e'; hctx.lineWidth = 1; hctx.beginPath(); hctx.moveTo(px, y + h); hctx.lineTo(px, y + h - (hh % 10 ? 5 : 9)); hctx.stroke();
+          if (hh % 30 === 0) { font(11, 600); const lab = hh === 0 ? 'N' : hh === 90 ? 'E' : hh === 180 ? 'S' : hh === 270 ? 'W' : String(hh / 10).padStart(2, '0'); text(lab, px, y + 10, 'center', '#e6edf3'); }
+        }
+        // the delivery bearing
+        if (quest.target) {
+          const b = bearingTo(s, quest.target), d = ((b - i.heading + 540) % 360) - 180;
+          const px = clamp(cw / 2 + d * pxPerDeg, x + 8, x + w - 8);
+          hctx.fillStyle = '#f2c94c'; hctx.beginPath(); hctx.moveTo(px, y + h - 2); hctx.lineTo(px - 6, y + h - 12); hctx.lineTo(px + 6, y + h - 12); hctx.fill();
+        }
+        hctx.restore();
+        hctx.fillStyle = '#f2c94c'; hctx.beginPath(); hctx.moveTo(cw / 2, y + h + 1); hctx.lineTo(cw / 2 - 5, y + h + 8); hctx.lineTo(cw / 2 + 5, y + h + 8); hctx.fill();
+        font(12, 700); text(`${Math.round(i.heading) % 360}°`, cw / 2, y + h + 18, 'center');
+      }
+      // rotor and engine gauges, bottom left of the view
+      {
+        const r = short ? 27 : small ? 34 : 44, cx = leftPad + r + 8, cy = ch - r - 14;
+        box(cx - r - 8, cy - r - 8, 2 * r + 16, 2 * r + 20, 12);
+        const arc = (a0, a1, col, lw) => { hctx.strokeStyle = col; hctx.lineWidth = lw; hctx.beginPath(); hctx.arc(cx, cy, r, a0, a1); hctx.stroke(); };
+        const ang = (rpm) => Math.PI * 0.75 + (clamp(rpm, 0, 500) / 500) * Math.PI * 1.5;
+        arc(ang(0), ang(220), '#f85149', 5); arc(ang(220), ang(300), '#e3b341', 5); arc(ang(300), ang(430), '#3fb950', 5); arc(ang(430), ang(470), '#e3b341', 5); arc(ang(470), ang(500), '#f85149', 5);
+        const a = ang(i.rotorRpm);
+        hctx.strokeStyle = '#e6edf3'; hctx.lineWidth = 3; hctx.beginPath(); hctx.moveTo(cx + Math.cos(a) * (r - 14), cy + Math.sin(a) * (r - 14)); hctx.lineTo(cx + Math.cos(a) * (r + 2), cy + Math.sin(a) * (r + 2)); hctx.stroke();
+        font(short ? 13 : small ? 15 : 18, 800); text(Math.round(i.rotorRpm).toString(), cx, cy - 2, 'center', i.lowRotor || i.overspeed ? '#f85149' : '#e6edf3');
+        font(short ? 8 : 10); text('ROTOR rpm', cx, cy + (short ? 10 : 14), 'center', '#8b949e');
+        if (s.rotor.prerotating) { font(10, 700); text('PREROTATING', cx, cy + r + 4, 'center', '#f2c94c'); }
+        // engine
+        const ex = cx + r + 14, ew = short ? 66 : small ? 72 : 90;
+        box(ex, cy - 26, ew, 52);
+        font(13, 700); text(`${Math.round(i.engineRpm * 2.58 / 100) * 100}`, ex + 8, cy - 12, 'left', s.engine.on ? '#e6edf3' : '#8b949e');
+        font(10); text('engine rpm', ex + 8, cy + 2, 'left', '#8b949e');
+        text(`${short ? '' : 'thr '}${Math.round(s.input.throttle * 100)}% ${s.engine.on ? (s.engine.startT < 1.6 ? 'start' : short ? 'on' : 'running') : 'off'}`, ex + 8, cy + 16, 'left', '#8b949e');
+        if (short) { font(10); text(`${i.nz.toFixed(1)} g · wind ${Math.round(i.windDir)}°/${Math.round(U.spd(s.wind.speed))}`, ex + ew + 8, cy + 16, 'left', 'rgba(230,237,243,0.85)'); }
+      }
+      // slip ball, under the heading
+      {
+        const w = 90, x = cw / 2 - w / 2, y = top + (short ? 48 : 56);
+        box(x, y, w, 14, 7);
+        const sl = clamp(i.slip / 12, -1, 1);
+        hctx.fillStyle = '#e6edf3'; hctx.beginPath(); hctx.arc(x + w / 2 - sl * (w / 2 - 10), y + 7, 5, 0, Math.PI * 2); hctx.fill();
+        hctx.strokeStyle = '#8b949e'; hctx.beginPath(); hctx.moveTo(x + w / 2 - 7, y + 1); hctx.lineTo(x + w / 2 - 7, y + 13); hctx.moveTo(x + w / 2 + 7, y + 1); hctx.lineTo(x + w / 2 + 7, y + 13); hctx.stroke();
+      }
+      // warnings
+      {
+        const warns = [];
+        if (s.crashed) warns.push(['CRASHED', '#f85149']);
+        else {
+          if (i.lowRotor) warns.push(['LOW ROTOR RPM', '#f85149']);
+          if (i.overspeed) warns.push(['ROTOR OVERSPEED', '#f85149']);
+          if (i.unloaded) warns.push(['ROTOR UNLOADED — EASE BACK', '#f85149']);
+          if (!i.onGround && !s.engine.on) warns.push(['ENGINE OFF — GLIDE 45–50 KT', '#e3b341']);
+          if (!i.onGround && i.ias > 75 * KT) warns.push(['TOO FAST', '#e3b341']);
+          if (!i.onGround && i.agl < 60 && i.vs < -5) warns.push(['SINK RATE', '#e3b341']);
+          if (!insideMap(s.pos[0], s.pos[2])) warns.push(['LEAVING THE MAP — TURN BACK', '#e3b341']);
+          if (s.input.rotorBrake && i.onGround && i.rotorRpm > 5) warns.push(['ROTOR BRAKE ON', '#e3b341']);
+        }
+        const blink = Math.floor(sim.time * 3) % 2 === 0;
+        warns.slice(0, 3).forEach(([t, col], k) => { font(small ? 14 : 17, 800); if (col === '#f85149' && !blink) return; text(t, cw / 2, top + 90 + k * 22, 'center', col); });
+      }
+      // the delivery line and the target marker
+      if (quest.target) {
+        const t = quest.target, d = Math.hypot(t.x - s.pos[0], t.z - s.pos[2]);
+        const label = `${quest.phase === 'pickup' ? 'Pick up at' : 'Deliver to'} ${t.name} · land on ${t.street || 'the street'} · ${U.dist(d)}`;
+        font(small ? 12 : 13, 600);
+        const tw = hctx.measureText(label).width + 20;
+        box(cw / 2 - tw / 2, ch - 30, tw, 24, 12);
+        text(label, cw / 2, ch - 18, 'center', d < 80 ? '#3fb950' : '#f2c94c');
+        if (quest.holdT > 0) { font(12, 700); text(`${quest.phase === 'pickup' ? 'Loading' : 'Unloading'}… ${Math.ceil(3 - quest.holdT)}`, cw / 2, ch - 44, 'center', '#3fb950'); }
+        // projected marker
+        const p = new THREE.Vector3(t.x, surface(t.x, t.z).h + 2, t.z).project(camera);
+        if (p.z < 1 && p.z > -1) {
+          const sx = (p.x + 1) / 2 * cw, sy = (1 - p.y) / 2 * ch;
+          if (sx > 0 && sx < cw && sy > 0 && sy < ch) {
+            hctx.strokeStyle = '#f2c94c'; hctx.lineWidth = 2; hctx.beginPath(); hctx.moveTo(sx, sy - 12); hctx.lineTo(sx + 9, sy); hctx.lineTo(sx, sy + 12); hctx.lineTo(sx - 9, sy); hctx.closePath(); hctx.stroke();
+            font(11, 600); text(U.dist(d), sx, sy - 20, 'center', '#f2c94c');
+          }
+        }
+      }
+      // minimap
+      {
+        const size = short ? 84 : small ? 110 : 150, x = rightPad - size, y = ch - size - 12;
+        minimapBox.x = x; minimapBox.y = y; minimapBox.w = size; minimapBox.h = size;
+        hctx.save(); hctx.beginPath(); hctx.roundRect(x, y, size, size, 10); hctx.clip();
+        const mm = W.minimap, m = W.meta, scale = 0.08; // screen px per metre
+        const mpp = (2 * m.halfX) / mm.width; // metres per minimap px
+        const sw = size / scale / mpp; // minimap pixels shown
+        const mx = (s.pos[0] + m.halfX) / mpp, mz = (s.pos[2] + m.halfZ) / mpp;
+        hctx.drawImage(mm, mx - sw / 2, mz - sw / 2, sw, sw, x, y, size, size);
+        hctx.fillStyle = 'rgba(13,17,23,0.15)'; hctx.fillRect(x, y, size, size);
+        if (quest.target) {
+          const tx = x + size / 2 + (quest.target.x - s.pos[0]) * scale, tz = y + size / 2 + (quest.target.z - s.pos[2]) * scale;
+          const cx2 = clamp(tx, x + 8, x + size - 8), cz2 = clamp(tz, y + 8, y + size - 8);
+          hctx.fillStyle = '#f2c94c'; hctx.beginPath(); hctx.arc(cx2, cz2, 5, 0, Math.PI * 2); hctx.fill();
+        }
+        // the aircraft
+        hctx.save(); hctx.translate(x + size / 2, y + size / 2); hctx.rotate(i.heading * D2R);
+        hctx.fillStyle = '#ffffff'; hctx.beginPath(); hctx.moveTo(0, -8); hctx.lineTo(5, 6); hctx.lineTo(0, 3); hctx.lineTo(-5, 6); hctx.closePath(); hctx.fill(); hctx.restore();
+        hctx.restore();
+        hctx.strokeStyle = 'rgba(255,255,255,0.25)'; hctx.lineWidth = 1; hctx.beginPath(); hctx.roundRect(x, y, size, size, 10); hctx.stroke();
+      }
+    }
+    onViewTap = (ev, kind) => {
+      if (kind !== 'tap') return;
+      const r = hud.getBoundingClientRect(), px = ev.clientX - r.left, py = ev.clientY - r.top;
+      if (px >= minimapBox.x && px <= minimapBox.x + minimapBox.w && py >= minimapBox.y && py <= minimapBox.y + minimapBox.h) toggleMap();
+    };
+    const bearingTo = (s, t) => ((Math.atan2(t.x - s.pos[0], -(t.z - s.pos[2])) * R2D) + 360) % 360;
+
+    // ---- deliveries
+    const quest = { phase: null, job: null, target: null, holdT: 0, startT: 0, offers: [] };
+    sim.quest = quest; sim.env = env; sim.place = (x, z, hdg, opts) => GYRO.place(sim.state, env, x, z, hdg, opts); sim.surface = surface;
+    const ITEMS = { food: ['a hot order', 'two pizzas', 'a catering tray', 'a bag of takeout'], cafe: ['a crate of coffee', 'a box of pastries'], drink: ['a case of beer', 'a keg', 'a crate of wine'], sweets: ['a tub of ice cream (hurry)', 'a birthday cake'], pharmacy: ['a prescription', 'a cold-chain vaccine box'], medical: ['lab samples', 'a case of medical supplies', 'a transplant cooler'], papers: ['a pouch of signed contracts', 'a bank deposit', 'a sealed court file'], auto: ['a box of car parts', 'a tyre', 'a battery'], flowers: ['a bouquet', 'a wedding arrangement'], parts: ['a box of hardware', 'a server drive', 'a replacement phone'], groceries: ['a crate of groceries', 'a week\'s shopping'], gifts: ['a parcel of books', 'a gift box', 'a board game'], fashion: ['a garment bag', 'a pair of boots'], pets: ['a sack of dog food', 'a cat carrier (empty, thankfully)'], luggage: ['a forgotten suitcase', 'a guest\'s luggage'], parcel: ['a parcel', 'a small crate', 'an envelope that must not get wet'] };
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    function dist2(a, b) { return Math.hypot(a.x - b.x, a.z - b.z); }
+    function makeOffers(n = 4) {
+      const s = sim.state, here = { x: s.pos[0], z: s.pos[2] };
+      const biz = W.meta.businesses, houses = W.meta.houses, offers = [];
+      let tries = 0;
+      while (offers.length < n && tries++ < 400) {
+        const from = pick(biz);
+        const dFrom = dist2(here, from);
+        if (dFrom < 400 || dFrom > 9000) continue;
+        const toHouse = Math.random() < 0.5;
+        const to = toHouse ? pick(houses) : pick(biz);
+        if (to === from) continue;
+        const d = dist2(from, to);
+        if (d < 1200 || d > 11000) continue;
+        const item = pick(ITEMS[from.k] || ITEMS.parcel);
+        const pay = Math.round(18 + 0.0075 * d + 0.002 * dFrom);
+        offers.push({ from, to, toHouse, item, d, dFrom, pay, name: toHouse ? (to.a || `a house on ${to.r || 'a quiet street'}`) : to.n });
+      }
+      offers.sort((a, b) => a.dFrom - b.dFrom);
+      quest.offers = offers;
+      return offers;
+    }
+    function acceptJob(job) {
+      quest.job = job; quest.phase = 'pickup'; quest.holdT = 0; quest.startT = sim.time;
+      quest.target = { x: job.from.s[0], z: job.from.s[1], name: job.from.n, street: job.from.r, heading: job.from.h };
+      setMarker(quest.target);
+      $('#chipQuest').textContent = `Pick up ${job.item} at ${job.from.n}`;
+      toast(`Job taken: ${job.item} from ${job.from.n} to ${job.name} · $${job.pay}`, 5000);
+      closeOverlays();
+    }
+    function questStep(s, dt) {
+      if (!quest.job) return;
+      const t = quest.target, d = Math.hypot(t.x - s.pos[0], t.z - s.pos[2]);
+      const landed = s.info.onGround && s.ground.wheels >= 2 && s.info.gs < 0.4 && d < 80 && !s.crashed;
+      if (landed) {
+        quest.holdT += dt;
+        if (quest.holdT >= 3) {
+          if (quest.phase === 'pickup') {
+            quest.phase = 'deliver'; quest.holdT = 0;
+            const to = quest.job.to;
+            quest.target = { x: to.s[0], z: to.s[1], name: quest.job.name, street: to.r, heading: to.h };
+            setMarker(quest.target);
+            $('#chipQuest').textContent = `Deliver ${quest.job.item} to ${quest.job.name}`;
+            toast(`${quest.job.item} aboard. Now to ${quest.job.name}${to.r ? ', ' + to.r : ''} — ${units().dist(quest.job.d)} away.`, 5000);
+          } else {
+            const took = sim.time - quest.startT, pay = quest.job.pay + (took < quest.job.d / 15 ? Math.round(quest.job.pay * 0.3) : 0);
+            log.deliveries++; log.earnings += pay;
+            log.recent = [{ item: quest.job.item, from: quest.job.from.n, to: quest.job.name, pay, took: Math.round(took), when: Date.now() }, ...(log.recent || [])].slice(0, 12);
+            if (!log.best || took / quest.job.d < log.best.rate) log.best = { rate: took / quest.job.d, took: Math.round(took), d: quest.job.d };
+            saveLog();
+            toast(`Delivered! $${pay} (${Math.round(took / 60)} min ${Math.round(took % 60)} s). ${log.deliveries} deliveries, $${log.earnings} earned.`, 6000);
+            quest.job = null; quest.phase = null; quest.target = null; setMarker(null);
+            $('#chipQuest').textContent = 'Delivered — tap for the next job';
+          }
+        }
+      } else quest.holdT = 0;
+    }
+    function failQuest(reason) {
+      if (!quest.job) return;
+      toast(`${reason} — the job is lost.`, 4000);
+      quest.job = null; quest.phase = null; quest.target = null; setMarker(null);
+      $('#chipQuest').textContent = 'No job — tap for the job board';
+    }
+
+    // ---- the map overlay
+    const mapView = { cx: 0, cz: 0, scale: 0.03, drag: null };
+    const mapCanvas = $('#map'), mctx = mapCanvas.getContext('2d');
+    function drawMap() {
+      const s = sim.state, m = W.meta, mm = W.minimap;
+      const cw = mapCanvas.width, ch = mapCanvas.height;
+      mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.clearRect(0, 0, cw, ch);
+      const mpp = (2 * m.halfX) / mm.width;
+      const toScreen = (x, z) => [cw / 2 + (x - mapView.cx) * mapView.scale, ch / 2 + (z - mapView.cz) * mapView.scale];
+      const sw = cw / mapView.scale / mpp, sh = ch / mapView.scale / mpp;
+      mctx.drawImage(mm, (mapView.cx + m.halfX) / mpp - sw / 2, (mapView.cz + m.halfZ) / mpp - sh / 2, sw, sh, 0, 0, cw, ch);
+      // the airport
+      for (const rw of m.airport.runways) { const a = toScreen(...rw.pts[0]), b = toScreen(...rw.pts[1]); mctx.strokeStyle = '#ddd'; mctx.lineWidth = Math.max(2, rw.w * mapView.scale); mctx.beginPath(); mctx.moveTo(...a); mctx.lineTo(...b); mctx.stroke(); }
+      mctx.font = '12px sans-serif'; mctx.fillStyle = '#fff'; mctx.textAlign = 'center';
+      const ap = toScreen(m.airport.arp.x, m.airport.arp.z); mctx.fillText('KCHA', ap[0], ap[1] - 14);
+      // offers
+      quest.offers.forEach((o, k) => {
+        const a = toScreen(o.from.s[0], o.from.s[1]), b = toScreen(o.to.s[0], o.to.s[1]);
+        mctx.strokeStyle = 'rgba(242,201,76,0.5)'; mctx.lineWidth = 1; mctx.setLineDash([4, 4]); mctx.beginPath(); mctx.moveTo(...a); mctx.lineTo(...b); mctx.stroke(); mctx.setLineDash([]);
+        mctx.fillStyle = '#f2c94c'; mctx.beginPath(); mctx.arc(a[0], a[1], 5, 0, Math.PI * 2); mctx.fill();
+        mctx.fillStyle = '#fff'; mctx.fillText(String(k + 1), a[0], a[1] - 9);
+        mctx.strokeStyle = '#f2c94c'; mctx.beginPath(); mctx.arc(b[0], b[1], 5, 0, Math.PI * 2); mctx.stroke();
+      });
+      if (quest.target) { const t = toScreen(quest.target.x, quest.target.z); mctx.strokeStyle = '#3fb950'; mctx.lineWidth = 3; mctx.beginPath(); mctx.arc(t[0], t[1], 9, 0, Math.PI * 2); mctx.stroke(); }
+      // the aircraft
+      const p = toScreen(s.pos[0], s.pos[2]);
+      mctx.save(); mctx.translate(p[0], p[1]); mctx.rotate(s.info.heading * D2R); mctx.fillStyle = '#fff'; mctx.beginPath(); mctx.moveTo(0, -10); mctx.lineTo(6, 8); mctx.lineTo(0, 4); mctx.lineTo(-6, 8); mctx.closePath(); mctx.fill(); mctx.restore();
+      mctx.fillStyle = 'rgba(255,255,255,0.6)'; mctx.textAlign = 'left'; mctx.fillText(`${(cw / mapView.scale / 1000).toFixed(1)} km across · drag to pan, wheel or pinch to zoom`, 8, ch - 8);
+    }
+    {
+      const el = mapCanvas; const pts = new Map();
+      const pos = (ev) => { const r = el.getBoundingClientRect(); return [(ev.clientX - r.left) * (el.width / r.width), (ev.clientY - r.top) * (el.height / r.height)]; };
+      el.addEventListener('pointerdown', (ev) => { pts.set(ev.pointerId, pos(ev)); el.setPointerCapture(ev.pointerId); ev.preventDefault(); });
+      el.addEventListener('pointermove', (ev) => {
+        if (!pts.has(ev.pointerId)) return;
+        const prev = pts.get(ev.pointerId), now = pos(ev);
+        if (pts.size === 1) { mapView.cx -= (now[0] - prev[0]) / mapView.scale; mapView.cz -= (now[1] - prev[1]) / mapView.scale; }
+        else if (pts.size === 2) {
+          const other = [...pts.entries()].find(([id]) => id !== ev.pointerId)[1];
+          const d0 = Math.hypot(prev[0] - other[0], prev[1] - other[1]), d1 = Math.hypot(now[0] - other[0], now[1] - other[1]);
+          if (d0 > 0) mapView.scale = clamp(mapView.scale * (d1 / d0), 0.008, 0.6);
+        }
+        pts.set(ev.pointerId, now); drawMap();
+      });
+      const up = (ev) => pts.delete(ev.pointerId);
+      el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+      el.addEventListener('wheel', (ev) => { mapView.scale = clamp(mapView.scale * (ev.deltaY < 0 ? 1.2 : 1 / 1.2), 0.008, 0.6); drawMap(); ev.preventDefault(); }, { passive: false });
+    }
+    function renderJobs() {
+      const el = $('#jobs'); el.innerHTML = '';
+      if (quest.job) {
+        const j = quest.job;
+        el.innerHTML = `<div class="job" style="border-color:var(--good)"><span class="pay">$${j.pay}</span><div class="from">${quest.phase === 'pickup' ? 'Pick up' : 'Carrying'} ${j.item} from <b>${j.from.n}</b> <small>(${j.from.r || 'no street'})</small></div><div class="to">→ ${j.name} <small>(${j.to.r || 'no street'}) · ${units().dist(j.d)}</small></div><div class="row"><button id="btnDropJob">Give up the job</button></div></div>`;
+        $('#btnDropJob').addEventListener('click', () => { failQuest('Job dropped'); renderJobs(); drawMap(); });
+      } else {
+        if (!quest.offers.length) makeOffers();
+        el.innerHTML = `<h2 style="margin-top:12px">Offers near you</h2>` + quest.offers.map((o, k) => `<div class="job" data-k="${k}"><span class="pay">$${o.pay}</span><div class="from"><b>${k + 1}.</b> ${o.item} from <b>${o.from.n}</b> <small>(${o.from.r || 'no street'} · ${units().dist(o.dFrom)} from you)</small></div><div class="to">→ ${o.toHouse ? '🏠 ' : '🏪 '}${o.name} <small>(${o.to.r || 'no street'}) · ${units().dist(o.d)} flight</small></div></div>`).join('');
+        el.querySelectorAll('.job').forEach((d) => d.addEventListener('click', () => acceptJob(quest.offers[Number(d.dataset.k)])));
+      }
+      const L = $('#log');
+      L.innerHTML = `<h2>Your log</h2><p>${log.deliveries} deliveries · $${log.earnings} earned · ${log.crashes} crashes · ${Math.round(log.flightTime / 60)} min flown${log.best ? ` · best pace ${(log.best.d / 1000 / (log.best.took / 3600)).toFixed(0)} km/h door to door` : ''}</p>` +
+        ((log.recent || []).length ? `<table>${log.recent.slice(0, 6).map((r) => `<tr><td>${r.item}</td><td>${r.from} → ${r.to}</td><td class="right">${Math.round(r.took / 60)}:${String(r.took % 60).padStart(2, '0')}</td><td class="right">$${r.pay}</td></tr>`).join('')}</table>` : '');
+      $('#mapStats').textContent = `${W.meta.businesses.length} businesses · ${W.meta.houses.length} houses`;
+    }
+    function toggleMap() {
+      const ov = $('#ovMap');
+      if (ov.classList.contains('show')) { ov.classList.remove('show'); return; }
+      closeOverlays();
+      const s = sim.state; mapView.cx = s.pos[0]; mapView.cz = s.pos[2];
+      renderJobs(); drawMap(); ov.classList.add('show');
+    }
+    $('#btnMap').addEventListener('click', toggleMap);
+    $('#chipQuest').addEventListener('click', toggleMap);
+    $('#btnCloseMap').addEventListener('click', () => $('#ovMap').classList.remove('show'));
+    $('#btnNewJobs').addEventListener('click', () => { makeOffers(); renderJobs(); drawMap(); });
+    function closeOverlays() { for (const id of ['#ovHelp', '#ovMap', '#ovCrash']) $(id).classList.remove('show'); }
+
+    // ---- starting, resetting, crashing
+    function applyWind() {
+      const s = sim.state;
+      const presets = { calm: [0, 0.5, 0], light: [1.5, 3.0, 1], breezy: [4, 7, 1], gusty: [6, 10, 1.6] };
+      const [lo, hi, g] = presets[settings.wind] || presets.light;
+      s.wind.speed = lo + Math.random() * (hi - lo); s.wind.dir = Math.round(Math.random() * 360); s.wind.gustiness = g;
+    }
+    function startOnRamp() {
+      const s = sim.state, A = W.meta.airport;
+      GYRO.place(s, env, A.start.x, A.start.z, A.start.heading);
+      s.input.trimLon = 0; s.input.trimLat = 0;
+      stickL.set(0, -1); look.recenter(); camTmp.chaseYaw = null;
+      if (quest.job) failQuest('Back at the ramp');
+      closeOverlays(); sim.running = true; refreshButtons();
+      toast('On the ramp. ENGINE, then throttle to 40% and hold PREROT.', 4500);
+    }
+    function startOnRunway() {
+      const s = sim.state, A = W.meta.airport;
+      const rw = A.runways.find((r) => /02|20/.test(r.ref)) || A.runways[0];
+      const [p0, p1] = rw.pts;
+      // the end that puts us into the wind, a little in from the threshold
+      const h01 = ((Math.atan2(p1[0] - p0[0], -(p1[1] - p0[1])) * R2D) + 360) % 360;
+      const into = ((h01 - s.wind.dir + 540) % 360) - 180;
+      const [a, b, hdg] = Math.abs(into) <= 90 ? [p0, p1, h01] : [p1, p0, (h01 + 180) % 360];
+      const x = a[0] + (b[0] - a[0]) * 0.04, z = a[1] + (b[1] - a[1]) * 0.04;
+      GYRO.place(s, env, x, z, hdg, { engineOn: true, rotorRpm: 210 });
+      s.input.trimLon = 0; s.input.trimLat = 0;
+      stickL.set(0, -1); look.recenter(); camTmp.chaseYaw = null;
+      closeOverlays(); sim.running = true; refreshButtons();
+      toast(`Lined up on runway ${Math.round(hdg / 10).toString().padStart(2, '0')}, rotor at 210 rpm. Full throttle, stick back, ease forward past 300 rpm.`, 6000);
+    }
+    function startAirborne() {
+      const s = sim.state, A = W.meta.airport;
+      GYRO.place(s, env, A.arp.x, A.arp.z - 1500, 180, { engineOn: true, rotorRpm: 360, airborne: { agl: 300, speed: 50 * KT } });
+      s.input.trimLon = 0; s.input.trimLat = 0;
+      stickL.set(0, 0.2); look.recenter(); camTmp.chaseYaw = null;
+      closeOverlays(); sim.running = true; refreshButtons();
+      toast('Airborne over the airport at 50 kt. Throttle is at 60%; the runway is ahead.', 5000);
+    }
+    function respawnNearest() {
+      const s = sim.state, R = W.roads;
+      let best = null;
+      for (let r = 0; r < R.n; r++) {
+        if (R.cls[r] > 6 || R.cls[r] < 2 || (R.flags[r] & 1)) continue;
+        for (let k = 0; k + 1 < R.count[r]; k++) {
+          const o = (R.start[r] + k) * 2, mx = (R.xz[o] + R.xz[o + 2]) / 2, mz = (R.xz[o + 1] + R.xz[o + 3]) / 2;
+          const d = Math.hypot(mx - s.pos[0], mz - s.pos[2]);
+          if (!best || d < best.d) best = { d, x: mx, z: mz, hdg: ((Math.atan2(R.xz[o + 2] - R.xz[o], -(R.xz[o + 3] - R.xz[o + 1])) * R2D) + 360) % 360 };
+        }
+      }
+      if (!best) return startOnRamp();
+      GYRO.place(s, env, best.x, best.z, best.hdg, { engineOn: true, rotorRpm: 0 });
+      s.input.trimLon = 0; s.input.trimLat = 0;
+      stickL.set(0, -1); look.recenter(); camTmp.chaseYaw = null;
+      closeOverlays(); sim.running = true; refreshButtons();
+      toast('On the nearest street, engine running. Prerotate and take off along the road.', 4500);
+    }
+    function onCrash(s) {
+      log.crashes++; saveLog();
+      if (quest.job) failQuest(`${s.crashed.reason[0].toUpperCase() + s.crashed.reason.slice(1)}`);
+      $('#crashTitle').textContent = '💥 ' + s.crashed.reason;
+      $('#crashText').textContent = `at ${Math.round(units().spd(s.crashed.speed))} ${units().spdU}${s.crashed.sink > 0.5 ? `, ${s.crashed.sink.toFixed(1)} m/s down` : ''}. ${crashAdvice(s.crashed.reason)}`;
+      setTimeout(() => $('#ovCrash').classList.add('show'), 900);
+    }
+    function crashAdvice(reason) {
+      if (/hard landing/.test(reason)) return 'Flare later and slower: aim for a touchdown under 1 m/s of sink, stick back, at walking pace.';
+      if (/prop strike|nosed/.test(reason)) return 'The tail or prop hit first — too much flare, or a nose-up touchdown at speed.';
+      if (/rolled/.test(reason)) return 'A touchdown with drift, or a turn on the ground at speed. Land straight, into the wind, and steer gently.';
+      if (/stops/.test(reason)) return 'The rotor was unloaded or too slow and the blades flapped past their stops. Keep the rotor loaded: no push-overs, no low rotor rpm.';
+      if (/trees/.test(reason)) return 'The canopy counts as ground. Find a street.';
+      if (/river|water/.test(reason)) return 'A gyro does not float.';
+      if (/building/.test(reason)) return 'Buildings are solid. Fly higher between the blocks.';
+      if (/rotor strike/.test(reason)) return 'A blade touched the ground — too much bank or pitch near the ground, or a rotor flapping at low rpm in wind.';
+      return 'Try again.';
+    }
+    $('#btnCrashRamp').addEventListener('click', startOnRamp);
+    $('#btnCrashHere').addEventListener('click', respawnNearest);
+    $('#btnStartRamp').addEventListener('click', async () => { if (isPhone && settings.look) await enableSensors(true); startOnRamp(); });
+    $('#btnStartRunway').addEventListener('click', async () => { if (isPhone && settings.look) await enableSensors(true); startOnRunway(); });
+    $('#btnStartAir').addEventListener('click', async () => { if (isPhone && settings.look) await enableSensors(true); startAirborne(); });
+    $('#btnCloseHelp').addEventListener('click', () => { closeOverlays(); if (!sim.running) startOnRamp(); });
+    $('#btnHelp').addEventListener('click', () => { closeOverlays(); $('#ovHelp').classList.add('show'); });
+    // settings
+    $('#setAssist').checked = settings.assist; $('#setLook').checked = settings.look; $('#setMetric').checked = settings.metric;
+    $('#setWind').value = settings.wind; $('#setTime').value = settings.time; $('#setQuality').value = settings.quality;
+    $('#setAssist').addEventListener('change', (ev) => { settings.assist = ev.target.checked; saveSettings(); refreshButtons(); });
+    $('#setLook').addEventListener('change', (ev) => { settings.look = ev.target.checked; saveSettings(); if (!settings.look) disableSensors(); refreshButtons(); });
+    $('#setMetric').addEventListener('change', (ev) => { settings.metric = ev.target.checked; saveSettings(); });
+    $('#setWind').addEventListener('change', (ev) => { settings.wind = ev.target.value; saveSettings(); applyWind(); toast(`Wind now ${Math.round(sim.state.wind.dir)}° at ${Math.round(sim.state.wind.speed / KT)} kt`); });
+    $('#setTime').addEventListener('change', (ev) => { settings.time = ev.target.value; saveSettings(); applyTime(); });
+    $('#setQuality').addEventListener('change', (ev) => { settings.quality = ev.target.value; saveSettings(); toast('Detail applies after a reload'); });
+
+    // ---- sizing
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      renderer.setSize(r.width, r.height, false);
+      camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+      const dpr = Math.min(devicePixelRatio, 2);
+      hud.width = Math.round(r.width * dpr); hud.height = Math.round(r.height * dpr);
+    }
+    addEventListener('resize', resize);
+    if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(resize, 100));
+
+    // ---- the loop
+    let last = performance.now(), wasCrashed = false, fpsAcc = 0, fpsN = 0;
+    function frame(now) {
+      requestAnimationFrame(frame);
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const s = sim.state;
+      sim.time += dt;
+      if (sim.running) {
+        gatherInput(dt);
+        GYRO.step(s, env, dt);
+        if (s.crashed && !wasCrashed) onCrash(s);
+        wasCrashed = !!s.crashed;
+        if (!s.info.onGround && !s.crashed) log.flightTime += dt;
+        questStep(s, dt);
+        if (Math.floor(sim.time) % 30 === 0 && Math.floor(sim.time) !== Math.floor(sim.time - dt)) saveLog();
+      }
+      updateAircraft(s, sim.firstPerson, dt);
+      updateCamera(s, dt);
+      updateTerrain(camera.position.x, camera.position.z, sim.time);
+      updateTiles(s.pos[0], s.pos[2]);
+      updateTrees(s.pos[0], s.pos[2], false);
+      updateWindsock(s.wind.dir, s.wind.speed);
+      if (marker.ring) { marker.ring.rotation.z += dt * 0.6; marker.beam.material.opacity = 0.14 + 0.06 * Math.sin(sim.time * 3); }
+      renderer.render(scene, camera);
+      drawHud(s, dt);
+      fpsAcc += dt; fpsN++; if (fpsAcc >= 1) { sim.fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+      sound.update(s);
+      // the warning chip
+      const chip = $('#chipWarn');
+      const w = s.info.lowRotor ? 'LOW ROTOR' : s.info.unloaded ? 'UNLOADED' : s.info.overspeed ? 'ROTOR OVERSPEED' : '';
+      if (w) { chip.style.display = ''; chip.textContent = w; } else chip.style.display = 'none';
+    }
+
+    // ---- go
+    (async () => {
+      try {
+        const T0 = performance.now(); const lap = (n) => console.log(`gyro-courier: ${n} at ${((performance.now() - T0) / 1000).toFixed(1)} s`);
+        await loadWorld(); lap('world loaded');
+        bucketWorld(); lap('bucketed');
+        buildSky(); buildTerrain(); lap('terrain'); buildAirport(); buildTrees(); buildAircraft(); buildMarker(); lap('scene built');
+        applyTime(); applyWind();
+        const A = W.meta.airport;
+        GYRO.place(sim.state, env, A.start.x, A.start.z, A.start.heading);
+        resize();
+        updateTrees(A.start.x, A.start.z, true); lap('trees');
+        for (let i = 0; i < 12; i++) updateTiles(A.start.x, A.start.z); lap('first tiles');
+        renderer.render(scene, camera); lap('first frame');
+        $('#loading').classList.add('hide');
+        refreshButtons();
+        $('#ovHelp').classList.add('show');
+        if (settings.sound) { /* sound needs a tap; the button will start it */ }
+        requestAnimationFrame(frame);
+      } catch (e) {
+        $('#loadText').textContent = `Could not load the world: ${e.message}`;
+        $('#loadBar').style.background = '#f85149';
+        console.error(e);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -111,6 +111,11 @@ window.PELIGAMING = {
       accent: "#9fb7ff",
       tools: [
         {
+          name: "Gyro Courier",
+          description: "Fly a single-seat open-frame gyrocopter over Chattanooga and Lovell Field (KCHA), with a flight model that follows both blades of the teetering rotor around the azimuth — autorotation, blowback, retreating-blade stall, rotor unloading and the vertical descent fall out of the maths — and run deliveries from the city's businesses to its houses, landing on the empty streets. Touch sticks, a phone that looks around when you turn it, cockpit and chase views, real terrain and OpenStreetMap streets and buildings.",
+          path: "tools/irl/gyro-courier.html",
+        },
+        {
           name: "Sky Pointer",
           description: "Hold your phone up to the night sky and see what it is pointing at: the stars to magnitude 6 in their real colours, the constellation figures, the planets, the Moon with its phase, the Messier objects, and the satellites passing over right now — with a finder arrow to whatever you search for. No phone sensors? Set a place and time and pan and zoom the sky by hand.",
           path: "tools/irl/sky-pointer.html",
