@@ -680,8 +680,11 @@ land.
 - **The machine.** A Bensen-class single-seater scaled toward today's 7-metre
   rotors: 258 kg with the pilot, a 7.2 m teetering rotor on a tall mast, a
   65 hp two-stroke swinging a 1.65 m fixed-pitch pusher prop, a stabilizer
-  and a rudder in the propwash, tricycle gear with a steerable nosewheel, a
-  prerotator and a rotor brake. It cruises at 50–60 kt on about 30 kW, climbs
+  and a rudder in the propwash, tricycle gear with a steerable nosewheel on
+  fat tyres and long legs (the streets are its runway), a prerotator and a
+  rotor brake. The airframe is drawn as what it is: a keel, a mast and a
+  tail post of welded tube with the braces, the engine bed, the seat frame,
+  the nose fork and the sprung main-gear bars all meeting at their joints. It cruises at 50–60 kt on about 30 kW, climbs
   at 600 ft/min at full power, glides engine-off at 1,200 ft/min (an L/D of
   about 4), takes off in under 200 m from a 200 rpm prerotation, and descends
   vertically at 2,100 ft/min with no airspeed at all, the rotor still at
@@ -723,20 +726,25 @@ land.
   Everything has a key.
 - **Looking around.** Drag the view, or let the phone's orientation sensors
   turn your head: hold the phone up and turn, and the cockpit view turns with
-  it, relative to the aircraft (a tap recentres). The cockpit view looks out
-  over a small nose fairing with a real instrument panel in it — airspeed,
-  altimeter, rotor and engine tachometers and a slip ball, needles driven by
-  the model — so the view is anchored to the machine; the chase view orbits
-  it.
+  it, relative to the aircraft (a tap recentres). Scroll or pinch to zoom:
+  the cockpit narrows its field of view (and the drag gets finer with it),
+  the chase camera comes closer; `-`, `=` and `0` do the same from the
+  keyboard. The cockpit view looks out over a small nose fairing with a real
+  instrument panel in it — airspeed, altimeter, rotor and engine tachometers
+  and a slip ball, needles driven by the model — so the view is anchored to
+  the machine; the chase view orbits it.
 - **The world.** 29 × 23 km around the airport — downtown, the river's bends,
   Lookout and Signal Mountains, the suburbs out to Collegedale and Hixson —
-  on USGS terrain, with OpenStreetMap's 38,000 streets as draped ribbons
-  (centre lines on the bigger ones, bridges on their decks), 84,000 buildings
-  extruded to their tagged or typical heights, forests and parks and
-  farmland painted from the land cover and planted with trees, the river
-  with a glint on it, and KCHA with both runways marked and numbered, its
-  taxiways, aprons and a windsock. The forest canopy and the buildings are
-  solid; the river is wet.
+  on USGS terrain, dressed in USDA's aerial photography (NAIP, public
+  domain: the whole box at 7 m a pixel, downtown to the airport at 3 m) with
+  OpenStreetMap's 38,000 streets as draped ribbons on top (centre lines on
+  the bigger ones, bridges on their decks), 84,000 buildings extruded to
+  their tagged or typical heights, forests and parks and farmland planted
+  with trees from the land cover, the river with a glint on it, and KCHA
+  with both runways marked and numbered, its taxiways, aprons and a
+  windsock. The forest canopy and the buildings are solid; the river is wet.
+  The photography is a 7 MB download, so the low detail setting (and a
+  "Ground" setting) falls back to the land cover painted in flat colours.
 - **Deliveries.** The job board offers runs from 2,300 named businesses to
   other businesses or to 7,400 houses, each with the street point nearest its
   door; land within 80 m of it, stop, wait three seconds, and fly on. Pay by
@@ -761,7 +769,14 @@ land.
 - The terrain is a geometry clipmap: seven nested rings of one fixed grid
   around the camera, their heights read in the vertex shader from a float
   texture of the same 14 m grid the physics stands on, the land cover read in
-  the fragment shader from a class texture and blended at the cell edges.
+  the fragment shader from a class texture and blended at the cell edges,
+  and the aerial imagery from two mipmapped, anisotropically filtered
+  textures (the city layer blended in over a margin inside its edge), with
+  a little of the fine procedural grain kept on top so the ground is not
+  flat right under the wheels. The procedural noise and the road markings
+  are drawn with their screen-space footprint in hand (`fwidth`), so each
+  octave fades out and the dashes dissolve into a half-tone before they
+  could shimmer; the renderer multisamples at medium and high detail.
   Streets and buildings are built into 2 km tiles as the aircraft moves, the
   trees are two instanced meshes re-scattered from the land cover around the
   camera.
@@ -776,15 +791,24 @@ land.
   deltas in half metres (`world.bin`), footprints simplified with
   Douglas–Peucker; and `world.json` with the index, the airport, the
   bridges with their deck heights, and every business and sampled house with
-  the nearest landable street point. Downloads are cached in
-  `.gyro-cache/`. © OpenStreetMap contributors, ODbL.
+  the nearest landable street point. The aerial imagery (`imagery-*.jpg`)
+  comes from the USGS National Map's NAIP image service, asked for in plain
+  latitude/longitude with pixels square in degrees so it lands on the game's
+  grid exactly (the service widens any box that is not, which the script
+  checks against the extent it reports back), in eight chunks the page
+  composites; `npm run data:gyro -- --imagery` refreshes just those.
+  Downloads are cached in `.gyro-cache/`. © OpenStreetMap contributors,
+  ODbL; terrain and imagery US government work, public domain.
 
 The honest limits: a single rigid teetering rotor with ten blade elements
 and uniform-plus-linear inflow, no blade lag or torsion, a ground effect
 from the classic hover formula rather than the wake itself, no rotor wake on
 the tail; the buildings are boxes at typical heights where
-OSM has none; the trees are placed by hash, not by survey; and the land cover
-is 7 m cells, so a narrow street through a forest is a narrow landing.
+OSM has none; the trees are placed by hash, not by survey; the land cover
+is 7 m cells, so a narrow street through a forest is a narrow landing; and
+the aerial photography is 3 m a pixel at best, flown on another day than
+OSM was surveyed (and in two seasons across one seam), so up close it is a
+soft, lit-from-elsewhere ground under the sharp streets and buildings.
 
 ## Other tools
 

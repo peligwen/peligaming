@@ -98,7 +98,7 @@ console.log('Prerotation and the takeoff roll');
   const s = GYRO.createState(); calm(s);
   GYRO.place(s, env, 0, 0, 0);
   run(s, 2);
-  check('resting height of the CG over the pavement', s.info.agl, 0.7, 0.8, ' m');
+  check('resting height of the CG over the pavement', s.info.agl, 0.9, 1.0, ' m');
   s.input.ignition = true; s.input.brake = 1;
   run(s, 3);
   check('engine idling', s.info.engineRpm, 700, 820, ' rpm');
@@ -113,9 +113,11 @@ console.log('Prerotation and the takeoff roll');
   let lift = null, dist = 0, rpmLift = 0;
   const x0 = s.pos[0], z0 = s.pos[2];
   run(s, 40, () => {
-    if (s.info.agl > 1.3 && lift == null) { lift = s.t; dist = Math.hypot(s.pos[0] - x0, s.pos[2] - z0); rpmLift = s.info.rotorRpm; }
-    if (lift == null) { s.input.lon = s.info.rotorRpm < 300 ? 0.9 : 0.45; s.input.lat = clamp(-0.03 * s.info.roll - 0.012 * s.omega[0] * GYRO.R2D, -1, 1); }
-    else pilot(s, { ias: 45 * KT, throttle: 1, pitchBias: 4 });
+    if (s.info.agl > 1.5 && lift == null) { lift = s.t; dist = Math.hypot(s.pos[0] - x0, s.pos[2] - z0); rpmLift = s.info.rotorRpm; }
+    if (lift == null) { // stick back until the nose comes up, then balance on the mains at a shallow nose-up attitude and let it accelerate
+      if (s.info.rotorRpm < 300 && s.info.pitch < 5) { s.input.lon = 0.9; s.input.lat = clamp(-0.03 * s.info.roll - 0.012 * s.omega[0] * GYRO.R2D, -1, 1); }
+      else pilot(s, { pitch: 9, throttle: 1 });
+    } else pilot(s, s.info.iasKt < 43 ? { pitch: 7, throttle: 1 } : { ias: 45 * KT, throttle: 1, pitchBias: 4 }); // hold the attitude until climb speed
   });
   check('climbing after liftoff', s.info.vs, 1.0, 8, ' m/s');
   check('takeoff roll from 200 rpm', lift == null ? 9999 : dist, 60, 500, ' m');

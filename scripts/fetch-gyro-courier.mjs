@@ -20,6 +20,8 @@
 //                each one (where a delivery is landed), the bridges with their
 //                deck heights, and the projection
 //   minimap.jpg  a shaded 1024-wide map for the in-game map
+//   imagery-*.jpg  USDA NAIP aerial imagery (public domain) in two layers: the
+//                whole box at 7 m/px, the city and the airport at 3 m/px
 //
 // Sources:
 //   - Terrain: the AWS Open Data "Terrain Tiles" (Mapzen Terrarium PNGs, in the
@@ -76,11 +78,11 @@ async function fetchRetry(url, init = {}, tries = 4) {
     }
   }
 }
-async function cachedBuffer(name, url) {
+async function cachedBuffer(name, url, timeoutMs) {
   const file = join(CACHE, name);
   if (FRESH) rmSync(file, { force: true });
   if (!existsSync(file)) {
-    const res = await fetchRetry(url);
+    const res = await fetchRetry(url, timeoutMs ? { timeoutMs } : {});
     writeFileSync(file, Buffer.from(await res.arrayBuffer()));
   }
   return readFileSync(file);
@@ -140,6 +142,77 @@ async function overpassStriped(label, bodyFor, n) {
     }
   }
   return out;
+}
+
+// ------------------------------------------------------------ aerial imagery
+// USDA's National Agriculture Imagery Program, public domain, served by the
+// USGS National Map as an image service that reprojects on request. Asked
+// for in plain latitude/longitude, with pixels square in degrees (the
+// service keeps them so, widening any box that is not), the image maps
+// linearly onto the game's grid: a pixel is one width in x and, by the
+// ratio of a degree of latitude to one of longitude here, 1.216 of it in z.
+// Two layers, each in four chunks the page composites: the whole box at the
+// land cover's 7 m, and downtown to the airport at 3 m. The chunk JPEGs are
+// kept as the service made them, so nothing is encoded twice.
+const NAIP = 'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage';
+const NAIP_CREDIT = 'Aerial imagery: USDA National Agriculture Imagery Program (NAIP) via the USGS National Map (public domain)';
+const IMAGERY = [
+  // the whole box, on the land cover's 7.08 m in x (and 8.6 m in z, so 2 × 1336 rows cover the 23 km)
+  { name: 'overview', centre: [0, 0], pxX: CV_CELL, cols: 2, rows: 2, chunk: [CV_COLS / 2, 1336], quality: 70 },
+  // downtown to the airport, 4096 px at 3 m
+  { name: 'city', centre: [-1000, 1800], pxX: 3, cols: 2, rows: 2, chunk: [2048, 2048], quality: 72 },
+];
+async function buildImagery() {
+  console.log('aerial imagery: NAIP from the USGS National Map');
+  const layers = [];
+  for (const L of IMAGERY) {
+    const [cw, ch] = L.chunk, deg = L.pxX / M_PER_DEG_LON, pxX = L.pxX, pxZ = deg * M_PER_DEG_LAT;
+    const min = [L.centre[0] - (L.cols * cw * pxX) / 2, L.centre[1] - (L.rows * ch * pxZ) / 2];
+    const max = [L.centre[0] + (L.cols * cw * pxX) / 2, L.centre[1] + (L.rows * ch * pxZ) / 2];
+    for (let r = 0; r < L.rows; r++) for (let c = 0; c < L.cols; c++) {
+      // the chunk's box in degrees, north up: row 0 is the north edge (z = -n)
+      const [lat1, lon0] = toLatLon(min[0] + c * cw * pxX, -(min[1] + r * ch * pxZ));
+      const w = lon0, e = lon0 + cw * deg, n = lat1, s = lat1 - ch * deg;
+      const bbox = [w, s, e, n].map((v) => v.toFixed(8)).join(',');
+      const query = `bbox=${bbox}&bboxSR=4326&imageSR=4326&size=${cw},${ch}&format=jpg&compressionQuality=${L.quality}&interpolation=RSP_BilinearInterpolation&renderingRule=${encodeURIComponent('{"rasterFunction":"NaturalColor"}')}`;
+      const file = `imagery-${L.name}-${c}${r}.jpg`, key = `naip-${L.name}-${c}${r}-${createHash('sha1').update(query).digest('hex').slice(0, 10)}`;
+      process.stdout.write(`  ${file} (${cw}×${ch} at ${pxX.toFixed(2)} × ${pxZ.toFixed(2)} m) … `);
+      // the service says which box it will actually render; it must be the one asked for
+      const info = JSON.parse((await cachedBuffer(`${key}.json`, `${NAIP}?${query}&f=json`, 600000)).toString());
+      const ex = info.extent || {};
+      const off = Math.max(Math.abs(ex.xmin - w), Math.abs(ex.xmax - e), Math.abs(ex.ymin - s), Math.abs(ex.ymax - n));
+      if (!(off < deg * 0.5)) { rmSync(join(CACHE, `${key}.json`), { force: true }); throw new Error(`${file}: the service would render ${JSON.stringify(ex)} for ${bbox}`); }
+      const t0 = Date.now();
+      const buf = await cachedBuffer(`${key}.jpg`, `${NAIP}?${query}&f=image`, 600000);
+      const dims = jpegSize(buf);
+      if (!dims || dims[0] !== cw || dims[1] !== ch) { rmSync(join(CACHE, `${key}.jpg`), { force: true }); throw new Error(`${file}: not a ${cw}×${ch} JPEG (${dims ? dims.join('×') : buf.slice(0, 80).toString()})`); }
+      writeFileSync(join(OUT, file), buf);
+      console.log(`${(buf.length / 1e6).toFixed(2)} MB${Date.now() - t0 > 1000 ? ` in ${((Date.now() - t0) / 1000).toFixed(0)} s` : ''}`);
+    }
+    layers.push({ name: L.name, file: `imagery-${L.name}-{c}{r}.jpg`, cols: L.cols, rows: L.rows, chunk: L.chunk, min: min.map((v) => Math.round(v * 10) / 10), max: max.map((v) => Math.round(v * 10) / 10), px: [pxX, pxZ].map((v) => Math.round(v * 1000) / 1000) });
+  }
+  return { credit: NAIP_CREDIT, source: 'USGS National Map USGSNAIPImagery image service, NaturalColor, bilinear, in plain latitude/longitude', layers };
+}
+// the size in a JPEG's start-of-frame marker, without decoding it
+function jpegSize(buf) {
+  if (buf[0] !== 0xff || buf[1] !== 0xd8) return null;
+  for (let i = 2; i + 9 < buf.length;) {
+    if (buf[i] !== 0xff) return null;
+    const m = buf[i + 1], len = buf.readUInt16BE(i + 2);
+    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return [buf.readUInt16BE(i + 7), buf.readUInt16BE(i + 5)];
+    i += 2 + len;
+  }
+  return null;
+}
+if (process.argv.includes('--imagery')) { // only the imagery, patched into the world index already built
+  const imagery = await buildImagery();
+  const wj = join(OUT, 'world.json');
+  const meta = JSON.parse(readFileSync(wj, 'utf8'));
+  meta.imagery = imagery;
+  meta.credits = [...meta.credits.filter((c) => !/aerial imagery/i.test(c)), NAIP_CREDIT];
+  writeFileSync(wj, JSON.stringify(meta));
+  console.log(`patched ${wj} with ${imagery.layers.length} imagery layers`);
+  process.exit(0);
 }
 
 // ------------------------------------------------------------ terrain
@@ -744,6 +817,7 @@ writeFileSync(join(OUT, 'cover.bin'), gzipSync(Buffer.from(cover.buffer), { leve
   writeFileSync(join(OUT, 'minimap.jpg'), jpeg.encode({ data: img, width: MW, height: MH }, 82).data);
 }
 
+const imagery = await buildImagery();
 const meta = {
   name: 'Chattanooga, Tennessee — Lovell Field (KCHA) and the city around it',
   origin: { lat: LAT0, lon: LON0, mPerDegLat: M_PER_DEG_LAT, mPerDegLon: M_PER_DEG_LON },
@@ -763,7 +837,8 @@ const meta = {
     bounds: airportBounds ? { ring: airportBounds.map((p) => p.map((v) => Math.round(v * 10) / 10)), min: [0, 1].map((k) => Math.floor(Math.min(...airportBounds.map((p) => p[k])))), max: [0, 1].map((k) => Math.ceil(Math.max(...airportBounds.map((p) => p[k])))) } : null,
   },
   bridges, businesses: bizOut, houses,
-  credits: ['Map data © OpenStreetMap contributors (ODbL), via the Overpass API', 'Terrain: USGS 3DEP via the AWS Terrain Tiles (Mapzen Terrarium)'],
+  imagery,
+  credits: ['Map data © OpenStreetMap contributors (ODbL), via the Overpass API', 'Terrain: USGS 3DEP via the AWS Terrain Tiles (Mapzen Terrarium)', NAIP_CREDIT],
   built: new Date().toISOString().slice(0, 10),
 };
 writeFileSync(join(OUT, 'world.json'), JSON.stringify(meta));
