@@ -112,11 +112,47 @@
     .stick.left .knob { background: radial-gradient(circle at 35% 35%, #ffe28a, #d9a334 65%, #7a5a14); }
     .stick .trail { position: absolute; left: 50%; top: 10%; bottom: 10%; width: 6px; margin-left: -3px; border-radius: 3px; background: rgba(255,255,255,0.06); pointer-events: none; }
     .stick .fill { position: absolute; left: 50%; width: 6px; margin-left: -3px; bottom: 10%; border-radius: 3px; background: linear-gradient(#f2c94c, #d9a334); pointer-events: none; }
-    .buttons { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 6px; min-width: 0; }
+    .mid { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+    .switches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-width: 0; flex: 1.25; }
+    .buttons { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 6px; min-width: 0; flex: 1; }
     .buttons button { padding: 4px 6px; font-size: 12px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; border-radius: 10px; line-height: 1.2; }
     .buttons button small { display: block; font-weight: 400; font-size: 10px; color: var(--text-dim); }
-    .buttons button.on small, .buttons button.held small { color: inherit; }
-    .buttons button.danger.on { border-color: var(--bad); color: var(--bad); }
+    .buttons button.on small { color: inherit; }
+    /* aviation toggle switches: a plate screwed to the panel, a bat handle in its round bezel, a lamp beside it */
+    .sw {
+      position: relative; display: flex; align-items: center; justify-content: space-between; gap: 5px; min-width: 0;
+      padding: 4px 8px 4px 10px; border-radius: 6px; border: 1px solid #3a4048; cursor: pointer; text-align: left; white-space: normal;
+      background:
+        radial-gradient(circle at 6px 6px, #8d949b 1.4px, transparent 2.2px), radial-gradient(circle at calc(100% - 6px) 6px, #8d949b 1.4px, transparent 2.2px),
+        radial-gradient(circle at 6px calc(100% - 6px), #8d949b 1.4px, transparent 2.2px), radial-gradient(circle at calc(100% - 6px) calc(100% - 6px), #8d949b 1.4px, transparent 2.2px),
+        linear-gradient(170deg, #2c3139, #1a1e24);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.4);
+      -webkit-backdrop-filter: none; backdrop-filter: none;
+    }
+    .sw:hover { border-color: #5a626c; }
+    .sw .sw-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; }
+    .sw .sw-text b { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; color: #c9d1d9; text-shadow: 0 1px 0 rgba(0,0,0,0.7); }
+    .sw .sw-text small { font-size: 9px; color: var(--text-dim); letter-spacing: 0.3px; margin-top: 1px; }
+    .sw.on .sw-text small { color: var(--text); }
+    .sw .sw-bezel {
+      position: relative; flex: none; width: 30px; height: 30px; border-radius: 50%; perspective: 70px;
+      background: radial-gradient(circle at 40% 35%, #d2d6da, #8b9197 55%, #4b5056 78%, #2a2e33 100%);
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .sw .sw-bezel::after { content: ""; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: radial-gradient(circle at 50% 50%, #0b0d10, #23272d 70%); }
+    .sw .sw-lever {
+      position: absolute; left: 50%; top: 50%; width: 9px; height: 17px; margin: -17px 0 0 -4.5px; z-index: 1;
+      border-radius: 4.5px 4.5px 3px 3px; transform-origin: 50% 100%;
+      background: linear-gradient(90deg, #7d848b, #e8ebee 45%, #b7bdc3 70%, #6a7076);
+      box-shadow: 0 0 2px rgba(0,0,0,0.6);
+      transform: rotate(180deg) rotateX(-50deg);
+      transition: transform 0.14s ease-in-out;
+    }
+    .sw.on .sw-lever { transform: rotate(0deg) rotateX(-50deg); }
+    .sw .sw-led { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #2a2f36; box-shadow: inset 0 1px 1px rgba(0,0,0,0.7); }
+    .sw.on .sw-led { background: var(--led); box-shadow: 0 0 6px var(--led); }
+    .sw[data-led="green"] { --led: #3fb950; } .sw[data-led="blue"] { --led: #58a6ff; } .sw[data-led="amber"] { --led: #f2c94c; } .sw[data-led="red"] { --led: #f85149; }
+    .sw.danger .sw-bezel { box-shadow: inset 0 0 0 2px rgba(248, 81, 73, 0.6), 0 1px 2px rgba(0,0,0,0.5); }
 
     /* ---- overlays ---- */
     .overlay {
@@ -165,18 +201,31 @@
     @media (max-width: 700px) {
       :root { --panel-h: 150px; }
       #panel { grid-template-columns: 128px 1fr 128px; gap: 6px; }
-      .buttons { grid-template-columns: repeat(3, 1fr); gap: 4px; }
+      .mid { gap: 4px; }
+      .switches { gap: 4px; }
+      .buttons { gap: 4px; }
       .buttons button { font-size: 11px; padding: 2px 4px; }
       .buttons button small { font-size: 9px; }
+      .sw { padding: 2px 5px 2px 7px; gap: 4px; }
+      .sw .sw-text b { font-size: 10px; letter-spacing: 0.2px; }
+      .sw .sw-bezel { width: 26px; height: 26px; }
+      .sw .sw-lever { height: 15px; margin-top: -15px; width: 8px; margin-left: -4px; }
       .stick .knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
       .title { display: none; }
     }
     @media (max-width: 520px) {
       :root { --panel-h: 196px; }
       #panel { grid-template-columns: 96px 1fr 96px; gap: 6px; }
+      .switches { grid-template-columns: repeat(2, 1fr); gap: 4px; }
       .buttons { grid-template-columns: repeat(2, 1fr); gap: 4px; }
       .buttons button { font-size: 11px; padding: 2px 3px; letter-spacing: -0.2px; }
       .buttons button small { font-size: 9px; }
+      .sw { padding: 2px 4px 2px 6px; gap: 3px; }
+      .sw .sw-text b { font-size: 9px; letter-spacing: 0; }
+      .sw .sw-text small { font-size: 8px; }
+      .sw .sw-bezel { width: 24px; height: 24px; }
+      .sw .sw-lever { height: 14px; margin-top: -14px; width: 7px; margin-left: -3.5px; }
+      .sw .sw-led { width: 6px; height: 6px; }
       .stick .knob { width: 40px; height: 40px; margin: -20px 0 0 -20px; }
       .stick .label { font-size: 9px; }
       .stick .label.long { display: none; }
@@ -211,15 +260,19 @@
       <span class="label long">throttle ↕</span><span class="label r long">rudder ↔</span><span class="label short">thr ↕ · rud ↔</span><span class="label b" id="thrLabel">0%</span>
       <div class="cross"></div><div class="trail"></div><div class="fill" id="thrFill" style="height:0"></div><div class="knob"></div>
     </div>
-    <div class="buttons">
-      <button id="btnEngine" title="Ignition">ENGINE<small>off</small></button>
-      <button id="btnPrerot" title="Hold: the prerotator spins the rotor up on the ground (needs some throttle)">PREROT<small>hold</small></button>
-      <button id="btnBrake" title="Hold: wheel brakes">BRAKE<small>hold</small></button>
-      <button id="btnRotorBrake" class="danger" title="Rotor brake: stops the rotor on the ground">ROTOR BRK<small>off</small></button>
-      <button id="btnTrim" title="Trim: take the stick's current position as the new centre (double-tap to clear)">TRIM<small>set</small></button>
-      <button id="btnCam" title="First or third person">VIEW<small>cockpit</small></button>
-      <button id="btnMap" title="The map and the job board">MAP<small>jobs</small></button>
-      <button id="btnReset" title="Back to the ramp">RESET<small>ramp</small></button>
+    <div class="mid">
+      <div class="switches">
+        <button class="sw" id="swEngine" data-led="green" role="switch" aria-checked="false" title="Ignition (I)"><span class="sw-text"><b>ENGINE</b><small>off</small></span><span class="sw-bezel"><i class="sw-lever"></i></span><i class="sw-led"></i></button>
+        <button class="sw" id="swPrerot" data-led="blue" role="switch" aria-checked="false" title="Prerotator (P): spins the rotor up on the ground with some throttle; it drops out at liftoff"><span class="sw-text"><b>PREROT</b><small>off</small></span><span class="sw-bezel"><i class="sw-lever"></i></span><i class="sw-led"></i></button>
+        <button class="sw" id="swBrake" data-led="amber" role="switch" aria-checked="false" title="Wheel brakes (B); Space holds them while pressed"><span class="sw-text"><b>BRAKE</b><small>off</small></span><span class="sw-bezel"><i class="sw-lever"></i></span><i class="sw-led"></i></button>
+        <button class="sw danger" id="swRotorBrake" data-led="red" role="switch" aria-checked="false" title="Rotor brake (R): stops the rotor on the ground"><span class="sw-text"><b>ROTOR<br>BRAKE</b><small>off</small></span><span class="sw-bezel"><i class="sw-lever"></i></span><i class="sw-led"></i></button>
+      </div>
+      <div class="buttons">
+        <button id="btnTrim" title="Trim: take the stick's current position as the new centre (double-tap to clear)">TRIM<small>set</small></button>
+        <button id="btnCam" title="First or third person">VIEW<small>cockpit</small></button>
+        <button id="btnMap" title="The map and the job board">MAP<small>jobs</small></button>
+        <button id="btnReset" title="Back to the ramp">RESET<small>ramp</small></button>
+      </div>
     </div>
     <div class="stick right" id="stickR">
       <span class="label long">cyclic</span><span class="label r" id="assistLabel">assist</span>
@@ -244,7 +297,7 @@
       <p>The rotor is not driven in flight. It spins because air flows <b>up</b> through it, so the disc must always be tilted a little back into the airflow, and it must be kept <b>loaded</b>: a push-over that unloads it slows it, and a slow rotor cannot lift you. Watch the rotor gauge. The prerotator only spins it up on the ground; the takeoff roll brings it to flight speed.</p>
       <h2>Flying it</h2>
       <ol>
-        <li><b>ENGINE</b> to start. Hold <b>BRAKE</b>, bring the throttle to about 40%, and hold <b>PREROT</b> until the rotor passes 200 rpm.</li>
+        <li><b>ENGINE</b> on to start. With the <b>BRAKE</b> set, bring the throttle to about 40% and switch <b>PREROT</b> on; past 200 rpm switch it off and release the brake.</li>
         <li>Line up, full throttle, stick well back. As the rotor passes 300 rpm ease the stick forward; it lifts off around 40–45 kt. Climb at 45–50 kt.</li>
         <li>Cruise at 50–60 kt. The stick tilts the rotor head: back to slow and climb, forward to speed up. Throttle sets climb and descent. Rudder (the left stick, sideways) keeps the ball centred and steers on the ground.</li>
         <li>To land: approach at 40 kt, throttle low, flare over the street to walking pace, touch down, hold the stick back, brake. A gyro can land in a few metres; it can even descend vertically with no airspeed (about 2,000 ft/min, rotor spinning).</li>
@@ -255,7 +308,7 @@
         <div><b>Right stick</b> — cyclic (self-centring)</div><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows</div>
         <div><b>Left stick</b> — throttle up/down (stays), rudder left/right (centres)</div><div><kbd>Shift</kbd>/<kbd>Ctrl</kbd> throttle · <kbd>Q</kbd>/<kbd>E</kbd> rudder</div>
         <div><b>TRIM</b> — the stick's current position becomes centre</div><div><kbd>T</kbd> set · double-tap or <kbd>Y</kbd> clear</div>
-        <div><b>BRAKE</b> · <b>PREROT</b> (hold) · <b>ROTOR BRK</b> · <b>ENGINE</b></div><div><kbd>B</kbd> · <kbd>P</kbd> · <kbd>R</kbd> · <kbd>I</kbd></div>
+        <div><b>BRAKE</b> · <b>PREROT</b> · <b>ROTOR BRAKE</b> · <b>ENGINE</b> — toggle switches</div><div><kbd>B</kbd> · <kbd>P</kbd> · <kbd>R</kbd> · <kbd>I</kbd> · <kbd>Space</kbd> holds the brakes</div>
         <div><b>VIEW</b> cockpit / chase · <b>MAP</b> &amp; jobs · <b>RESET</b></div><div><kbd>C</kbd> · <kbd>M</kbd> · <kbd>Backspace</kbd></div>
         <div><b>Look</b> — drag the view, or turn the phone (📱)</div><div>mouse drag · ⌖ recentres</div>
       </div>
@@ -326,7 +379,7 @@
   // gyroscopic term from the airframe's rates, so the disc follows the
   // head with the real lag and the real damping; the induced flow comes
   // from momentum theory with the measured vortex-ring correction and a
-  // first-order lag.
+  // first-order lag, cut near the ground by the wake's image (ground effect).
   // ======================================================================
   const GYRO = (() => {
     'use strict';
@@ -462,7 +515,7 @@
       return {
         t: 0,
         pos: [0, 0, 0], vel: [0, 0, 0], q: [0, 0, 0, 1], omega: [0, 0, 0],
-        rotor: { psi: 0, omega: 0, beta: 0, betaDot: 0, vi: 0, thrust: 0, torque: 0, tiltAft: P.rotor.tiltNeutral, tiltRight: 0, hForce: 0, stopHits: 0, discAlpha: 0 },
+        rotor: { psi: 0, omega: 0, beta: 0, betaDot: 0, vi: 0, thrust: 0, torque: 0, tiltAft: P.rotor.tiltNeutral, tiltRight: 0, hForce: 0, stopHits: 0, discAlpha: 0, kG: 1 },
         engine: { omega: 0, on: false, startT: 0, thrust: 0, torque: 0 },
         input: { lon: 0, lat: 0, rudder: 0, throttle: 0, brake: 0, prerotate: false, rotorBrake: false, ignition: false, trimLon: 0, trimLat: 0, assist: false },
         ctl: { lon: 0, lat: 0, rudder: 0, sasLon: 0, sasLat: 0, holdPitch: null, holdRoll: null },
@@ -598,7 +651,7 @@
       // induced velocity: momentum theory with Leishman's vortex-ring fit
       const T = Math.max(0, Fy);
       const vh = Math.sqrt(T / (2 * rho * R.area));
-      let target = 0;
+      let target = 0, kG = 1;
       if (vh > 0.02) {
         let v = r.vi;
         for (let i = 0; i < 6; i++) v = (vh * vh) / Math.sqrt(Vip * Vip + (Vc + v) * (Vc + v) + 0.01 * vh * vh);
@@ -610,8 +663,16 @@
           const wgt = clamp(1 - Vip / (1.5 * vh), 0, 1);
           v = v * (1 - wgt) + vAx * wgt;
         }
-        target = v;
+        // ground effect: close to the ground the wake's image cuts the induced flow
+        // (Cheeseman–Bennett, by the hub's height over the surface), and the forward
+        // speed sweeps the effect away — so the cushion is felt in the flare, not the cruise
+        const hubW = add(s.pos, qrot(s.q, R.hub));
+        const hHub = Math.max(0.3 * R.R, hubW[1] - env.surface(hubW[0], hubW[2]).h);
+        const rh = R.R / (4 * hHub);
+        kG = clamp(1 - (rh * rh) / (1 + (Vip * Vip) / (v * v + 0.1)), 0.5, 1);
+        target = v * kG;
       }
+      r.kG = kG;
       r.vi += ((target - r.vi) * dt) / R.inflowTau;
       // forces and moments on the airframe (body frame)
       const Fb = fromHub(B, [Fx, Fy, Fz]);
@@ -892,6 +953,7 @@
       i.overspeed = i.rotorRpm > 470;
       i.unloaded = !i.onGround && i.nz < 0.3 && i.agl > 2;
       i.flapping = Math.abs(s.rotor.beta) * R2D;
+      i.groundEffect = s.rotor.kG; // 1 clear of the ground, less in it
       return i;
     }
 
@@ -1014,6 +1076,17 @@
       return c.data[j * c.cols + i];
     }
     const insideMap = (x, z) => Math.abs(x) < halfX() - 50 && Math.abs(z) < halfZ() - 50;
+    // the aerodrome's polygon (from world.json): no trees are scattered inside it
+    function insideAirport(x, z) {
+      const b = W.meta.airport.bounds;
+      if (!b || x < b.min[0] || x > b.max[0] || z < b.min[1] || z > b.max[1]) return false;
+      const r = b.ring; let inside = false;
+      for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+        const xi = r[i][0], zi = r[i][1], xj = r[j][0], zj = r[j][1];
+        if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+      }
+      return inside;
+    }
 
     // spatial hashes: bridge decks (the physics must stand on them) and buildings (it must not fly through them)
     const HASH = 200;
@@ -1555,7 +1628,7 @@
         for (let k = 0; k < per; k++) {
           const px = x + hash2(i * 3 + k, j) * cell, pz = z + hash2(i, j * 3 + k) * cell;
           const under = coverAt(px, pz);
-          if (under === C.pavement || under === C.water || under === C.rail) continue;
+          if (under === C.pavement || under === C.water || under === C.rail || insideAirport(px, pz)) continue;
           if (obstacle(px, heightAt(px, pz) + 2, pz)) continue;
           const s = (0.8 + hash2(i + k, j - k) * 0.6) * scale;
           const h = heightAt(px, pz);
@@ -1711,6 +1784,26 @@
       const rim = new THREE.Mesh(new THREE.RingGeometry(R - 0.3, R, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
       rim.rotation.x = -Math.PI / 2; rim.visible = false; teeter.add(rim);
       aircraft.parts.blades = [b1, b2]; aircraft.parts.bladeMat = bladeMat; aircraft.parts.disc = disc; aircraft.parts.rim = rim;
+      // the nose: a fairing lofted ahead of the pilot's feet, closed at the back by the instrument panel
+      {
+        const S = 22, secs = [[0.98, 0.05, 0.33, 0.33], [1.14, 0.045, 0.31, 0.30], [1.32, 0.02, 0.26, 0.24], [1.50, -0.03, 0.18, 0.165], [1.64, -0.08, 0.085, 0.08]]; // x, centre height, vertical and lateral radii
+        const pos = [], idx = [];
+        for (const [x, yc, ry, rz] of secs) for (let k = 0; k < S; k++) { const a = (k / S) * Math.PI * 2; pos.push(x, yc + ry * Math.sin(a), rz * Math.cos(a)); }
+        for (let j = 0; j + 1 < secs.length; j++) for (let k = 0; k < S; k++) {
+          const a = j * S + k, b = j * S + ((k + 1) % S), c = a + S, d = b + S;
+          idx.push(a, b, c, b, d, c);
+        }
+        const tip = pos.length / 3; pos.push(1.70, -0.10, 0);
+        const last = (secs.length - 1) * S;
+        for (let k = 0; k < S; k++) idx.push(last + k, last + ((k + 1) % S), tip);
+        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+        g.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0xc0392b, side: THREE.DoubleSide })));
+        // the panel sits in the open end, leaning back toward the pilot
+        const pp = new THREE.Group(); pp.position.set(0.99, 0.05, 0); pp.rotation.z = 0.24; g.add(pp);
+        const plate = new THREE.Mesh(new THREE.CircleGeometry(0.325, 40), new THREE.MeshBasicMaterial({ map: buildInstruments() }));
+        plate.rotation.y = -Math.PI / 2; pp.add(plate);
+        aircraft.parts.panel = plate;
+      }
       // gear
       const wheel = (x, y, z, r) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.12, 12), tyre); m.rotation.x = Math.PI / 2; m.position.set(x, y, z); return m; };
       const nose = new THREE.Group(); nose.position.set(0.95, -0.42, 0); g.add(nose); aircraft.parts.nose = nose;
@@ -1752,6 +1845,86 @@
       sh.position.set(s.pos[0], gh + 0.2, s.pos[2]);
       sh.material.opacity = clamp(1 - agl / 60, 0, 1) * 0.9;
       sh.visible = agl < 60;
+      updateInstruments(s, firstPerson);
+    }
+
+    // ---- the instruments: four round gauges and a slip ball, painted on a canvas the panel wears.
+    // The faces are drawn once; the needles are redrawn over a copy a few times a second.
+    const GAUGES = [
+      { x: -0.42, y: 0.40, label: 'AIRSPEED', unit: 'KNOTS', min: 0, max: 100, major: 10, minor: 5, every: 2, arcs: [[25, 75, '#3fb950'], [75, 90, '#f2c94c']], red: 90, read: (i) => i.iasKt },
+      { x: 0.42, y: 0.40, label: 'ALTITUDE', unit: 'FEET', min: 0, max: 10, major: 1, minor: 0.2, every: 1, arcs: [], full: true, alt: true },
+      { x: -0.42, y: -0.34, label: 'ROTOR', unit: 'RPM', min: 0, max: 500, major: 50, minor: 10, every: 2, arcs: [[300, 420, '#3fb950'], [420, 470, '#f2c94c']], red: 470, read: (i) => i.rotorRpm },
+      { x: 0.42, y: -0.34, label: 'ENGINE', unit: 'RPM × 1000', min: 0, max: 8, major: 1, minor: 0.5, every: 1, arcs: [[2, 6.5, '#3fb950'], [6.5, 6.8, '#f2c94c']], red: 6.8, read: (i) => (i.engineRpm * 2.58) / 1000 },
+    ];
+    const panel = { canvas: null, ctx: null, back: null, tex: null, last: 0, N: 768, r: 0 };
+    const gaugeAngle = (G, v) => { const f = clamp((v - G.min) / (G.max - G.min), 0, 1); return (G.full ? -90 + 360 * f : -225 + 270 * f) * D2R; };
+    const gaugeCentre = (G) => [panel.N / 2 + (G.x * panel.N) / 2, panel.N / 2 - (G.y * panel.N) / 2];
+    function buildInstruments() {
+      const N = panel.N, R = (0.36 * N) / 2; panel.r = R;
+      const back = document.createElement('canvas'); back.width = back.height = N; const g = back.getContext('2d');
+      g.fillStyle = '#1d2126'; g.fillRect(0, 0, N, N);
+      const vg = g.createRadialGradient(N / 2, N / 2, N * 0.15, N / 2, N / 2, N * 0.52); vg.addColorStop(0, 'rgba(255,255,255,0.05)'); vg.addColorStop(1, 'rgba(0,0,0,0.45)'); g.fillStyle = vg; g.fillRect(0, 0, N, N);
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      for (const G of GAUGES) {
+        const [cx, cy] = gaugeCentre(G);
+        const bz = g.createRadialGradient(cx - R * 0.3, cy - R * 0.3, R * 0.5, cx, cy, R * 1.08); bz.addColorStop(0, '#9aa0a6'); bz.addColorStop(1, '#2d3238');
+        g.fillStyle = bz; g.beginPath(); g.arc(cx, cy, R * 1.08, 0, 7); g.fill();
+        g.fillStyle = '#0b0d10'; g.beginPath(); g.arc(cx, cy, R * 0.96, 0, 7); g.fill();
+        for (const [a, b, col] of G.arcs) { g.strokeStyle = col; g.lineWidth = R * 0.07; g.beginPath(); g.arc(cx, cy, R * 0.86, gaugeAngle(G, a), gaugeAngle(G, b)); g.stroke(); }
+        const steps = Math.round((G.max - G.min) / G.minor);
+        for (let k = 0; k <= steps; k++) {
+          const v = G.min + k * G.minor, isMajor = Math.abs(v / G.major - Math.round(v / G.major)) < 1e-6;
+          if (G.full && k === steps) break; // a full circle ends where it starts
+          const a = gaugeAngle(G, v), r0 = isMajor ? R * 0.72 : R * 0.8, r1 = R * 0.9;
+          g.strokeStyle = '#e6edf3'; g.lineWidth = isMajor ? R * 0.03 : R * 0.015;
+          g.beginPath(); g.moveTo(cx + r0 * Math.cos(a), cy + r0 * Math.sin(a)); g.lineTo(cx + r1 * Math.cos(a), cy + r1 * Math.sin(a)); g.stroke();
+          if (isMajor && Math.round(v / G.major) % G.every === 0) { g.fillStyle = '#e6edf3'; g.font = `700 ${R * 0.17}px system-ui, sans-serif`; g.fillText(String(Math.round(v * 10) / 10), cx + R * 0.56 * Math.cos(a), cy + R * 0.56 * Math.sin(a)); }
+        }
+        if (G.red != null) { const a = gaugeAngle(G, G.red); g.strokeStyle = '#f85149'; g.lineWidth = R * 0.05; g.beginPath(); g.moveTo(cx + R * 0.7 * Math.cos(a), cy + R * 0.7 * Math.sin(a)); g.lineTo(cx + R * 0.94 * Math.cos(a), cy + R * 0.94 * Math.sin(a)); g.stroke(); }
+        g.fillStyle = '#c9d1d9'; g.font = `700 ${R * 0.13}px system-ui, sans-serif`; g.fillText(G.label, cx, cy + R * 0.36);
+        g.fillStyle = '#8b949e'; g.font = `500 ${R * 0.1}px system-ui, sans-serif`; g.fillText(G.unit, cx, cy + R * 0.5);
+      }
+      // the slip indicator's tube, and a placard
+      const sx = N / 2, sy = N / 2 + (0.80 * N) / 2, tw = N * 0.14, th = N * 0.03;
+      g.fillStyle = '#0b0d10'; g.beginPath(); g.moveTo(sx - tw + th, sy - th); g.lineTo(sx + tw - th, sy - th); g.arc(sx + tw - th, sy, th, -Math.PI / 2, Math.PI / 2); g.lineTo(sx - tw + th, sy + th); g.arc(sx - tw + th, sy, th, Math.PI / 2, (3 * Math.PI) / 2); g.closePath(); g.fill();
+      g.strokeStyle = '#e6edf3'; g.lineWidth = N * 0.004; for (const d of [-1, 1]) { g.beginPath(); g.moveTo(sx + d * N * 0.03, sy - N * 0.025); g.lineTo(sx + d * N * 0.03, sy + N * 0.025); g.stroke(); }
+      g.fillStyle = '#8b949e'; g.font = `700 ${N * 0.02}px system-ui, sans-serif`; g.fillText('GYRO COURIER', N / 2, N / 2 - (0.88 * N) / 2);
+      panel.back = back;
+      const c = document.createElement('canvas'); c.width = c.height = N; panel.canvas = c; panel.ctx = c.getContext('2d');
+      panel.ctx.drawImage(back, 0, 0);
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.anisotropy = 4;
+      panel.tex = tex;
+      return tex;
+    }
+    function updateInstruments(s, firstPerson) {
+      if (!panel.ctx) return;
+      const now = performance.now();
+      if (now - panel.last < (firstPerson ? 80 : 400)) return; // the needles only need to move when they can be seen
+      panel.last = now;
+      const g = panel.ctx, i = s.info, N = panel.N, R = panel.r;
+      g.drawImage(panel.back, 0, 0);
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      const needle = (cx, cy, a, len, w) => {
+        g.save(); g.translate(cx, cy); g.rotate(a);
+        g.fillStyle = '#e6edf3'; g.beginPath(); g.moveTo(-R * 0.12, -w / 2); g.lineTo(len, -w * 0.2); g.lineTo(len, w * 0.2); g.lineTo(-R * 0.12, w / 2); g.closePath(); g.fill();
+        g.restore();
+      };
+      for (const G of GAUGES) {
+        const [cx, cy] = gaugeCentre(G);
+        if (G.alt) {
+          const ft = Math.max(0, i.altFt || 0);
+          g.fillStyle = '#1a1e24'; g.fillRect(cx + R * 0.18, cy - R * 0.1, R * 0.5, R * 0.2);
+          g.fillStyle = '#e6edf3'; g.font = `700 ${R * 0.14}px ui-monospace, monospace`; g.fillText(String(Math.round(ft / 10) * 10), cx + R * 0.43, cy);
+          needle(cx, cy, ((ft % 10000) / 10000) * Math.PI * 2 - Math.PI / 2, R * 0.5, R * 0.11);
+          needle(cx, cy, ((ft % 1000) / 1000) * Math.PI * 2 - Math.PI / 2, R * 0.8, R * 0.06);
+        } else needle(cx, cy, gaugeAngle(G, G.read(i) || 0), R * 0.82, R * 0.06);
+        g.fillStyle = '#2a2f36'; g.beginPath(); g.arc(cx, cy, R * 0.07, 0, 7); g.fill();
+      }
+      // the ball: a yaw that wants pedal shows it off centre — step on the ball
+      const sx = N / 2, sy = N / 2 + (0.80 * N) / 2, bx = clamp((i.slip || 0) / 12, -1, 1) * N * 0.1;
+      g.fillStyle = '#111'; g.beginPath(); g.arc(sx + bx, sy, N * 0.022, 0, 7); g.fill();
+      g.fillStyle = '#e6edf3'; g.beginPath(); g.arc(sx + bx, sy, N * 0.019, 0, 7); g.fill();
+      panel.tex.needsUpdate = true;
     }
 
     // ---- the delivery marker: a beam of light on the street, a ring on the ground, a floating name
@@ -1781,6 +1954,7 @@
     // ======================================================================
     const sim = { state: GYRO.createState(), running: false, firstPerson: settings.camera !== 'chase', time: 0 };
     window.__sim = sim; // reachable from the page's own tests
+    sim.trees = () => treeCrown; sim.insideAirport = insideAirport; sim.camera = camera;
 
     // ---- sticks: a knob that follows the finger; cyclic centres on release, throttle stays
     function makeStick(el, opts) {
@@ -1824,8 +1998,10 @@
       const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
       keys.add(k);
       if (!ev.repeat) {
-        if (k === 'i') toggleEngine();
-        if (k === 'r') toggleRotorBrake();
+        if (k === 'i') flipSwitch('engine');
+        if (k === 'r') flipSwitch('rotorBrake');
+        if (k === 'p') flipSwitch('prerot');
+        if (k === 'b') flipSwitch('brake');
         if (k === 'c') toggleCamera();
         if (k === 'm') toggleMap();
         if (k === 't') setTrim();
@@ -1847,20 +2023,31 @@
       keyAxes.rudder = ramp(keyAxes.rudder, (has('e') ? 1 : 0) - (has('q') ? 1 : 0), 3);
       if (has('Shift')) stickL.set(stickL.x, clamp(stickL.y + 0.8 * dt, -1, 1));
       if (has('Control')) stickL.set(stickL.x, clamp(stickL.y - 0.8 * dt, -1, 1));
-      holdKeys.brake = has('b', ' '); holdKeys.prerot = has('p');
+      holdKeys.brake = has(' ');
     }
 
-    // ---- buttons
-    const held = { brake: false, prerot: false };
-    function holdButton(el, name) {
-      const down = (ev) => { held[name] = true; el.classList.add('held'); el.setPointerCapture?.(ev.pointerId); ev.preventDefault(); };
-      const up = () => { held[name] = false; el.classList.remove('held'); };
-      el.addEventListener('pointerdown', down); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    // ---- the switches: they latch, like the real panel's; the keyboard's Space still holds the brakes
+    const toggles = { brake: true, prerot: false }; // the brake is set whenever we start on the ground
+    sim.toggles = toggles;
+    function flipSwitch(name) {
+      const s = sim.state;
+      if (name === 'engine') { s.input.ignition = !s.input.ignition; if (s.input.ignition && s.input.throttle > 0.3) toast('Throttle back to start the engine'); }
+      else if (name === 'prerot') {
+        toggles.prerot = !toggles.prerot;
+        if (toggles.prerot && !s.engine.on) toast('The prerotator needs the engine running');
+        else if (toggles.prerot && s.input.throttle < 0.25) toast('Give it about 40% throttle to prerotate');
+      } else if (name === 'brake') toggles.brake = !toggles.brake;
+      else if (name === 'rotorBrake') {
+        if (!s.input.rotorBrake && !s.info.onGround) { toast('Rotor brake in flight? That would be the end of you — it only engages on the ground.'); return; }
+        s.input.rotorBrake = !s.input.rotorBrake;
+      }
+      refreshButtons();
+    }
+    for (const [sel, name] of [['#swEngine', 'engine'], ['#swPrerot', 'prerot'], ['#swBrake', 'brake'], ['#swRotorBrake', 'rotorBrake']]) {
+      const el = $(sel);
+      el.addEventListener('click', () => flipSwitch(name));
       el.addEventListener('contextmenu', (ev) => ev.preventDefault());
     }
-    holdButton($('#btnBrake'), 'brake'); holdButton($('#btnPrerot'), 'prerot');
-    function toggleEngine() { const s = sim.state; s.input.ignition = !s.input.ignition; if (s.input.ignition && s.input.throttle > 0.3) toast('Throttle back to start the engine'); refreshButtons(); }
-    function toggleRotorBrake() { const s = sim.state; s.input.rotorBrake = !s.input.rotorBrake; if (s.input.rotorBrake && !s.info.onGround) toast('Rotor brake in flight? That would be the end of you — ignored.'); refreshButtons(); }
     function toggleCamera() { sim.firstPerson = !sim.firstPerson; settings.camera = sim.firstPerson ? 'cockpit' : 'chase'; saveSettings(); look.recenter(); refreshButtons(); }
     let trimTap = 0;
     function setTrim() {
@@ -1874,16 +2061,19 @@
     function clearTrim() { const s = sim.state; s.input.trimLon = 0; s.input.trimLat = 0; toast('Trim cleared'); refreshButtons(); }
     const currentLon = () => clamp(expo(-stickR.y) + keyAxes.lon, -1, 1);
     const currentLat = () => clamp(expo(stickR.x) + keyAxes.lat, -1, 1);
-    $('#btnEngine').addEventListener('click', toggleEngine);
-    $('#btnRotorBrake').addEventListener('click', toggleRotorBrake);
+    // a tapped panel button must not keep the focus: Space (the brake hold) would press it again
+    $('#panel').addEventListener('click', (ev) => { const b = ev.target.closest('button'); if (b) b.blur(); });
     $('#btnTrim').addEventListener('click', setTrim);
     $('#btnCam').addEventListener('click', toggleCamera);
     $('#btnReset').addEventListener('click', () => startOnRamp());
     function refreshButtons() {
       const s = sim.state;
       const b = (sel, on, small) => { const el = $(sel); el.classList.toggle('on', on); if (small) el.querySelector('small').textContent = small; };
-      b('#btnEngine', s.input.ignition, s.input.ignition ? 'on' : 'off');
-      b('#btnRotorBrake', s.input.rotorBrake, s.input.rotorBrake ? 'ON' : 'off');
+      const sw = (sel, on, small) => { const el = $(sel); el.classList.toggle('on', on); el.setAttribute('aria-checked', on ? 'true' : 'false'); if (el._small !== small) { el.querySelector('small').textContent = small; el._small = small; } };
+      sw('#swEngine', s.input.ignition, s.input.ignition ? (s.engine.on && s.engine.startT < GYRO.P.engine.startTime ? 'starting' : 'on') : 'off');
+      sw('#swPrerot', toggles.prerot, toggles.prerot ? (s.rotor.prerotating ? 'engaged' : 'on') : 'off');
+      sw('#swBrake', toggles.brake || holdKeys.brake, toggles.brake ? 'set' : holdKeys.brake ? 'held' : 'off');
+      sw('#swRotorBrake', s.input.rotorBrake, s.input.rotorBrake ? 'ON' : 'off');
       b('#btnTrim', s.input.trimLon !== 0 || s.input.trimLat !== 0, s.input.trimLon !== 0 || s.input.trimLat !== 0 ? `${Math.round(s.input.trimLon * 100)}%` : 'set');
       b('#btnCam', false, sim.firstPerson ? 'cockpit' : 'chase');
       $('#assistLabel').textContent = settings.assist ? 'assist on' : 'assist off';
@@ -1897,14 +2087,16 @@
       inp.lon = currentLon(); inp.lat = currentLat();
       inp.rudder = clamp(expo(stickL.x) + keyAxes.rudder, -1, 1);
       inp.throttle = clamp((stickL.y + 1) / 2, 0, 1);
-      inp.brake = held.brake || holdKeys.brake ? 1 : 0;
-      inp.prerotate = held.prerot || holdKeys.prerot;
+      inp.brake = toggles.brake || holdKeys.brake ? 1 : 0;
+      inp.prerotate = toggles.prerot;
       inp.assist = settings.assist;
       if (sim.override) Object.assign(inp, sim.override); // the page's own tests drive the inputs through here
     }
 
     // ---- looking around: offsets from the aircraft's own axes, by drag or by the phone's sensors
+    // yaw is positive to the right and pitch positive upward, whichever camera uses them
     const look = { yaw: 0, pitch: 0, mode: 'manual', ref: null, smooth: null, handler: null, event: null };
+    sim.look = look;
     look.recenter = () => { look.yaw = 0; look.pitch = 0; look.ref = null; look.smooth = null; };
     function screenAngle() {
       if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
@@ -1968,7 +2160,7 @@
         if (!drag || ev.pointerId !== drag.id) return;
         const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; drag.x = ev.clientX; drag.y = ev.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
         const k = 0.0045;
-        look.yaw -= dx * k; look.pitch += dy * k * (sim.firstPerson ? -1 : -1);
+        look.yaw += dx * k; look.pitch -= dy * k; // drag right: look right; drag down: look down
         look.yaw = clamp(look.yaw, -Math.PI, Math.PI); look.pitch = clamp(look.pitch, -1.4, 1.4);
         if (look.mode === 'sensor' && look.smooth) { look.smooth[0] = look.yaw; look.ref = null; look.smooth = null; look.mode = 'manual'; disableSensors(); refreshButtons(); }
       });
@@ -1985,8 +2177,8 @@
       if (sim.firstPerson) {
         const eye = new THREE.Vector3(P.eye[0], P.eye[1], P.eye[2]).applyQuaternion(bodyQ);
         camera.position.set(s.pos[0] + eye.x, s.pos[1] + eye.y, s.pos[2] + eye.z);
-        // look: yaw about the body's up, pitch about the body's right, from the body's forward
-        const q = bodyQ.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, look.yaw, 0, 'YXZ'))).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), look.pitch));
+        // look: yaw about the body's up (a positive rotation there turns left, hence the sign), pitch about the body's right
+        const q = bodyQ.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -look.yaw, 0, 'YXZ'))).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), look.pitch));
         // the camera looks down its −z; the body looks down +x
         q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2));
         camera.quaternion.copy(q);
@@ -1995,7 +2187,8 @@
         if (camTmp.chaseYaw == null) camTmp.chaseYaw = e.heading;
         let d = ((e.heading - camTmp.chaseYaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
         camTmp.chaseYaw += d * Math.min(1, dt * 2.5);
-        const yaw = camTmp.chaseYaw + look.yaw, el = clamp(0.28 + look.pitch, -0.6, 1.4), dist = 11;
+        // the camera orbits the other way from the look (it swings left to look right), so dragging turns the view like the cockpit does
+        const yaw = camTmp.chaseYaw + look.yaw, el = clamp(0.28 - look.pitch, -0.6, 1.4), dist = 11;
         const cx = s.pos[0] - Math.sin(yaw) * Math.cos(el) * dist, cz = s.pos[2] + Math.cos(yaw) * Math.cos(el) * dist, cy = s.pos[1] + Math.sin(el) * dist + 1.0;
         const groundH = surface(cx, cz).h + 1.2;
         camera.position.set(cx, Math.max(cy, groundH), cz);
@@ -2157,6 +2350,7 @@
           if (!i.onGround && i.agl < 60 && i.vs < -5) warns.push(['SINK RATE', '#e3b341']);
           if (!insideMap(s.pos[0], s.pos[2])) warns.push(['LEAVING THE MAP — TURN BACK', '#e3b341']);
           if (s.input.rotorBrake && i.onGround && i.rotorRpm > 5) warns.push(['ROTOR BRAKE ON', '#e3b341']);
+          if (toggles.brake && i.onGround && s.input.throttle > 0.7 && !s.rotor.prerotating) warns.push(['BRAKE SET', '#e3b341']);
         }
         const blink = Math.floor(sim.time * 3) % 2 === 0;
         warns.slice(0, 3).forEach(([t, col], k) => { font(small ? 14 : 17, 800); if (col === '#f85149' && !blink) return; text(t, cw / 2, top + 90 + k * 22, 'center', col); });
@@ -2366,11 +2560,11 @@
     function startOnRamp() {
       const s = sim.state, A = W.meta.airport;
       GYRO.place(s, env, A.start.x, A.start.z, A.start.heading);
-      s.input.trimLon = 0; s.input.trimLat = 0;
+      s.input.trimLon = 0; s.input.trimLat = 0; toggles.brake = true; toggles.prerot = false;
       stickL.set(0, -1); look.recenter(); camTmp.chaseYaw = null;
       if (quest.job) failQuest('Back at the ramp');
       closeOverlays(); sim.running = true; refreshButtons();
-      toast('On the ramp. ENGINE, then throttle to 40% and hold PREROT.', 4500);
+      toast('On the ramp, brake set. ENGINE on, throttle to 40%, PREROT on until 200 rpm.', 4500);
     }
     function startOnRunway() {
       const s = sim.state, A = W.meta.airport;
@@ -2382,15 +2576,15 @@
       const [a, b, hdg] = Math.abs(into) <= 90 ? [p0, p1, h01] : [p1, p0, (h01 + 180) % 360];
       const x = a[0] + (b[0] - a[0]) * 0.04, z = a[1] + (b[1] - a[1]) * 0.04;
       GYRO.place(s, env, x, z, hdg, { engineOn: true, rotorRpm: 210 });
-      s.input.trimLon = 0; s.input.trimLat = 0;
+      s.input.trimLon = 0; s.input.trimLat = 0; toggles.brake = true; toggles.prerot = false;
       stickL.set(0, -1); look.recenter(); camTmp.chaseYaw = null;
       closeOverlays(); sim.running = true; refreshButtons();
-      toast(`Lined up on runway ${Math.round(hdg / 10).toString().padStart(2, '0')}, rotor at 210 rpm. Full throttle, stick back, ease forward past 300 rpm.`, 6000);
+      toast(`Lined up on runway ${Math.round(hdg / 10).toString().padStart(2, '0')}, rotor at 210 rpm. Brake off, full throttle, stick back, ease forward past 300 rpm.`, 6000);
     }
     function startAirborne() {
       const s = sim.state, A = W.meta.airport;
       GYRO.place(s, env, A.arp.x, A.arp.z - 1500, 180, { engineOn: true, rotorRpm: 360, airborne: { agl: 300, speed: 50 * KT } });
-      s.input.trimLon = 0; s.input.trimLat = 0;
+      s.input.trimLon = 0; s.input.trimLat = 0; toggles.brake = false; toggles.prerot = false;
       stickL.set(0, 0.2); look.recenter(); camTmp.chaseYaw = null;
       closeOverlays(); sim.running = true; refreshButtons();
       toast('Airborne over the airport at 50 kt. Throttle is at 60%; the runway is ahead.', 5000);
@@ -2408,10 +2602,10 @@
       }
       if (!best) return startOnRamp();
       GYRO.place(s, env, best.x, best.z, best.hdg, { engineOn: true, rotorRpm: 0 });
-      s.input.trimLon = 0; s.input.trimLat = 0;
+      s.input.trimLon = 0; s.input.trimLat = 0; toggles.brake = true; toggles.prerot = false;
       stickL.set(0, -1); look.recenter(); camTmp.chaseYaw = null;
       closeOverlays(); sim.running = true; refreshButtons();
-      toast('On the nearest street, engine running. Prerotate and take off along the road.', 4500);
+      toast('On the nearest street, engine running, brake set. Prerotate and take off along the road.', 4500);
     }
     function onCrash(s) {
       log.crashes++; saveLog();
@@ -2460,7 +2654,7 @@
     if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(resize, 100));
 
     // ---- the loop
-    let last = performance.now(), wasCrashed = false, fpsAcc = 0, fpsN = 0;
+    let last = performance.now(), wasCrashed = false, fpsAcc = 0, fpsN = 0, frameN = 0;
     function frame(now) {
       requestAnimationFrame(frame);
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -2473,6 +2667,7 @@
         wasCrashed = !!s.crashed;
         if (!s.info.onGround && !s.crashed) log.flightTime += dt;
         questStep(s, dt);
+        if (toggles.prerot && !s.info.onGround && s.info.agl > 1.5) { toggles.prerot = false; toast('Prerotator disengaged'); refreshButtons(); }
         if (Math.floor(sim.time) % 30 === 0 && Math.floor(sim.time) !== Math.floor(sim.time - dt)) saveLog();
       }
       updateAircraft(s, sim.firstPerson, dt);
@@ -2486,6 +2681,7 @@
       drawHud(s, dt);
       fpsAcc += dt; fpsN++; if (fpsAcc >= 1) { sim.fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
       sound.update(s);
+      if ((++frameN & 7) === 0) refreshButtons();
       // the warning chip
       const chip = $('#chipWarn');
       const w = s.info.lowRotor ? 'LOW ROTOR' : s.info.unloaded ? 'UNLOADED' : s.info.overspeed ? 'ROTOR OVERSPEED' : '';

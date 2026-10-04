@@ -226,5 +226,20 @@ console.log('A landing');
   check('survived', s.crashed ? 1 : 0, 0, 0);
 }
 
+// ------------------------------------------------------------------ 8. ground effect
+console.log('Ground effect');
+{
+  // the same state, a free fall from rest with the rotor turning, high up and just over the ground
+  const drop = (agl) => { const s = airborne(0, { rpm: 380, agl }); s.input.ignition = false; s.input.throttle = 0; run(s, 0.3); return { kG: s.info.groundEffect, vi: s.rotor.vi, T: s.rotor.thrust }; };
+  const high = drop(100), low = drop(1.0);
+  console.log(`   induced flow ${high.vi.toFixed(2)} m/s at 100 m, ${low.vi.toFixed(2)} m/s at 1 m (factor ${low.kG.toFixed(2)}); rotor thrust ${high.T.toFixed(0)} N → ${low.T.toFixed(0)} N`);
+  check('no ground effect high up', high.kG, 0.99, 1);
+  check('induced flow cut near the ground', low.kG, 0.6, 0.95);
+  check('more rotor thrust near the ground for the same state', low.T / high.T, 1.02, 1.5);
+  // and it is gone in forward flight
+  const s = airborne(50 * KT, { rpm: 360, agl: 1.0 }); run(s, 0.3);
+  check('no cushion at cruise speed', s.info.groundEffect, 0.97, 1);
+}
+
 console.log(`\n${checks - failures}/${checks} checks passed${failures ? ` — ${failures} FAILED` : ''}`);
 process.exit(failures ? 1 : 0);

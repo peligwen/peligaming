@@ -367,6 +367,28 @@ for (const cls of ORDER) {
 }
 for (const a of painted.get(C.rail) || []) paintLine(cover, CV_COLS, CV_ROWS, a.line.map(toPx), a.w / CV_CELL, C.rail);
 
+// ------------------------------------------------------------ the aerodrome
+// No trees on the airport: inside the aerodrome's polygon the wooded and
+// scrub cover becomes grass (so neither the canopy nor the forest texture
+// appears there), and the page keeps its tree scatter out of the polygon.
+console.log('airport: the aerodrome polygon');
+const aerodromes = await overpass('aerodrome', `(way["aeroway"="aerodrome"]["icao"="KCHA"](${BBOX}); relation["aeroway"="aerodrome"]["icao"="KCHA"](${BBOX});); out tags geom;`);
+let airportBounds = null;
+for (const el of aerodromes) {
+  if (!el.tags || el.tags.aeroway !== 'aerodrome') continue;
+  const rings = ringsOf(el).filter((r) => r.some(inBox));
+  if (!rings.length) continue;
+  const ring = rings.reduce((a, b) => (Math.abs(ringArea(b)) > Math.abs(ringArea(a)) ? b : a));
+  airportBounds = simplifyRing(ring, 2);
+  const mask = new Uint8Array(CV_COLS * CV_ROWS);
+  fillRings(mask, CV_COLS, CV_ROWS, [ring.map(toPx)], 1);
+  let n = 0;
+  for (let i = 0; i < mask.length; i++) if (mask[i] && (cover[i] === C.forest || cover[i] === C.scrub)) { cover[i] = C.grass; n++; }
+  console.log(`  ${el.tags.name || el.id}: ${airportBounds.length} vertices, ${(Math.abs(ringArea(ring)) / 1e4).toFixed(0)} ha, ${n} wooded cells cleared`);
+  break;
+}
+if (!airportBounds) console.warn('  no aerodrome polygon found: the page cannot keep trees off the airport');
+
 // ------------------------------------------------------------ roads
 console.log('roads: OSM highways');
 const highways = await overpassStriped('highways', (bb) => `way["highway"](${bb}); out tags geom;`, 3);
@@ -738,6 +760,7 @@ const meta = {
     otherRunways: runways.filter((r) => !kcha.includes(r)).map((r) => ({ ref: r.ref, w: r.w, pts: r.pts.map((p) => p.map((v) => Math.round(v * 10) / 10)) })),
     taxiways: taxiways.map((t) => ({ ref: t.ref, w: t.w, pts: t.pts.map((p) => p.map((v) => Math.round(v * 10) / 10)) })),
     start: { x: Math.round(start.x * 10) / 10, z: Math.round(start.z * 10) / 10, heading: start.heading },
+    bounds: airportBounds ? { ring: airportBounds.map((p) => p.map((v) => Math.round(v * 10) / 10)), min: [0, 1].map((k) => Math.floor(Math.min(...airportBounds.map((p) => p[k])))), max: [0, 1].map((k) => Math.ceil(Math.max(...airportBounds.map((p) => p[k])))) } : null,
   },
   bridges, businesses: bizOut, houses,
   credits: ['Map data © OpenStreetMap contributors (ODbL), via the Overpass API', 'Terrain: USGS 3DEP via the AWS Terrain Tiles (Mapzen Terrarium)'],

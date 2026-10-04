@@ -573,8 +573,11 @@ land.
   gyroscopic term from the airframe's rates, so the disc follows the head with
   the real lag and the real damping and the cross-coupling that goes with it;
   the induced flow comes from momentum theory with Leishman's vortex-ring fit
-  and a first-order lag; the teeter stops are modelled and a rotor flapped
-  onto them in flight is the end of you. The airframe is a six-degree-of-
+  and a first-order lag, cut near the ground by the wake's image
+  (Cheeseman–Bennett ground effect, by the hub's height, which the forward
+  speed sweeps away — so the cushion is there in a vertical flare and gone in
+  the cruise); the teeter stops are modelled and a rotor flapped onto them in
+  flight is the end of you. The airframe is a six-degree-of-
   freedom rigid body with the propeller as a thrust-and-torque map against
   advance ratio, the engine as a torque curve with an idle governor and a
   starter, the tail surfaces as finite plates in the slipstream, tyres as
@@ -586,13 +589,20 @@ land.
   departs hands-off in about twenty seconds, as it should.
 - **The controls.** Two touch sticks in a static panel: the right one the
   cyclic (self-centring, with an expo curve), the left one throttle up and
-  down (it stays where you leave it) and rudder sideways (it centres). Hold
-  buttons for the wheel brakes and the prerotator; toggles for the engine and
-  the rotor brake; a trim button that makes the stick's current position its
-  new centre. Everything has a key.
+  down (it stays where you leave it) and rudder sideways (it centres). Between
+  them a row of bat-handle toggle switches, up for on, each with its lamp:
+  ENGINE, PREROT (it drops out by itself at liftoff), BRAKE (set whenever you
+  start on the ground; Space holds the brakes from the keyboard) and ROTOR
+  BRAKE (it only engages on the ground); and buttons for trim (the stick's
+  current position becomes its new centre), the view, the map and a reset.
+  Everything has a key.
 - **Looking around.** Drag the view, or let the phone's orientation sensors
   turn your head: hold the phone up and turn, and the cockpit view turns with
-  it, relative to the aircraft (a tap recentres). Cockpit and chase views.
+  it, relative to the aircraft (a tap recentres). The cockpit view looks out
+  over a small nose fairing with a real instrument panel in it — airspeed,
+  altimeter, rotor and engine tachometers and a slip ball, needles driven by
+  the model — so the view is anchored to the machine; the chase view orbits
+  it.
 - **The world.** 29 × 23 km around the airport — downtown, the river's bends,
   Lookout and Signal Mountains, the suburbs out to Collegedale and Hixson —
   on USGS terrain, with OpenStreetMap's 38,000 streets as draped ribbons
@@ -645,8 +655,9 @@ land.
   `.gyro-cache/`. © OpenStreetMap contributors, ODbL.
 
 The honest limits: a single rigid teetering rotor with ten blade elements
-and uniform-plus-linear inflow, no blade lag or torsion, no ground effect,
-no rotor wake on the tail; the buildings are boxes at typical heights where
+and uniform-plus-linear inflow, no blade lag or torsion, a ground effect
+from the classic hover formula rather than the wake itself, no rotor wake on
+the tail; the buildings are boxes at typical heights where
 OSM has none; the trees are placed by hash, not by survey; and the land cover
 is 7 m cells, so a narrow street through a forest is a narrow landing.
 
