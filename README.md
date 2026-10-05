@@ -679,16 +679,24 @@ land.
 
 - **The machine.** A Bensen-class single-seater scaled toward today's 7-metre
   rotors: 258 kg with the pilot, a 7.2 m teetering rotor on a tall mast, a
-  65 hp two-stroke swinging a 1.65 m fixed-pitch pusher prop, a stabilizer
+  65 hp two-stroke high on its bed behind the seat swinging a 1.65 m
+  fixed-pitch pusher prop (the thrust line sits 0.36 m above the CG, as on
+  today's machines, and the stabilizer carries enough negative incidence in
+  the propwash to balance it, so power does not pitch the nose), a stabilizer
   and a rudder in the propwash, tricycle gear with a steerable nosewheel on
-  fat tyres and long legs (the streets are its runway), a prerotator and a
-  rotor brake. The airframe is drawn as what it is: a keel, a mast and a
-  tail post of welded tube with the braces, the engine bed, the seat frame,
-  the nose fork and the sprung main-gear bars all meeting at their joints. It cruises at 50–60 kt on about 30 kW, climbs
-  at 600 ft/min at full power, glides engine-off at 1,200 ft/min (an L/D of
-  about 4), takes off in under 200 m from a 200 rpm prerotation, and descends
-  vertically at 2,100 ft/min with no airspeed at all, the rotor still at
-  380 rpm — which is what the real ones do.
+  fat tyres and long legs (the streets are its runway), a tail wheel, a
+  prerotator and a rotor brake. There is no collective: the blades are
+  fixed-pitch, and tilting the head with the stick is the only rotor control
+  there is. The airframe is drawn as what it is: a keel and a mast of welded
+  tube, a boom that rises from the keel's end behind the engine to the tail
+  (so the tail clears the ground in a flare — the tail wheel under the
+  boom's end touches at 17° nose-up, the propeller's arc would at 28°), with
+  the braces, the engine bed, the seat frame, the nose fork and the sprung
+  main-gear bars all meeting at their joints. It cruises at 50–60 kt on
+  about 30 kW, climbs at 600 ft/min at full power, glides engine-off at
+  1,200 ft/min (an L/D of about 4), takes off in under 200 m from a 200 rpm
+  prerotation, and descends vertically at 2,100 ft/min with no airspeed at
+  all, the rotor still at 380 rpm — which is what the real ones do.
 - **The flight model.** The rotor is not a lift coefficient. Both blades of
   the teetering rotor are followed around the azimuth in the time domain,
   each sliced into blade elements whose lift and drag come from the local
@@ -704,32 +712,61 @@ land.
   and a first-order lag, cut near the ground by the wake's image
   (Cheeseman–Bennett ground effect, by the hub's height, which the forward
   speed sweeps away — so the cushion is there in a vertical flare and gone in
-  the cruise); the teeter stops are modelled and a rotor flapped onto them in
-  flight is the end of you. The airframe is a six-degree-of-
-  freedom rigid body with the propeller as a thrust-and-torque map against
-  advance ratio, the engine as a torque curve with an idle governor and a
-  starter, the tail surfaces as finite plates in the slipstream, tyres as
-  bristles that hold still until they slide, and a surface-layer wind with
-  gusts. Everything integrates at 360 Hz. A **flight assist** (on by default;
-  off in the settings) damps the head and holds attitude while the stick is
-  centred, because a phone's self-centring stick cannot be a hand on a real
-  gyro's; the aerodynamics are the same either way, and the bare machine
-  departs hands-off in about twenty seconds, as it should.
+  the cruise); the teeter stops are modelled, and a rotor flapped onto them
+  in flight puts the blades into the tail and the propeller. The airframe is
+  a six-degree-of-freedom rigid body with the propeller as a thrust-and-torque
+  map against advance ratio, the engine as a torque curve with an idle
+  governor and a starter, the tail surfaces as finite plates in the
+  slipstream, tyres as bristles that hold still until they slide, and a
+  surface-layer wind with gusts. Everything integrates at 360 Hz. A **flight
+  assist** (on by default; off in the settings) damps the head and holds
+  attitude while the stick is centred, because a phone's self-centring stick
+  cannot be a hand on a real gyro's; the aerodynamics are the same either
+  way, and the bare machine departs hands-off in ten to twenty seconds, as
+  it should.
+- **What breaks.** There is no cut to a crash screen: the physics carries
+  on, and what touches too hard breaks. The wheels, the bottom of the
+  propeller's arc, the rim of the rotor disc and a dozen hard points on the
+  frame (the keel, the boom, the nose, the mast, the head, the engine, the
+  seat, the tyres' sides, the tail surfaces) are all contacts against the
+  ground, the forest canopy (soft, and it catches), the river (soft, and a
+  gyro sinks) and the buildings (their footprints and roofs — you can land on
+  a roof), so a wreck tumbles, slides and comes to rest on whatever it ends
+  up on. A leg that takes more than 3 m/s folds and puts the frame on the
+  street; the propeller's arc touching anything with the engine turning
+  shatters it and the engine is done; a turning blade in the ground is
+  stopped by the ground (the torque wrenches the airframe round) and bends
+  back beyond the break, lifting nothing; a tail that hits breaks the boom at
+  its root and takes the stabilizer and rudder with it; the rotor head coming
+  down on something folds the mast; an engine on its back or under water
+  quits. Each failure changes the machine from then on, in the model and in
+  the drawing — legs fold up under the frame, the tail droops, the mast leans
+  over with the bent blades hanging off it, the prop is stubs — and the
+  crash card waits for the wreck to stop before it tells the whole story in
+  order.
 - **The controls.** Two touch sticks in a static panel: the right one the
   cyclic (self-centring, with an expo curve), the left one throttle up and
   down (it stays where you leave it) and rudder sideways (it centres). Between
   them a row of bat-handle toggle switches, up for on, each with its lamp:
   ENGINE, PREROT (it drops out by itself at liftoff), BRAKE (set whenever you
   start on the ground; Space holds the brakes from the keyboard) and ROTOR
-  BRAKE (it only engages on the ground); and buttons for trim (the stick's
-  current position becomes its new centre), the view, the map and a reset.
-  Everything has a key.
+  BRAKE (it only engages on the ground); three trim wheels, ribbed drums
+  beside the axis each trims — pitch down the side of the cyclic (roll it
+  down for nose up), roll under it, rudder under the throttle — rolled by
+  dragging or scrolling, clicked a notch by tapping an end, zeroed by a
+  double-tap; and buttons for trim (the stick's current position becomes its
+  new centre, in one go), the view, the map and a reset. Everything has a
+  key.
 - **Looking around.** Drag the view, or let the phone's orientation sensors
   turn your head: hold the phone up and turn, and the cockpit view turns with
   it, relative to the aircraft (a tap recentres). Scroll or pinch to zoom:
   the cockpit narrows its field of view (and the drag gets finer with it),
   the chase camera comes closer; `-`, `=` and `0` do the same from the
-  keyboard. The cockpit view looks out over a small nose fairing with a real
+  keyboard. The aircraft's shadow is the sun's: a shadow map framed tightly
+  on the machine and following it, so the frame, the blades and the wheels
+  fall on the street, the grass and the buildings as the sun has them (and
+  sweep over the pilot); the low detail setting keeps a soft blob instead.
+  The cockpit view looks out over a small nose fairing with a real
   instrument panel in it — airspeed, altimeter, rotor and engine tachometers
   and a slip ball, needles driven by the model — so the view is anchored to
   the machine; the chase view orbits it.
@@ -764,14 +801,20 @@ land.
   DOM, which is why `npm run check:gyro` (`scripts/check-gyro.mjs`) can fly
   it under Node: a test pilot prerotates, takes off, trims level flight at
   four speeds, glides engine-off, descends vertically, pushes over, lets go
-  of the stick with and without the assist, and lands, and thirty-odd checks
-  hold the numbers to the published ranges for machines of this class.
+  of the stick with and without the assist, and lands, and forty-odd checks
+  hold the numbers to the published ranges for machines of this class; then
+  it wrecks the machine five ways (a drop, an over-flare, a banked
+  touchdown, a ditching, a wall) and checks what breaks, what does not, and
+  that the wreck comes to rest.
 - The terrain is a geometry clipmap: seven nested rings of one fixed grid
   around the camera, their heights read in the vertex shader from a float
   texture of the same 14 m grid the physics stands on, the land cover read in
   the fragment shader from a class texture and blended at the cell edges,
-  and the aerial imagery from two mipmapped, anisotropically filtered
-  textures (the city layer blended in over a margin inside its edge), with
+  the aircraft's shadow sampled from the sun's shadow map (the terrain and
+  the street ribbons do it in their own shaders, the lit materials through
+  three.js), and the aerial imagery from two mipmapped, anisotropically
+  filtered textures (the city layer blended in over a margin inside its
+  edge), with
   a little of the fine procedural grain kept on top so the ground is not
   flat right under the wheels. The procedural noise and the road markings
   are drawn with their screen-space footprint in hand (`fwidth`), so each
@@ -803,8 +846,10 @@ land.
 The honest limits: a single rigid teetering rotor with ten blade elements
 and uniform-plus-linear inflow, no blade lag or torsion, a ground effect
 from the classic hover formula rather than the wake itself, no rotor wake on
-the tail; the buildings are boxes at typical heights where
-OSM has none; the trees are placed by hash, not by survey; the land cover
+the tail; the damage is a handful of switches (a leg is whole or folded, a
+boom whole or broken) rather than a crumpling structure, and nothing comes
+off the airframe; the buildings are boxes at typical heights where
+OSM has none, and their collision is their footprint and flat roof; the trees are placed by hash, not by survey; the land cover
 is 7 m cells, so a narrow street through a forest is a narrow landing; and
 the aerial photography is 3 m a pixel at best, flown on another day than
 OSM was surveyed (and in two seasons across one seam), so up close it is a

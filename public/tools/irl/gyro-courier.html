@@ -112,6 +112,28 @@
     .stick.left .knob { background: radial-gradient(circle at 35% 35%, #ffe28a, #d9a334 65%, #7a5a14); }
     .stick .trail { position: absolute; left: 50%; top: 10%; bottom: 10%; width: 6px; margin-left: -3px; border-radius: 3px; background: rgba(255,255,255,0.06); pointer-events: none; }
     .stick .fill { position: absolute; left: 50%; width: 6px; margin-left: -3px; bottom: 10%; border-radius: 3px; background: linear-gradient(#f2c94c, #d9a334); pointer-events: none; }
+    /* trim wheels: a ribbed drum beside the axis it trims; roll it by dragging or scrolling, tap an end to click it a notch, double-tap to zero it */
+    .twheel { position: absolute; z-index: 2; touch-action: none; cursor: ns-resize; }
+    .twheel.h { cursor: ew-resize; }
+    .twheel .drum {
+      position: absolute; inset: 0; border-radius: 4px; overflow: hidden;
+      background-image: repeating-linear-gradient(to bottom, #7a8189 0 1.5px, #262b31 1.5px 5px); background-size: 100% 5px;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.65), 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .twheel.h .drum { background-image: repeating-linear-gradient(to right, #7a8189 0 1.5px, #262b31 1.5px 5px); background-size: 5px 100%; }
+    .twheel .drum::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(0,0,0,0.6)); }
+    .twheel.h .drum::after { background: linear-gradient(to right, rgba(0,0,0,0.6), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(0,0,0,0.6)); }
+    .twheel .mark { position: absolute; width: 0; height: 0; pointer-events: none; }
+    .twheel.v .mark { left: -6px; top: 50%; margin-top: -4px; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 5px solid var(--accent); }
+    .twheel.h .mark { top: -6px; left: 50%; margin-left: -4px; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid var(--accent); }
+    .twheel .tval { position: absolute; font-size: 9px; letter-spacing: 0.3px; color: var(--text-dim); white-space: nowrap; pointer-events: none; }
+    .twheel.v .tval { right: 0; bottom: -15px; }
+    .twheel.h .tval { left: 0; top: -13px; }
+    .twheel.set .tval { color: var(--accent); }
+    .twheel:hover .drum { box-shadow: inset 0 0 0 1px var(--brand), 0 1px 2px rgba(0,0,0,0.5); }
+    #trimPitch { right: 4px; top: 24px; bottom: 24px; width: 16px; }
+    #trimRoll { left: 24px; right: 38px; bottom: 4px; height: 16px; }
+    #trimYaw { left: 42px; right: 8px; bottom: 4px; height: 16px; }
     .mid { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
     .switches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-width: 0; flex: 1.25; }
     .buttons { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 6px; min-width: 0; flex: 1; }
@@ -232,6 +254,9 @@
       .stick .label.short { display: block; }
       .stick .label.r { left: 8px; right: auto; top: 18px; }
       .chip.quest { max-width: 52vw; }
+      #trimPitch { width: 14px; top: 30px; }
+      #trimRoll { left: 14px; right: 30px; height: 14px; }
+      #trimYaw { left: 34px; right: 6px; height: 14px; }
     }
     @media (max-height: 420px) {
       :root { --panel-h: 132px; }
@@ -259,6 +284,7 @@
     <div class="stick left" id="stickL">
       <span class="label long">throttle ↕</span><span class="label r long">rudder ↔</span><span class="label short">thr ↕ · rud ↔</span><span class="label b" id="thrLabel">0%</span>
       <div class="cross"></div><div class="trail"></div><div class="fill" id="thrFill" style="height:0"></div><div class="knob"></div>
+      <div class="twheel h" id="trimYaw" title="Rudder trim: drag or scroll to roll it, tap an end for a notch, double-tap to zero (; and ')"><div class="drum"></div><i class="mark"></i><span class="tval">0</span></div>
     </div>
     <div class="mid">
       <div class="switches">
@@ -268,7 +294,7 @@
         <button class="sw danger" id="swRotorBrake" data-led="red" role="switch" aria-checked="false" title="Rotor brake (R): stops the rotor on the ground"><span class="sw-text"><b>ROTOR<br>BRAKE</b><small>off</small></span><span class="sw-bezel"><i class="sw-lever"></i></span><i class="sw-led"></i></button>
       </div>
       <div class="buttons">
-        <button id="btnTrim" title="Trim: take the stick's current position as the new centre (double-tap to clear)">TRIM<small>set</small></button>
+        <button id="btnTrim" title="Trim: take the stick's current position as the new centre — the wheels beside the sticks adjust it (double-tap to clear)">TRIM<small>set</small></button>
         <button id="btnCam" title="First or third person">VIEW<small>cockpit</small></button>
         <button id="btnMap" title="The map and the job board">MAP<small>jobs</small></button>
         <button id="btnReset" title="Back to the ramp">RESET<small>ramp</small></button>
@@ -277,6 +303,8 @@
     <div class="stick right" id="stickR">
       <span class="label long">cyclic</span><span class="label r" id="assistLabel">assist</span>
       <div class="cross"></div><div class="knob"></div>
+      <div class="twheel v" id="trimPitch" title="Pitch trim: roll it down for nose up, up for nose down; tap an end for a notch, double-tap to zero ([ and ])"><div class="drum"></div><i class="mark"></i><span class="tval">0</span></div>
+      <div class="twheel h" id="trimRoll" title="Roll trim: drag or scroll to roll it, tap an end for a notch, double-tap to zero (, and .)"><div class="drum"></div><i class="mark"></i><span class="tval">0</span></div>
     </div>
   </div>
 
@@ -294,7 +322,7 @@
       <h1>🚁 Gyro Courier</h1>
       <p>A single-seat open-frame gyrocopter — the engine behind your seat pushing, a free-wheeling two-blade rotor overhead doing the lifting — over Chattanooga, Tennessee, around Lovell Field (KCHA). The streets are empty: that is where you land.</p>
       <h2>How a gyro flies</h2>
-      <p>The rotor is not driven in flight. It spins because air flows <b>up</b> through it, so the disc must always be tilted a little back into the airflow, and it must be kept <b>loaded</b>: a push-over that unloads it slows it, and a slow rotor cannot lift you. Watch the rotor gauge. The prerotator only spins it up on the ground; the takeoff roll brings it to flight speed.</p>
+      <p>The rotor is not driven in flight. It spins because air flows <b>up</b> through it, so the disc must always be tilted a little back into the airflow, and it must be kept <b>loaded</b>: a push-over that unloads it slows it, and a slow rotor cannot lift you. Watch the rotor gauge. The prerotator only spins it up on the ground; the takeoff roll brings it to flight speed. There is no collective: the blades are fixed-pitch, so the stick tilting the whole rotor head is the only rotor control there is, and the rotor speed looks after itself.</p>
       <h2>Flying it</h2>
       <ol>
         <li><b>ENGINE</b> on to start. With the <b>BRAKE</b> set, bring the throttle to about 40% and switch <b>PREROT</b> on; past 200 rpm switch it off and release the brake.</li>
@@ -302,12 +330,13 @@
         <li>Cruise at 50–60 kt. The stick tilts the rotor head: back to slow and climb, forward to speed up. Throttle sets climb and descent. Rudder (the left stick, sideways) keeps the ball centred and steers on the ground.</li>
         <li>To land: approach at 40 kt, throttle low, flare over the street to walking pace, touch down, hold the stick back, brake. A gyro can land in a few metres; it can even descend vertically with no airspeed (about 2,000 ft/min, rotor spinning).</li>
         <li>Engine failure is not an emergency: glide at 45–50 kt and flare. <b>Never</b> push the nose over hard, and never let the rotor get slow.</li>
+        <li>What breaks, breaks: a leg that takes more than about 3 m/s folds and puts the frame on the street; the propeller's arc touching anything shatters it (the tail wheel is there to touch first, up to 17° nose-up — the prop would at 28°); a blade in the ground stops the rotor and bends the blades, and wrenches the machine round; the tail boom snaps if the tail hits; the mast folds if the rotor head does. The physics carries on through all of it, so a wreck rolls, slides and comes to rest where it will.</li>
       </ol>
       <h2>Controls</h2>
       <div class="grid2">
         <div><b>Right stick</b> — cyclic (self-centring)</div><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows</div>
         <div><b>Left stick</b> — throttle up/down (stays), rudder left/right (centres)</div><div><kbd>Shift</kbd>/<kbd>Ctrl</kbd> throttle · <kbd>Q</kbd>/<kbd>E</kbd> rudder</div>
-        <div><b>TRIM</b> — the stick's current position becomes centre</div><div><kbd>T</kbd> set · double-tap or <kbd>Y</kbd> clear</div>
+        <div><b>Trim wheels</b> — pitch beside the cyclic (down for nose up), roll under it, rudder under the throttle: drag or scroll to roll one, tap an end for a notch, double-tap to zero it. <b>TRIM</b> takes the stick's current position</div><div><kbd>[</kbd>/<kbd>]</kbd> pitch · <kbd>,</kbd>/<kbd>.</kbd> roll · <kbd>;</kbd>/<kbd>'</kbd> rudder · <kbd>T</kbd> set · double-tap or <kbd>Y</kbd> clear</div>
         <div><b>BRAKE</b> · <b>PREROT</b> · <b>ROTOR BRAKE</b> · <b>ENGINE</b> — toggle switches</div><div><kbd>B</kbd> · <kbd>P</kbd> · <kbd>R</kbd> · <kbd>I</kbd> · <kbd>Space</kbd> holds the brakes</div>
         <div><b>VIEW</b> cockpit / chase · <b>MAP</b> &amp; jobs · <b>RESET</b></div><div><kbd>C</kbd> · <kbd>M</kbd> · <kbd>Backspace</kbd></div>
         <div><b>Look</b> — drag the view, or turn the phone (📱)</div><div>mouse drag · ⌖ recentres</div>
@@ -459,18 +488,35 @@
         inflowTau: 0.08,
       },
       engine: { torquePeak: 190, rpmIdle: 750, rpmMax: 2550, inertia: 0.55, starter: 30, friction: 0.03, startTime: 1.6 }, // at the prop shaft
-      prop: { D: 1.65, ct0: 0.10, cq0: 0.0072, j0: 0.95, pos: [-1.05, 0.12, 0], spin: 1 },
+      // The engine sits high on its bed, as on today's machines, so the propeller's arc clears the keel and the ground in a
+      // flare (28° nose-up on the mains); the thrust line is 0.36 m above the CG, and the stabilizer carries enough negative
+      // incidence in the propwash to balance it, so power does not pitch the nose.
+      prop: { D: 1.65, ct0: 0.10, cq0: 0.0072, j0: 0.95, pos: [-1.05, 0.36, 0], spin: 1 },
       fuselage: { flatPlate: 0.55, pos: [0, -0.15, 0], damp: [18, 26, 28] },
-      stab: { area: 0.42, span: 1.5, incidence: -3.0 * D2R, pos: [-2.05, 0.10, 0], slip: 0.85 },
+      stab: { area: 0.42, span: 1.5, incidence: -6.5 * D2R, pos: [-2.05, 0.10, 0], slip: 0.85 },
       fin: { area: 0.45, ar: 1.5, pos: [-2.15, 0.45, 0], rudderMax: 25 * D2R, rudderEff: 0.55, slip: 0.9 },
-      gear: [ // big wheels on long legs: the streets are the runway
-        { name: 'nose', pos: [1.10, -0.98, 0], wheel: true, steer: true, brake: 0 },
-        { name: 'left', pos: [-0.25, -0.98, -0.95], wheel: true, brake: 1 },
-        { name: 'right', pos: [-0.25, -0.98, 0.95], wheel: true, brake: 1 },
-        { name: 'tail', pos: [-2.28, -0.58, 0], wheel: false },
-        { name: 'prop', pos: [-1.05, -0.36, 0], wheel: false, strike: true },
+      // Big wheels on long legs (the streets are the runway), a tail wheel under the end of the boom that angles up to the
+      // tail — it touches at 17° nose-up, well before the propeller's arc would — and the bottom of that arc. Each leg has
+      // `fold`: where the frame comes to rest once the leg has collapsed under it.
+      gear: [
+        { name: 'nose', pos: [1.10, -0.98, 0], wheel: true, steer: true, brake: 0, fold: [-0.05, 0.45, 0] },
+        { name: 'left', pos: [-0.25, -0.98, -0.95], wheel: true, brake: 1, fold: [0, 0.45, 0.55] },
+        { name: 'right', pos: [-0.25, -0.98, 0.95], wheel: true, brake: 1, fold: [0, 0.45, -0.55] },
+        { name: 'tail', pos: [-2.35, -0.34, 0], wheel: true, caster: true, brake: 0, tail: true, fold: [0, 0.25, 0] },
+        { name: 'prop', pos: [-1.12, -0.465, 0], prop: true },
       ],
-      gearK: 26000, gearC: 1700, tyreK: 40000, tyreC: 900, steerMax: 22 * D2R,
+      // The frame's other hard points, for when it is no longer on its wheels: a wreck can tumble and come to rest on any of them.
+      hard: [
+        { name: 'keel', pos: [1.05, -0.54, 0] }, { name: 'keel', pos: [-0.9, -0.54, 0] }, { name: 'boom', pos: [-1.30, -0.54, 0] },
+        { name: 'nose', pos: [1.70, -0.10, 0] }, { name: 'rotor head', pos: [-0.05, 1.30, 0], head: true }, { name: 'mast', pos: [-0.05, 0.74, 0], head: true },
+        { name: 'engine', pos: [-0.85, 0.60, 0] }, { name: 'seat', pos: [0.25, -0.22, -0.3] }, { name: 'seat', pos: [0.25, -0.22, 0.3] },
+        { name: 'left tyre', pos: [-0.25, -0.64, -1.08] }, { name: 'right tyre', pos: [-0.25, -0.64, 1.08] },
+        { name: 'fin', pos: [-2.18, 0.83, 0], tail: true }, { name: 'stabilizer', pos: [-2.2, 0.1, -0.75], tail: true }, { name: 'stabilizer', pos: [-2.2, 0.1, 0.75], tail: true },
+      ],
+      tailRoot: [-1.30, -0.50, 0], tailDroop: 30 * D2R, // the boom breaks at its root, and the tail hangs down by this
+      restHeight: 1.00, // m, the CG over the pavement when placed (the tyres then settle a few centimetres)
+      gearK: 26000, gearC: 1700, frameK: 30000, frameC: 3200, tyreK: 40000, tyreC: 900, steerMax: 22 * D2R,
+      soft: { water: [500, 1200, 0.02], forest: [4000, 2600, 0.9] }, // what is not ground: stiffness, damping, friction — a gyro sinks; a canopy catches
       eye: [0.30, 0.68, 0],
       ctlTau: 0.07, // s, the stick's lag
       // Flight assist (optional): rate damping on the head, and attitude hold
@@ -478,7 +524,8 @@
       // change to the aerodynamics. Its authority is a third of the stick.
       assist: { rateQ: 0.012, rateP: 0.012, holdPitch: 0.02, holdRoll: 0.02, authority: 0.35, deadband: 0.06 },
       dt: 1 / 360,
-      hardLanding: 3.2, // m/s down at touchdown — more is a crash
+      hardLanding: 3.2, // m/s down at touchdown — more folds the leg that took it
+      strike: { torque: 4500, rate: 2.2 }, // a blade in the ground: the torque the ground puts on the rotor, and how fast it wrecks the blades at full speed
     };
     P.rotor.Ib = (P.rotor.bladeMass * P.rotor.R * P.rotor.R) / 3;
     P.rotor.IR = 2 * P.rotor.Ib + 2.5;
@@ -513,17 +560,20 @@
     }
 
     // ---------------------------------------------------------- state
+    // What has broken, 0 or 1 each (the rotor's blades in between: how far along the span they are bent back), and the record of it.
+    function freshDamage() { return { gear: [0, 0, 0, 0], prop: 0, rotor: 0, mast: 0, tail: 0, engine: 0, events: [], rest: 0 }; }
     function createState() {
       return {
         t: 0,
         pos: [0, 0, 0], vel: [0, 0, 0], q: [0, 0, 0, 1], omega: [0, 0, 0],
-        rotor: { psi: 0, omega: 0, beta: 0, betaDot: 0, vi: 0, thrust: 0, torque: 0, tiltAft: P.rotor.tiltNeutral, tiltRight: 0, hForce: 0, stopHits: 0, discAlpha: 0, kG: 1 },
+        rotor: { psi: 0, omega: 0, beta: 0, betaDot: 0, vi: 0, thrust: 0, torque: 0, tiltAft: P.rotor.tiltNeutral, tiltRight: 0, hForce: 0, stopHits: 0, discAlpha: 0, kG: 1, strikeQ: 0 },
         engine: { omega: 0, on: false, startT: 0, thrust: 0, torque: 0 },
-        input: { lon: 0, lat: 0, rudder: 0, throttle: 0, brake: 0, prerotate: false, rotorBrake: false, ignition: false, trimLon: 0, trimLat: 0, assist: false },
+        input: { lon: 0, lat: 0, rudder: 0, throttle: 0, brake: 0, prerotate: false, rotorBrake: false, ignition: false, trimLon: 0, trimLat: 0, trimRud: 0, assist: false },
         ctl: { lon: 0, lat: 0, rudder: 0, sasLon: 0, sasLat: 0, holdPitch: null, holdRoll: null },
         wind: { dir: 290, speed: 2.5, gust: [0, 0, 0], gustiness: 1 },
         ground: { contacts: 0, kind: 'pavement', wheels: 0, speed: 0, slip: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]] },
-        crashed: null,
+        crashed: null, // set at the first thing that breaks: { reason, t, speed, sink, events }; the physics carries on
+        damage: freshDamage(),
         acc: 0,
         info: {},
         trace: [],
@@ -532,14 +582,14 @@
     // Put the aircraft on the ground at x, z facing heading (degrees), still.
     function place(s, env, x, z, headingDeg, opts = {}) {
       const h = env.surface(x, z).h;
-      s.pos = [x, h + 0.98 + 0.02, z];
+      s.pos = [x, h + P.restHeight, z];
       s.vel = [0, 0, 0]; s.omega = [0, 0, 0];
       s.q = qfromEuler(headingDeg * D2R, 0, 0);
-      s.rotor.psi = 0; s.rotor.omega = (opts.rotorRpm || 0) * TAU / 60; s.rotor.beta = 0; s.rotor.betaDot = 0; s.rotor.vi = 0; s.rotor.stopHits = 0;
+      s.rotor.psi = 0; s.rotor.omega = (opts.rotorRpm || 0) * TAU / 60; s.rotor.beta = 0; s.rotor.betaDot = 0; s.rotor.vi = 0; s.rotor.stopHits = 0; s.rotor.strikeQ = 0;
       s.engine.omega = opts.engineOn ? P.engine.rpmIdle * TAU / 60 : 0; s.engine.on = !!opts.engineOn; s.engine.startT = 0;
       s.input.ignition = !!opts.engineOn; s.input.throttle = 0; s.input.brake = 0; s.input.prerotate = false; s.input.rotorBrake = false;
       s.ctl = { lon: 0, lat: 0, rudder: 0 };
-      s.crashed = null; s.acc = 0;
+      s.crashed = null; s.damage = freshDamage(); s.acc = 0;
       if (opts.airborne) { // in flight at a height and speed
         s.pos[1] = h + opts.airborne.agl;
         const f = qrot(s.q, [1, 0, 0]);
@@ -576,8 +626,14 @@
     // ---------------------------------------------------------- the rotor
     const rotorScratch = { F: [0, 0, 0], M: [0, 0, 0] };
     function stepRotor(s, env, dt, Vb, rho, out) {
-      const R = P.rotor, r = s.rotor;
+      const R = P.rotor, r = s.rotor, dmg = s.damage.rotor;
       const B = hubBasis(r.tiltAft, r.tiltRight);
+      if (s.damage.mast) { // the mast has folded: the rotor is wreckage, winding down, stopped by whatever its blades hit
+        r.omega = Math.max(0, r.omega + ((r.strikeQ / R.IR) - 2) * dt); r.strikeQ = 0;
+        r.psi = (r.psi + r.omega * dt) % TAU;
+        r.thrust = 0; r.hForce = 0; r.torque = 0; r.prerotating = false; r.prerotTorque = 0; r.kG = 1; r.vi = 0;
+        return B;
+      }
       const Vh = toHub(B, Vb);                 // hub velocity relative to the air, hub frame (x fwd, y up the shaft, z right)
       const wh = toHub(B, s.omega);            // airframe rates in the hub frame
       const gh = toHub(B, qinv(s.q, [0, -G, 0])); // gravity in the hub frame
@@ -609,6 +665,7 @@
           const U = Math.sqrt(U2);
           const phi = Math.atan2(UP, UT), alpha = R.theta0 - phi;
           let [cl, cd] = airfoil(alpha);
+          if (dmg > 0 && x > 1 - 0.65 * dmg) { cl = 0; cd = 2 * cd + 0.4; } // beyond the bend the blade is a bent plate dragging
           if (x > R.tipLoss) cl *= (1 - x) / (1 - R.tipLoss);
           const qc = 0.5 * rho * U2 * c * dr, dL = qc * cl, dD = qc * cd;
           const ft = (-dL * UP - dD * UT) / U, fn = (dL * UT - dD * UP) / U;
@@ -646,7 +703,8 @@
       }
       if (s.input.rotorBrake && Om > 0) Qbrake = -Math.min(R.brakeTorque, (Om * R.IR) / dt);
       const Qfric = -R.friction * Om;
-      const Qnet = Q + Qpre + Qbrake + Qfric;
+      const Qnet = Q + Qpre + Qbrake + Qfric + r.strikeQ; // the ground's torque, from a blade that touched it last step
+      r.strikeQ = 0;
       r.omega = Math.max(0, Om + (Qnet / R.IR) * dt);
       r.psi = (r.psi + r.omega * dt) % TAU;
       r.torque = Q; r.prerotTorque = Qpre; r.prerotating = canPre;
@@ -693,13 +751,13 @@
     // ---------------------------------------------------------- engine and propeller
     function stepEngine(s, dt, Vb, rho) {
       const E = P.engine, Pr = P.prop, e = s.engine, inp = s.input;
-      if (inp.ignition && !e.on) { e.on = true; e.startT = 0; }
+      if (inp.ignition && !e.on && !s.damage.engine) { e.on = true; e.startT = 0; }
       if (!inp.ignition && e.on) e.on = false;
       const n = e.omega / TAU; // rev/s
       const Vax = Math.max(0, Vb[0]);
       const J = n > 1 ? Vax / (n * Pr.D) : 0;
       const ct = Math.max(-0.02, Pr.ct0 * (1 - J / Pr.j0)), cq = Math.max(0.0008, Pr.cq0 * (1 - 0.45 * (J / Pr.j0) ** 2));
-      const T = ct * rho * n * n * Pr.D ** 4, Qp = cq * rho * n * n * Pr.D ** 5;
+      const T = s.damage.prop ? 0 : ct * rho * n * n * Pr.D ** 4, Qp = s.damage.prop ? 0 : cq * rho * n * n * Pr.D ** 5; // a shattered prop pushes nothing
       let Qe = 0;
       const rpm = e.omega * 60 / TAU;
       if (e.on) {
@@ -723,7 +781,7 @@
     // ---------------------------------------------------------- the airframe
     function substep(s, env, dt) {
       const out = { F: [0, 0, 0], M: [0, 0, 0] };
-      const inp = s.input;
+      const inp = s.input, D = s.damage;
       // controls follow the stick with a short lag; the trim offsets the centre
       const k = clamp(dt / P.ctlTau, 0, 1);
       let sasLon = 0, sasLat = 0;
@@ -739,7 +797,7 @@
       s.ctl.sasLon = sasLon; s.ctl.sasLat = sasLat;
       s.ctl.lon += (clamp(inp.lon + inp.trimLon + sasLon, -1, 1) - s.ctl.lon) * k;
       s.ctl.lat += (clamp(inp.lat + inp.trimLat + sasLat, -1, 1) - s.ctl.lat) * k;
-      s.ctl.rudder += (clamp(inp.rudder, -1, 1) - s.ctl.rudder) * k;
+      s.ctl.rudder += (clamp(inp.rudder + (inp.trimRud || 0), -1, 1) - s.ctl.rudder) * k;
       const r = s.rotor;
       r.tiltAft = P.rotor.tiltNeutral + (s.ctl.lon >= 0 ? s.ctl.lon * (P.rotor.tiltAft - P.rotor.tiltNeutral) : s.ctl.lon * (P.rotor.tiltFwd + P.rotor.tiltNeutral));
       r.tiltRight = s.ctl.lat * P.rotor.tiltLat + P.rotor.tiltLatOffset;
@@ -765,8 +823,8 @@
         if (V > 0.01) { const F = scale(vf, -0.5 * rho * V * P.fuselage.flatPlate); madd(out.F, F, 1); madd(out.M, cross(P.fuselage.pos, F), 1); }
         madd(out.M, [om[0] * P.fuselage.damp[0], om[1] * P.fuselage.damp[1], om[2] * P.fuselage.damp[2]], -1);
       }
-      // horizontal stabilizer
-      {
+      // horizontal stabilizer (none of the tail is any use once the boom has broken)
+      if (!D.tail) {
         const S = P.stab, v = add(Vb, cross(om, S.pos));
         const vx = v[0] >= 0 ? Math.max(v[0], v[0] * (1 - S.slip) + slip * S.slip) : v[0], vy = v[1];
         const V2 = vx * vx + vy * vy;
@@ -780,7 +838,7 @@
         }
       }
       // fin and rudder
-      {
+      if (!D.tail) {
         const Fn = P.fin, v = add(Vb, cross(om, Fn.pos));
         const vx = v[0] >= 0 ? Math.max(v[0], v[0] * (1 - Fn.slip) + slip * Fn.slip) : v[0], vz = v[2];
         const V2 = vx * vx + vz * vz;
@@ -795,87 +853,153 @@
         }
       }
       const gravB = qinv(s.q, [0, -P.mass * G, 0]);
-      // ground contacts
-      let wheels = 0, contacts = 0, kindUnder = 'pavement', worst = 0, crash = null;
+      // ---- contacts: the wheels (or what is left of them), the propeller's arc, the frame's hard points and the rotor's
+      // rim, against the ground, the canopy, the water and the buildings. Anything can touch, so a wreck tumbles, slides and
+      // comes to rest on whatever it lands on; what touches too hard breaks, and what has broken changes the aircraft from
+      // then on: a folded leg puts the frame on the ground, a shattered prop pushes nothing, bent blades lift nothing, a
+      // broken boom takes the tail's authority with it, a folded mast ends the rotor.
+      let wheels = 0, contacts = 0, worst = 0;
       const steer = s.ctl.rudder * Math.abs(s.ctl.rudder) * P.steerMax; // right pedal, nosewheel right; progressive
       const under = env.surface(s.pos[0], s.pos[2]);
-      kindUnder = under.kind;
+      const kindUnder = under.kind, nearGround = s.pos[1] - under.h < 6;
+      const omW = qrot(s.q, om);
+      const event = (what, minor) => { // one line each, in order; the first is the crash (a minor one only ever starts the story)
+        if ((minor && s.crashed) || D.events.some((ev) => ev.what === what)) return;
+        D.events.push({ t: s.t, what });
+        if (!s.crashed) s.crashed = { reason: what, t: s.t, speed: norm(s.vel), sink: Math.max(0, -s.vel[1]), events: D.events };
+      };
+      const touch = (pb, always) => { // a point of the airframe against whatever it is in: null if clear
+        const pw = add(s.pos, qrot(s.q, pb));
+        let pen = 0, nrm = null, kind = kindUnder;
+        if (always || nearGround) { const sf = env.surface(pw[0], pw[2]); if (sf.h > pw[1]) { pen = sf.h - pw[1]; nrm = [sf.n[0], sf.n[1], sf.n[2]]; kind = sf.kind; } }
+        if (env.wall) { const w = env.wall(pw[0], pw[1], pw[2]); if (w && w.pen > pen) { pen = w.pen; nrm = [w.n[0], w.n[1], w.n[2]]; kind = 'building'; } }
+        if (pen <= 0) return null;
+        const vp = add(s.vel, cross(omW, qrot(s.q, pb)));
+        const vn = dot(vp, nrm);
+        return { pen, nrm, kind, vp, vn, vt: sub(vp, scale(nrm, vn)) };
+      };
+      const apply = (F, pb) => { const Fb = qinv(s.q, F); madd(out.F, Fb, 1); madd(out.M, cross(pb, Fb), 1); };
+      const skid = (c, K, C, mu) => { // a point that slides: a spring in, friction along
+        let N = K * c.pen - C * c.vn; if (N < 0) N = 0;
+        const F = scale(c.nrm, N), vtN = norm(c.vt);
+        if (vtN > 1e-6) madd(F, scale(c.vt, 1 / vtN), -mu * N * Math.tanh(vtN / 0.1));
+        return F;
+      };
+      const whatHappened = (c, name) => { // the frame touching something is never normal; which part is only worth saying first
+        if (c.kind === 'building' && c.nrm[1] < 0.5) event('hit a building');
+        else if (c.kind === 'water') event('ditched in the river');
+        else if (c.kind === 'forest') event('flew into the trees');
+        else {
+          const e = qtoEuler(s.q);
+          if (Math.abs(e.roll) > 60 * D2R) event('rolled over'); else if (e.pitch < -45 * D2R) event('nosed over'); else if (e.pitch > 45 * D2R) event('went over onto its tail');
+          else event(`the ${name} hit the ground`, true);
+        }
+      };
+      const droop = (p) => { const t = P.tailRoot, c = Math.cos(P.tailDroop), sn = Math.sin(P.tailDroop), dx = p[0] - t[0], dy = p[1] - t[1]; return [t[0] + dx * c - dy * sn, t[1] + dx * sn + dy * c, p[2]]; };
+      // the gear, and the propeller's arc
       for (let gi = 0; gi < P.gear.length; gi++) {
-        const g = P.gear[gi], slipD = s.ground.slip[gi];
-        const pw = add(s.pos, qrot(s.q, g.pos));
-        const sf = env.surface(pw[0], pw[2]);
-        const pen = sf.h - pw[1];
-        if (pen <= 0) { slipD[0] = 0; slipD[1] = 0; continue; }
+        const g = P.gear[gi], slipD = s.ground.slip[gi], folded = D.gear[gi] > 0;
+        let pb = g.pos;
+        if (folded && g.fold) pb = add(g.pos, g.fold);
+        if (g.tail && D.tail) pb = droop(pb);
+        const c = touch(pb, true);
+        if (!c) { slipD[0] = 0; slipD[1] = 0; continue; }
         contacts++;
         if (g.wheel) wheels++;
-        if (sf.kind === 'water') crash = crash || 'ditched in the river';
-        else if (sf.kind === 'forest') crash = crash || 'flew into the trees';
-        else if (sf.kind === 'building') crash = crash || 'hit a building';
-        const nrm = sf.n || [0, 1, 0];
-        const vp = add(s.vel, cross(qrot(s.q, om), qrot(s.q, g.pos)));
-        const vn = dot(vp, nrm);
-        if (vn < -P.hardLanding) crash = crash || (g.strike ? 'prop strike' : 'hard landing');
-        if (g.strike && vn < -1.5) crash = crash || 'prop strike';
-        let N = P.gearK * pen - P.gearC * vn;
-        if (N < 0) N = 0;
-        worst = Math.max(worst, -vn);
-        let F = scale(nrm, N);
-        const vt = sub(vp, scale(nrm, vn)); // tangential velocity
-        const mu = sf.kind === 'pavement' ? 0.85 : sf.kind === 'grass' ? 0.55 : 0.5;
-        const muRoll = sf.kind === 'pavement' ? 0.015 : sf.kind === 'grass' ? 0.06 : 0.09;
-        // A tyre as a bristle: the contact patch deflects like a spring until
-        // the force reaches μN, then slides. Stationary wheels hold still.
-        const bristle = (vel, idx, muMax) => {
-          slipD[idx] += vel * dt;
-          let f = -P.tyreK * slipD[idx] - P.tyreC * vel;
-          const lim = muMax * N;
-          if (f > lim) { f = lim; slipD[idx] = -(lim + P.tyreC * vel) / P.tyreK; }
-          else if (f < -lim) { f = -lim; slipD[idx] = (lim - P.tyreC * vel) / P.tyreK; }
-          return f;
-        };
-        if (g.wheel) {
+        worst = Math.max(worst, -c.vn);
+        const soft = P.soft[c.kind];
+        const rolling = g.wheel && !folded && !soft;
+        if (rolling) {
+          let N = P.gearK * c.pen - P.gearC * c.vn;
+          if (N < 0) N = 0;
+          const F = scale(c.nrm, N);
+          const mu = c.kind === 'pavement' ? 0.85 : c.kind === 'grass' ? 0.55 : 0.5;
+          const muRoll = c.kind === 'pavement' ? 0.015 : c.kind === 'grass' ? 0.06 : 0.09;
+          // A tyre as a bristle: the contact patch deflects like a spring until
+          // the force reaches μN, then slides. Stationary wheels hold still.
+          const bristle = (vel, idx, muMax) => {
+            slipD[idx] += vel * dt;
+            let f = -P.tyreK * slipD[idx] - P.tyreC * vel;
+            const lim = muMax * N;
+            if (f > lim) { f = lim; slipD[idx] = -(lim + P.tyreC * vel) / P.tyreK; }
+            else if (f < -lim) { f = -lim; slipD[idx] = (lim - P.tyreC * vel) / P.tyreK; }
+            return f;
+          };
           let ax = [1, 0, 0];
           if (g.steer) ax = [Math.cos(steer), 0, Math.sin(steer)];
           const axw = qrot(s.q, ax);
-          const axt = unit(sub(axw, scale(nrm, dot(axw, nrm))));
-          const side = unit(cross(nrm, axt));
-          const vroll = dot(vt, axt), vlat = dot(vt, side);
-          madd(F, side, bristle(vlat, 0, mu));
+          const axt = unit(sub(axw, scale(c.nrm, dot(axw, c.nrm))));
+          const side = unit(cross(c.nrm, axt));
+          const vroll = dot(c.vt, axt), vlat = dot(c.vt, side);
+          madd(F, side, bristle(vlat, 0, g.caster ? mu * 0.4 : mu)); // a castering tail wheel follows the path more than it holds it
           const brake = g.brake * clamp(inp.brake, 0, 1);
           if (brake > 0.02) madd(F, axt, bristle(vroll, 1, mu * 0.75 * brake));
           else { slipD[1] = 0; madd(F, axt, -N * muRoll * Math.tanh(vroll / 0.1)); }
+          apply(F, pb);
         } else {
-          const vtN = norm(vt);
-          if (vtN > 1e-6) madd(F, scale(vt, 1 / vtN), -0.6 * N * Math.tanh(vtN / 0.1));
+          slipD[0] = 0; slipD[1] = 0;
+          apply(skid(c, ...(soft || [P.frameK, P.frameC, 0.6])), pb);
         }
-        const Fb = qinv(s.q, F);
-        madd(out.F, Fb, 1); madd(out.M, cross(g.pos, Fb), 1);
+        // what breaks
+        if (g.wheel && !folded) {
+          if ((!soft && c.vn < -P.hardLanding) || (c.kind === 'building' && c.nrm[1] < 0.5 && c.vn < -1.5)) {
+            D.gear[gi] = 1;
+            event(g.tail ? 'the tail wheel tore off' : `the ${g.name} gear collapsed`);
+            if (g.tail && c.vn < -1.5 * P.hardLanding && !D.tail) { D.tail = 1; event('the tail boom broke'); }
+          } else if (c.kind === 'water' || c.kind === 'forest' || (c.kind === 'building' && c.nrm[1] < 0.5)) event(c.kind === 'water' ? 'ditched in the river' : c.kind === 'forest' ? 'landed in the trees' : 'hit a building');
+        }
+        if (g.prop && !D.prop && (s.engine.omega > 40 || c.vn < -2.0)) { // the prop's arc in the ground: at speed it shatters, and the engine is done
+          D.prop = 1; D.engine = 1; s.engine.on = false; s.input.ignition = false;
+          event(s.engine.omega > 40 ? (c.kind === 'building' ? 'the prop hit a wall' : 'prop strike') : 'the prop hit the ground');
+        }
       }
-      // the rotor rim: eight points on the tip path plane, any one in the ground or a building is a strike
+      // the frame's hard points
+      for (const h of P.hard) {
+        const pb = h.tail && D.tail ? droop(h.pos) : h.pos;
+        const c = touch(pb, false);
+        if (!c) continue;
+        contacts++;
+        worst = Math.max(worst, -c.vn);
+        apply(skid(c, ...(P.soft[c.kind] || [P.frameK, P.frameC, 0.6])), pb);
+        whatHappened(c, h.name);
+        if (h.head && c.vn < -1.5 && !D.mast) { D.mast = 1; event('the mast folded'); }
+        if (h.tail && !D.tail && (c.vn < -2.5 || (c.kind === 'building' && norm(c.vp) > 3))) { D.tail = 1; event('the tail boom broke'); }
+      }
+      // the rotor's rim: eight points on the tip path plane
       {
         const R = P.rotor, B = hubBasis(r.tiltAft, r.tiltRight);
+        let struck = false;
         for (let i = 0; i < 8; i++) {
           const ph = (i * TAU) / 8, beta = R.precone + r.beta * Math.cos(ph - r.psi);
           const ph_ = [-Math.cos(ph) * Math.cos(beta) * R.R, Math.sin(beta) * R.R, Math.sin(ph) * Math.cos(beta) * R.R];
           const pb = add(R.hub, fromHub(B, ph_));
-          const pw = add(s.pos, qrot(s.q, pb));
-          const sf = env.surface(pw[0], pw[2]);
-          if (pw[1] < sf.h + 0.05 && r.omega > 3) { crash = crash || 'rotor strike'; break; }
-          if (env.obstacle && env.obstacle(pw[0], pw[1], pw[2])) { crash = crash || 'rotor hit a building'; break; }
+          const c = touch(pb, false);
+          if (!c) continue;
+          const soft = P.soft[c.kind];
+          if (r.omega > 3) {
+            // a turning blade in the ground: the ground stops the rotor, the blade bends, and the airframe is wrenched the other way
+            const Q = Math.min(P.strike.torque, (R.IR * r.omega) / 0.2) * (soft ? 0.5 : 1);
+            r.strikeQ -= Q;
+            const et = fromHub(B, [Math.sin(ph), 0, Math.cos(ph)]); // the blade's direction of travel at this azimuth
+            apply(add(scale(c.nrm, (soft ? soft[0] : P.frameK * 0.4) * c.pen), scale(qrot(s.q, et), -Q / R.R)), pb);
+            D.rotor = Math.min(1, D.rotor + dt * P.strike.rate * clamp(r.omega / 35, 0.1, 1.2));
+            if (!struck) { struck = true; event(c.kind === 'building' ? 'the rotor hit a building' : c.kind === 'water' ? 'the rotor hit the water' : c.kind === 'forest' ? 'the rotor hit the trees' : 'rotor strike'); }
+            if (D.rotor >= 1 && !D.mast && r.omega > 15) { D.mast = 1; event('the mast folded'); }
+          } else { // a stopped blade resting on something: it bends, and holds a little
+            contacts++;
+            apply(skid(c, ...(soft || [P.frameK * 0.25, P.frameC * 0.5, 0.5])), pb);
+          }
         }
       }
-      if (env.obstacle) {
-        for (const p of [[0.6, 0, 0], [-2.2, 0.3, 0], [0, -0.5, 0], [0, 1.0, 0]]) {
-          const pw = add(s.pos, qrot(s.q, p));
-          if (env.obstacle(pw[0], pw[1], pw[2])) { crash = crash || 'hit a building'; break; }
-        }
+      if (r.stopHits > 1.5) { // flapped onto the stops: the blades sail down into the tail and the propeller
+        r.stopHits = 0; D.tail = 1; D.prop = 1; D.engine = 1; s.engine.on = false; s.input.ignition = false; D.rotor = Math.max(D.rotor, 0.6);
+        om[0] += 1.5; om[2] -= 1.0;
+        event('the rotor flapped onto its stops and into the tail');
       }
-      if (contacts > 0) {
-        const e = qtoEuler(s.q);
-        if (Math.abs(e.roll) > 55 * D2R) crash = crash || 'rolled over';
-        if (Math.abs(e.pitch) > 50 * D2R) crash = crash || 'nosed over';
-      }
-      if (r.stopHits > 1.5) crash = crash || 'the rotor flapped onto its stops';
+      // an engine on its back, or under water, quits
+      const upW = qrot(s.q, [0, 1, 0]);
+      if (s.engine.on && (upW[1] < -0.2 || (kindUnder === 'water' && s.pos[1] - under.h < 0.3))) { s.engine.on = false; s.input.ignition = false; D.engine = 1; }
+      if (s.crashed) { const still = norm(s.vel) < 0.3 && norm(om) < 0.3; D.rest = still ? D.rest + dt : 0; }
       s.ground.wheels = wheels; s.ground.contacts = contacts; s.ground.kind = kindUnder; s.ground.worstSink = worst;
 
       // gravity last, kept apart so the load factor reads the specific force
@@ -896,23 +1020,7 @@
       s.nz = Fspec[1] / (P.mass * G);
       s.specific = Fspec;
       s.t += dt;
-      if (crash && !s.crashed) s.crashed = { reason: crash, t: s.t, speed: norm(s.vel), sink: worst };
       stepGusts(s, dt);
-    }
-
-    // The wreck: after a crash the aircraft sits where it stopped, the rotor
-    // and the engine winding down.
-    function wreckStep(s, env, dt) {
-      s.vel = scale(s.vel, Math.max(0, 1 - 6 * dt));
-      s.omega = scale(s.omega, Math.max(0, 1 - 6 * dt));
-      s.pos = add(s.pos, scale(s.vel, dt));
-      const h = env.surface(s.pos[0], s.pos[2]).h + 0.6;
-      if (s.pos[1] < h) { s.pos[1] = h; s.vel[1] = Math.max(0, s.vel[1]); }
-      s.rotor.omega = Math.max(0, s.rotor.omega - 1.5 * dt);
-      s.rotor.psi = (s.rotor.psi + s.rotor.omega * dt) % TAU;
-      s.engine.omega = Math.max(0, s.engine.omega - 80 * dt);
-      s.engine.on = false; s.engine.thrust = 0;
-      s.t += dt;
     }
 
     // Advance by a frame's worth of real time (sub-stepped at P.dt).
@@ -920,7 +1028,7 @@
       s.acc += Math.min(dtFrame, 0.1);
       let n = 0;
       while (s.acc >= P.dt && n < 60) {
-        if (s.crashed) wreckStep(s, env, P.dt); else substep(s, env, P.dt);
+        substep(s, env, P.dt);
         s.acc -= P.dt; n++;
       }
       readout(s, env);
@@ -956,10 +1064,11 @@
       i.unloaded = !i.onGround && i.nz < 0.3 && i.agl > 2;
       i.flapping = Math.abs(s.rotor.beta) * R2D;
       i.groundEffect = s.rotor.kG; // 1 clear of the ground, less in it
+      i.damaged = s.damage.events.length > 0; i.rest = s.damage.rest; // a wreck, and how long it has lain still
       return i;
     }
 
-    return { P, G, KT, FT, D2R, R2D, createState, place, step, readout, airfoil, plate, airDensity, windAt, qfromEuler, qtoEuler, qrot, qinv, qmul, qaxis, hubBasis, fromHub, add, sub, scale, dot, cross, norm, unit };
+    return { P, G, KT, FT, D2R, R2D, createState, freshDamage, place, step, readout, airfoil, plate, airDensity, windAt, qfromEuler, qtoEuler, qrot, qinv, qmul, qaxis, hubBasis, fromHub, add, sub, scale, dot, cross, norm, unit };
   })();
   </script>
 
@@ -1152,6 +1261,31 @@
       }
       return false;
     }
+    // A point inside a building, for the crash physics: how deep it is and which way out — the nearest wall, or the roof.
+    const wallOut = { n: [0, 1, 0], pen: 0 };
+    function wall(x, y, z) {
+      const list = bldHash.get(hkey(x, z));
+      if (!list) return null;
+      for (const i of list) {
+        const o = i * 6;
+        if (x < bldBox[o] || x > bldBox[o + 2] || z < bldBox[o + 1] || z > bldBox[o + 3] || y > bldBox[o + 5] || y < bldBox[o + 4] - 1) continue;
+        if (!pointInBuilding(i, x, z)) continue;
+        const B = W.bld, n = B.count[i], st = B.start[i];
+        let best = Infinity, bnx = 0, bnz = 1;
+        for (let a = 0, b = n - 1; a < n; b = a++) {
+          const ax = B.xz[(st + a) * 2], az = B.xz[(st + a) * 2 + 1], bx = B.xz[(st + b) * 2], bz = B.xz[(st + b) * 2 + 1];
+          const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+          const t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
+          const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x - px, z - pz);
+          if (d < best) { best = d; if (d > 1e-6) { bnx = (px - x) / d; bnz = (pz - z) / d; } else { const L = Math.sqrt(L2); bnx = -dz / L; bnz = dx / L; } }
+        }
+        const roof = bldBox[o + 5] - y;
+        if (roof < best) { wallOut.n[0] = 0; wallOut.n[1] = 1; wallOut.n[2] = 0; wallOut.pen = roof; }
+        else { wallOut.n[0] = bnx; wallOut.n[1] = 0; wallOut.n[2] = bnz; wallOut.pen = best; }
+        return wallOut;
+      }
+      return null;
+    }
     // One shared answer object: the physics asks thousands of times a second.
     const surf = { h: 0, kind: 'grass', n: [0, 1, 0] };
     const KIND = ['grass', 'forest', 'water', 'grass', 'grass', 'grass', 'grass', 'grass', 'pavement', 'bare', 'grass', 'bare'];
@@ -1170,7 +1304,7 @@
       surf.h = h; surf.kind = kind;
       return surf;
     }
-    const env = { surface, obstacle };
+    const env = { surface, obstacle, wall };
 
     // ------------------------------------------------------------ the scene
     const canvas = $('#view');
@@ -1182,6 +1316,40 @@
     const sun = new THREE.DirectionalLight(0xffffff, 2.2);
     const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x6b7a55, 0.9);
     scene.add(sun, hemi);
+    // The aircraft's shadow: the sun's shadow map, framed tightly on the aircraft (16 m across) and following it, so the
+    // frame, the blades and the wheels fall on the ground, the streets and the buildings as the sun has them. The terrain
+    // and the street ribbons sample the map in their own shaders; the lit materials take it from three.js. The low detail
+    // setting keeps a soft blob instead.
+    const SHADOWS = settings.quality !== 'low';
+    const shadowU = { uShadowMap: { value: null }, uShadowMat: { value: new THREE.Matrix4() }, uShadowOn: { value: 0 }, uShadowPx: { value: 1 / 1024 } };
+    if (SHADOWS) {
+      renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      const sz = settings.quality === 'high' ? 2048 : 1024;
+      sun.castShadow = true; sun.shadow.mapSize.set(sz, sz); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.03;
+      const c = sun.shadow.camera; c.left = c.bottom = -8; c.right = c.top = 8; c.near = 1; c.far = 700; c.updateProjectionMatrix();
+      scene.add(sun.target);
+      shadowU.uShadowPx.value = 1 / sz;
+    }
+    function updateShadow(s) {
+      sun.position.set(s.pos[0], s.pos[1], s.pos[2]).addScaledVector(sunDir, 60);
+      sun.target.position.set(s.pos[0], s.pos[1], s.pos[2]);
+      sun.updateMatrixWorld(); sun.target.updateMatrixWorld();
+      sun.shadow.updateMatrices(sun); // the same matrices the shadow pass will use, so the lookup and the map agree this frame
+      if (sun.shadow.map) { shadowU.uShadowMap.value = sun.shadow.map.texture; shadowU.uShadowMat.value.copy(sun.shadow.matrix); }
+      shadowU.uShadowOn.value = sun.shadow.map ? clamp(1 - (s.info.agl - 120) / 160, 0, 1) : 0; // a thin frame's shadow fades with height
+    }
+    // the lookup for the custom shaders: 1 in the aircraft's shadow, 0 clear, with a little filtering (three.js packs the depth into RGBA)
+    const SHADOW_GLSL = (tex) => `
+          uniform sampler2D uShadowMap; uniform mat4 uShadowMat; uniform float uShadowOn; uniform float uShadowPx;
+          float shadowAt(vec3 w) {
+            if (uShadowOn <= 0.0) return 0.0;
+            vec4 sc = uShadowMat * vec4(w, 1.0); sc.xyz /= sc.w;
+            if (sc.x <= 0.0 || sc.x >= 1.0 || sc.y <= 0.0 || sc.y >= 1.0 || sc.z >= 1.0) return 0.0;
+            const vec4 UNPACK = (255.0 / 256.0) / vec4(16777216.0, 65536.0, 256.0, 1.0);
+            float sum = 0.0;
+            for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) sum += step(dot(${tex}(uShadowMap, sc.xy + vec2(float(i), float(j)) * uShadowPx), UNPACK), sc.z);
+            return (sum / 9.0) * uShadowOn;
+          }`;
     const TIMES = {
       morning: { el: 22, az: 105, sun: 0xffe2b8, sky: 0x6f9fe0, horizon: 0xf2d7b5, ground: 0x7a7a60, fog: 0xe9d7bf, hemi: 1.0, dir: 1.8 },
       noon: { el: 62, az: 180, sun: 0xffffff, sky: 0x4f8fe0, horizon: 0xd9e6f2, ground: 0x6b7a55, fog: 0xd3e0ee, hemi: 0.95, dir: 2.3 },
@@ -1272,6 +1440,7 @@
           uSun: { value: sunDir.clone() }, uSunColor: { value: new THREE.Color(0xffffff) }, uSkyColor: { value: new THREE.Color(0x4f8fe0) },
           uTime: { value: 0 }, uCam: { value: new THREE.Vector3() },
           fogColor: { value: new THREE.Color() }, fogNear: { value: 1 }, fogFar: { value: 2 },
+          uShadowMap: shadowU.uShadowMap, uShadowMat: shadowU.uShadowMat, uShadowOn: shadowU.uShadowOn, uShadowPx: shadowU.uShadowPx,
         },
         vertexShader: `
           uniform sampler2D uHeight; uniform vec4 uHm; uniform vec2 uHalf; uniform vec2 uOrigin; uniform float uSpacing;
@@ -1301,7 +1470,7 @@
           uniform vec3 uSun; uniform vec3 uSunColor; uniform vec3 uSkyColor; uniform float uTime; uniform vec3 uCam;
           uniform vec3 fogColor; uniform float fogNear; uniform float fogFar;
           in vec3 vWorld; in vec3 vNormal; in float vSkirt;
-          out vec4 outColor;
+          out vec4 outColor;${SHADOW_GLSL('texture')}
           float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
           float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
             return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
@@ -1338,7 +1507,7 @@
             col = mix(col, img, imgOn);
             // light: the imagery carries its own shading already, so it takes less of the sun
             vec3 n = normalize(vNormal);
-            float diff = max(dot(n, normalize(uSun)), 0.0);
+            float diff = max(dot(n, normalize(uSun)), 0.0) * (1.0 - shadowAt(vWorld));
             vec3 lit = col * mix(0.42 * uSkyColor * 0.55 + 0.35 + diff * 0.95 * uSunColor, 0.56 * uSkyColor * 0.55 + 0.52 + diff * 0.55 * uSunColor, imgOn);
             if (water > 0.01) {
               vec3 wcol = mix(vec3(0.16, 0.33, 0.50), img * 0.85, uImgOn);
@@ -1386,7 +1555,7 @@
         if (spacing * N > 90000) break;
         const mat = terrainMat.clone();
         mat.uniforms.uHeight = terrainMat.uniforms.uHeight; mat.uniforms.uCover = terrainMat.uniforms.uCover;
-        for (const k of ['uImg0', 'uImgBox0', 'uImg1', 'uImgBox1', 'uImgCity', 'uImgOn']) mat.uniforms[k] = terrainMat.uniforms[k]; // shared, so the imagery arrives for every level at once
+        for (const k of ['uImg0', 'uImgBox0', 'uImg1', 'uImgBox1', 'uImgCity', 'uImgOn', 'uShadowMap', 'uShadowMat', 'uShadowOn', 'uShadowPx']) mat.uniforms[k] = terrainMat.uniforms[k]; // shared, so the imagery and the shadow arrive for every level at once
         mat.uniforms.uSpacing.value = spacing;
         const mesh = new THREE.Mesh(L === 0 ? square : ring, mat);
         mesh.frustumCulled = false; mesh.renderOrder = 0;
@@ -1481,14 +1650,14 @@
 
     // ---- ribbons: a strip of quads along a polyline, draped on the ground, with markings in the shader
     const ribbonMat = new THREE.ShaderMaterial({
-      uniforms: { uSun: { value: new THREE.Vector3(0, 1, 0) }, fogColor: { value: new THREE.Color() }, fogNear: { value: 1 }, fogFar: { value: 2 }, uCam: { value: new THREE.Vector3() } },
+      uniforms: { uSun: { value: new THREE.Vector3(0, 1, 0) }, fogColor: { value: new THREE.Color() }, fogNear: { value: 1 }, fogFar: { value: 2 }, uCam: { value: new THREE.Vector3() }, uShadowMap: shadowU.uShadowMap, uShadowMat: shadowU.uShadowMat, uShadowOn: shadowU.uShadowOn, uShadowPx: shadowU.uShadowPx },
       vertexShader: `attribute float mark; attribute float dash;
         varying vec3 vColor; varying vec2 vUv; varying float vMark; varying float vDash; varying vec3 vWorld;
         void main() { vColor = color; vUv = uv; vMark = mark; vDash = dash; vWorld = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `uniform vec3 fogColor; uniform float fogNear, fogFar; uniform vec3 uCam;
-        varying vec3 vColor; varying vec2 vUv; varying float vMark; varying float vDash; varying vec3 vWorld;
+        varying vec3 vColor; varying vec2 vUv; varying float vMark; varying float vDash; varying vec3 vWorld;${SHADOW_GLSL('texture2D')}
         void main() {
-          vec3 col = vColor;
+          vec3 col = vColor * (1.0 - 0.5 * shadowAt(vWorld));
           float av = abs(vUv.y);
           float edge = smoothstep(0.86, 1.0, av);
           col *= 1.0 - 0.12 * edge;
@@ -1633,7 +1802,7 @@
       geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
       geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
       const mesh = new THREE.Mesh(geo, bldMat);
-      mesh.renderOrder = 2;
+      mesh.renderOrder = 2; mesh.receiveShadow = SHADOWS;
       return mesh;
     }
 
@@ -1682,6 +1851,7 @@
       treeCrown = new THREE.InstancedMesh(crown, new THREE.MeshLambertMaterial({ color: 0xffffff }), TREES[1]);
       treeTrunk = new THREE.InstancedMesh(trunk, new THREE.MeshLambertMaterial({ color: 0x5a4632 }), TREES[1]);
       treeCrown.frustumCulled = false; treeTrunk.frustumCulled = false;
+      treeCrown.receiveShadow = SHADOWS; treeTrunk.receiveShadow = SHADOWS;
       treeCrown.count = 0; treeTrunk.count = 0;
       scene.add(treeCrown, treeTrunk);
     }
@@ -1753,7 +1923,7 @@
         geo.setAttribute('uv', new THREE.Float32BufferAttribute(out.uv, 2));
         geo.setIndex(out.idx);
         const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
-        mesh.renderOrder = 1;
+        mesh.renderOrder = 1; mesh.receiveShadow = SHADOWS;
         scene.add(mesh);
       }
       const out = newOut();
@@ -1814,11 +1984,15 @@
       const frame = M(0x2b2f36), red = M(0xc0392b), blue = M(0x2f6fd1), skin = M(0xd9b48c), white = M(0xf2f2f2), black = M(0x111111), grey = M(0x9aa0a6), tyre = M(0x1a1a1a);
       const alu = new THREE.MeshPhongMaterial({ color: 0xb4bac2, specular: 0x606468, shininess: 50 }); // the airframe's tubes
       const F = { members: [], balls: [], boxes: [] }; aircraft.frame = F; // what is where, in the body frame, for the contiguity check
-      const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); g.add(m); F.boxes.push({ c: [x, y, z], s: [w, h, d] }); return m; };
+      const inBody = (p, parent) => { // up through the groups (only ever translated when built) to the body frame
+        const q = p.slice();
+        for (let o = parent; o && o !== g; o = o.parent) { q[0] += o.position.x; q[1] += o.position.y; q[2] += o.position.z; }
+        return q;
+      };
+      const box = (w, h, d, mat, x, y, z, parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); (parent || g).add(m); F.boxes.push({ c: inBody([x, y, z], parent), s: [w, h, d] }); return m; };
       // Members between nodes, so the frame is one welded thing: a tube or a flat bar from a to b, and a ball at a joint.
       const unitTube = new THREE.CylinderGeometry(1, 1, 1, 10, 1), unitBar = new THREE.BoxGeometry(1, 1, 1), unitBall = new THREE.SphereGeometry(1, 8, 6);
       const yAxis = new THREE.Vector3(0, 1, 0), dir = new THREE.Vector3();
-      const inBody = (p, parent) => (parent && parent !== g ? [p[0] + parent.position.x, p[1] + parent.position.y, p[2] + parent.position.z] : p);
       const member = (geo, a, b, sx, sz, mat, parent, free) => {
         const m = new THREE.Mesh(geo, mat || alu);
         dir.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = dir.length();
@@ -1831,24 +2005,21 @@
       const tube = (a, b, r, mat, parent, free) => member(unitTube, a, b, r, r, mat, parent, free);
       const bar = (a, b, w, t, mat, parent, free) => member(unitBar, a, b, w, t, mat, parent, free);
       const ball = (p, r, mat, parent) => { const m = new THREE.Mesh(unitBall, mat || alu); m.position.set(p[0], p[1], p[2]); m.scale.setScalar(r); (parent || g).add(m); F.balls.push({ p: inBody(p, parent), r }); return m; };
-      // the keel, the mast and the tail post: the three spars everything hangs on
-      const KEEL = -0.50, TAIL = -2.35;
-      tube([TAIL, KEEL, 0], [1.08, KEEL, 0], 0.036);                       // keel
+      // the keel and the mast, and the boom that rises from the keel's end to the tail: the spars everything hangs on
+      const KEEL = -0.50, TAIL = -2.35, ROOT = -1.30, TAILY = 0.10;
+      tube([ROOT, KEEL, 0], [1.08, KEEL, 0], 0.036);                       // keel, from the nose to the boom's root behind the engine
       tube([-0.05, KEEL, 0], [-0.05, P.rotor.hub[1], 0], 0.036);           // mast
-      tube([TAIL, KEEL, 0], [TAIL, 0.86, 0], 0.03);                        // tail post
-      tube([-1.45, KEEL, 0], [TAIL, 0.34, 0], 0.024);                      // tail brace
-      tube([TAIL, KEEL, 0], [-2.28, -0.58, 0], 0.024, alu, g, true);       // tail skid
       for (const z of [-1, 1]) {
         tube([-0.05, 0.74, 0], [-0.25, -0.60, z * 0.86], 0.022);           // mast braces down to the gear
-        tube([-0.62, KEEL, 0], [-0.62, -0.18, z * 0.2], 0.02);             // engine bed, off the keel
-        tube([-1.08, KEEL, 0], [-1.08, -0.18, z * 0.2], 0.02);
-        tube([-1.1, -0.18, z * 0.2], [-0.6, -0.18, z * 0.2], 0.022);       // engine rails
+        tube([-0.62, KEEL, 0], [-0.62, 0.07, z * 0.2], 0.02);              // engine bed, tall off the keel so the propeller's arc clears it
+        tube([-1.08, KEEL, 0], [-1.08, 0.07, z * 0.2], 0.02);
+        tube([-1.1, 0.07, z * 0.2], [-0.6, 0.07, z * 0.2], 0.022);         // engine rails
         tube([0.5, KEEL, 0], [0.48, -0.26, z * 0.2], 0.018);               // seat legs
-        ball([-0.62, -0.18, z * 0.2], 0.028); ball([-1.08, -0.18, z * 0.2], 0.028);
+        ball([-0.62, 0.07, z * 0.2], 0.028); ball([-1.08, 0.07, z * 0.2], 0.028);
       }
-      tube([-0.05, 0.45, 0], [-0.6, 0.27, 0], 0.02);                       // engine tie to the mast
+      tube([-0.05, 0.45, 0], [-0.6, 0.45, 0], 0.02);                       // engine tie to the mast
       tube([-0.05, 0.30, -0.25], [-0.05, 0.30, 0.25], 0.02);               // seat-back cross tube
-      for (const p of [[-0.05, KEEL, 0], [TAIL, KEEL, 0], [-1.45, KEEL, 0], [-0.62, KEEL, 0], [-1.08, KEEL, 0], [0.5, KEEL, 0], [1.08, KEEL, 0], [-0.05, 0.74, 0], [-0.05, 0.45, 0], [TAIL, 0.34, 0], [TAIL, 0.86, 0]]) ball(p, 0.042);
+      for (const p of [[-0.05, KEEL, 0], [ROOT, KEEL, 0], [-0.62, KEEL, 0], [-1.08, KEEL, 0], [0.5, KEEL, 0], [1.08, KEEL, 0], [-0.05, 0.74, 0], [-0.05, 0.45, 0]]) ball(p, 0.042);
       box(0.5, 0.08, 0.5, red, 0.25, -0.22, 0);             // seat
       box(0.08, 0.55, 0.5, red, 0.02, 0.05, 0);             // seat back
       const pilot = new THREE.Group(); g.add(pilot); aircraft.parts.pilot = pilot;
@@ -1862,41 +2033,86 @@
       pb(0.22, 0.07, 0.12, black, 1.0, -0.6, 0.14); pb(0.22, 0.07, 0.12, black, 1.0, -0.6, -0.14); // feet, on the pedals
       tube([1.02, KEEL, 0], [1.02, -0.63, 0], 0.02); tube([1.02, -0.63, -0.16], [1.02, -0.63, 0.16], 0.015); // the pedal post and bar, off the keel
       for (const z of [-0.14, 0.14]) bar([0.94, -0.67, z], [1.1, -0.59, z], 0.14, 0.02, frame, g, true); // rudder pedals
-      box(0.5, 0.45, 0.5, black, -0.85, 0.05, 0);           // engine, on its rails
-      box(0.3, 0.12, 0.42, M(0x3a3f47), -0.8, 0.33, 0);     // cylinder heads
-      tube([-0.62, 0.2, 0.24], [-1.0, -0.06, 0.3], 0.028, M(0x5a5f66));                 // exhaust
-      member(unitTube, [-1.12, -0.08, 0.3], [-0.75, -0.08, 0.3], 0.06, 0.06, M(0x5a5f66), g, true); // muffler
-      tube([-1.1, 0.12, 0], [-1.17, 0.12, 0], 0.05, black);  // prop hub
-      F.balls.push({ p: [-1.17, 0.12, 0], r: 0.06 }); // the propeller's boss
+      // the engine, high on its bed behind the seat, with the propeller behind it
+      box(0.5, 0.45, 0.5, black, -0.85, 0.30, 0);           // engine, on its rails
+      box(0.3, 0.12, 0.42, M(0x3a3f47), -0.8, 0.58, 0);     // cylinder heads
+      tube([-0.62, 0.45, 0.24], [-1.0, 0.19, 0.3], 0.028, M(0x5a5f66));                 // exhaust
+      member(unitTube, [-1.12, 0.17, 0.3], [-0.75, 0.17, 0.3], 0.06, 0.06, M(0x5a5f66), g, true); // muffler
+      tube([-1.1, P.prop.pos[1], 0], [-1.17, P.prop.pos[1], 0], 0.05, black);  // prop hub
+      F.balls.push({ p: [-1.17, P.prop.pos[1], 0], r: 0.06 }); // the propeller's boss
       box(0.08, 0.06, 0.9, frame, 0.2, 0.0, 0);             // control bar
-      // propeller
-      const prop = new THREE.Group(); prop.position.set(-1.12, 0.12, 0); g.add(prop); aircraft.parts.prop = prop;
-      for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.8, 0.09), black); b.position.y = 0.42; const h = new THREE.Group(); h.rotation.x = (i * 2 * Math.PI) / 3; h.add(b); prop.add(h); }
+      const prop = new THREE.Group(); prop.position.set(-1.12, P.prop.pos[1], 0); g.add(prop); aircraft.parts.prop = prop;
+      const propBlades = [];
+      for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.8, 0.09), black); b.position.y = 0.42; const h = new THREE.Group(); h.rotation.x = (i * 2 * Math.PI) / 3; h.add(b); prop.add(h); propBlades.push(b); }
       const propDisc = new THREE.Mesh(new THREE.CircleGeometry(0.84, 24), new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }));
       propDisc.rotation.y = Math.PI / 2; propDisc.visible = false; prop.add(propDisc); aircraft.parts.propDisc = propDisc;
-      const propBlades = prop.children.filter((c) => c !== propDisc); aircraft.parts.propBlades = propBlades;
-      // tail: the stabilizer and the fin on the post, the rudder hinged behind it
-      box(0.42, 0.025, 1.5, white, -2.2, 0.1, 0);           // stabilizer
-      box(0.38, 0.74, 0.03, red, -2.18, 0.46, 0);           // fin
-      const rudder = new THREE.Group(); rudder.position.set(TAIL, 0.44, 0); g.add(rudder); aircraft.parts.rudder = rudder;
+      aircraft.parts.propBlades = propBlades;
+      // the tail: a boom from the keel's end up to the stabilizer, the fin on the boom's end with the rudder hinged behind it,
+      // braces out to the stabilizer's tips, and a tail wheel on a leg beneath — one group, hinged at the root, where the boom breaks
+      const tail = new THREE.Group(); tail.position.set(ROOT, KEEL, 0); g.add(tail); aircraft.parts.tail = tail;
+      const T = (p) => [p[0] - ROOT, p[1] - KEEL, p[2]];
+      tube(T([ROOT, KEEL, 0]), T([TAIL, TAILY, 0]), 0.034, alu, tail);                       // the boom
+      tube(T([TAIL, TAILY, 0]), T([TAIL, 0.86, 0]), 0.026, alu, tail);                       // the fin post
+      for (const z of [-1, 1]) tube(T([-1.62, -0.32, 0]), T([-2.15, TAILY, z * 0.7]), 0.016, alu, tail); // stabilizer braces
+      for (const [p, r] of [[[TAIL, TAILY, 0], 0.042], [[-1.62, -0.32, 0], 0.03], [[TAIL, 0.86, 0], 0.042]]) ball(T(p), r, alu, tail);
+      box(0.42, 0.025, 1.5, white, -2.2 - ROOT, TAILY - KEEL, 0, tail);                       // stabilizer
+      box(0.38, 0.74, 0.03, red, -2.18 - ROOT, 0.46 - KEEL, 0, tail);                         // fin
+      const rudder = new THREE.Group(); rudder.position.set(TAIL - ROOT, 0.44 - KEEL, 0); tail.add(rudder); aircraft.parts.rudder = rudder;
       const rm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.66, 0.03), white); rm.position.x = -0.16; rudder.add(rm);
       const rs = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.03), red); rs.position.set(-0.26, 0.3, 0); rudder.add(rs); // a trim tab's worth of colour
-      // rotor head and blades
-      const head2 = new THREE.Group(); head2.position.set(P.rotor.hub[0], P.rotor.hub[1], P.rotor.hub[2]); head2.rotation.order = 'ZXY'; g.add(head2); aircraft.parts.head = head2;
+      // gear: fat tyres on a sprung bar either side, a trailing fork in front and the small tail wheel, sized for the streets; each leg its own group, so it can fold
+      const wheel = (parent, x, y, z, r, w) => {
+        const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 18), tyre); t.rotation.x = Math.PI / 2; t.position.set(x, y, z); parent.add(t);
+        F.boxes.push({ c: inBody([x, y, z], parent), s: [2 * r, 2 * r, w] }); (F.tyres || (F.tyres = [])).push({ p: inBody([x, y, z], parent), r });
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.52, r * 0.52, w + 0.02, 12), grey); rim.rotation.x = Math.PI / 2; rim.position.set(x, y, z); parent.add(rim);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.14, r * 0.14, w + 0.08, 8), frame); hub.rotation.x = Math.PI / 2; hub.position.set(x, y, z); parent.add(hub);
+        return t;
+      };
+      const GT = P.gear.find((q) => q.name === 'tail'), TR = 0.10;
+      const tailLeg = new THREE.Group(); tailLeg.position.set(TAIL - ROOT, TAILY - KEEL, 0); tail.add(tailLeg); aircraft.parts.tailLeg = tailLeg;
+      tube([0, 0, 0], [0, GT.pos[1] + TR - TAILY, 0], 0.018, alu, tailLeg);                  // the tail wheel's leg
+      wheel(tailLeg, 0, GT.pos[1] + TR - TAILY, 0, TR, 0.07);
+      const G = P.gear.find((q) => q.name === 'nose'), GL = P.gear.find((q) => q.name === 'left');
+      const nose = new THREE.Group(); nose.position.set(1.0, KEEL, 0); g.add(nose); aircraft.parts.nose = nose; // steers about the keel's nose end
+      const NR = 0.30, nx = G.pos[0] - 1.0, ny = G.pos[1] + NR - KEEL; // the wheel's centre in the group
+      for (const z of [-0.13, 0.13]) tube([0, 0, z], [nx, ny, z], 0.022, alu, nose); // the fork, trailing
+      tube([0, 0, -0.13], [0, 0, 0.13], 0.03, alu, nose);
+      tube([0, 0, 0], [0, 0.2, 0], 0.03, alu, nose); // the steering head
+      wheel(nose, nx, ny, 0, NR, 0.17);
+      const MR = 0.34, my = GL.pos[1] + MR, mz = Math.abs(GL.pos[2]), mx = GL.pos[0];
+      const legs = {};
+      for (const z of [-1, 1]) {
+        const leg = new THREE.Group(); leg.position.set(mx, KEEL, 0); g.add(leg); legs[z < 0 ? 'left' : 'right'] = leg;
+        bar([0, 0.04, 0], [0, my + 0.02 - KEEL, z * (mz - 0.05)], 0.10, 0.035, M(0xd0d4d8), leg); // the spring bar, out and down from the keel
+        tube([0, my - KEEL, z * (mz - 0.12)], [0, my - KEEL, z * (mz + 0.02)], 0.03, frame, leg); // the axle stub
+        wheel(leg, 0, my - KEEL, z * mz, MR, 0.21);
+      }
+      aircraft.parts.legs = legs;
+      ball([mx, KEEL, 0], 0.05);
+      box(0.02, 0.4, 0.02, frame, 0.02, 0.45, 0.0);          // stick
+      // the rotor head on top of the mast (the mast folds there), the head tilting with the stick, the blades teetering on it
+      const mastTop = new THREE.Group(); mastTop.position.set(P.rotor.hub[0], P.rotor.hub[1], P.rotor.hub[2]); g.add(mastTop); aircraft.parts.mastTop = mastTop;
+      const head2 = new THREE.Group(); head2.rotation.order = 'ZXY'; mastTop.add(head2); aircraft.parts.head = head2;
       const hub = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.2), frame); head2.add(hub); F.boxes.push({ c: P.rotor.hub.slice(), s: [0.2, 0.14, 0.2] });
       const az = new THREE.Group(); head2.add(az); aircraft.parts.azimuth = az;
       const teeter = new THREE.Group(); teeter.position.y = 0.08; az.add(teeter); aircraft.parts.teeter = teeter;
       const bladeMat = new THREE.MeshLambertMaterial({ color: 0xc9ced4, emissive: 0x3a3e44, transparent: true, opacity: 1 });
-      const R = P.rotor.R, blen = R - 0.3;
-      const b1 = new THREE.Mesh(new THREE.BoxGeometry(blen, 0.03, P.rotor.chord), bladeMat); b1.position.x = -(0.3 + blen / 2); b1.rotation.z = -P.rotor.precone;
-      const b2 = new THREE.Mesh(new THREE.BoxGeometry(blen, 0.03, P.rotor.chord), bladeMat); b2.position.x = 0.3 + blen / 2; b2.rotation.z = P.rotor.precone;
-      const tip1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.035, P.rotor.chord + 0.02), red); tip1.position.x = -R + 0.15; tip1.rotation.z = -P.rotor.precone; b1.add(new THREE.Object3D());
-      teeter.add(b1, b2);
+      const R = P.rotor.R, blen = R - 0.3, chord = P.rotor.chord, BREAK = 0.58; // of the span: where a struck blade bends
+      const blades = [];
+      for (const sgn of [-1, 1]) { // each blade in two pieces, the outer one hinged, so a struck blade can bend back
+        const root = new THREE.Group(); root.rotation.z = sgn * P.rotor.precone; teeter.add(root);
+        const inner = new THREE.Mesh(new THREE.BoxGeometry(blen * BREAK, 0.03, chord), bladeMat); inner.position.x = sgn * (0.3 + (blen * BREAK) / 2); root.add(inner);
+        const hinge = new THREE.Group(); hinge.position.x = sgn * (0.3 + blen * BREAK); root.add(hinge);
+        const outerL = blen * (1 - BREAK);
+        const outer = new THREE.Mesh(new THREE.BoxGeometry(outerL, 0.03, chord), bladeMat); outer.position.x = (sgn * outerL) / 2; hinge.add(outer);
+        if (sgn < 0) { const tip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.035, chord + 0.02), red); tip.position.x = -outerL / 2 + 0.15; outer.add(tip); } // one tip marked
+        blades.push({ sgn, root, hinge });
+      }
       const disc = new THREE.Mesh(new THREE.CircleGeometry(R, 48), new THREE.MeshBasicMaterial({ color: 0xdfe4ea, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
       disc.rotation.x = -Math.PI / 2; disc.visible = false; teeter.add(disc);
       const rim = new THREE.Mesh(new THREE.RingGeometry(R - 0.3, R, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
       rim.rotation.x = -Math.PI / 2; rim.visible = false; teeter.add(rim);
-      aircraft.parts.blades = [b1, b2]; aircraft.parts.bladeMat = bladeMat; aircraft.parts.disc = disc; aircraft.parts.rim = rim;
+      aircraft.parts.blades = blades; aircraft.parts.bladeMat = bladeMat; aircraft.parts.disc = disc; aircraft.parts.rim = rim;
       // the nose: a fairing lofted ahead of the pilot's feet, closed at the back by the instrument panel
       {
         const S = 22, secs = [[0.98, 0.05, 0.33, 0.33], [1.14, 0.045, 0.31, 0.30], [1.32, 0.02, 0.26, 0.24], [1.50, -0.03, 0.18, 0.165], [1.64, -0.08, 0.085, 0.08]]; // x, centre height, vertical and lateral radii
@@ -1918,59 +2134,55 @@
         plate.rotation.y = -Math.PI / 2; pp.add(plate);
         aircraft.parts.panel = plate;
       }
-      // gear: fat tyres on a sprung bar either side and a trailing fork in front, sized for the streets
-      const wheel = (parent, x, y, z, r, w) => {
-        const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 18), tyre); t.rotation.x = Math.PI / 2; t.position.set(x, y, z); parent.add(t);
-        F.boxes.push({ c: inBody([x, y, z], parent), s: [2 * r, 2 * r, w] }); (F.tyres || (F.tyres = [])).push({ p: inBody([x, y, z], parent), r });
-        const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.52, r * 0.52, w + 0.02, 12), grey); rim.rotation.x = Math.PI / 2; rim.position.set(x, y, z); parent.add(rim);
-        const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.14, r * 0.14, w + 0.08, 8), frame); hub.rotation.x = Math.PI / 2; hub.position.set(x, y, z); parent.add(hub);
-        return t;
-      };
-      const G = P.gear.find((q) => q.name === 'nose'), GL = P.gear.find((q) => q.name === 'left');
-      const nose = new THREE.Group(); nose.position.set(1.0, KEEL, 0); g.add(nose); aircraft.parts.nose = nose; // steers about the keel's nose end
-      const NR = 0.30, nx = G.pos[0] - 1.0, ny = G.pos[1] + NR - KEEL; // the wheel's centre in the group
-      for (const z of [-0.13, 0.13]) tube([0, 0, z], [nx, ny, z], 0.022, alu, nose); // the fork, trailing
-      tube([0, 0, -0.13], [0, 0, 0.13], 0.03, alu, nose);
-      tube([0, 0, 0], [0, 0.2, 0], 0.03, alu, nose); // the steering head
-      wheel(nose, nx, ny, 0, NR, 0.17);
-      const MR = 0.34, my = GL.pos[1] + MR, mz = Math.abs(GL.pos[2]), mx = GL.pos[0];
-      for (const z of [-1, 1]) {
-        bar([mx, KEEL + 0.04, 0], [mx, my + 0.02, z * (mz - 0.05)], 0.10, 0.035, M(0xd0d4d8)); // the spring bar, out and down from the keel
-        tube([mx, my, z * (mz - 0.12)], [mx, my, z * (mz + 0.02)], 0.03, frame); // the axle stub
-        wheel(g, mx, my, z * mz, MR, 0.21);
-      }
-      ball([mx, KEEL, 0], 0.05);
-      box(0.02, 0.4, 0.02, frame, 0.02, 0.45, 0.0);          // stick
       scene.add(g);
-      // the shadow on the ground
-      const sc = document.createElement('canvas'); sc.width = sc.height = 128; const sg = sc.getContext('2d');
-      const rg = sg.createRadialGradient(64, 64, 4, 64, 64, 64); rg.addColorStop(0, 'rgba(0,0,0,0.5)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); sg.fillStyle = rg; sg.fillRect(0, 0, 128, 128);
-      const shadow = new THREE.Mesh(new THREE.CircleGeometry(4.5, 24), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false }));
-      shadow.rotation.x = -Math.PI / 2; shadow.renderOrder = 3; scene.add(shadow); aircraft.shadow = shadow;
+      if (SHADOWS) { // everything solid casts the shadow (not the discs the blades blur into); the frame takes the blades' shadow too
+        const ghosts = new Set([disc, rim, propDisc, aircraft.parts.panel]);
+        g.traverse((o) => { if (o.isMesh && !ghosts.has(o)) { o.castShadow = true; o.receiveShadow = true; } });
+      } else { // the soft blob of the low detail setting
+        const sc = document.createElement('canvas'); sc.width = sc.height = 128; const sg = sc.getContext('2d');
+        const rg = sg.createRadialGradient(64, 64, 4, 64, 64, 64); rg.addColorStop(0, 'rgba(0,0,0,0.5)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); sg.fillStyle = rg; sg.fillRect(0, 0, 128, 128);
+        const shadow = new THREE.Mesh(new THREE.CircleGeometry(4.5, 24), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false }));
+        shadow.rotation.x = -Math.PI / 2; shadow.renderOrder = 3; scene.add(shadow); aircraft.shadow = shadow;
+      }
     }
-    const tmpQ = new THREE.Quaternion();
+    const vis = { gear: [0, 0, 0, 0], prop: 0, rotor: 0, mast: 0, tail: 0, mastSide: 0 }; // the damage as drawn, folding toward the model's over a few frames
     function updateAircraft(s, firstPerson, dt) {
-      const g = aircraft.group, p = aircraft.parts, P = GYRO.P;
+      const g = aircraft.group, p = aircraft.parts, P = GYRO.P, D = s.damage;
       g.position.set(s.pos[0], s.pos[1], s.pos[2]);
       g.quaternion.set(s.q[0], s.q[1], s.q[2], s.q[3]);
+      // what has broken: legs fold up under the frame, the tail droops from its root, the mast leans over, the blades bend back, the prop is stubs
+      const ease = Math.min(1, dt * 7);
+      for (let i = 0; i < 4; i++) vis.gear[i] += (D.gear[i] - vis.gear[i]) * ease;
+      for (const k of ['prop', 'rotor', 'mast', 'tail']) vis[k] += (D[k] - vis[k]) * ease;
+      if (D.mast && !vis.mastSide) vis.mastSide = s.info.roll < 0 ? -1 : 1; else if (!D.mast) vis.mastSide = 0;
+      p.nose.rotation.set(1.2 * vis.gear[0], -s.ctl.rudder * Math.abs(s.ctl.rudder) * P.steerMax, 0.35 * vis.gear[0]);
+      p.legs.left.rotation.x = 0.52 * vis.gear[1]; p.legs.right.rotation.x = -0.52 * vis.gear[2];
+      p.tailLeg.rotation.z = -1.4 * vis.gear[3];
+      p.tail.rotation.set(0.2 * vis.tail, 0.25 * vis.tail, P.tailDroop * vis.tail);
+      p.mastTop.rotation.set(1.1 * vis.mast * (vis.mastSide || 1), 0, 0.3 * vis.mast); p.mastTop.position.y = P.rotor.hub[1] - 0.15 * vis.mast;
+      for (const b of p.blades) b.hinge.rotation.set(0, b.sgn * 0.5 * vis.rotor, -b.sgn * 0.9 * vis.rotor);
       p.head.rotation.z = s.rotor.tiltAft; p.head.rotation.x = s.rotor.tiltRight;
       p.azimuth.rotation.y = s.rotor.psi;
       p.teeter.rotation.z = -s.rotor.beta;
-      const fast = s.rotor.omega > 12;
-      p.disc.visible = fast; p.rim.visible = fast;
-      p.bladeMat.opacity = fast ? clamp(1 - (s.rotor.omega - 12) / 20, 0.3, 1) : 1;
+      const fast = s.rotor.omega > 12, whole = D.rotor < 0.5;
+      p.disc.visible = fast && whole; p.rim.visible = fast && whole;
+      p.bladeMat.opacity = fast && whole ? clamp(1 - (s.rotor.omega - 12) / 20, 0.3, 1) : 1;
       p.disc.material.opacity = clamp((s.rotor.omega - 12) / 30, 0, 1) * 0.14;
       p.rim.material.opacity = clamp((s.rotor.omega - 12) / 30, 0, 1) * 0.25;
       p.prop.rotation.x += s.engine.omega * dt;
-      const propFast = s.engine.omega > 40;
-      p.propDisc.visible = propFast; for (const b of p.propBlades) b.visible = !propFast;
+      const propFast = s.engine.omega > 40 && !D.prop;
+      p.propDisc.visible = propFast;
+      for (const b of p.propBlades) { b.visible = !propFast; b.scale.y = 1 - 0.72 * vis.prop; b.position.y = 0.42 * b.scale.y; }
       p.rudder.rotation.y = s.ctl.rudder * P.fin.rudderMax;
-      p.nose.rotation.y = -s.ctl.rudder * Math.abs(s.ctl.rudder) * P.steerMax;
       p.pilot.visible = !firstPerson;
-      const sh = aircraft.shadow, gh = heightAt(s.pos[0], s.pos[2]), agl = s.pos[1] - gh;
-      sh.position.set(s.pos[0], gh + 0.2, s.pos[2]);
-      sh.material.opacity = clamp(1 - agl / 60, 0, 1) * 0.9;
-      sh.visible = agl < 60;
+      if (SHADOWS) updateShadow(s);
+      else {
+        const sh = aircraft.shadow, gh = heightAt(s.pos[0], s.pos[2]), agl = s.pos[1] - gh;
+        const off = agl / Math.max(0.2, sunDir.y); // the blob lands where the sun puts it
+        sh.position.set(s.pos[0] - sunDir.x * off, gh + 0.2, s.pos[2] - sunDir.z * off);
+        sh.material.opacity = clamp(1 - agl / 60, 0, 1) * 0.9;
+        sh.visible = agl < 60;
+      }
       updateInstruments(s, firstPerson);
     }
 
@@ -2132,6 +2344,11 @@
         if (k === 'm') toggleMap();
         if (k === 't') setTrim();
         if (k === 'y') clearTrim();
+      }
+      {
+        if (k === '[') nudgeTrim('pitch', -0.02); if (k === ']') nudgeTrim('pitch', 0.02);
+        if (k === ',') nudgeTrim('roll', -0.02); if (k === '.') nudgeTrim('roll', 0.02);
+        if (k === ';') nudgeTrim('yaw', -0.02); if (k === "'") nudgeTrim('yaw', 0.02);
         if (k === 'f') { settings.assist = !settings.assist; $('#setAssist').checked = settings.assist; saveSettings(); refreshButtons(); toast(`Flight assist ${settings.assist ? 'on' : 'off'}`); }
         if (k === 'Backspace') { ev.preventDefault(); startOnRamp(); }
         if (k === '0') look.setZoom(1);
@@ -2178,16 +2395,60 @@
       el.addEventListener('contextmenu', (ev) => ev.preventDefault());
     }
     function toggleCamera() { sim.firstPerson = !sim.firstPerson; settings.camera = sim.firstPerson ? 'cockpit' : 'chase'; saveSettings(); look.recenter(); refreshButtons(); }
+    // ---- trim: three wheels, each beside the axis it trims (pitch down the side of the cyclic, roll under it, rudder under the
+    // throttle), rolled by dragging or scrolling, clicked a notch by tapping an end, zeroed by a double-tap; and the TRIM button,
+    // which takes the stick's current position as the trim in one go
+    const TRIM = {
+      pitch: { key: 'trimLon', range: 0.8, el: $('#trimPitch'), axis: 'y', fmt: (v) => (v === 0 ? '0' : `${v > 0 ? 'NU' : 'ND'} ${Math.round(Math.abs(v) * 100)}`) },
+      roll: { key: 'trimLat', range: 0.6, el: $('#trimRoll'), axis: 'x', fmt: (v) => (v === 0 ? '0' : `${v > 0 ? 'R' : 'L'} ${Math.round(Math.abs(v) * 100)}`) },
+      yaw: { key: 'trimRud', range: 0.5, el: $('#trimYaw'), axis: 'x', fmt: (v) => (v === 0 ? '0' : `${v > 0 ? 'R' : 'L'} ${Math.round(Math.abs(v) * 100)}`) },
+    };
+    function drawTrim() {
+      for (const t of Object.values(TRIM)) {
+        const v = sim.state.input[t.key] || 0;
+        t.el.querySelector('.drum').style.backgroundPosition = t.axis === 'y' ? `0 ${v * 160}px` : `${v * 160}px 0`;
+        t.el.querySelector('.tval').textContent = t.fmt(v);
+        t.el.classList.toggle('set', v !== 0);
+      }
+    }
+    function setTrimAxis(name, v) { const t = TRIM[name]; sim.state.input[t.key] = clamp(Math.round(v * 100) / 100, -t.range, t.range); drawTrim(); refreshButtons(); }
+    function nudgeTrim(name, d) { setTrimAxis(name, (sim.state.input[TRIM[name].key] || 0) + d); }
+    function zeroTrim() { const inp = sim.state.input; inp.trimLon = 0; inp.trimLat = 0; inp.trimRud = 0; drawTrim(); }
+    for (const [name, t] of Object.entries(TRIM)) {
+      const el = t.el; let drag = null, lastTap = 0;
+      el.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); ev.preventDefault(); el.setPointerCapture(ev.pointerId); drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, v0: sim.state.input[t.key] || 0, moved: false }; });
+      el.addEventListener('pointermove', (ev) => {
+        if (!drag || ev.pointerId !== drag.id) return;
+        const d = t.axis === 'y' ? ev.clientY - drag.y : ev.clientX - drag.x; // down for nose up, right for right
+        if (Math.abs(d) > 3) drag.moved = true;
+        if (drag.moved) setTrimAxis(name, drag.v0 + d * 0.006);
+      });
+      const up = (ev) => {
+        if (!drag || ev.pointerId !== drag.id) return;
+        if (!drag.moved) {
+          const now = performance.now();
+          if (now - lastTap < 350) { setTrimAxis(name, 0); lastTap = 0; }
+          else { lastTap = now; const r = el.getBoundingClientRect(); const f = t.axis === 'y' ? (ev.clientY - r.top) / r.height : (ev.clientX - r.left) / r.width; nudgeTrim(name, f > 0.5 ? 0.02 : -0.02); }
+        }
+        drag = null;
+      };
+      el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+      el.addEventListener('wheel', (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        const raw = t.axis === 'x' && Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
+        if (raw) nudgeTrim(name, Math.sign(raw) * 0.02);
+      }, { passive: false });
+      el.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    }
     let trimTap = 0;
     function setTrim() {
       const s = sim.state, now = performance.now();
       if (now - trimTap < 400) { clearTrim(); return; }
       trimTap = now;
-      s.input.trimLon = clamp(s.input.trimLon + currentLon(), -0.8, 0.8); s.input.trimLat = clamp(s.input.trimLat + currentLat(), -0.6, 0.6);
-      toast(`Trimmed: ${(s.input.trimLon * 100).toFixed(0)}% ${s.input.trimLon >= 0 ? 'aft' : 'forward'}, ${(s.input.trimLat * 100).toFixed(0)}% ${s.input.trimLat >= 0 ? 'right' : 'left'}`);
-      refreshButtons();
+      setTrimAxis('pitch', s.input.trimLon + currentLon()); setTrimAxis('roll', s.input.trimLat + currentLat());
+      toast(`Trimmed: ${TRIM.pitch.fmt(s.input.trimLon)} pitch, ${TRIM.roll.fmt(s.input.trimLat)} roll`);
     }
-    function clearTrim() { const s = sim.state; s.input.trimLon = 0; s.input.trimLat = 0; toast('Trim cleared'); refreshButtons(); }
+    function clearTrim() { zeroTrim(); toast('Trim cleared'); refreshButtons(); }
     const currentLon = () => clamp(expo(-stickR.y) + keyAxes.lon, -1, 1);
     const currentLat = () => clamp(expo(stickR.x) + keyAxes.lat, -1, 1);
     // a tapped panel button must not keep the focus: Space (the brake hold) would press it again
@@ -2203,7 +2464,7 @@
       sw('#swPrerot', toggles.prerot, toggles.prerot ? (s.rotor.prerotating ? 'engaged' : 'on') : 'off');
       sw('#swBrake', toggles.brake || holdKeys.brake, toggles.brake ? 'set' : holdKeys.brake ? 'held' : 'off');
       sw('#swRotorBrake', s.input.rotorBrake, s.input.rotorBrake ? 'ON' : 'off');
-      b('#btnTrim', s.input.trimLon !== 0 || s.input.trimLat !== 0, s.input.trimLon !== 0 || s.input.trimLat !== 0 ? `${Math.round(s.input.trimLon * 100)}%` : 'set');
+      b('#btnTrim', s.input.trimLon !== 0 || s.input.trimLat !== 0 || s.input.trimRud !== 0, s.input.trimLon !== 0 ? TRIM.pitch.fmt(s.input.trimLon) : 'set');
       b('#btnCam', false, sim.firstPerson ? 'cockpit' : 'chase');
       $('#assistLabel').textContent = settings.assist ? 'assist on' : 'assist off';
       $('#btnLook').classList.toggle('on', look.mode === 'sensor');
@@ -2370,8 +2631,10 @@
       const lfo = ctx.createOscillator(); lfo.frequency.value = 10; const lfoG = ctx.createGain(); lfoG.gain.value = 0; lfo.connect(lfoG); lfoG.connect(rotG.gain); lfo.start();
       noise.connect(rotF); rotF.connect(rotG); rotG.connect(master);
       const windF = ctx.createBiquadFilter(); windF.type = 'lowpass'; windF.frequency.value = 500; const windG = ctx.createGain(); windG.gain.value = 0;
-      noise.connect(windF); windF.connect(windG); windG.connect(master); noise.start();
-      Object.assign(sound, { eng, eng2, engF, engG, rotG, lfo, lfoG, windG });
+      noise.connect(windF); windF.connect(windG); windG.connect(master);
+      const crF = ctx.createBiquadFilter(); crF.type = 'lowpass'; crF.frequency.value = 420; const crG = ctx.createGain(); crG.gain.value = 0;
+      noise.connect(crF); crF.connect(crG); crG.connect(master); noise.start();
+      Object.assign(sound, { eng, eng2, engF, engG, rotG, lfo, lfoG, windG, crG });
     }
     sound.toggle = async () => {
       if (!sound.ctx) buildSound();
@@ -2379,6 +2642,11 @@
       sound.enabled = !sound.enabled; settings.sound = sound.enabled; saveSettings();
       sound.master.gain.setTargetAtTime(sound.enabled ? 0.5 : 0, sound.ctx.currentTime, 0.1);
       refreshButtons();
+    };
+    sound.crunch = (k) => { // something broke
+      if (!sound.enabled || !sound.ctx) return;
+      const t = sound.ctx.currentTime, g = sound.crG.gain;
+      g.cancelScheduledValues(t); g.setValueAtTime(0.9 * k, t); g.exponentialRampToValueAtTime(0.001, t + 0.6);
     };
     sound.update = (s) => {
       if (!sound.enabled || !sound.ctx) return;
@@ -2494,7 +2762,7 @@
       // warnings
       {
         const warns = [];
-        if (s.crashed) warns.push(['CRASHED', '#f85149']);
+        if (s.crashed) { warns.push([s.crashed.reason.toUpperCase(), '#f85149']); for (const ev of s.damage.events.slice(1).slice(-2)) warns.push([ev.what, '#e3b341']); }
         else {
           if (i.lowRotor) warns.push(['LOW ROTOR RPM', '#f85149']);
           if (i.overspeed) warns.push(['ROTOR OVERSPEED', '#f85149']);
@@ -2726,7 +2994,7 @@
     function startOnRamp() {
       const s = sim.state, A = W.meta.airport;
       GYRO.place(s, env, A.start.x, A.start.z, A.start.heading);
-      s.input.trimLon = 0; s.input.trimLat = 0; toggles.brake = true; toggles.prerot = false;
+      zeroTrim(); toggles.brake = true; toggles.prerot = false;
       stickL.set(0, -1); look.recenter(); camTmp.chaseYaw = null;
       if (quest.job) failQuest('Back at the ramp');
       closeOverlays(); sim.running = true; refreshButtons();
@@ -2742,7 +3010,7 @@
       const [a, b, hdg] = Math.abs(into) <= 90 ? [p0, p1, h01] : [p1, p0, (h01 + 180) % 360];
       const x = a[0] + (b[0] - a[0]) * 0.04, z = a[1] + (b[1] - a[1]) * 0.04;
       GYRO.place(s, env, x, z, hdg, { engineOn: true, rotorRpm: 210 });
-      s.input.trimLon = 0; s.input.trimLat = 0; toggles.brake = true; toggles.prerot = false;
+      zeroTrim(); toggles.brake = true; toggles.prerot = false;
       stickL.set(0, -1); look.recenter(); camTmp.chaseYaw = null;
       closeOverlays(); sim.running = true; refreshButtons();
       toast(`Lined up on runway ${Math.round(hdg / 10).toString().padStart(2, '0')}, rotor at 210 rpm. Brake off, full throttle, stick back, ease forward past 300 rpm.`, 6000);
@@ -2750,7 +3018,7 @@
     function startAirborne() {
       const s = sim.state, A = W.meta.airport;
       GYRO.place(s, env, A.arp.x, A.arp.z - 1500, 180, { engineOn: true, rotorRpm: 360, airborne: { agl: 300, speed: 50 * KT } });
-      s.input.trimLon = 0; s.input.trimLat = 0; toggles.brake = false; toggles.prerot = false;
+      zeroTrim(); toggles.brake = false; toggles.prerot = false;
       stickL.set(0, 0.2); look.recenter(); camTmp.chaseYaw = null;
       closeOverlays(); sim.running = true; refreshButtons();
       toast('Airborne over the airport at 50 kt. Throttle is at 60%; the runway is ahead.', 5000);
@@ -2768,27 +3036,36 @@
       }
       if (!best) return startOnRamp();
       GYRO.place(s, env, best.x, best.z, best.hdg, { engineOn: true, rotorRpm: 0 });
-      s.input.trimLon = 0; s.input.trimLat = 0; toggles.brake = true; toggles.prerot = false;
+      zeroTrim(); toggles.brake = true; toggles.prerot = false;
       stickL.set(0, -1); look.recenter(); camTmp.chaseYaw = null;
       closeOverlays(); sim.running = true; refreshButtons();
       toast('On the nearest street, engine running, brake set. Prerotate and take off along the road.', 4500);
     }
+    // The crash is the first thing that breaks; the physics carries on, and the overlay waits for the wreck to come to rest
+    // (or a while, if it never quite does), then tells the whole story in order.
     function onCrash(s) {
       log.crashes++; saveLog();
       if (quest.job) failQuest(`${s.crashed.reason[0].toUpperCase() + s.crashed.reason.slice(1)}`);
-      $('#crashTitle').textContent = '💥 ' + s.crashed.reason;
-      $('#crashText').textContent = `at ${Math.round(units().spd(s.crashed.speed))} ${units().spdU}${s.crashed.sink > 0.5 ? `, ${s.crashed.sink.toFixed(1)} m/s down` : ''}. ${crashAdvice(s.crashed.reason)}`;
-      setTimeout(() => $('#ovCrash').classList.add('show'), 900);
+      toast('💥 ' + s.crashed.reason, 2500);
+    }
+    function showCrash(s) {
+      const c = s.crashed, then = s.damage.events.slice(1).map((ev) => ev.what);
+      $('#crashTitle').textContent = '💥 ' + c.reason;
+      $('#crashText').textContent = `At ${Math.round(units().spd(c.speed))} ${units().spdU}${c.sink > 0.5 ? `, ${c.sink.toFixed(1)} m/s down` : ''}.${then.length ? ` Then ${then.join('; ')}.` : ''} ${crashAdvice(c.reason)}`;
+      $('#ovCrash').classList.add('show');
     }
     function crashAdvice(reason) {
-      if (/hard landing/.test(reason)) return 'Flare later and slower: aim for a touchdown under 1 m/s of sink, stick back, at walking pace.';
-      if (/prop strike|nosed/.test(reason)) return 'The tail or prop hit first — too much flare, or a nose-up touchdown at speed.';
+      if (/gear collapsed/.test(reason)) return 'Flare later and slower: aim for a touchdown under 1 m/s of sink, stick back, at walking pace.';
+      if (/prop/.test(reason)) return 'The propeller\'s arc reached the ground — too much flare, a nose-up touchdown at speed, or a leg that had already folded under it.';
+      if (/tail wheel|tail boom|onto its tail/.test(reason)) return 'The tail hit first and hard — too much flare at speed. The tail wheel is for touching, not for landing on.';
+      if (/nosed/.test(reason)) return 'A nose-down arrival, or hard braking with the rotor still lifting. Hold the stick back and let it slow before the brakes.';
       if (/rolled/.test(reason)) return 'A touchdown with drift, or a turn on the ground at speed. Land straight, into the wind, and steer gently.';
       if (/stops/.test(reason)) return 'The rotor was unloaded or too slow and the blades flapped past their stops. Keep the rotor loaded: no push-overs, no low rotor rpm.';
       if (/trees/.test(reason)) return 'The canopy counts as ground. Find a street.';
       if (/river|water/.test(reason)) return 'A gyro does not float.';
-      if (/building/.test(reason)) return 'Buildings are solid. Fly higher between the blocks.';
-      if (/rotor strike/.test(reason)) return 'A blade touched the ground — too much bank or pitch near the ground, or a rotor flapping at low rpm in wind.';
+      if (/building|wall/.test(reason)) return 'Buildings are solid. Fly higher between the blocks.';
+      if (/rotor/.test(reason)) return 'A blade touched the ground — too much bank or pitch near the ground, or a rotor flapping at low rpm in wind.';
+      if (/mast/.test(reason)) return 'The rotor head came down on something. The mast is the one tube that must not bend.';
       return 'Try again.';
     }
     $('#btnCrashRamp').addEventListener('click', startOnRamp);
@@ -2822,7 +3099,7 @@
     if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(resize, 100));
 
     // ---- the loop
-    let last = performance.now(), wasCrashed = false, fpsAcc = 0, fpsN = 0, frameN = 0;
+    let last = performance.now(), wasCrashed = false, crashShown = false, eventsSeen = 0, fpsAcc = 0, fpsN = 0, frameN = 0;
     function frame(now) {
       requestAnimationFrame(frame);
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -2832,6 +3109,11 @@
         gatherInput(dt);
         GYRO.step(s, env, dt);
         if (s.crashed && !wasCrashed) onCrash(s);
+        if (!s.crashed) { crashShown = false; eventsSeen = 0; }
+        else {
+          if (s.damage.events.length > eventsSeen) { sound.crunch(eventsSeen ? 0.6 : 1); eventsSeen = s.damage.events.length; }
+          if (!crashShown && (s.damage.rest > 1.5 || s.t - s.crashed.t > 25)) { crashShown = true; showCrash(s); }
+        }
         wasCrashed = !!s.crashed;
         if (!s.info.onGround && !s.crashed) log.flightTime += dt;
         questStep(s, dt);
@@ -2873,7 +3155,7 @@
         renderer.render(scene, camera); lap('first frame');
         $('#loading').classList.add('hide');
         applyGround(); // the aerial imagery comes in behind the first frame
-        refreshButtons();
+        refreshButtons(); drawTrim();
         $('#ovHelp').classList.add('show');
         if (settings.sound) { /* sound needs a tap; the button will start it */ }
         requestAnimationFrame(frame);

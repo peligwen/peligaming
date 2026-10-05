@@ -5,7 +5,9 @@
 // alone, level flight trims at sane rotor speeds and power, the glide and the
 // vertical autorotative descent land in the published ranges for machines of
 // this class, pushing over unloads and slows the rotor, and a trimmed cruise
-// rides out a disturbance.
+// rides out a disturbance; then it wrecks the machine five ways and checks
+// that what should break does, what should not does not, and that the wreck
+// comes to rest.
 // The model is the <script id="gyro-engine"> block of the tool page; pass
 // `--engine path.js` to check a copy somewhere else, `--verbose` for the
 // time histories.
@@ -79,6 +81,11 @@ function run(s, seconds, fn) {
   const n = Math.round(seconds / FRAME);
   for (let k = 0; k < n; k++) { if (fn) fn(k * FRAME); GYRO.step(s, env, FRAME); if (s.crashed) break; }
 }
+function runOn(s, seconds, fn) { // through a crash: the physics carries on
+  const n = Math.round(seconds / FRAME);
+  for (let k = 0; k < n; k++) { if (fn) fn(k * FRAME); GYRO.step(s, env, FRAME); }
+}
+const events = (s) => s.damage.events.map((e) => e.what).join(' | ');
 function avg(s, seconds, fn, keys) {
   const sums = Object.fromEntries(keys.map((k) => [k, 0])); let n = 0;
   run(s, seconds, (t) => { if (fn) fn(t); for (const k of keys) sums[k] += typeof k === 'string' ? s.info[k] : 0; n++; });
@@ -226,6 +233,7 @@ console.log('A landing');
   check('touchdown sink rate gentle', sink, 0, 3.2, ' m/s');
   check('stopped on the brakes', s.info.gs, 0, 1, ' m/s');
   check('survived', s.crashed ? 1 : 0, 0, 0);
+  check('nothing broke', s.damage.events.length, 0, 0);
 }
 
 // ------------------------------------------------------------------ 8. ground effect
@@ -241,6 +249,75 @@ console.log('Ground effect');
   // and it is gone in forward flight
   const s = airborne(50 * KT, { rpm: 360, agl: 1.0 }); run(s, 0.3);
   check('no cushion at cruise speed', s.info.groundEffect, 0.97, 1);
+}
+
+// ------------------------------------------------------------------ 9. what breaks
+// The crash is the first thing that breaks; the physics carries on, so a wreck tumbles and comes to rest.
+console.log('Crashes: a drop, an over-flare, a rollover, a ditching, a wall');
+{
+  // dropped onto the mains from 3.5 m with the rotor turning: a leg folds, the frame comes down, the wreck stops where it is
+  const s = airborne(3 * KT, { rpm: 340, agl: 3.5 }); s.input.throttle = 0.5;
+  const x0 = s.pos[0], z0 = s.pos[2];
+  let tRest = null;
+  runOn(s, 25, () => { if (s.crashed && s.damage.rest > 1.0 && tRest == null) tRest = s.t - s.crashed.t; });
+  console.log(`   dropped: ${s.crashed ? s.crashed.sink.toFixed(1) + ' m/s down — ' + events(s) : 'no crash'}`);
+  check('a hard arrival folds a leg', s.crashed && /gear collapsed/.test(s.crashed.reason) ? 1 : 0, 1, 1);
+  check('legs folded', s.damage.gear.reduce((a, b) => a + b, 0), 1, 4);
+  check('the wreck comes to rest', tRest == null ? 99 : tRest, 0, 15, ' s');
+  check('and stays put', Math.hypot(s.pos[0] - x0, s.pos[2] - z0), 0, 40, ' m');
+}
+{
+  // an over-flare: the end of a flare at 22° nose-up, well past the tail wheel's 17° and short of the propeller's 28°,
+  // settling from just above the street with no airspeed
+  const s = GYRO.createState(); calm(s);
+  GYRO.place(s, env, 0, 0, 0, { engineOn: true, rotorRpm: 340, airborne: { agl: 1.4, speed: 0 } });
+  s.q = GYRO.qfromEuler(0, 22 * GYRO.D2R, 0); s.input.throttle = 0.3; s.input.lon = 0.3;
+  let pitchTouch = null;
+  runOn(s, 15, () => { if (s.ground.contacts > 0 && pitchTouch == null) pitchTouch = s.info.pitch; if (s.ground.wheels >= 2) { s.input.brake = 1; s.input.throttle = 0; } });
+  console.log(`   over-flared: first touch at ${pitchTouch == null ? '—' : pitchTouch.toFixed(0) + '°'}, ${s.crashed ? 'CRASHED ' + events(s) : 'no crash'}, prop ${s.damage.prop ? 'struck' : 'whole'}`);
+  check('the tail wheel touches first, nose-high', pitchTouch == null ? 0 : pitchTouch, 15, 30, '°');
+  check('the propeller clears the ground', s.damage.prop, 0, 0);
+  check('settles onto the mains', s.info.onGround && Math.abs(s.info.pitch) < 12 ? 1 : 0, 1, 1);
+}
+{
+  // a touchdown banked 55° with the rotor turning: a blade strikes, the ground stops the rotor, the wreck lies on its side
+  // (a kick in roll on the ground does not do it: the turning rotor is a gyroscope, and shrugs it off)
+  const s = GYRO.createState(); calm(s);
+  GYRO.place(s, env, 0, 0, 0, { engineOn: true, rotorRpm: 320, airborne: { agl: 1.3, speed: 0 } });
+  s.q = GYRO.qfromEuler(0, 0, 55 * GYRO.D2R);
+  runOn(s, 15);
+  console.log(`   rolled: ${events(s)}; rotor ${s.info.rotorRpm.toFixed(0)} rpm, roll ${s.info.roll.toFixed(0)}°, rest ${s.damage.rest.toFixed(1)} s`);
+  check('a blade strikes', /rotor strike/.test(events(s)) ? 1 : 0, 1, 1);
+  check('the ground stops the rotor', s.info.rotorRpm, 0, 40, ' rpm');
+  check('the blades are wrecked', s.damage.rotor, 0.5, 1);
+  check('and the wrench takes more with it', s.damage.events.length, 2, 99, ' things broken');
+  check('at rest', s.damage.rest, 1, 99, ' s');
+}
+{
+  // a ditching: a gyro does not float; the engine quits in the water
+  world.kind = 'water';
+  const s = airborne(30 * KT, { agl: 6 }); s.input.throttle = 0.2;
+  runOn(s, 20, () => { if (!s.crashed) pilot(s, { ias: 30 * KT, vs: -1.5 }); });
+  console.log(`   ditched: ${events(s)}; CG ${s.info.agl.toFixed(2)} m over the water, engine ${s.engine.on ? 'running' : 'stopped'}`);
+  check('ditched', /ditched/.test(s.crashed ? s.crashed.reason : '') ? 1 : 0, 1, 1);
+  check('and sank', s.info.agl, -3, 0.3, ' m');
+  check('engine quit in the water', s.engine.on ? 1 : 0, 0, 0);
+  world.kind = 'pavement';
+}
+{
+  // a wall: a building 20 m tall across the path (north is −z), 60 m ahead; the near face and the roof are the faces that matter
+  env.wall = (x, y, z) => {
+    if (z > -60 || z < -90 || Math.abs(x) > 20 || y > world.h + 20) return null;
+    const pen = -60 - z, roof = world.h + 20 - y;
+    return roof < pen ? { n: [0, 1, 0], pen: roof } : { n: [0, 0, 1], pen };
+  };
+  const s = airborne(45 * KT, { agl: 5 }); s.input.throttle = 0.6;
+  runOn(s, 12, () => { if (!s.crashed) pilot(s, { pitch: 3, throttle: 0.6 }); });
+  console.log(`   into a wall: ${events(s)}; stopped ${(-s.pos[2]).toFixed(0)} m along, ${s.info.gs.toFixed(1)} m/s`);
+  check('hit the building', /building|wall/.test(s.crashed ? s.crashed.reason : '') ? 1 : 0, 1, 1);
+  check('did not pass through it', -s.pos[2], -50, 66, ' m');
+  check('stopped by it', s.info.gs, 0, 2, ' m/s');
+  delete env.wall;
 }
 
 console.log(`\n${checks - failures}/${checks} checks passed${failures ? ` — ${failures} FAILED` : ''}`);
