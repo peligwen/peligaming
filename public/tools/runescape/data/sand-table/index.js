@@ -8,9 +8,9 @@ window.SAND_TABLE.ids = [
   // group bosses
   "hueycoatl", "nex", "corporeal-beast", "gwd-graardor", "gwd-kril", "gwd-zilyana", "gwd-kreearra",
   // solo bosses
-  "scurrius", "brutus", "obor", "bryophyta", "king-black-dragon", "dagannoth-kings", "kalphite-queen", "zulrah", "vorkath", "phantom-muspah", "vardorvis", "duke-sucellus", "whisperer", "leviathan", "araxxor", "amoxliatl", "maggot-king", "mad-angel", "doom-of-mokhaiotl",
+  "scurrius", "brutus", "obor", "bryophyta", "king-black-dragon", "dagannoth-kings", "kalphite-queen", "zulrah", "vorkath", "phantom-muspah", "vardorvis", "duke-sucellus", "whisperer", "leviathan", "araxxor", "amoxliatl", "maggot-king", "mad-angel", "doom-of-mokhaiotl", "skotizo",
   // slayer bosses
-  "shellbane-gryphon",
+  "shellbane-gryphon", "grotesque-guardians",
   // wilderness bosses
   "callisto", "vetion", "venenatis", "chaos-elemental", "scorpia", "chaos-fanatic", "crazy-archaeologist",
   // challenges
@@ -19,4 +19,4 @@ window.SAND_TABLE.ids = [
   "wintertodt", "tempoross", "zalcano",
 ];
 // Planned, not yet written (see docs/sand-table/AUTHORING.md):
-// toa, royal-titans, yama, giant-mole, sarachnis, skotizo, nightmare, alchemical-hydra, cerberus, grotesque-guardians, kraken, thermonuclear-smoke-devil, abyssal-sire, barrows, moons-of-peril
+// toa, royal-titans, yama, giant-mole, sarachnis, nightmare, alchemical-hydra, cerberus, kraken, thermonuclear-smoke-devil, abyssal-sire, barrows, moons-of-peril
