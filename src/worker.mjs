@@ -52,7 +52,8 @@ const SKY_UA = "sky-pointer edge proxy @ peligaming.com (shared cache for all si
 // The site's one home. The worker is also attached to www.peligaming.com and
 // to its old home, gaming.peliglot.com; a request to either is answered with a
 // permanent redirect to the same path here, so old links, bookmarks and share
-// links keep working and search engines learn the move. Only these named
+// links keep working and search engines learn the move. A plain-http request
+// to the home itself gets the same redirect, onto https. Only these named
 // hosts redirect — `wrangler dev` and the workers.dev preview serve the site
 // as themselves. (`assets.run_worker_first` in wrangler.jsonc is what lets the
 // worker see requests for the pages at all; without it only /api/* and 404s
@@ -60,10 +61,24 @@ const SKY_UA = "sky-pointer edge proxy @ peligaming.com (shared cache for all si
 const CANONICAL_HOST = "peligaming.com";
 const REDIRECT_HOSTS = new Set(["www.peligaming.com", "gaming.peliglot.com"]);
 
+// The scheme the visitor used, as Cloudflare reports it in the cf-visitor
+// header it adds at the edge. The request URL cannot be trusted for this:
+// `wrangler dev` presents the site as http://peligaming.com/ and would
+// redirect every page to production, and it sends no cf-visitor at all —
+// which is exactly what keeps local preview out of the redirect.
+function visitorScheme(req) {
+  try {
+    return JSON.parse(req.headers.get("cf-visitor") || "{}").scheme;
+  } catch {
+    return undefined;
+  }
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
-    if (REDIRECT_HOSTS.has(url.hostname)) {
+    const insecureHome = url.hostname === CANONICAL_HOST && visitorScheme(req) === "http";
+    if (REDIRECT_HOSTS.has(url.hostname) || insecureHome) {
       return Response.redirect(`https://${CANONICAL_HOST}${url.pathname}${url.search}`, 301);
     }
     if (url.pathname.startsWith("/api/osrs/")) return osrs(req, url, ctx);
