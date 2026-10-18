@@ -541,6 +541,92 @@ the fix while the phone is flat and holds it for as long as the phone is
 raised; point the phone at the ground for a moment now and then and it
 re-calibrates.
 
+## 🧶 Cat Sweater Pattern
+
+Not a game either: a sewing pattern drafted to your cat. Three measurements
+in — neck, chest, back length — and out comes a two-piece sweater or a
+step-in vest harness as printable pattern pieces at true size, with the
+garment tried on a 3D cat in the fabric print and colours you choose, and
+the sewing steps for it.
+
+**Try it: [peligaming.com/tools/irl/cat-sweater](https://peligaming.com/tools/irl/cat-sweater)**
+
+- **Measure the cat.** Neck girth, chest girth and back length are
+  required; the front-leg girth, collar-to-leg distance, chest width between
+  the legs, belly length, waist and head girth are estimated from them in
+  the proportions of an ordinary cat until you measure them. Hover a
+  measurement and a tape is drawn on the 3D cat where it goes. Presets from
+  kitten to Maine Coon, centimetres or inches, and a sanity check that the
+  neck and chest are not swapped.
+- **The sweater.** A back piece and a belly piece, cut on the fold, joined
+  at side seams with the leg holes notched out of both; the belly piece
+  stops before the belly so the cat can pee. A pull-over, or a back that
+  opens along the spine with velcro for a cat who will not have things put
+  over its head. A ribbed collar band, a turned hem or a bound edge at the
+  neck; ribbed leg cuffs and a ribbed hem band to taste. Stretch knit, rib
+  knit or woven, each with its own ease (a knit is cut smaller than the cat
+  and hugs; a woven is cut bigger) and seam allowance, both overridable.
+  A fit check says whether a pull-over's neck will pass the head, with the
+  band's stretch counted.
+- **The harness.** A lined step-in vest: lay it open on the floor, the cat
+  steps in, close the velcro along the spine. A D-ring tab is marked on the
+  upper back half; the shopping list has the webbing, ring and hook-and-loop
+  lengths. Woven by default, since a harness should not give.
+- **The pattern.** Every piece with its cutting line and stitch line, fold
+  and grainline, notches at the leg holes and the ends of the seams, labels,
+  and the few sizes worth checking against the cat. Pan and zoom on screen;
+  print tiled over A4 or Letter pages with a lettered frame, a cover page
+  with a 5 cm and a 2 in test square, the tile map, the cat's measurements
+  and the cutting list; or download the lot as one SVG in millimetres.
+- **On the cat.** The cat is built from the same girth profile the pattern
+  is drafted on, so the garment is the pattern's own pieces wrapped round
+  it, leg holes and hems and all. Pick a print — stripes, Fair Isle,
+  argyle, plaid, hearts, fish, paw prints and more — and three colours; a
+  knit texture; the cat's coat (orange or brown or grey tabby, black, white,
+  tuxedo, calico, tortie, Siamese, cream) and eyes. Orbit, or pick a view,
+  including from below to see the belly piece.
+- **Sew it.** The pieces and what to cut, fabric to buy, notions, the fit
+  notes, numbered sewing steps for the garment as configured, and the
+  measuring guide. Share links reproduce everything.
+
+### How it's built
+
+- `public/tools/irl/cat-sweater.html` is the app, vanilla JS and SVG with
+  three.js (r128, from cdnjs) for the cat. Its `<script id="sweater-engine">`
+  block is the drafting, pure geometry: the cat is a tube whose cross-sections
+  are ellipses a little deeper than wide, the girth blending from the neck
+  through the chest (just behind the front legs) to the waist; the garment is
+  that tube with the ease applied. The pieces are regions of its surface in
+  (station along the body, fraction round the ring) coordinates — the
+  neckline is the collar ring, which sits at an angle because the neck rises
+  from the body, the leg holes are discs centred on the side seam, and the
+  seam is placed so the belly piece between the holes is the chest width.
+  Each region is flattened by triangulation development, the sheet-metal
+  method: a grid of rays and rings is laid out flat triangle by triangle
+  with the true 3D lengths of its edges, the fold kept straight, so every
+  width is right and the side seam — one curve on the body — comes out the
+  same length on both pieces. Corners are rounded, the seam allowance is
+  offset (round at convex corners, mitred at concave ones, any fold-back
+  at a tight notch cut out), notches and marks placed.
+- The 3D garment is the same (station, fraction) outlines clipped onto a
+  grid of the body surface cell by cell, so its edges are the pattern's own
+  curves; the fabric print, the ribbing and the coat are canvas textures
+  drawn in the page.
+- `npm run check:cat-sweater` (`scripts/check-cat-sweater.mjs`) runs the
+  engine under Node over every preset, garment, closure and fabric and
+  checks what a pattern has to have: simple polygons, the side seam equal on
+  both pieces, the leg-hole notches meeting and going round the leg with its
+  ease, the neck opening the length of the collar line on the body, the fold
+  the back length, every flattened edge within a few per cent of its length
+  on the body, and the fit check catching a neck that cannot pass the head.
+
+The honest limits: a cat is not a tube, so the pattern is as good as the
+ease and the stretch of the fabric make it — the chest front is doubly
+curved and a few millimetres of that are eased into the belly piece's leg
+notches. The 3D cat is a cartoon in the right proportions, not your cat.
+And a determined cat can back out of any harness: it is for supervised
+walks, with the two-finger fit checked each time.
+
 ## 🚁 Gyro Courier
 
 A flight simulator, and a courier game: a single-seat open-frame

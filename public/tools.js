@@ -116,6 +116,11 @@ window.PELIGAMING = {
           path: "tools/irl/gyro-courier.html",
         },
         {
+          name: "Cat Sweater Pattern",
+          description: "Measure your cat — neck, chest and back length, more if you like — and get a sewing pattern drafted to it: a two-piece sweater (pull-over or velcro-backed, ribbed collar, cuffs and hem to taste) or a lined step-in vest harness with a D-ring. The pieces at true size, printed tiled with a test square, and the garment tried on a 3D cat in the fabric print and colours you pick, with the sewing steps.",
+          path: "tools/irl/cat-sweater.html",
+        },
+        {
           name: "Sky Pointer",
           description: "Hold your phone up to the night sky and see what it is pointing at: the stars to magnitude 6 in their real colours, the constellation figures, the planets, the Moon with its phase, the Messier objects, and the satellites passing over right now — with a finder arrow to whatever you search for. No phone sensors? Set a place and time and pan and zoom the sky by hand.",
           path: "tools/irl/sky-pointer.html",

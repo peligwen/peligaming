@@ -1,0 +1,2309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cat Sweater Pattern — a sewing pattern drafted to your cat</title>
+  <meta name="description" content="Measure your cat, get a printable sewing pattern for a sweater or a vest harness: the pieces at true size, a 3D preview of the garment on a cat in the fabric and colours you pick, and the sewing steps.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧶</text></svg>">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-2: #1c2129;
+      --panel-border: #30363d;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --brand: #58a6ff;
+      --accent: #f2a65a;
+      --good: #3fb950;
+      --warn: #e3b341;
+      --bad: #f85149;
+      --paper: #f6efe1;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --panel-w: 350px;
+    }
+
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+      overflow: hidden;
+    }
+    a { color: var(--brand); }
+    button, input, select { font: inherit; color: inherit; }
+    button {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 6px 11px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:hover { border-color: var(--brand); }
+    button.on { border-color: var(--accent); color: var(--accent); background: rgba(242, 166, 90, 0.08); }
+    button.primary { background: var(--accent); color: #1b1200; border-color: transparent; font-weight: 700; }
+    button:disabled { opacity: 0.45; cursor: default; }
+    input[type="number"], input[type="text"], select {
+      background: #0b0f14;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      width: 100%;
+      min-width: 0;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--brand); }
+    input[type="color"] { width: 34px; height: 28px; border: 1px solid var(--panel-border); border-radius: 6px; background: none; padding: 1px; cursor: pointer; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
+    select option { background: #161b22; }
+
+    /* ---- frame ---- */
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      grid-template-columns: var(--panel-w) 1fr;
+      grid-template-areas: "top top" "panel main";
+      height: 100%;
+      padding-top: var(--safe-top);
+    }
+    .top {
+      grid-area: top;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--panel-border);
+      background: var(--panel);
+    }
+    .back { color: var(--text-dim); text-decoration: none; font-size: 12px; }
+    .back:hover { color: var(--text); }
+    .title { font-weight: 800; font-size: 16px; letter-spacing: -0.2px; }
+    .sub { color: var(--text-dim); font-size: 12px; }
+    .tabs { display: flex; gap: 4px; margin-left: auto; }
+    .tabs button { padding: 5px 10px; font-size: 13px; }
+    .actions { display: flex; gap: 6px; }
+    .actions button { font-size: 13px; }
+    #menu-btn { display: none; }
+
+    /* ---- panel ---- */
+    .panel {
+      grid-area: panel;
+      overflow-y: auto;
+      border-right: 1px solid var(--panel-border);
+      background: var(--panel);
+      padding: 10px 14px 40px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .panel h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      margin: 18px 0 8px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .panel h2:first-child { margin-top: 6px; }
+    .panel h2 .right { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .row label { flex: 1; min-width: 0; }
+    .row .val { width: 92px; flex: none; }
+    .seg { display: flex; gap: 0; border: 1px solid var(--panel-border); border-radius: 8px; overflow: hidden; }
+    .seg button { flex: 1; border: 0; border-radius: 0; padding: 6px 4px; font-size: 12.5px; background: transparent; }
+    .seg button + button { border-left: 1px solid var(--panel-border); }
+    .seg button.on { background: rgba(242, 166, 90, 0.14); }
+    .presets { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+    .presets button { font-size: 12px; padding: 4px 9px; }
+    .hint { color: var(--text-dim); font-size: 12px; line-height: 1.4; }
+    .measure { display: grid; grid-template-columns: 1fr 86px 24px; align-items: center; gap: 4px 8px; margin: 4px 0; }
+    .measure label { cursor: help; }
+    .measure .tag { font-size: 10.5px; color: var(--text-dim); display: block; }
+    .measure .tag.measured { color: var(--good); }
+    .measure .clear { background: none; border: 0; color: var(--text-dim); padding: 0; font-size: 14px; width: 24px; height: 24px; text-align: center; }
+    .measure .clear:hover { color: var(--text); }
+    .measure input.est { color: var(--text-dim); font-style: italic; }
+    .measure.active label { color: var(--accent); }
+    details.more { margin-top: 6px; }
+    details.more summary { cursor: pointer; color: var(--brand); font-size: 13px; list-style: none; }
+    details.more summary::before { content: "▸ "; }
+    details.more[open] summary::before { content: "▾ "; }
+    .how { font-size: 12px; color: var(--text-dim); margin: 2px 0 8px; }
+    .colors { display: flex; gap: 8px; align-items: center; }
+    .colors label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-dim); }
+    .swatches { display: flex; flex-wrap: wrap; gap: 5px; }
+    .swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+    .swatch.on { border-color: var(--accent); }
+    .fit { border-radius: 8px; padding: 8px 10px; font-size: 12.5px; margin: 6px 0; }
+    .fit.warn { background: rgba(227, 179, 65, 0.1); border: 1px solid rgba(227, 179, 65, 0.4); }
+    .fit.note { background: rgba(63, 185, 80, 0.08); border: 1px solid rgba(63, 185, 80, 0.3); }
+    .small { font-size: 12px; }
+
+    /* ---- main ---- */
+    .main {
+      grid-area: main;
+      position: relative;
+      min-width: 0; min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .main.single { grid-template-columns: 1fr; }
+    .pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; display: none; }
+    .pane.show { display: block; }
+    .pane + .pane.show { border-left: 1px solid var(--panel-border); }
+    #pane-pattern { background: #11161d; }
+    #pattern-svg { width: 100%; height: 100%; display: block; touch-action: none; }
+    #cat-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+    .pane-tools {
+      position: absolute; top: 8px; left: 8px; right: 8px;
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      pointer-events: none;
+    }
+    .pane-tools > * { pointer-events: auto; }
+    .pane-tools button, .pane-tools label { font-size: 12px; background: rgba(22, 27, 34, 0.85); border: 1px solid var(--panel-border); border-radius: 8px; padding: 4px 8px; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+    .pane-tools label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    .pane-tools .spacer { flex: 1; pointer-events: none; }
+    .pane-note { position: absolute; left: 10px; bottom: 8px; font-size: 11.5px; color: var(--text-dim); pointer-events: none; text-shadow: 0 1px 2px #000; }
+    #pane-sew { overflow-y: auto; padding: 18px 28px 60px; background: var(--bg); }
+    .sew { max-width: 760px; }
+    .sew h1 { font-size: 22px; margin-bottom: 4px; }
+    .sew h2 { font-size: 15px; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--panel-border); }
+    .sew p, .sew li { color: #c9d1d9; margin: 6px 0; }
+    .sew ol, .sew ul { padding-left: 22px; }
+    .sew table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    .sew td, .sew th { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--panel-border); vertical-align: top; }
+    .sew th { color: var(--text-dim); font-weight: 600; }
+    .sew .est { color: var(--text-dim); font-style: italic; }
+    .sew .warn { color: var(--warn); }
+    .sew .muted { color: var(--text-dim); }
+    kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: #0b0f14; border: 1px solid var(--panel-border); border-radius: 4px; padding: 0 5px; }
+
+    /* ---- pattern drawing ---- */
+    .piece-cut { fill: var(--paper); stroke: #2a2520; stroke-width: 0.5; stroke-dasharray: 2.4 1.6; }
+    .piece-stitch { fill: none; stroke: #a0342c; stroke-width: 0.45; }
+    .piece-fold { stroke: #2b5aa8; stroke-width: 0.5; stroke-dasharray: 5 1.5 1 1.5; }
+    .piece-ghost { fill: rgba(246, 239, 225, 0.25); stroke: #8f8a80; stroke-width: 0.35; stroke-dasharray: 1.5 1.5; }
+    .notch { stroke: #2a2520; stroke-width: 0.7; }
+    .grain { stroke: #2a2520; stroke-width: 0.6; fill: none; }
+    .label { fill: #2a2520; font-family: Georgia, "Times New Roman", serif; }
+    .label.dim { fill: #5a544c; }
+    .dimline { stroke: #5a544c; stroke-width: 0.35; }
+    .dimtext { fill: #5a544c; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 4px; }
+    .velcro { fill: rgba(43, 90, 168, 0.12); stroke: #2b5aa8; stroke-width: 0.35; }
+    .dring { fill: rgba(160, 52, 44, 0.15); stroke: #a0342c; stroke-width: 0.5; }
+    .scalebar { stroke: #c9d1d9; stroke-width: 0.6; }
+    .scaletext { fill: #c9d1d9; font-size: 4.5px; }
+    .bg-text { fill: var(--text-dim); font-size: 5px; }
+
+    /* ---- print layout: hidden on screen ---- */
+    #print { display: none; }
+    @media print {
+      @page { margin: 0; }
+      html, body { overflow: visible; height: auto; background: #fff; }
+      .app { display: none; }
+      #print { display: block; }
+      .page {
+        position: relative;
+        overflow: hidden;
+        page-break-after: always;
+        break-after: page;
+        background: #fff;
+        color: #000;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      .page:last-child { page-break-after: auto; break-after: auto; }
+      .page svg { display: block; }
+      .cover { padding: 12mm 16mm; font-size: 10.5pt; line-height: 1.35; overflow: visible; }
+      .cover h1 { font-size: 20pt; margin-bottom: 2mm; }
+      .cover h2 { font-size: 12pt; margin: 6mm 0 2mm; }
+      .cover table { border-collapse: collapse; font-size: 10pt; }
+      .cover td, .cover th { text-align: left; padding: 1mm 4mm 1mm 0; vertical-align: top; }
+      .cover .squares { display: flex; gap: 10mm; align-items: flex-start; margin-top: 3mm; }
+      .cover .sq { border: 0.4mm solid #000; display: flex; align-items: center; justify-content: center; font-size: 9pt; }
+      .cover .map { margin-top: 2mm; }
+      .page .piece-cut { fill: none; stroke: #000; stroke-width: 0.35; stroke-dasharray: 2.4 1.6; }
+      .page .piece-stitch { stroke: #000; stroke-width: 0.25; }
+      .page .piece-fold { stroke: #000; }
+      .page .label, .page .dimtext, .page .label.dim { fill: #000; }
+      .page .notch, .page .grain, .page .dimline { stroke: #000; }
+      .page .velcro, .page .dring { fill: none; stroke: #000; }
+      .tile-frame { fill: none; stroke: #999; stroke-width: 0.25; }
+      .tile-label { font-size: 3.2px; fill: #666; font-family: Georgia, serif; }   /* px in a mm viewBox is mm */
+      .tile-mark { stroke: #000; stroke-width: 0.25; }
+    }
+
+    /* ---- narrow screens: the panel slides over the main area ---- */
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-areas: "top" "main"; }
+      .panel {
+        position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+        max-height: 72%;
+        border-right: 0; border-top: 1px solid var(--panel-border);
+        border-radius: 14px 14px 0 0;
+        transform: translateY(100%);
+        transition: transform 0.2s;
+        z-index: 5;
+        padding-bottom: calc(24px + var(--safe-bottom));
+        box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+      }
+      .panel.open { transform: none; }
+      #menu-btn { display: inline-block; }
+      .tabs { margin-left: 0; }
+      .main { grid-template-columns: 1fr; }
+      .pane + .pane.show { border-left: 0; }
+      .sub { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <a class="back" href="../../">← peligaming</a>
+    <span class="title">🧶 Cat Sweater Pattern</span>
+    <span class="sub">a sewing pattern drafted to your cat, with the sweater tried on in 3D</span>
+    <nav class="tabs" id="tabs">
+      <button data-tab="pattern" class="on">Pattern</button>
+      <button data-tab="cat">On the cat</button>
+      <button data-tab="sew">Sew it</button>
+    </nav>
+    <div class="actions">
+      <button id="menu-btn">☰ Measurements</button>
+      <button id="print-btn" title="Print the pattern at true size, tiled over pages">🖨 Print</button>
+      <button id="svg-btn" title="Download the pattern as an SVG at true size">⬇ SVG</button>
+      <button id="share-btn" title="Copy a link that reproduces this pattern">🔗 Share</button>
+    </div>
+  </header>
+
+  <aside class="panel" id="panel">
+    <h2>Your cat <span class="right"><span class="seg" id="unit-seg" style="display:inline-flex"><button data-unit="cm" class="on">cm</button><button data-unit="in">in</button></span></span></h2>
+    <div class="presets" id="presets"></div>
+    <div id="measures-required"></div>
+    <details class="more" id="more-measures">
+      <summary>More measurements (optional — estimated from the three above until you measure)</summary>
+      <div id="measures-optional"></div>
+    </details>
+    <p class="hint" style="margin-top:8px">Hover or tap a measurement's name to see where the tape goes on the cat. A soft tape, snug but not tight, on a standing cat. Note the cat's name for the print-out: <input type="text" id="cat-name" placeholder="Cat's name" style="width:120px;display:inline-block;padding:3px 6px;margin-left:4px"></p>
+
+    <h2>Garment</h2>
+    <div class="seg" id="garment-seg"><button data-garment="sweater" class="on">Sweater</button><button data-garment="harness">Harness vest</button></div>
+    <div class="row" id="closure-row" style="margin-top:8px">
+      <label>Closure</label>
+      <div class="seg" style="flex:1.4"><button data-closure="pullover" class="on">Pull-over</button><button data-closure="velcro">Velcro back</button></div>
+    </div>
+    <div class="row">
+      <label>Fabric</label>
+      <select id="fabric" class="val" style="width:160px"></select>
+    </div>
+    <p class="hint" id="fabric-hint"></p>
+    <div class="row">
+      <label>Ease <span class="hint" id="ease-val"></span></label>
+      <label class="small" style="flex:0 0 auto;display:flex;gap:4px;align-items:center"><input type="checkbox" id="ease-auto" checked> auto</label>
+    </div>
+    <input type="range" id="ease" min="-15" max="25" step="1" value="-5" disabled>
+    <div class="row">
+      <label>Seam allowance</label>
+      <label class="small" style="flex:0 0 auto;display:flex;gap:4px;align-items:center"><input type="checkbox" id="sa-auto" checked> auto</label>
+      <input type="number" id="sa" class="val" style="width:70px" min="3" max="20" step="1" value="7" disabled>
+      <span class="hint">mm</span>
+    </div>
+    <div id="sweater-opts">
+      <div class="row">
+        <label>Neck finish</label>
+        <select id="collar" class="val" style="width:160px">
+          <option value="band">Ribbed collar band</option>
+          <option value="hem">Turned hem</option>
+          <option value="binding">Bound edge</option>
+        </select>
+      </div>
+      <div class="row" id="collar-height-row">
+        <label>Collar height</label>
+        <input type="number" id="collar-height" class="val" style="width:70px" min="10" max="60" step="5" value="30">
+        <span class="hint">mm</span>
+      </div>
+      <div class="row"><label><input type="checkbox" id="cuffs"> Ribbed leg cuffs</label></div>
+      <div class="row"><label><input type="checkbox" id="hem-band"> Ribbed hem band</label></div>
+    </div>
+    <p class="hint" id="harness-hint" style="display:none">A step-in vest: lay it open on the floor, the cat steps in, close the velcro along the spine. Lined, with a D-ring on the back between the shoulders. For supervised walks on a leash — a determined cat can back out of any harness, so check the two-finger fit each time.</p>
+
+    <h2>Fabric look</h2>
+    <div class="row">
+      <label>Pattern</label>
+      <select id="pattern" class="val" style="width:160px"></select>
+    </div>
+    <div class="row colors">
+      <label>Main <input type="color" id="c1" value="#c84a3a"></label>
+      <label>Accent <input type="color" id="c2" value="#f4ead8"></label>
+      <label>Third <input type="color" id="c3" value="#28405f"></label>
+      <label style="margin-left:auto"><input type="checkbox" id="knit" checked> knit texture</label>
+    </div>
+    <div class="row" style="margin-top:8px"><label>Bands</label>
+      <div class="seg" style="flex:1.2"><button data-band="accent" class="on">Accent</button><button data-band="main">Main</button><button data-band="third">Third</button></div>
+    </div>
+
+    <h2>The cat</h2>
+    <div class="swatches" id="coats"></div>
+    <div class="row" style="margin-top:8px">
+      <label>Eyes</label>
+      <div class="swatches" id="eyes"></div>
+    </div>
+
+    <h2>Fit</h2>
+    <div id="fit"></div>
+    <h2>Print</h2>
+    <div class="row">
+      <label>Paper</label>
+      <div class="seg" style="flex:1"><button data-paper="a4" class="on">A4</button><button data-paper="letter">Letter</button></div>
+    </div>
+    <p class="hint">Print at 100% (“actual size”, no fit-to-page), then check the test square on the first page. The pieces are tiled over pages with a lettered frame: trim or fold along the frame and tape the pages edge to edge.</p>
+  </aside>
+
+  <main class="main" id="main">
+    <section class="pane show" id="pane-pattern">
+      <svg id="pattern-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="pane-tools">
+        <label><input type="checkbox" id="show-sa" checked> seam allowance</label>
+        <label><input type="checkbox" id="show-mirror"> whole piece</label>
+        <label><input type="checkbox" id="show-dims" checked> measurements</label>
+        <span class="spacer"></span>
+        <button id="fit-btn" title="Fit the drawing to the pane">⤢ fit</button>
+      </div>
+      <div class="pane-note" id="pattern-note">drag to pan · scroll or pinch to zoom</div>
+    </section>
+    <section class="pane" id="pane-cat">
+      <canvas id="cat-canvas"></canvas>
+      <div class="pane-tools">
+        <button data-view="three-quarter" class="on">¾ view</button>
+        <button data-view="side">side</button>
+        <button data-view="front">front</button>
+        <button data-view="top">top</button>
+        <button data-view="below">below</button>
+        <span class="spacer"></span>
+        <label><input type="checkbox" id="show-garment" checked> garment</label>
+        <label><input type="checkbox" id="auto-rotate" checked> turn</label>
+      </div>
+      <div class="pane-note" id="cat-note">drag to orbit · scroll or pinch to zoom</div>
+    </section>
+    <section class="pane" id="pane-sew"><div class="sew" id="sew"></div></section>
+  </main>
+</div>
+<div id="print"></div>
+
+<script id="sweater-engine">
+// Cat sweater and harness drafting engine — pure geometry, no DOM, so the
+// same block runs under Node for scripts/check-cat-sweater.mjs.
+//
+// How a pattern is drafted here:
+//   1. The cat is modelled as a tube whose cross-sections are ellipses a
+//      little deeper than wide, with the girth read off the measurements —
+//      the neck at the collar, the chest just behind the front legs, the
+//      waist at the tail — and blended smoothly between.
+//   2. The garment is that tube with the ease applied (negative for a
+//      stretch knit, positive for a woven). The two pattern pieces — back
+//      and belly — are regions of that surface in (s, f) coordinates: s is
+//      the station along the body from the collar at the spine, f the
+//      fraction of the way around the ring from the spine (0 on top, 0.5 on
+//      the belly line). The neckline is the tilted collar ring, the leg
+//      holes are discs centred on the side seam, the hems are curves.
+//   3. Each region is flattened by triangulation development, the sheet-metal
+//      method: a grid of rays (constant f) and rings (constant s) is laid out
+//      flat triangle by triangle using the true 3D lengths of its edges, with
+//      the fold line kept straight. Every ray and ring edge keeps its length,
+//      so widths are right everywhere and the side seam — the same 3D curve
+//      on both pieces — comes out the same length on both, which is what lets
+//      them sew together without easing.
+//   4. The piece outline is mapped through that grid, the corners are
+//      rounded, the seam allowance is offset from it, and notches, grainlines
+//      and labels are added.
+var SWEATER = (function () {
+  'use strict';
+  const TAU = Math.PI * 2;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  const dist3 = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+
+  // ---------------------------------------------------------------- rings
+  // Cross-sections are ellipses, vertical semi-axis a = ASPECT × the
+  // horizontal one b. Points on a ring are addressed by arc-length fraction
+  // f from the top, so widths on the pattern are true arc lengths. A table
+  // of the unit ellipse (b = 1) turns a fraction into the parametric angle.
+  const ASPECT = 1.12;
+  const RING_N = 1440;
+  const ring = (function () {
+    const cum = [0];
+    let px = 0, py = ASPECT;
+    for (let k = 1; k <= RING_N; k++) {
+      const t = TAU * k / RING_N;
+      const x = Math.sin(t), y = ASPECT * Math.cos(t);
+      cum.push(cum[k - 1] + Math.hypot(x - px, y - py));
+      px = x; py = y;
+    }
+    return { cum, total: cum[RING_N] };
+  })();
+  function ringParam(f) {
+    f -= Math.floor(f);
+    const target = f * ring.total;
+    let lo = 0, hi = RING_N;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (ring.cum[mid] <= target) lo = mid; else hi = mid; }
+    const seg = ring.cum[hi] - ring.cum[lo];
+    return TAU * (lo + (seg > 0 ? (target - ring.cum[lo]) / seg : 0)) / RING_N;
+  }
+  // unit-ellipse point for arc fraction f: [sideways, vertical], the top at [0, ASPECT]
+  function ringPoint(f) { const t = ringParam(f); return [Math.sin(t), ASPECT * Math.cos(t)]; }
+  // semi-axes of the ring with girth G
+  function ringRadii(G) { const b = G / ring.total; return { a: ASPECT * b, b }; }
+
+  // ---------------------------------------------------------- measurements
+  // Everything in mm. Three are required; the rest default from them in the
+  // proportions of an ordinary cat, and a real measurement overrides.
+  const DERIVED = {
+    legCirc:     (m) => 0.36 * m.chest,   // around the top of a front leg
+    neckToLeg:   (m) => 0.22 * m.back,    // collar at the spine to the front of the front leg
+    chestWidth:  (m) => 0.14 * m.chest,   // between the front legs, across the chest
+    waist:       (m) => 0.86 * m.chest,   // girth in front of the hind legs
+    head:        (m) => 1.28 * m.neck,    // around the head in front of the ears
+    bellyLength: (m) => 0.70 * m.back,    // throat to where the belly piece ends underneath
+  };
+  const REQUIRED = ['neck', 'chest', 'back'];
+  function derive(m) {
+    const out = {}, derived = {};
+    for (const k of REQUIRED) out[k] = +m[k];
+    for (const k in DERIVED) {
+      const v = m[k];
+      if (v != null && isFinite(v) && v > 0) out[k] = +v;
+      else { out[k] = DERIVED[k](out); derived[k] = true; }
+    }
+    out.derived = derived;
+    return out;
+  }
+  // Sanity checks on what was typed — a cat, not a typo.
+  function validate(m) {
+    const w = [];
+    if (!(m.neck > 60)) w.push('The neck girth looks too small for a cat.');
+    if (!(m.chest > m.neck * 1.15)) w.push('The chest girth should be well over the neck girth — check the two are not swapped.');
+    if (!(m.back > 100)) w.push('The back length looks too short — measure from the collar to the base of the tail.');
+    if (m.back > m.chest * 1.6) w.push('The back length is long for that chest — is it from the collar, not the head?');
+    if (m.legCirc > m.chest * 0.6) w.push('The leg girth is more than half the chest — measure around the top of one front leg.');
+    if (m.neckToLeg > m.back * 0.5) w.push('The front legs are placed past the middle of the back.');
+    if (m.chestWidth > m.chest * 0.35) w.push('The chest width between the legs is wide for that chest.');
+    return w;
+  }
+
+  const PRESETS = [
+    { id: 'kitten',  name: 'Kitten',      about: '3–4 months, about 1.5 kg', m: { neck: 150, chest: 260, back: 210 } },
+    { id: 'small',   name: 'Small cat',   about: 'about 3 kg',               m: { neck: 190, chest: 340, back: 290 } },
+    { id: 'average', name: 'Average cat', about: 'about 4.5 kg',             m: { neck: 220, chest: 400, back: 330 } },
+    { id: 'large',   name: 'Large cat',   about: 'about 6.5 kg',             m: { neck: 250, chest: 460, back: 380 } },
+    { id: 'coon',    name: 'Maine Coon',  about: '8 kg and up',              m: { neck: 290, chest: 540, back: 450 } },
+  ];
+
+  const FABRICS = {
+    fleece: { name: 'Stretch knit', detail: 'fleece, jersey, sweatshirting', ease: -0.05, holeEase: 0.15, sa: 7,  stretch: 0.25, width: 1500 },
+    rib:    { name: 'Rib or sweater knit', detail: 'very stretchy', ease: -0.10, holeEase: 0.12, sa: 7,  stretch: 0.50, width: 1500 },
+    woven:  { name: 'Woven', detail: 'cotton, flannel, canvas', ease: 0.08, holeEase: 0.22, sa: 10, stretch: 0.0,  width: 1120 },
+  };
+
+  const NECK_ANGLE = 35 * Math.PI / 180; // the neck rises from the body at about this angle
+  const GRID_J = 24, GRID_I = 48;        // development grid: rays across, stations along
+
+  // ------------------------------------------------------------ the draft
+  function build(settings) {
+    const m = derive(settings.m || {});
+    const fab = FABRICS[settings.fabric] || FABRICS.fleece;
+    const harness = settings.garment === 'harness';
+    const split = harness || settings.closure === 'velcro';
+    const ease = settings.ease != null && settings.ease !== '' ? settings.ease / 100 : fab.ease;
+    const sa = settings.sa != null && settings.sa !== '' ? +settings.sa : fab.sa;
+    const opt = Object.assign({ collar: 'band', cuffs: false, hemBand: false, collarHeight: 30, overlap: 25, cornerR: 18 }, settings.opt || {});
+
+    // --- the body: girth along the station s, 0 at the collar on the spine
+    const legR = m.legCirc * (1 + fab.holeEase) / TAU;  // leg hole radius on the surface
+    const sHole = m.neckToLeg + legR;                     // leg hole centre
+    const sChest = sHole + legR + 8;                      // widest girth, just behind the legs
+    const L = m.back;
+    function G(s) {
+      if (s <= 0) return m.neck;
+      if (s <= sChest) return lerp(m.neck, m.chest, smooth(s / sChest));
+      const t = (s - sChest) / Math.max(1, L - sChest);
+      return lerp(m.chest, m.waist, smooth((t - 0.15) / 0.85));
+    }
+    const Gg = (s) => G(s) * (1 + ease);                  // the garment's girth
+
+    // --- the neckline: the collar ring is perpendicular to the neck, which
+    // rises from the body; seen along the body the ring's top is further back
+    // than its underside by the ring's height × tan(angle).
+    const neckRadii = ringRadii(Gg(0));
+    const h = neckRadii.a * Math.tan(NECK_ANGLE);
+    const sFront = (f) => h * (ringPoint(f)[1] / ASPECT - 1); // 0 at the spine, −2h under the throat
+
+    // --- the side seam: placed so the belly piece between the leg holes is
+    // the measured chest width, with the holes centred on the seam
+    const bellyW = m.chestWidth * (1 + ease) + 2 * legR;
+    const fTop = clamp(1 - bellyW / Gg(sHole), 0.5, 0.8);
+    const fSeam = fTop / 2;
+    const fSeamB = 0.5 - fSeam;   // the seam in the belly piece's own coordinate, from the belly line
+
+    // --- lengths
+    const sBellyEnd = harness ? sHole + legR + 32 : clamp(sFront(0.5) + m.bellyLength, sHole + legR + 22, L - 15);
+    const bellyDrop = harness ? 8 : 14;          // the belly hem is a shallow curve, its sides higher
+    const sBellySide = sBellyEnd - bellyDrop;    // where the side seam ends
+    const Lback = harness ? sHole + legR + 44 : L;
+    const hemDrop = harness ? 6 : 12;
+    const fHem = harness ? fTop : Math.min(fTop, 0.52);  // the sweater's skirt narrows to sit on the hips
+    const sCornerBack = Lback - hemDrop;
+    const fSide = (s) => {                                // the back piece's half-width fraction at s
+      if (s <= sBellySide) return fSeam;
+      return lerp(fSeam, fHem / 2, smooth((s - sBellySide) / Math.max(1, sCornerBack - sBellySide)));
+    };
+    const sBack = (f) => Lback - hemDrop * Math.pow(clamp(f / (fHem / 2), 0, 1), 2);
+    const sDring = harness ? sHole + legR + 14 : null;
+
+    // --- the 3D garment surface, mm: [along (s), sideways, vertical] with the spine line level
+    function surface(s, f) {
+      const r = ringRadii(Gg(s));
+      const p = ringPoint(f);
+      return [s, r.b * p[0], r.b * p[1] - r.a];
+    }
+
+    // A straight run in (s, f), sampled every few mm so that its flattened
+    // image follows the development's curve rather than cutting a chord.
+    function run(a, b) {
+      const n = Math.max(2, Math.ceil(Math.abs(b[0] - a[0]) / 4));
+      const pts = [];
+      for (let k = 0; k <= n; k++) pts.push([lerp(a[0], b[0], k / n), lerp(a[1], b[1], k / n)]);
+      return pts;
+    }
+    // The half of the leg hole that belongs to a piece whose seam is at fSeamPiece
+    // in that piece's own f, lying on the lower-f side of the seam; front to back.
+    function holeArc(fSeamPiece) {
+      const pts = [];
+      for (let k = 0; k <= 24; k++) {
+        const t = Math.PI * k / 24;
+        const s = sHole - legR * Math.cos(t);
+        pts.push([s, fSeamPiece - legR * Math.sin(t) / Gg(s)]);
+      }
+      return pts;
+    }
+
+    // ------------------------------------------------- the back piece
+    // Outline in (s, f), walked as it will be drawn: fold on the left, neck
+    // at the top; neck edge, seam with the leg notch, skirt edge, hem, fold.
+    function backOutline() {
+      const segs = [];
+      const neck = [];
+      for (let k = 0; k <= 24; k++) { const f = fSeam * k / 24; neck.push([sFront(f), f]); }
+      segs.push({ tag: 'neck', pts: neck });
+      segs.push({ tag: 'seam', pts: run([sFront(fSeam), fSeam], [sHole - legR, fSeam]) });
+      segs.push({ tag: 'hole', pts: holeArc(fSeam) });
+      segs.push({ tag: 'seam', pts: run([sHole + legR, fSeam], [sBellySide, fSeam]) });
+      const skirt = [];
+      for (let k = 0; k <= 20; k++) { const s = lerp(sBellySide, sCornerBack, k / 20); skirt.push([s, fSide(s)]); }
+      segs.push({ tag: 'skirt', pts: skirt, round: 'end' });
+      const hem = [];
+      for (let k = 0; k <= 24; k++) { const f = (fHem / 2) * (1 - k / 24); hem.push([sBack(f), f]); }
+      segs.push({ tag: 'hem', pts: hem });
+      segs.push({ tag: 'fold', pts: [[Lback, 0], [0, 0]] });
+      return segs;
+    }
+
+    // ------------------------------------------------- the belly piece
+    // In its own coordinate fb = 0.5 − f, measured from the belly line.
+    function bellyOutline() {
+      const segs = [];
+      const neck = [];
+      for (let k = 0; k <= 24; k++) { const fb = fSeamB * k / 24; neck.push([sFront(0.5 - fb), fb]); }
+      segs.push({ tag: 'neck', pts: neck });
+      segs.push({ tag: 'seam', pts: run([sFront(fSeam), fSeamB], [sHole - legR, fSeamB]) });
+      segs.push({ tag: 'hole', pts: holeArc(fSeamB) });
+      segs.push({ tag: 'seam', pts: run([sHole + legR, fSeamB], [sBellySide, fSeamB]), round: 'end' });
+      const hem = [];
+      for (let k = 0; k <= 24; k++) { const fb = fSeamB * (1 - k / 24); hem.push([sBellyEnd - bellyDrop * Math.pow(fb / fSeamB, 2), fb]); }
+      segs.push({ tag: 'hem', pts: hem });
+      segs.push({ tag: 'fold', pts: [[sBellyEnd, 0], [sFront(0.5), 0]] });
+      return segs;
+    }
+
+    // ------------------------------------------- development (flattening)
+    // rays: f values; each ray carries GRID_I+1 stations from s0[j] to s1[j].
+    function develop(rays, s0, s1, toSurface) {
+      const J = rays.length - 1, I = GRID_I;
+      const P = [], Q = [];
+      for (let j = 0; j <= J; j++) {
+        P.push([]);
+        for (let i = 0; i <= I; i++) P[j].push(toSurface(lerp(s0[j], s1[j], i / I), rays[j]));
+      }
+      // the fold ray, straight, with its true length, y equal to the station it starts at
+      Q.push([[0, s0[0]]]);
+      for (let i = 1; i <= I; i++) Q[0].push([0, Q[0][i - 1][1] + dist3(P[0][i], P[0][i - 1])]);
+      for (let j = 1; j <= J; j++) {
+        const row = new Array(I + 1);
+        // station 1 from the diagonal and its ring edge, then station 0 from the ray and ring edges
+        row[1] = third(Q[j - 1][1], Q[j - 1][0], dist3(P[j][1], P[j - 1][1]), dist3(P[j][1], P[j - 1][0]));
+        row[0] = third(row[1], Q[j - 1][0], dist3(P[j][0], P[j][1]), dist3(P[j][0], P[j - 1][0]));
+        for (let i = 2; i <= I; i++) row[i] = third(Q[j - 1][i], row[i - 1], dist3(P[j][i], P[j - 1][i]), dist3(P[j][i], P[j][i - 1]));
+        Q.push(row);
+      }
+      // a point (s, f) of the region onto the flat sheet, by bilinear interpolation in the grid
+      function map(s, f) {
+        const jc = clamp(f / rays[J] * J, 0, J - 1e-9);
+        const j = Math.floor(jc), tj = jc - j;
+        const onRay = (jj) => {
+          const ic = clamp((s - s0[jj]) / (s1[jj] - s0[jj]) * I, 0, I - 1e-9);
+          const i = Math.floor(ic), ti = ic - i;
+          const a = Q[jj][i], b = Q[jj][i + 1];
+          return [lerp(a[0], b[0], ti), lerp(a[1], b[1], ti)];
+        };
+        const p = onRay(j), q = onRay(j + 1);
+        return [lerp(p[0], q[0], tj), lerp(p[1], q[1], tj)];
+      }
+      return { P, Q, map, rays, s0, s1 };
+    }
+    // The third corner of a triangle with corners A and B and the lengths of
+    // its other two sides, on the side where cross(B−A, C−A) > 0.
+    function third(A, B, dA, dB) {
+      const dx = B[0] - A[0], dy = B[1] - A[1];
+      const d = Math.hypot(dx, dy) || 1e-9;
+      const x = clamp((dA * dA - dB * dB + d * d) / (2 * d), -dA, dA);
+      const y = Math.sqrt(Math.max(0, dA * dA - x * x));
+      const ux = dx / d, uy = dy / d;
+      return [A[0] + x * ux - y * uy, A[1] + x * uy + y * ux];
+    }
+
+    const raysB = [], s0B = [], s1B = [];
+    for (let j = 0; j <= GRID_J; j++) { const f = fSeam * j / GRID_J; raysB.push(f); s0B.push(sFront(f) - 3); s1B.push(Lback + 3); }
+    const devB = develop(raysB, s0B, s1B, surface);
+    const raysY = [], s0Y = [], s1Y = [];
+    for (let j = 0; j <= GRID_J; j++) { const fb = fSeamB * j / GRID_J; raysY.push(fb); s0Y.push(sFront(0.5 - fb) - 3); s1Y.push(sBellyEnd + 3); }
+    const devY = develop(raysY, s0Y, s1Y, (s, fb) => surface(s, 0.5 - fb));
+
+    function flatten(segs, dev) {
+      return segs.map((sg) => {
+        const pts = sg.pts.map((p) => dev.map(p[0], p[1]));
+        return { tag: sg.tag, round: sg.round, param: sg.pts, pts, raw: pts.slice() };  // raw: before any corner is rounded
+      });
+    }
+    const backSegs = flatten(backOutline(), devB);
+    const bellySegs = flatten(bellyOutline(), devY);
+
+    // --------------------------------------------------------- pieces
+    const pieces = [];
+    const title = harness ? 'Cat harness vest' : 'Cat sweater';
+    const back = makePiece({
+      id: 'back', name: 'Back', segs: backSegs, sa, fold: !split, cornerR: opt.cornerR,
+      cut: split ? (harness ? 'cut 2 mirrored, plus 2 in lining' : 'cut 2 mirrored') : 'cut 1 on fold',
+      extension: split ? opt.overlap / 2 : 0,
+      marks: sDring ? [{ kind: 'dring', y: devB.map(sDring, 0)[1], w: 25, l: 50 }] : [],
+    });
+    const belly = makePiece({
+      id: 'belly', name: harness ? 'Chest' : 'Belly', segs: bellySegs, sa, fold: true, cornerR: opt.cornerR,
+      cut: harness ? 'cut 1 on fold, plus 1 in lining' : 'cut 1 on fold',
+      extension: 0, marks: [],
+    });
+    pieces.push(back, belly);
+
+    // --- the edge lengths that bands and the fit check need (finished, before bands)
+    const sum = (segs, tag) => segs.filter((s) => s.tag === tag).reduce((t, s) => t + polyLength(s.pts), 0);
+    const neckOpening = 2 * (sum(back.segs, 'neck') + sum(belly.segs, 'neck'));
+    const holeOpening = sum(back.segs, 'hole') + sum(belly.segs, 'hole');
+    const backHem = 2 * (sum(back.segs, 'hem') + sum(back.segs, 'skirt'));
+    const bellyHem = 2 * sum(belly.segs, 'hem');
+    const seamLen = (sg) => (sg.straight != null ? sg.straight : polyLength(sg.pts));
+    const seamBack = back.segs.filter((s) => s.tag === 'seam').map(seamLen);
+    const seamBelly = belly.segs.filter((s) => s.tag === 'seam').map(seamLen);
+    // the belly's seam ends where its hem curve begins; a notch on the back piece marks the spot
+    const backSeam2 = back.segs.filter((s) => s.tag === 'seam')[1];
+    if (backSeam2 && seamBelly[1] < seamBack[1] - 2) back.notches.push({ p: pointAt(backSeam2.pts, seamBelly[1]), kind: 'end' });
+
+    // --- bands (rectangles): ribbing is cut shorter than the edge it finishes, and stretched on
+    const bands = [];
+    const ribRecover = fab.stretch >= 0.5 ? 0.8 : 0.88;
+    if (!harness && opt.collar === 'band') {
+      bands.push(rect('collar', 'Collar band', neckOpening * ribRecover, 2 * opt.collarHeight, sa, split ? 'cut 1, open at the back' : 'cut 1, joined into a ring', 'ribbing, greatest stretch along the length'));
+    }
+    if (!harness && opt.cuffs) bands.push(rect('cuff', 'Leg cuff', holeOpening * 0.85, 2 * 20, sa, 'cut 2', 'ribbing, stretch along the length'));
+    if (!harness && opt.hemBand) bands.push(rect('hemband', 'Hem band', (backHem + bellyHem) * 0.9, 2 * 25, sa, split ? 'cut 1, open at the back' : 'cut 1, joined into a ring', 'ribbing, stretch along the length'));
+    pieces.push(...bands);
+
+    // --- the fit check and what to buy
+    const fit = fitCheck({ m, fab, ease, neckOpening, holeOpening, split, harness, opt, bellyEnd: sBellyEnd, L });
+    const warnings = validate(m).concat(fit.warnings);
+    const notions = notionsFor({ harness, split, opt, fab, sa, back, bands, neckOpening, holeOpening });
+    const yardage = fabricEstimate(pieces, fab.width, harness);
+
+    return {
+      title, pieces, fit, warnings, notions, yardage,
+      body: { G, Gg, sFront, sBack, fSide, surface, sHole, legR, sChest, L, Lback, fTop, fSeam, fHem, sBellyEnd, sBellySide, h, sDring },
+      edges: { neckOpening, holeOpening, backHem, bellyHem, seamBack, seamBelly },
+      settings: { ease, sa, fabric: settings.fabric in FABRICS ? settings.fabric : 'fleece', garment: harness ? 'harness' : 'sweater', closure: split ? 'velcro' : 'pullover', opt, split, harness },
+      measurements: m,
+      // the (s, f) outlines in body coordinates, for drawing the garment on the cat
+      regions: {
+        back: back.segs.map((s) => ({ tag: s.tag, pts: s.param })),
+        belly: belly.segs.map((s) => ({ tag: s.tag, pts: s.param.map((p) => [p[0], 0.5 - p[1]]) })),
+      },
+    };
+  }
+
+  // A piece: its stitch line (closed), its cutting line (offset by the seam
+  // allowance, except along the fold), and the marks that go on it.
+  function makePiece({ id, name, segs, sa, fold, cut, extension, cornerR, marks }) {
+    // round the corners flagged on the (s, f) outline, now in flat mm
+    for (let k = 0; k < segs.length; k++) {
+      if (segs[k].round === 'end') {
+        const next = segs[(k + 1) % segs.length];
+        segs[k].straight = fillet(segs[k].pts, next.pts, cornerR);   // the length before the arc begins
+      }
+    }
+    // the stitch line as one closed polygon; edge k runs from verts[k] to verts[k+1] and carries tags[k]
+    let verts = [], tags = [];
+    for (const sg of segs) {
+      for (let k = 0; k < sg.pts.length - 1; k++) {
+        if (dist(sg.pts[k], sg.pts[k + 1]) < 1e-6) continue;
+        verts.push(sg.pts[k]); tags.push(sg.tag);
+      }
+    }
+    // the fold is straight by construction; pin it to x = 0 exactly
+    for (let k = 0; k < verts.length; k++) if (Math.abs(verts[k][0]) < 1e-6) verts[k] = [0, verts[k][1]];
+    const stitch = verts.slice();
+    // a split back: the fold becomes an overlap strip, the mirror of the first
+    // few mm of the piece, so the neck and hem curves carry on across the centre
+    if (extension > 0) {
+      const kFold = tags.indexOf('fold');                                      // the fold is the last run: drop it
+      const neckRun = clipRun(segs[0].pts, extension);                         // neck points with x ≤ extension
+      const hemRun = clipRun(segs[segs.length - 2].pts.slice().reverse(), extension); // the hem, walked out from the fold
+      const nv = verts.slice(0, kFold + 1), nt = tags.slice(0, kFold + 1);
+      nt[kFold] = 'overlap';
+      // along the mirrored hem leftward, up the outer edge, back along the mirrored neck to the start
+      for (let k = 1; k < hemRun.length; k++) { nv.push([-hemRun[k][0], hemRun[k][1]]); nt.push('overlap'); }
+      for (let k = neckRun.length - 1; k >= 1; k--) { nv.push([-neckRun[k][0], neckRun[k][1]]); nt.push('overlap'); }
+      verts = nv; tags = nt;
+    }
+    const cutLine = offsetOutline(verts, tags, sa, fold ? 'fold' : null);
+    const bb = bbox(cutLine);
+    // notches: the ends of the leg hole and the middle of each seam run
+    const notches = [];
+    for (const sg of segs) {
+      if (sg.tag === 'hole') notches.push({ p: sg.pts[0], kind: 'hole' }, { p: sg.pts[sg.pts.length - 1], kind: 'hole' });
+      if (sg.tag === 'seam') { const l = polyLength(sg.pts); if (l > 40) notches.push({ p: pointAt(sg.pts, l / 2), kind: 'seam' }); }
+    }
+    return { id, name, cut, stitch, outline: verts, tags, cutLine, sa, fold, extension, bbox: bb, notches, segs, marks: marks || [], kind: 'piece' };
+  }
+  // The leading run of a polyline with x ≤ xMax, ending on the exact crossing.
+  function clipRun(pts, xMax) {
+    const out = [pts[0]];
+    for (let k = 1; k < pts.length; k++) {
+      if (pts[k][0] <= xMax) { out.push(pts[k]); continue; }
+      const a = pts[k - 1], b = pts[k];
+      const t = (xMax - a[0]) / (b[0] - a[0]);
+      out.push([xMax, lerp(a[1], b[1], t)]);
+      break;
+    }
+    return out;
+  }
+  // Round the corner where polyline A ends and B begins: each side is trimmed
+  // back by the tangent length of a radius-R arc and the gap is bridged by a
+  // quadratic curve through the old corner, which is tangent to both sides.
+  // Returns the length of A that is left straight (before the curve begins).
+  function fillet(A, B, R) {
+    const P = A[A.length - 1];
+    const lenA = polyLength(A), lenB = polyLength(B);
+    if (lenA < 1e-6 || lenB < 1e-6) return lenA;
+    const probe = Math.min(R, lenA * 0.5, lenB * 0.5);
+    const a = pointAt(A.slice().reverse(), probe), b = pointAt(B, probe);
+    const u = [a[0] - P[0], a[1] - P[1]], v = [b[0] - P[0], b[1] - P[1]];
+    const lu = Math.hypot(u[0], u[1]) || 1e-9, lv = Math.hypot(v[0], v[1]) || 1e-9;
+    const theta = Math.acos(clamp((u[0] * v[0] + u[1] * v[1]) / (lu * lv), -1, 1));
+    if (theta > Math.PI - 0.05 || theta < 0.05) return lenA;
+    const t = Math.min(R / Math.tan(theta / 2), 0.9 * Math.min(lenA, lenB));
+    const T1 = pointAt(A.slice().reverse(), t), T2 = pointAt(B, t);
+    trimEnd(A, t); trimStart(B, t);
+    const steps = 8;
+    for (let k = 1; k < steps; k++) {
+      const q = k / steps, w0 = (1 - q) * (1 - q), w1 = 2 * q * (1 - q), w2 = q * q;
+      A.push([w0 * T1[0] + w1 * P[0] + w2 * T2[0], w0 * T1[1] + w1 * P[1] + w2 * T2[1]]);
+    }
+    return lenA - t;
+  }
+  // cut the last / first t mm off a polyline, in place
+  function trimEnd(pts, t) {
+    let left = t;
+    while (pts.length > 1) {
+      const l = dist(pts[pts.length - 1], pts[pts.length - 2]);
+      if (l > left) { const q = (l - left) / l; const a = pts[pts.length - 2], b = pts[pts.length - 1]; pts[pts.length - 1] = [lerp(a[0], b[0], q), lerp(a[1], b[1], q)]; return; }
+      left -= l; pts.pop();
+    }
+  }
+  function trimStart(pts, t) { pts.reverse(); trimEnd(pts, t); pts.reverse(); }
+
+  function rect(id, name, length, height, sa, cut, note) {
+    const stitch = [[0, 0], [length, 0], [length, height], [0, height]];
+    const cutLine = [[-sa, -sa], [length + sa, -sa], [length + sa, height + sa], [-sa, height + sa]];
+    return { id, name, cut, note, stitch, outline: stitch, tags: ['edge', 'edge', 'edge', 'edge'], cutLine, sa, fold: false, extension: 0, bbox: bbox(cutLine), notches: [], segs: [], marks: [], kind: 'band', length, height };
+  }
+
+  // Offset a closed outline outward by d: round at convex corners, mitred at
+  // concave ones. Edges tagged `skip` (the fold) are not offset — the cut
+  // line runs along them and the neighbours' offsets are squared off onto it.
+  function offsetOutline(pts, tags, d, skip) {
+    const n = pts.length;
+    if (!(d > 0)) return pts.slice();
+    const cw = signedArea(pts) > 0;          // in screen coordinates (y down) a clockwise walk has positive area
+    const normal = (k) => {                   // outward unit normal of edge k
+      const a = pts[k], b = pts[(k + 1) % n];
+      const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1e-9;
+      return cw ? [dy / l, -dx / l] : [-dy / l, dx / l];
+    };
+    const out = [];
+    for (let k = 0; k < n; k++) {
+      const kPrev = (k - 1 + n) % n;
+      const p = pts[k];
+      const inSkip = tags[kPrev] === skip, outSkip = tags[k] === skip;
+      const nIn = normal(kPrev), nOut = normal(k);
+      if (inSkip && outSkip) { out.push(p); continue; }
+      if (inSkip) { out.push(p, [p[0] + d * nOut[0], p[1] + d * nOut[1]]); continue; }
+      if (outSkip) { out.push([p[0] + d * nIn[0], p[1] + d * nIn[1]], p); continue; }
+      const cross = nIn[0] * nOut[1] - nIn[1] * nOut[0];
+      const dot = nIn[0] * nOut[0] + nIn[1] * nOut[1];
+      if (dot > 0.99995) { out.push([p[0] + d * nOut[0], p[1] + d * nOut[1]]); continue; }
+      const convex = cw ? cross > 0 : cross < 0;
+      if (convex) {
+        const a0 = Math.atan2(nIn[1], nIn[0]);
+        let da = Math.atan2(nOut[1], nOut[0]) - a0;
+        while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
+        const steps = Math.max(1, Math.ceil(Math.abs(da) / (Math.PI / 12)));
+        for (let s = 0; s <= steps; s++) { const a = a0 + da * s / steps; out.push([p[0] + d * Math.cos(a), p[1] + d * Math.sin(a)]); }
+      } else {
+        const mx = nIn[0] + nOut[0], my = nIn[1] + nOut[1];
+        const ml = Math.hypot(mx, my) || 1e-9;
+        const len = Math.min(d / Math.sqrt(Math.max(1e-6, (1 + dot) / 2)), 2.5 * d);   // 1/cos of the half-angle, mitre-limited
+        out.push([p[0] + mx / ml * len, p[1] + my / ml * len]);
+      }
+    }
+    return removeLoops(out);
+  }
+  // An offset of a tight notch can fold back on itself; cut such local loops
+  // out at the crossing, leaving the outer boundary.
+  function removeLoops(pts) {
+    for (let guard = 0; guard < 40; guard++) {
+      const x = selfIntersects(pts);
+      if (!x) return pts;
+      const [i, j] = x;
+      const X = segIntersection(pts[i], pts[(i + 1) % pts.length], pts[j], pts[(j + 1) % pts.length]) || pts[j];
+      const inner = pts.slice(i + 1, j + 1);                       // the loop between the crossing edges
+      const outer = pts.slice(0, i + 1).concat([X], pts.slice(j + 1));
+      // keep whichever side is the piece: the one with the larger area
+      pts = Math.abs(signedArea(outer)) >= Math.abs(signedArea(inner)) ? outer : inner.concat([X]);
+    }
+    return pts;
+  }
+  function segIntersection(a, b, c, d) {
+    const r = [b[0] - a[0], b[1] - a[1]], s = [d[0] - c[0], d[1] - c[1]];
+    const den = r[0] * s[1] - r[1] * s[0];
+    if (Math.abs(den) < 1e-12) return null;
+    const t = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / den;
+    return [a[0] + t * r[0], a[1] + t * r[1]];
+  }
+
+  // ------------------------------------------------------------- fit
+  function fitCheck({ m, fab, ease, neckOpening, holeOpening, split, harness, opt, bellyEnd, L }) {
+    const warnings = [], notes = [];
+    const bandStretch = opt.collar === 'band' && !harness ? 0.6 : fab.stretch;
+    const neckMax = neckOpening * (1 + bandStretch);
+    if (!split) {
+      if (neckMax < m.head) warnings.push(`Pull-over: the neck opening is ${fmt(neckOpening)} around and stretches to about ${fmt(neckMax)}, but the head is ${fmt(m.head)}. Choose the velcro back, a stretchier fabric or a ribbed collar, or add neck ease.`);
+      else notes.push(`The neck opening is ${fmt(neckOpening)} around and stretches to about ${fmt(neckMax)}, enough to pass a ${fmt(m.head)} head.`);
+    } else {
+      notes.push(`The back opens along the spine, so the neck (${fmt(neckOpening)} around) never has to pass over the head.`);
+    }
+    if (holeOpening * (1 + fab.stretch * 0.5) < m.legCirc * 1.08) warnings.push(`The leg holes (${fmt(holeOpening)} around) are tight for ${fmt(m.legCirc)} legs.`);
+    else notes.push(`Each leg hole is ${fmt(holeOpening)} around for a ${fmt(m.legCirc)} leg.`);
+    if (!harness && bellyEnd > L * 0.62) notes.push('The belly piece is long. On a male cat it should stop at the last rib so he can pee without wetting it.');
+    if (ease < 0 && fab.stretch === 0) warnings.push('Negative ease with a woven fabric will not go on: wovens do not stretch.');
+    if (harness && fab.stretch > 0.3) warnings.push('A harness in a very stretchy knit will give when the leash is pulled — a woven or a stable fleece with a woven lining holds its shape.');
+    return { warnings, notes, neckOpening, neckMax, head: m.head, holeOpening };
+  }
+
+  function notionsFor({ harness, split, opt, fab, sa, back, bands, neckOpening, holeOpening }) {
+    const list = [];
+    if (split) {
+      const run = back.bbox[3] - back.bbox[1] - 2 * sa;
+      list.push({ item: `Sew-on hook-and-loop tape, ${opt.overlap} mm wide`, qty: `${fmt(run + 20)} of hook and the same of loop` });
+    }
+    if (harness) {
+      list.push({ item: 'D-ring, 20–25 mm', qty: '1' });
+      list.push({ item: 'Webbing, 20–25 mm wide', qty: '80 mm, for the D-ring tab' });
+      list.push({ item: 'Lining fabric (a stable woven)', qty: 'as the main fabric' });
+    } else {
+      if (opt.collar === 'binding') list.push({ item: 'Bias binding or knit binding', qty: `${fmt(neckOpening + 80)} for the neck` });
+      if (bands.length) list.push({ item: 'Ribbing', qty: bands.map((b) => `${fmt(b.length + 2 * sa)} × ${fmt(b.height + 2 * sa)} for the ${b.name.toLowerCase()}`).join('; ') });
+      if (!opt.cuffs) list.push({ item: 'Leg-hole finish', qty: fab.stretch > 0 ? 'turn under and zigzag, or bind' : `bias binding, ${fmt(2 * holeOpening + 80)}` });
+    }
+    list.push({ item: 'Thread', qty: fab.stretch > 0 ? 'polyester, sewn with a stretch or narrow zigzag stitch' : 'polyester' });
+    return list;
+  }
+
+  // A greedy shelf layout of the cut pieces across the fabric width, for the length to buy.
+  function fabricEstimate(pieces, width, harness) {
+    const items = [];
+    for (const p of pieces) {
+      const w = p.bbox[2] - p.bbox[0], hgt = p.bbox[3] - p.bbox[1];
+      const copies = /^cut 2/.test(p.cut) ? 2 : 1;
+      for (let c = 0; c < copies; c++) items.push({ w: p.fold ? 2 * w : w, h: hgt });
+    }
+    items.sort((a, b) => b.h - a.h);
+    let x = 0, y = 0, rowH = 0;
+    for (const it of items) {
+      const w = Math.min(it.w, width), gap = 15;
+      if (x + w > width) { x = 0; y += rowH + gap; rowH = 0; }
+      x += w + gap; rowH = Math.max(rowH, it.h);
+    }
+    const length = Math.ceil((y + rowH + 30) / 50) * 50;
+    return { width, length, lined: harness, total: harness ? 2 * length : length };
+  }
+
+  // ----------------------------------------------------------- helpers
+  function polyLength(pts) { let l = 0; for (let k = 1; k < pts.length; k++) l += dist(pts[k], pts[k - 1]); return l; }
+  function pointAt(pts, d) {
+    for (let k = 1; k < pts.length; k++) {
+      const l = dist(pts[k], pts[k - 1]);
+      if (d <= l) { const t = l > 0 ? d / l : 0; return [lerp(pts[k - 1][0], pts[k][0], t), lerp(pts[k - 1][1], pts[k][1], t)]; }
+      d -= l;
+    }
+    return pts[pts.length - 1];
+  }
+  function signedArea(pts) { let a = 0; for (let k = 0; k < pts.length; k++) { const p = pts[k], q = pts[(k + 1) % pts.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
+  function bbox(pts) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of pts) { if (p[0] < x0) x0 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[0] > x1) x1 = p[0]; if (p[1] > y1) y1 = p[1]; }
+    return [x0, y0, x1, y1];
+  }
+  function pointInPolygon(x, y, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  // the first pair of edges of a polygon that cross, or null
+  function selfIntersects(pts) {
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue;
+        if (segsCross(a, b, pts[j], pts[(j + 1) % n])) return [i, j];
+      }
+    }
+    return null;
+  }
+  function segsCross(a, b, c, d) {
+    const o = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+    const o1 = o(a, b, c), o2 = o(a, b, d), o3 = o(c, d, a), o4 = o(c, d, b);
+    return (o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0) && o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0;
+  }
+  function fmt(mm) { return (mm / 10).toFixed(1).replace(/\.0$/, '') + ' cm'; }
+
+  const MM_PER_IN = 25.4;
+  function toUnit(mm, unit) { return unit === 'in' ? mm / MM_PER_IN : mm / 10; }
+  function fromUnit(v, unit) { return unit === 'in' ? v * MM_PER_IN : v * 10; }
+  function fmtUnit(mm, unit, digits) {
+    const v = toUnit(mm, unit);
+    const d = digits != null ? digits : (unit === 'in' ? 2 : 1);
+    return v.toFixed(d).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '') + (unit === 'in' ? '″' : ' cm');
+  }
+
+  return { build, derive, validate, PRESETS, FABRICS, DERIVED, ringPoint, ringRadii, ringParam, ASPECT, NECK_ANGLE, polyLength, pointAt, bbox, signedArea, pointInPolygon, selfIntersects, offsetOutline, toUnit, fromUnit, fmtUnit, fmt };
+})();
+if (typeof module !== 'undefined') module.exports = SWEATER;
+</script>
+<script>
+// ---------------------------------------------------------------------------
+// The cat, in three.js: a body built from the same girth profile the pattern
+// is drafted on, the garment's pieces wrapped onto it from their (s, f)
+// outlines — so what is drawn is the pattern, not a separate model — the
+// fabric print as a generated texture, and a tape to show where to measure.
+// ---------------------------------------------------------------------------
+var CAT3D = (function () {
+  'use strict';
+  const S = 0.01;                 // mm → scene units
+  const NECK_ANGLE = SWEATER.NECK_ANGLE;
+  let renderer, scene, camera, canvas, catGroup, garmentGroup, tapeGroup, lights;
+  const orbit = { theta: 0.8, phi: 1.2, dist: 9, target: new THREE.Vector3(-1.5, 1.4, 0), auto: true };
+  let cat = null;                 // the cat's layout numbers, for the garment and the tape
+  let lastCatKey = '', lastGarmentKey = '', lastHighlight = null;
+  let current = null;
+  const api = { onInteract: null };
+
+  // ------------------------------------------------------------ setup
+  function setup(cv) {
+    canvas = cv;
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color('#0f141b');
+    camera = new THREE.PerspectiveCamera(32, 1, 0.05, 200);
+    lights = new THREE.Group();
+    const hemi = new THREE.HemisphereLight(0xdfe9ff, 0x3a3328, 0.85);
+    const key = new THREE.DirectionalLight(0xfff3e0, 0.95); key.position.set(6, 9, 5);
+    const fill = new THREE.DirectionalLight(0xbcd3ff, 0.35); fill.position.set(-7, 4, -4);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.25); rim.position.set(-3, 6, 8);
+    lights.add(hemi, key, fill, rim);
+    scene.add(lights);
+    // a soft shadow blob on the floor
+    const gc = document.createElement('canvas'); gc.width = gc.height = 256;
+    const g = gc.getContext('2d');
+    const grad = g.createRadialGradient(128, 128, 10, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(0,0,0,0.55)'); grad.addColorStop(0.6, 'rgba(0,0,0,0.25)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gc), transparent: true, depthWrite: false }));
+    ground.rotation.x = -Math.PI / 2; ground.name = 'ground';
+    scene.add(ground);
+    catGroup = new THREE.Group(); garmentGroup = new THREE.Group(); tapeGroup = new THREE.Group();
+    scene.add(catGroup, garmentGroup, tapeGroup);
+    controls();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas.parentElement);
+    resize();
+    requestAnimationFrame(frame);
+  }
+  function resize() {
+    if (!renderer) return;
+    const r = canvas.parentElement.getBoundingClientRect();
+    const w = Math.max(1, Math.floor(r.width)), h = Math.max(1, Math.floor(r.height));
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    if (cat) fitDistance();
+  }
+  function frame() {
+    requestAnimationFrame(frame);
+    if (!cat || canvas.clientWidth === 0) return;
+    if (orbit.auto) orbit.theta += 0.0035;
+    placeCamera();
+    renderer.render(scene, camera);
+  }
+  function placeCamera() {
+    const sp = Math.sin(orbit.phi);
+    camera.position.set(orbit.target.x + orbit.dist * sp * Math.sin(orbit.theta), orbit.target.y + orbit.dist * Math.cos(orbit.phi), orbit.target.z + orbit.dist * sp * Math.cos(orbit.theta));
+    camera.lookAt(orbit.target);
+  }
+  function fitDistance() {
+    const L = cat.L * S;
+    const t = Math.tan(camera.fov * Math.PI / 360);
+    orbit.dist = Math.max(2.5 * L / (2 * t * camera.aspect), 1.45 * L / (2 * t)) * 1.08;
+  }
+  function controls() {
+    const touches = new Map();
+    let drag = null, pinch = null;
+    const interact = () => { if (orbit.auto) { orbit.auto = false; if (api.onInteract) api.onInteract(); } };
+    canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      touches.set(e.pointerId, [e.clientX, e.clientY]);
+      if (touches.size === 1) drag = { x: e.clientX, y: e.clientY, theta: orbit.theta, phi: orbit.phi };
+      else if (touches.size === 2) { const [a, b] = Array.from(touches.values()); pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), dist: orbit.dist }; drag = null; }
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pinch && touches.size === 2) {
+        const [a, b] = Array.from(touches.values());
+        orbit.dist = Math.min(40, Math.max(1.5, pinch.dist * pinch.d / Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1]))));
+        interact();
+      } else if (drag) {
+        const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (Math.abs(dx) + Math.abs(dy) > 2) interact();
+        orbit.theta = drag.theta - dx * 0.007;
+        orbit.phi = Math.min(2.35, Math.max(0.12, drag.phi - dy * 0.006));   // past 1.57 you are looking up from under the floor, at the belly piece
+      }
+    });
+    const end = (e) => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; if (!touches.size) drag = null; };
+    canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
+    canvas.addEventListener('wheel', (e) => { e.preventDefault(); orbit.dist = Math.min(40, Math.max(1.5, orbit.dist * Math.exp((e.deltaMode === 1 ? e.deltaY * 20 : e.deltaY) * 0.0012))); }, { passive: false });
+  }
+  function setView(name) {
+    const v = { 'three-quarter': [0.8, 1.2], side: [0, 1.35], front: [Math.PI / 2, 1.25], top: [0.5, 0.15], below: [0.6, 2.2] }[name] || [0.8, 1.2];
+    orbit.theta = v[0]; orbit.phi = v[1];
+  }
+  function autoRotate(on) { orbit.auto = on; }
+  function showGarment(on) { garmentGroup.visible = on; }
+
+  // ------------------------------------------------------------ helpers
+  function clear(group) {
+    while (group.children.length) {
+      const o = group.children[0];
+      o.traverse((c) => { if (c.geometry) c.geometry.dispose(); if (c.material) { const ms = Array.isArray(c.material) ? c.material : [c.material]; for (const m of ms) { if (m.map) m.map.dispose(); m.dispose(); } } });
+      group.remove(o);
+    }
+  }
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  // body-frame [s, sideways, vertical] (mm, vertical relative to the spine line) → scene
+  const toScene = (p) => V(-p[0] * S, (cat.zTop + p[2]) * S, p[1] * S);
+  function limb(A, B, rA, rB, mat, group) {
+    const dir = B.clone().sub(A), len = dir.length();
+    const geo = new THREE.CylinderGeometry(rB * S, rA * S, len, 18, 1);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.copy(A).add(B).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(V(0, 1, 0), dir.normalize());
+    group.add(m);
+    return m;
+  }
+  function ball(P, r, mat, group, scale) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r * S, 24, 18), mat);
+    if (group === tapeGroup) m.renderOrder = 10;
+    m.position.copy(P);
+    if (scale) m.scale.set(scale[0], scale[1], scale[2]);
+    group.add(m);
+    return m;
+  }
+  function tube(points, radius, mat, closed, group) {
+    if (points.length < 2) return null;
+    const curve = new THREE.CatmullRomCurve3(points, closed, 'catmullrom', 0.5);
+    const m = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(8, points.length * 2), radius * S, 10, closed), mat);
+    if (group === tapeGroup) m.renderOrder = 10;
+    group.add(m);
+    return m;
+  }
+  // a surface mesh from a (u, v) grid function returning scene positions; uv from the grid
+  function gridMesh(fn, nu, nv, mat, uvScale) {
+    const pos = [], uv = [], idx = [];
+    for (let i = 0; i <= nu; i++) for (let j = 0; j <= nv; j++) {
+      const p = fn(i / nu, j / nv); pos.push(p.x, p.y, p.z); uv.push(i / nu * (uvScale ? uvScale[0] : 1), j / nv * (uvScale ? uvScale[1] : 1));
+    }
+    for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+      const a = i * (nv + 1) + j, b = a + nv + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    return new THREE.Mesh(geo, mat);
+  }
+  function texture(cv) {
+    const t = new THREE.CanvasTexture(cv);
+    t.encoding = THREE.sRGBEncoding;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return t;
+  }
+  // a small seeded random, so a calico's patches stay put between rebuilds
+  function rng(seed) { let x = seed | 0 || 1; return () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return ((x >>> 0) % 100000) / 100000; }; }
+  function shade(hex, k) { // lighten (k > 0) or darken (k < 0) a colour
+    const c = new THREE.Color(hex); const hsl = {}; c.getHSL(hsl);
+    c.setHSL(hsl.h, hsl.s, Math.min(1, Math.max(0, hsl.l + k)));
+    return '#' + c.getHexString();
+  }
+
+  // ------------------------------------------------------------ the cat
+  const COAT = {
+    orange: { base: '#e08a3c', tabby: '#b2541c', belly: '#f0c9a0' },
+    black: { base: '#232020' },
+    grey: { base: '#8d9096' },
+    white: { base: '#f1ede6' },
+    brownTabby: { base: '#8b6a44', tabby: '#3d2a18', belly: '#c9b593' },
+    greyTabby: { base: '#a3a39b', tabby: '#4f4f4a', belly: '#d0cfc6' },
+    tuxedo: { base: '#2a2727', bib: '#f1ede6' },
+    calico: { base: '#eadfcf', patches: ['#e08a3c', '#2a2727'] },
+    siamese: { base: '#eadbc4', points: '#4a3426' },
+    cream: { base: '#e9d6b4', belly: '#f3e8d2' },
+    tortie: { base: '#3b2a22', patches: ['#c7762e', '#e0a04e'] },
+  };
+  const EYE = { green: '#6cb04a', gold: '#d9a62d', blue: '#5fa2d8', copper: '#b8622b', yellow: '#e3c54b', odd: ['#5fa2d8', '#d9a62d'] };
+
+  function coatCanvas(coatId, L) {
+    const coat = COAT[coatId] || COAT.orange;
+    const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512;
+    const g = cv.getContext('2d');
+    g.fillStyle = coat.base; g.fillRect(0, 0, 1024, 512);
+    const r = rng(7);
+    // the underside is paler on most coats
+    if (coat.belly) { const grad = g.createLinearGradient(0, 160, 0, 352); grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(0.5, coat.belly); grad.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = grad; g.globalAlpha = 0.8; g.fillRect(0, 160, 1024, 192); g.globalAlpha = 1; }
+    if (coat.bib) { // tuxedo: white belly and chest
+      g.fillStyle = coat.bib;
+      g.beginPath(); g.ellipse(512, 256, 560, 70, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(80, 256, 150, 130, 0, 0, Math.PI * 2); g.fill();
+    }
+    if (coat.tabby) { // stripes down the flanks, rings on the tail are elsewhere
+      g.strokeStyle = coat.tabby; g.lineCap = 'round'; g.globalAlpha = 0.6;
+      const pxPerMm = 1024 / (1.3 * L);
+      for (let x = 120; x < 1024; x += 24 * pxPerMm * (0.8 + 0.4 * r())) {
+        g.lineWidth = 5 * pxPerMm * (0.7 + 0.6 * r());
+        g.beginPath();
+        for (let y = 0; y <= 512; y += 16) { const xx = x + 18 * Math.sin(y / 60 + r() * 0.3) * (1 - Math.abs(y - 256) / 256); if (y === 0) g.moveTo(xx, y); else g.lineTo(xx, y); }
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      // the dorsal stripe
+      g.fillStyle = coat.tabby; g.globalAlpha = 0.45; g.fillRect(0, 0, 1024, 14); g.fillRect(0, 498, 1024, 14); g.globalAlpha = 1;
+    }
+    if (coat.patches) { // calico and tortoiseshell: big soft patches
+      for (let k = 0; k < (coatId === 'tortie' ? 26 : 11); k++) {
+        g.fillStyle = coat.patches[k % 2];
+        g.globalAlpha = coatId === 'tortie' ? 0.75 : 0.95;
+        const cx = r() * 1024, cy = r() * 512, rx = 60 + r() * 120, ry = 40 + r() * 80;
+        g.beginPath(); g.ellipse(cx, cy, rx, ry, r() * Math.PI, 0, Math.PI * 2); g.fill();
+        if (cx < 150) { g.beginPath(); g.ellipse(cx + 1024, cy, rx, ry, 0, 0, Math.PI * 2); g.fill(); }
+      }
+      g.globalAlpha = 1;
+    }
+    // fur: fine speckle
+    const img = g.getImageData(0, 0, 1024, 512), d = img.data;
+    for (let i = 0; i < d.length; i += 4) { const n = (r() - 0.5) * 26; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    g.putImageData(img, 0, 0);
+    return cv;
+  }
+
+  function buildCat(m, body, look) {
+    clear(catGroup);
+    const L = m.back;
+    const coat = COAT[look.coat] || COAT.orange;
+    const G = body.G;
+    const legR = m.legCirc / (2 * Math.PI) * 0.8;
+    const headR = m.head / (2 * Math.PI) * 0.93;
+    const legLen = 0.37 * L;
+    const aHole = SWEATER.ringRadii(G(body.sHole)).a;
+    const zTop = 2 * aHole * 0.9 + legLen;              // the spine line's height above the floor
+    cat = { L, zTop, legR, headR, body, m };
+    // the body: the girth profile with domed ends
+    const sA = body.sFront(0.5) - 24, sB = L + 36, capA = 42, capB = 46;
+    const bodyPt = (s, f) => {
+      const r = SWEATER.ringRadii(G(Math.min(Math.max(s, body.sFront(0.5)), L)));
+      let k = 1;
+      if (s < sA + capA) k = Math.sqrt(Math.max(0, 1 - Math.pow((sA + capA - s) / capA, 2)));
+      if (s > sB - capB) k = Math.min(k, Math.sqrt(Math.max(0, 1 - Math.pow((s - (sB - capB)) / capB, 2))));
+      k = 0.08 + 0.92 * k;
+      const p = SWEATER.ringPoint(f);
+      return [s, r.b * p[0] * k, r.b * p[1] * k - r.a];
+    };
+    const bodyMat = new THREE.MeshStandardMaterial({ map: texture(coatCanvas(look.coat, L)), roughness: 0.95, metalness: 0 });
+    const furMat = new THREE.MeshStandardMaterial({ color: coat.points || coat.base, roughness: 0.95 });
+    const faceMat = coat.points ? furMat : new THREE.MeshStandardMaterial({ color: coat.patches ? coat.patches[0] : coat.base, roughness: 0.95 });
+    const bellyMat = new THREE.MeshStandardMaterial({ color: coat.bib || coat.belly || (coat.points ? coat.points : coat.base), roughness: 0.95 });
+    catGroup.add(gridMesh((u, v) => toScene(bodyPt(sA + (sB - sA) * u, v)), 80, 56, bodyMat));
+    // the neck, rising from the body's front at the neck angle, and the head on it
+    const rNeck = SWEATER.ringRadii(m.neck).b * 0.98;
+    const neckBase = toScene([2, 0, -SWEATER.ringRadii(G(0)).a]);
+    const dir = V(Math.cos(NECK_ANGLE), Math.sin(NECK_ANGLE), 0);
+    const neckLen = 0.19 * L + 0.3 * headR;
+    const neckTop = neckBase.clone().add(dir.clone().multiplyScalar(neckLen * S));
+    limb(neckBase.clone().sub(dir.clone().multiplyScalar(20 * S)), neckTop, rNeck * 1.05, rNeck * 0.85, bodyMat, catGroup);
+    const head = neckTop.clone().add(V(0.3 * headR * S, 0.1 * headR * S, 0));
+    ball(head, headR, faceMat, catGroup, [1.02, 0.96, 1]);
+    const hp = (x, y, z) => head.clone().add(V(x * headR * S, y * headR * S, z * headR * S));
+    ball(hp(0.66, -0.2, 0), 0.5 * headR, coat.bib || coat.points ? bellyMat : faceMat, catGroup, [1.05, 0.72, 1.15]);
+    ball(hp(1.1, -0.04, 0), 0.11 * headR, new THREE.MeshStandardMaterial({ color: coat.points ? '#3a2a24' : '#d98b8b', roughness: 0.5 }), catGroup, [0.6, 0.75, 1]);
+    // eyes, with slit pupils
+    const eyeCol = EYE[look.eyes] || EYE.green;
+    for (const side of [-1, 1]) {
+      const col = Array.isArray(eyeCol) ? eyeCol[side < 0 ? 0 : 1] : eyeCol;
+      ball(hp(0.74, 0.22, side * 0.4), 0.17 * headR, new THREE.MeshStandardMaterial({ color: col, roughness: 0.25 }), catGroup);
+      ball(hp(0.86, 0.22, side * 0.39), 0.085 * headR, new THREE.MeshStandardMaterial({ color: '#0a0a0a', roughness: 0.4 }), catGroup, [0.5, 1.15, 0.4]);
+      ball(hp(0.88, 0.27, side * 0.36), 0.03 * headR, new THREE.MeshBasicMaterial({ color: '#ffffff' }), catGroup);
+      // ears
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.34 * headR * S, 0.8 * headR * S, 18), furMat);
+      ear.position.copy(hp(-0.12, 0.78, side * 0.5));
+      ear.rotation.set(side * 0.42, 0, -0.18);
+      catGroup.add(ear);
+      const inner = new THREE.Mesh(new THREE.ConeGeometry(0.2 * headR * S, 0.6 * headR * S, 14), new THREE.MeshStandardMaterial({ color: '#dba3a0', roughness: 0.8 }));
+      inner.position.copy(hp(-0.04, 0.74, side * 0.5));
+      inner.rotation.set(side * 0.42, 0, -0.18);
+      catGroup.add(inner);
+      // whiskers
+      const wpts = [];
+      for (const a of [-0.3, 0, 0.3]) {
+        const from = hp(0.95, -0.12, side * 0.28), to = hp(1.35, -0.12 + a * 0.5, side * 1.7);
+        wpts.push(from.x, from.y, from.z, to.x, to.y, to.z);
+      }
+      const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wpts, 3));
+      catGroup.add(new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })));
+    }
+    // legs
+    const pawMat = coat.bib ? bellyMat : furMat;
+    const sHole = body.sHole;
+    for (const side of [-1, 1]) {
+      // front: straight down from the shoulder, just inside the body wall
+      const top3 = bodyPt(sHole, body.fSeam + 0.02);
+      const top = toScene([top3[0], top3[1] * 0.72 * side, top3[2] + 10]);
+      const knee = V(top.x + 0.02 * L * S, legLen * 0.52 * S, top.z);
+      const paw = V(top.x + 0.06 * L * S, 0.9 * legR * S, top.z);
+      limb(top, knee, legR * 1.05, legR * 0.78, furMat, catGroup);
+      ball(knee, legR * 0.78, furMat, catGroup);
+      limb(knee, paw, legR * 0.78, legR * 0.6, furMat, catGroup);
+      ball(paw.clone().add(V(0.9 * legR * S, -0.3 * legR * S, 0)), legR * 0.95, pawMat, catGroup, [1.35, 0.62, 1.1]);
+      // hind: hip to a forward knee, back to the hock, forward to the paw
+      const hip3 = bodyPt(L - 0.09 * L, body.fSeam + 0.05);
+      const hip = toScene([hip3[0], hip3[1] * 0.7 * side, hip3[2] + 12]);
+      const hipH = hip.y;
+      const hknee = V(hip.x + 0.1 * L * S, hipH * 0.55, hip.z);
+      const hock = V(hip.x - 0.03 * L * S, hipH * 0.24, hip.z);
+      const hpaw = V(hip.x + 0.06 * L * S, 0.9 * legR * S, hip.z);
+      limb(hip, hknee, legR * 1.5, legR * 0.95, furMat, catGroup);
+      ball(hip, legR * 1.5, furMat, catGroup);
+      ball(hknee, legR * 0.95, furMat, catGroup);
+      limb(hknee, hock, legR * 0.9, legR * 0.6, furMat, catGroup);
+      ball(hock, legR * 0.6, furMat, catGroup);
+      limb(hock, hpaw, legR * 0.6, legR * 0.6, furMat, catGroup);
+      ball(hpaw.clone().add(V(0.9 * legR * S, -0.3 * legR * S, 0)), legR * 0.95, pawMat, catGroup, [1.35, 0.62, 1.1]);
+    }
+    // the tail: out of the rump and up in a curl
+    const tb = bodyPt(L + 22, 0.07);
+    const tail = [toScene([tb[0] - 10, 0, tb[2] - 4])];
+    const tl = 0.95 * L;
+    tail.push(toScene([L + 0.3 * tl, 0, tb[2] - 0.12 * tl]));
+    tail.push(toScene([L + 0.55 * tl, 0, tb[2] - 0.08 * tl]));
+    tail.push(toScene([L + 0.72 * tl, 0, tb[2] + 0.12 * tl]));
+    tail.push(toScene([L + 0.7 * tl, 0, tb[2] + 0.36 * tl]));
+    tail.push(toScene([L + 0.55 * tl, 0, tb[2] + 0.48 * tl]));
+    tube(tail, legR * 0.5, furMat, false, catGroup);
+    ball(tail[tail.length - 1], legR * 0.5, furMat, catGroup);
+    // the floor shadow and the camera target
+    const ground = scene.getObjectByName('ground');
+    ground.scale.set(2.2 * L * S, 1.1 * L * S, 1);
+    ground.position.set(-0.45 * L * S, 0.002, 0);
+    orbit.target.set(-0.58 * L * S, zTop * 0.6 * S, 0);
+    fitDistance();
+  }
+
+  // ------------------------------------------------------------ fabric
+  function fabricCanvas(look, along, around, harness) {
+    const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512;
+    const g = cv.getContext('2d');
+    const kx = 1024 / along, ky = 512 / around;    // px per mm
+    const { c1, c2, c3 } = look;
+    g.fillStyle = c1; g.fillRect(0, 0, 1024, 512);
+    const stripes = (period, width, col, vertical) => {
+      g.fillStyle = col;
+      if (vertical) for (let x = 0; x < 1024; x += period * kx) g.fillRect(x, 0, width * kx, 512);
+      else for (let y = 0; y < 512; y += period * ky) g.fillRect(0, y, 1024, width * ky);
+    };
+    const dots = (spacing, r, col, stagger) => {
+      g.fillStyle = col;
+      let row = 0;
+      for (let y = spacing * ky / 2; y < 512 + spacing * ky; y += spacing * ky, row++)
+        for (let x = (stagger && row % 2 ? spacing * kx : spacing * kx / 2); x < 1024 + spacing * kx; x += spacing * kx) { g.beginPath(); g.ellipse(x % 1024, y % 512, r * kx, r * ky, 0, 0, Math.PI * 2); g.fill(); }
+    };
+    const heart = (x, y, s, col) => {
+      g.fillStyle = col; g.beginPath();
+      g.moveTo(x, y + s * ky * 0.9);
+      g.bezierCurveTo(x - s * kx * 1.3, y, x - s * kx * 0.5, y - s * ky * 0.9, x, y - s * ky * 0.25);
+      g.bezierCurveTo(x + s * kx * 0.5, y - s * ky * 0.9, x + s * kx * 1.3, y, x, y + s * ky * 0.9);
+      g.fill();
+    };
+    const each = (spacing, fn, stagger) => { let row = 0; for (let y = spacing * ky / 2; y < 512 + spacing * ky; y += spacing * ky, row++) for (let x = (stagger && row % 2 ? spacing * kx : spacing * kx / 2); x < 1024 + spacing * kx; x += spacing * kx) fn(x % 1024, y % 512, row); };
+    switch (look.pattern) {
+      case 'stripes': stripes(28, 14, c2, true); break;
+      case 'pinstripes': stripes(9, 1.6, c2, true); break;
+      case 'wales': stripes(22, 11, c2, false); stripes(22, 1.5, c3, false); break;
+      case 'dots': dots(16, 3.2, c2, true); break;
+      case 'hearts': each(20, (x, y) => heart(x, y, 4, c2), true); break;
+      case 'fairisle':
+        stripes(56, 20, c2, true);
+        g.fillStyle = c3;
+        for (let x = 10 * kx; x < 1024; x += 56 * kx) for (let y = 0; y < 512 + 14 * ky; y += 14 * ky) {
+          g.beginPath(); g.moveTo(x, y - 5 * ky); g.lineTo(x + 5 * kx, y); g.lineTo(x, y + 5 * ky); g.lineTo(x - 5 * kx, y); g.closePath(); g.fill();
+          g.beginPath(); g.ellipse(x + 28 * kx, y + 7 * ky, 1.6 * kx, 1.6 * ky, 0, 0, Math.PI * 2); g.fill();
+          g.fillRect(x + 20 * kx - 1 * kx, y - 7 * ky, 2 * kx, 2 * ky); g.fillRect(x + 36 * kx - 1 * kx, y - 7 * ky, 2 * kx, 2 * ky);
+        }
+        break;
+      case 'argyle':
+        each(36, (x, y, row) => { g.fillStyle = row % 2 ? c2 : c3; g.beginPath(); g.moveTo(x, y - 18 * ky); g.lineTo(x + 14 * kx, y); g.lineTo(x, y + 18 * ky); g.lineTo(x - 14 * kx, y); g.closePath(); g.fill(); }, true);
+        g.strokeStyle = c2; g.lineWidth = 1.2 * kx; g.globalAlpha = 0.7;
+        for (let x = -1024; x < 2048; x += 36 * kx) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 512 * 14 / 18 * (kx / ky), 512); g.stroke(); g.beginPath(); g.moveTo(x, 512); g.lineTo(x + 512 * 14 / 18 * (kx / ky), 0); g.stroke(); }
+        g.globalAlpha = 1;
+        break;
+      case 'plaid':
+        g.globalAlpha = 0.55; stripes(40, 12, c2, true); stripes(40, 12, c2, false); g.globalAlpha = 0.6; stripes(40, 3, c3, true); stripes(40, 3, c3, false);
+        g.globalAlpha = 1; break;
+      case 'check': g.globalAlpha = 0.5; stripes(16, 8, c2, true); stripes(16, 8, c2, false); g.globalAlpha = 1; break;
+      case 'fish':
+        each(26, (x, y, row) => { g.fillStyle = c2; const d = row % 2 ? 1 : -1; g.beginPath(); g.ellipse(x, y, 6 * kx, 3.2 * ky, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.moveTo(x + d * 5 * kx, y); g.lineTo(x + d * 9 * kx, y - 3 * ky); g.lineTo(x + d * 9 * kx, y + 3 * ky); g.closePath(); g.fill(); g.fillStyle = c3; g.beginPath(); g.ellipse(x - d * 3 * kx, y - 0.8 * ky, 0.8 * kx, 0.8 * ky, 0, 0, Math.PI * 2); g.fill(); }, true);
+        break;
+      case 'paws':
+        each(24, (x, y) => { g.fillStyle = c2; g.beginPath(); g.ellipse(x, y + 1.5 * ky, 3.4 * kx, 2.8 * ky, 0, 0, Math.PI * 2); g.fill(); for (const [dx, dy] of [[-3.2, -2.6], [-1.1, -3.9], [1.1, -3.9], [3.2, -2.6]]) { g.beginPath(); g.ellipse(x + dx * kx, y + dy * ky, 1.2 * kx, 1.4 * ky, 0, 0, Math.PI * 2); g.fill(); } }, true);
+        break;
+      default: break;
+    }
+    // the knit: rows going round the cat, a faint stitch grain, a little fuzz
+    if (look.knit) {
+      g.globalAlpha = 0.12; g.fillStyle = '#000';
+      for (let x = 0; x < 1024; x += 2.3 * kx) g.fillRect(x, 0, Math.max(1, 0.8 * kx), 512);
+      g.globalAlpha = 0.07; g.fillStyle = '#fff';
+      for (let x = 1.1 * kx; x < 1024; x += 2.3 * kx) g.fillRect(x, 0, Math.max(1, 0.6 * kx), 512);
+      g.globalAlpha = 0.08; g.fillStyle = '#000';
+      for (let y = 0; y < 512; y += 1.6 * ky) g.fillRect(0, y, 1024, 1);
+      g.globalAlpha = 1;
+    } else if (harness) {
+      g.globalAlpha = 0.08; g.fillStyle = '#000';
+      for (let y = 0; y < 512; y += 1.2 * ky) g.fillRect(0, y, 1024, 1);
+      for (let x = 0; x < 1024; x += 1.2 * kx) g.fillRect(x, 0, 1, 512);
+      g.globalAlpha = 1;
+    }
+    const img = g.getImageData(0, 0, 1024, 512), d = img.data, r = rng(3);
+    for (let i = 0; i < d.length; i += 4) { const n = (r() - 0.5) * 14; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    g.putImageData(img, 0, 0);
+    return cv;
+  }
+  function ribCanvas(col) {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+    const g = cv.getContext('2d');
+    g.fillStyle = col; g.fillRect(0, 0, 256, 64);
+    g.fillStyle = 'rgba(0,0,0,0.22)'; for (let x = 0; x < 256; x += 8) g.fillRect(x, 0, 3, 64);
+    g.fillStyle = 'rgba(255,255,255,0.12)'; for (let x = 4; x < 256; x += 8) g.fillRect(x, 0, 2, 64);
+    return cv;
+  }
+
+  // ------------------------------------------------------------ the garment
+  // The pieces as (s, f) polygons are clipped to a grid on the body surface:
+  // each grid cell is kept, dropped, or cut along the outline, so the neck
+  // edge, hems and leg holes are the pattern's own curves.
+  function clipRegion(poly, bounds, cellMm, Gmax) {
+    const [s0, s1, f0, f1] = bounds;
+    const ns = Math.max(8, Math.ceil((s1 - s0) / cellMm)), nf = Math.max(6, Math.ceil((f1 - f0) * Gmax / cellMm));
+    const inside = (s, f) => SWEATER.pointInPolygon(s, f, poly);
+    const cross = (a, b) => { // the boundary point between an inside and an outside corner
+      let lo = a, hi = b;
+      const inA = inside(a[0], a[1]);
+      for (let k = 0; k < 11; k++) { const m = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2]; if (inside(m[0], m[1]) === inA) lo = m; else hi = m; }
+      return [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2];
+    };
+    const flags = [];
+    for (let i = 0; i <= ns; i++) { flags.push([]); for (let j = 0; j <= nf; j++) flags[i].push(inside(s0 + (s1 - s0) * i / ns, f0 + (f1 - f0) * j / nf)); }
+    const tris = [];
+    for (let i = 0; i < ns; i++) for (let j = 0; j < nf; j++) {
+      const corners = [[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]].map(([ii, jj]) => ({ p: [s0 + (s1 - s0) * ii / ns, f0 + (f1 - f0) * jj / nf], in: flags[ii][jj] }));
+      const n = corners.filter((c) => c.in).length;
+      if (n === 0) continue;
+      let polyCell;
+      if (n === 4) polyCell = corners.map((c) => c.p);
+      else {
+        polyCell = [];
+        for (let k = 0; k < 4; k++) {
+          const a = corners[k], b = corners[(k + 1) % 4];
+          if (a.in) polyCell.push(a.p);
+          if (a.in !== b.in) polyCell.push(cross(a.p, b.p));
+        }
+      }
+      for (let k = 1; k + 1 < polyCell.length; k++) tris.push(polyCell[0], polyCell[k], polyCell[k + 1]);
+    }
+    return tris;
+  }
+  function buildGarment(garment, look) {
+    clear(garmentGroup);
+    if (!cat) return;
+    const body = garment.body, set = garment.settings, m = garment.measurements;
+    const ease = set.ease;
+    const t = 2.6;                                                   // fabric over fur, mm
+    const Gr = (s) => Math.max(body.G(s), body.Gg(s));               // a stretch knit sits on the body, a loose woven hangs at its own size
+    const gPt = (s, f) => {                                          // body frame, mm
+      const r = SWEATER.ringRadii(Gr(Math.min(Math.max(s, body.sFront(0.5) - 5), body.L)));
+      const p = SWEATER.ringPoint(f);
+      // the garment ring is the body ring grown by the fabric thickness (or hanging at its own size), its top pinned to the back
+      return [s, (r.b + t) * p[0], (r.b + t) * p[1] + t - r.a - t * SWEATER.ASPECT];
+    };
+    const gScene = (s, f) => toScene(gPt(s, f));
+    const normalAt = (s, f) => {
+      const a = gScene(s + 1.5, f), b = gScene(s - 1.5, f), c = gScene(s, f + 0.003), d = gScene(s, f - 0.003);
+      return a.sub(b).cross(c.sub(d)).normalize();
+    };
+    const sMin = body.sFront(0.5) - 2, sMax = body.Lback + 2;
+    const around = Gr(body.sChest) / 2;
+    const fabricTex = texture(fabricCanvas(look, sMax - sMin, around, set.harness));
+    const fabricMat = new THREE.MeshStandardMaterial({ map: fabricTex, roughness: 0.93, metalness: 0, side: THREE.DoubleSide });
+    const bandCol = look.band === 'main' ? look.c1 : look.band === 'third' ? look.c3 : look.c2;
+    const ribMat = new THREE.MeshStandardMaterial({ map: texture(ribCanvas(bandCol)), roughness: 0.95, side: THREE.DoubleSide });
+    const edgeMat = new THREE.MeshStandardMaterial({ color: shade(look.c1, -0.08), roughness: 0.95 });
+    const seamMat = new THREE.MeshStandardMaterial({ color: shade(look.c1, -0.22), roughness: 1 });
+    const Gmax = Gr(body.sChest);
+    const regionPoly = (region) => region.flatMap((sg) => sg.pts.slice(0, -1));
+    for (const name of ['back', 'belly']) {
+      const poly = regionPoly(garment.regions[name]);
+      const bb = SWEATER.bbox(poly);
+      const tris = clipRegion(poly, [bb[0] - 1, bb[2] + 1, bb[1] - 0.002, bb[3] + 0.002], 3.5, Gmax);
+      const pos = [], nor = [], uv = [];
+      for (const p of tris) {
+        const q = gScene(p[0], p[1]), n = normalAt(p[0], p[1]);
+        pos.push(q.x, q.y, q.z); nor.push(n.x, n.y, n.z);
+        uv.push((p[0] - sMin) / (sMax - sMin), p[1] * 2);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      const mesh = new THREE.Mesh(geo, fabricMat);
+      garmentGroup.add(mesh);
+      const mirror = mesh.clone(); mirror.scale.z = -1;
+      garmentGroup.add(mirror);
+    }
+    // edges: a line in body (s, f) along a region's tagged runs → scene points
+    const runPts = (region, tags) => region.filter((sg) => tags.includes(sg.tag)).flatMap((sg) => sg.pts).map((p) => gScene(p[0], p[1]));
+    const both = (pts) => [pts, pts.map((p) => V(p.x, p.y, -p.z))];
+    // the side seam
+    for (const side of both(runPts(garment.regions.back, ['seam']))) tube(side, 0.7, seamMat, false, garmentGroup);
+    // the leg holes: the back's half and the belly's half make the ring
+    const hb = garment.regions.back.find((s) => s.tag === 'hole').pts, hy = garment.regions.belly.find((s) => s.tag === 'hole').pts;
+    const ring = hb.concat(hy.slice().reverse()).map((p) => gScene(p[0], p[1]));
+    for (const side of both(ring)) tube(side, set.opt.cuffs && !set.harness ? 3.4 : 1.4, set.opt.cuffs && !set.harness ? ribMat : edgeMat, true, garmentGroup);
+    // the hem: the back's hem and skirt edge, the belly's hem
+    const backHem = runPts(garment.regions.back, ['skirt', 'hem']);
+    const bellyHem = runPts(garment.regions.belly, ['hem']);
+    const hemR = set.opt.hemBand && !set.harness ? 3.2 : 1.4, hemMat = set.opt.hemBand && !set.harness ? ribMat : edgeMat;
+    for (const side of both(backHem)) tube(side, hemR, hemMat, false, garmentGroup);
+    for (const side of both(bellyHem)) tube(side, hemR, hemMat, false, garmentGroup);
+    // the neck: a standing ribbed collar, or a bound edge
+    const dir = V(Math.cos(NECK_ANGLE), Math.sin(NECK_ANGLE), 0);
+    if (!set.harness && set.opt.collar === 'band') {
+      const hgt = set.opt.collarHeight * 0.85;
+      const collar = gridMesh((u, v) => { const f = v; const base = gScene(body.sFront(f), f); const n = normalAt(body.sFront(f), f); return base.add(dir.clone().multiplyScalar(u * hgt * S)).add(n.multiplyScalar(u * 2 * S)); }, 4, 120, ribMat, [1, 14]);
+      garmentGroup.add(collar);
+      // the collar's top edge
+      const top = []; for (let k = 0; k <= 60; k++) { const f = k / 60; top.push(gScene(body.sFront(f), f).add(dir.clone().multiplyScalar(hgt * S))); }
+      tube(top, 1.6, ribMat, true, garmentGroup);
+    } else {
+      const neck = []; for (let k = 0; k <= 72; k++) { const f = k / 72; neck.push(gScene(body.sFront(f), f)); }
+      tube(neck, set.opt.collar === 'binding' || set.harness ? 2 : 1.4, set.opt.collar === 'binding' ? ribMat : edgeMat, true, garmentGroup);
+    }
+    // a split back: the velcro strip along the spine, lifted a little
+    if (set.split) {
+      const w = set.opt.overlap || 25;
+      const strip = gridMesh((u, v) => { const s = body.sFront(0) + 3 + (body.Lback - 5 - body.sFront(0)) * u; const f = (v - 0.5) * w / Gr(s); const p = gScene(s, f); return p.add(normalAt(s, f).multiplyScalar(1.6 * S)); }, 40, 4, new THREE.MeshStandardMaterial({ color: set.harness ? '#8e98a3' : shade(look.c1, -0.12), roughness: 1, side: THREE.DoubleSide }));
+      garmentGroup.add(strip);
+      const edgeL = []; for (let k = 0; k <= 30; k++) { const s = body.sFront(0) + 3 + (body.Lback - 8 - body.sFront(0)) * k / 30; edgeL.push(gScene(s, 0.5 * w / Gr(s)).add(normalAt(s, 0).multiplyScalar(1.8 * S))); }
+      tube(edgeL, 0.5, seamMat, false, garmentGroup);
+    }
+    // the harness D-ring on its tab
+    if (set.harness && body.sDring != null) {
+      const at = gScene(body.sDring, 0), n = normalAt(body.sDring, 0);
+      const tab = new THREE.Mesh(new THREE.BoxGeometry(50 * S, 2.2 * S, 24 * S), new THREE.MeshStandardMaterial({ color: '#3a3f46', roughness: 0.9 }));
+      tab.position.copy(at).add(n.clone().multiplyScalar(2.5 * S));
+      garmentGroup.add(tab);
+      const ringM = new THREE.Mesh(new THREE.TorusGeometry(10 * S, 1.7 * S, 12, 32), new THREE.MeshStandardMaterial({ color: '#d8dde3', metalness: 0.9, roughness: 0.3 }));
+      ringM.position.copy(at).add(n.clone().multiplyScalar(5 * S)).add(V(-12 * S, 6 * S, 0));
+      ringM.rotation.set(0, 0, 0.5);
+      garmentGroup.add(ringM);
+    }
+  }
+
+  // ------------------------------------------------------------ the tape
+  // drawn unlit and through the garment, so the tape shows wherever it goes
+  const tapeMat = () => new THREE.MeshBasicMaterial({ color: '#ffe135', depthTest: false, transparent: true, opacity: 0.92 });
+  function buildTape(id) {
+    clear(tapeGroup);
+    if (!id || !cat) return;
+    tapeGroup.renderOrder = 10;
+    const body = cat.body, m = cat.m, L = cat.L;
+    const mat = tapeMat();
+    const off = 3.5;
+    const surf = (s, f, lift) => { const r = SWEATER.ringRadii(body.G(Math.min(Math.max(s, body.sFront(0.5)), L))); const p = SWEATER.ringPoint(f); return toScene([s, (r.b + (lift || off)) * p[0], (r.b + (lift || off)) * p[1] - r.a + (lift || off) * 0]); };
+    const ringAt = (s, lift) => { const pts = []; for (let k = 0; k < 64; k++) pts.push(surf(s, k / 64, lift)); return pts; };
+    const line = (pts, r) => { tube(pts, r || 6, mat, false, tapeGroup); ball(pts[0], 10, mat, tapeGroup); ball(pts[pts.length - 1], 10, mat, tapeGroup); };
+    switch (id) {
+      case 'neck': { const pts = []; for (let k = 0; k < 64; k++) { const f = k / 64; pts.push(surf(body.sFront(f) * 0.6, f, off + 2)); } tube(pts, 6, mat, true, tapeGroup); break; }
+      case 'chest': tube(ringAt(body.sChest, off + 2), 6, mat, true, tapeGroup); break;
+      case 'waist': tube(ringAt(0.93 * L, off + 2), 6, mat, true, tapeGroup); break;
+      case 'back': { const pts = []; for (let k = 0; k <= 24; k++) pts.push(surf(L * k / 24, 0, off + 1)); line(pts); break; }
+      case 'neckToLeg': { const pts = []; for (let k = 0; k <= 12; k++) pts.push(surf((body.sHole - body.legR) * k / 12, 0.18, off + 1)); line(pts); break; }
+      case 'bellyLength': { const pts = []; const s0 = body.sFront(0.5), s1 = body.sBellyEnd; for (let k = 0; k <= 16; k++) pts.push(surf(s0 + (s1 - s0) * k / 16, 0.5, off + 1)); line(pts); break; }
+      case 'chestWidth': { const w = (m.chestWidth / 2) / body.G(body.sHole); const pts = []; for (let k = 0; k <= 10; k++) pts.push(surf(body.sHole, 0.5 - w + 2 * w * k / 10, off + 1)); line(pts, 6.5); break; }
+      case 'legCirc': {
+        // round the top of the front leg: the leg hangs from the seam point, just inside the body wall
+        const top3 = (function () { const r = SWEATER.ringRadii(body.G(body.sHole)); const p = SWEATER.ringPoint(body.fSeam + 0.02); return [body.sHole, r.b * p[0] * 0.72, r.b * p[1] - r.a + 10]; })();
+        const c = toScene(top3); c.y -= 0.18 * cat.legR * S * 10;
+        const pts = []; for (let k = 0; k < 40; k++) { const a = k / 40 * Math.PI * 2; pts.push(V(c.x + 1.15 * cat.legR * S * Math.cos(a), c.y - 1.4 * cat.legR * S, c.z + 1.15 * cat.legR * S * Math.sin(a))); }
+        tube(pts, 6, mat, true, tapeGroup); break;
+      }
+      case 'head': {
+        const dir = V(Math.cos(NECK_ANGLE), Math.sin(NECK_ANGLE), 0);
+        const neckBase = toScene([2, 0, -SWEATER.ringRadii(body.G(0)).a]);
+        const head = neckBase.add(dir.multiplyScalar((0.19 * L + 0.3 * cat.headR) * S)).add(V(0.3 * cat.headR * S, 0.1 * cat.headR * S, 0));
+        const ringM = new THREE.Mesh(new THREE.TorusGeometry(cat.headR * 1.06 * S, 6 * S, 10, 64), mat);
+        ringM.position.copy(head).add(V(0.12 * cat.headR * S, 0, 0));
+        ringM.rotation.y = Math.PI / 2;
+        ringM.renderOrder = 10;
+        tapeGroup.add(ringM); break;
+      }
+      default: break;
+    }
+  }
+
+  // ------------------------------------------------------------ update
+  function update(garment, state) {
+    current = garment;
+    const m = garment.measurements;
+    const catKey = JSON.stringify([m.neck, m.chest, m.back, m.legCirc, m.neckToLeg, m.chestWidth, m.waist, m.head, m.bellyLength, state.cat.coat, state.cat.eyes]);
+    if (catKey !== lastCatKey) { buildCat(m, garment.body, state.cat); lastCatKey = catKey; lastHighlight = null; }
+    const gKey = catKey + JSON.stringify([garment.settings, state.look]);
+    if (gKey !== lastGarmentKey) { buildGarment(garment, state.look); lastGarmentKey = gKey; }
+    if (lastHighlight !== undefined) buildTape(lastHighlight);
+  }
+  function highlight(id) { lastHighlight = id || null; buildTape(lastHighlight); }
+
+  Object.assign(api, { setup, update, highlight, setView, autoRotate, showGarment, resize });
+  return api;
+})();
+</script>
+<script>
+// ---------------------------------------------------------------------------
+// The page: measurements in, a pattern, a cat wearing it, and the sewing steps.
+// ---------------------------------------------------------------------------
+(function () {
+  'use strict';
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtU = (mm, digits) => SWEATER.fmtUnit(mm, state.unit, digits);
+
+  // Where the tape goes. Required ones first; the rest default from them.
+  const MEASURES = [
+    { id: 'neck', name: 'Neck', req: true, how: 'Around the neck where a collar sits — snug, with a finger under the tape.' },
+    { id: 'chest', name: 'Chest', req: true, how: 'Around the widest part of the chest, just behind the front legs, with the cat standing.' },
+    { id: 'back', name: 'Back length', req: true, how: 'Along the spine from where the collar sits to the base of the tail.' },
+    { id: 'legCirc', name: 'Front leg', how: 'Around the top of a front leg, close to the body.' },
+    { id: 'neckToLeg', name: 'Collar to front leg', how: 'Along the back from the collar to the point above the front edge of the front leg.' },
+    { id: 'chestWidth', name: 'Between the front legs', how: 'Across the chest underneath, from the inside of one front leg to the other.' },
+    { id: 'bellyLength', name: 'Belly length', how: 'From the throat, where the collar sits underneath, along the belly to where the garment should end. Stop before the genitals; on a male cat, no further than the last rib.' },
+    { id: 'waist', name: 'Waist', how: 'Around the body just in front of the hind legs.' },
+    { id: 'head', name: 'Head', how: 'Around the head just in front of the ears, over the cheeks. Decides whether a pull-over goes on.' },
+  ];
+  const PATTERNS = [
+    ['solid', 'Plain'], ['stripes', 'Stripes'], ['pinstripes', 'Pinstripes'], ['wales', 'Lengthwise stripes'],
+    ['dots', 'Polka dots'], ['hearts', 'Hearts'], ['fairisle', 'Fair Isle'], ['argyle', 'Argyle'],
+    ['plaid', 'Plaid'], ['fish', 'Fish'], ['paws', 'Paw prints'], ['check', 'Gingham'],
+  ];
+  const COATS = [
+    ['orange', 'Orange tabby', '#e08a3c'], ['black', 'Black', '#1f1d1d'], ['grey', 'Grey', '#8d9096'], ['white', 'White', '#f1ede6'],
+    ['brownTabby', 'Brown tabby', '#8b6a44'], ['greyTabby', 'Grey tabby', '#a3a39b'], ['tuxedo', 'Tuxedo', '#2a2727'],
+    ['calico', 'Calico', '#eadfcf'], ['siamese', 'Siamese', '#eadbc4'], ['cream', 'Cream', '#e9d6b4'], ['tortie', 'Tortoiseshell', '#4a2f22'],
+  ];
+  const EYES = [['green', '#6cb04a'], ['gold', '#d9a62d'], ['blue', '#5fa2d8'], ['copper', '#b8622b'], ['yellow', '#e3c54b'], ['odd', '#5fa2d8']];
+  const PAPERS = { a4: { w: 210, h: 297, name: 'A4' }, letter: { w: 215.9, h: 279.4, name: 'Letter' } };
+
+  // -------------------------------------------------------------- state
+  const state = {
+    unit: 'cm', garment: 'sweater', closure: 'pullover', fabric: 'fleece', ease: null, sa: null,
+    m: { neck: 220, chest: 400, back: 330, legCirc: null, neckToLeg: null, chestWidth: null, bellyLength: null, waist: null, head: null },
+    opt: { collar: 'band', collarHeight: 30, cuffs: false, hemBand: false },
+    look: { pattern: 'stripes', c1: '#c84a3a', c2: '#f4ead8', c3: '#28405f', knit: true, band: 'accent' },
+    cat: { coat: 'orange', eyes: 'green', name: '' },
+    paper: 'a4',
+    view: { showSA: true, mirror: false, dims: true, tab: 'pattern', cam: 'three-quarter', rotate: true, garment: true },
+  };
+  let garment = null;
+
+  // the hash carries everything that makes the pattern; local storage remembers the rest
+  const HASH_KEYS = { g: 'garment', c: 'closure', f: 'fabric', e: 'ease', s: 'sa', u: 'unit', p: 'paper' };
+  const M_KEYS = { n: 'neck', ch: 'chest', b: 'back', lg: 'legCirc', nl: 'neckToLeg', cw: 'chestWidth', bl: 'bellyLength', w: 'waist', hd: 'head' };
+  function toHash() {
+    const q = new URLSearchParams();
+    for (const k in HASH_KEYS) { const v = state[HASH_KEYS[k]]; if (v != null && v !== '') q.set(k, v); }
+    for (const k in M_KEYS) { const v = state.m[M_KEYS[k]]; if (v != null) q.set(k, Math.round(v)); }
+    q.set('o', [state.opt.collar, state.opt.collarHeight, state.opt.cuffs ? 1 : 0, state.opt.hemBand ? 1 : 0].join('.'));
+    q.set('l', [state.look.pattern, state.look.c1.slice(1), state.look.c2.slice(1), state.look.c3.slice(1), state.look.knit ? 1 : 0, state.look.band].join('.'));
+    q.set('k', state.cat.coat + '.' + state.cat.eyes);
+    if (state.cat.name) q.set('name', state.cat.name);
+    return q.toString();
+  }
+  function fromHash(h) {
+    if (!h) return false;
+    const q = new URLSearchParams(h.replace(/^#/, ''));
+    if (!q.has('n')) return false;
+    for (const k in HASH_KEYS) if (q.has(k)) { const v = q.get(k); state[HASH_KEYS[k]] = (k === 'e' || k === 's') ? +v : v; }
+    for (const k in M_KEYS) if (q.has(k)) state.m[M_KEYS[k]] = +q.get(k);
+    if (q.has('o')) { const o = q.get('o').split('.'); state.opt = { collar: o[0] || 'band', collarHeight: +o[1] || 30, cuffs: o[2] === '1', hemBand: o[3] === '1' }; }
+    if (q.has('l')) { const l = q.get('l').split('.'); if (l.length >= 5) state.look = { pattern: l[0], c1: '#' + l[1], c2: '#' + l[2], c3: '#' + l[3], knit: l[4] === '1', band: l[5] || 'accent' }; }
+    if (q.has('k')) { const k = q.get('k').split('.'); state.cat.coat = k[0]; state.cat.eyes = k[1] || 'green'; }
+    if (q.has('name')) state.cat.name = q.get('name').slice(0, 40);
+    return true;
+  }
+  function save() {
+    try { localStorage.setItem('cat-sweater', JSON.stringify({ state, v: 1 })); } catch (e) { /* private mode */ }
+    try { history.replaceState(null, '', '#' + toHash()); } catch (e) { /* file: urls */ }
+  }
+  function load() {
+    if (fromHash(location.hash)) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem('cat-sweater') || 'null');
+      if (saved && saved.v === 1) {
+        const s = saved.state;
+        Object.assign(state, { unit: s.unit, garment: s.garment, closure: s.closure, fabric: s.fabric, ease: s.ease, sa: s.sa, paper: s.paper });
+        Object.assign(state.m, s.m); Object.assign(state.opt, s.opt); Object.assign(state.look, s.look); Object.assign(state.cat, s.cat);
+        Object.assign(state.view, { showSA: s.view.showSA, mirror: s.view.mirror, dims: s.view.dims });
+      }
+    } catch (e) { /* ignore */ }
+  }
+  function settings() {
+    return { garment: state.garment, closure: state.closure, fabric: state.fabric, ease: state.ease, sa: state.sa, m: state.m, opt: state.opt };
+  }
+
+  // -------------------------------------------------------------- panel
+  function buildPanel() {
+    // presets
+    $('#presets').innerHTML = SWEATER.PRESETS.map((p) => `<button data-preset="${p.id}" title="${esc(p.about)}">${esc(p.name)}</button>`).join('');
+    $('#presets').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      const p = SWEATER.PRESETS.find((x) => x.id === b.dataset.preset);
+      for (const k in state.m) state.m[k] = p.m[k] != null ? p.m[k] : null;
+      fillMeasures(); update();
+    });
+    // measurements
+    const row = (mm) => `
+      <div class="measure" data-id="${mm.id}">
+        <label title="${esc(mm.how)}">${esc(mm.name)}${mm.req ? '' : '<span class="tag"></span>'}</label>
+        <input type="number" step="0.1" min="0" inputmode="decimal" data-m="${mm.id}">
+        ${mm.req ? '<span></span>' : `<button class="clear" title="Back to the estimate" data-clear="${mm.id}">×</button>`}
+      </div>`;
+    $('#measures-required').innerHTML = MEASURES.filter((m) => m.req).map(row).join('');
+    $('#measures-optional').innerHTML = MEASURES.filter((m) => !m.req).map(row).join('');
+    $$('.measure input').forEach((inp) => {
+      inp.addEventListener('input', () => {
+        const v = parseFloat(inp.value);
+        state.m[inp.dataset.m] = isFinite(v) && v > 0 ? SWEATER.fromUnit(v, state.unit) : null;
+        if (!MEASURES.find((m) => m.id === inp.dataset.m).req || state.m[inp.dataset.m] != null) update(true);
+      });
+      inp.addEventListener('change', () => { fillMeasures(); update(); });
+      inp.addEventListener('focus', () => highlight(inp.dataset.m));
+      inp.addEventListener('blur', () => highlight(null));
+    });
+    $$('.measure label').forEach((lab) => {
+      const id = lab.parentElement.dataset.id;
+      lab.addEventListener('mouseenter', () => highlight(id));
+      lab.addEventListener('mouseleave', () => highlight(null));
+      lab.addEventListener('click', () => { highlight(id); showTab('cat', true); });
+    });
+    $$('.measure .clear').forEach((b) => b.addEventListener('click', () => { state.m[b.dataset.clear] = null; fillMeasures(); update(); }));
+    $('#cat-name').addEventListener('input', () => { state.cat.name = $('#cat-name').value.slice(0, 40); save(); renderSew(); });
+
+    // segmented controls
+    seg('#unit-seg', 'unit', (v) => { state.unit = v; fillMeasures(); update(); });
+    seg('#garment-seg', 'garment', (v) => {
+      state.garment = v;
+      if (v === 'harness') { state.closure = 'velcro'; if (state.fabric !== 'woven') state.fabric = 'woven'; } // a harness wants a fabric that does not give
+      syncPanel(); update();
+    });
+    seg('#closure-row .seg', 'closure', (v) => { state.closure = v; update(); });
+    seg('.panel [data-band]', 'band', (v) => { state.look.band = v; update(); }, true);
+    seg('.panel [data-paper]', 'paper', (v) => { state.paper = v; save(); }, true);
+
+    // fabric and ease
+    $('#fabric').innerHTML = Object.keys(SWEATER.FABRICS).map((k) => `<option value="${k}">${esc(SWEATER.FABRICS[k].name)} — ${esc(SWEATER.FABRICS[k].detail)}</option>`).join('');
+    $('#fabric').addEventListener('change', () => { state.fabric = $('#fabric').value; syncPanel(); update(); });
+    $('#ease-auto').addEventListener('change', () => { state.ease = $('#ease-auto').checked ? null : +$('#ease').value; syncPanel(); update(); });
+    $('#ease').addEventListener('input', () => { state.ease = +$('#ease').value; syncPanel(); update(true); });
+    $('#ease').addEventListener('change', () => update());
+    $('#sa-auto').addEventListener('change', () => { state.sa = $('#sa-auto').checked ? null : +$('#sa').value; syncPanel(); update(); });
+    $('#sa').addEventListener('change', () => { state.sa = +$('#sa').value; update(); });
+    $('#collar').addEventListener('change', () => { state.opt.collar = $('#collar').value; syncPanel(); update(); });
+    $('#collar-height').addEventListener('change', () => { state.opt.collarHeight = +$('#collar-height').value || 30; update(); });
+    $('#cuffs').addEventListener('change', () => { state.opt.cuffs = $('#cuffs').checked; update(); });
+    $('#hem-band').addEventListener('change', () => { state.opt.hemBand = $('#hem-band').checked; update(); });
+
+    // looks
+    $('#pattern').innerHTML = PATTERNS.map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
+    $('#pattern').addEventListener('change', () => { state.look.pattern = $('#pattern').value; update(); });
+    for (const c of ['c1', 'c2', 'c3']) $('#' + c).addEventListener('input', () => { state.look[c] = $('#' + c).value; update(true); });
+    $('#knit').addEventListener('change', () => { state.look.knit = $('#knit').checked; update(); });
+    $('#coats').innerHTML = COATS.map(([k, n, col]) => `<button class="swatch" data-coat="${k}" title="${n}" style="background:${col}"></button>`).join('');
+    $('#coats').addEventListener('click', (e) => { const b = e.target.closest('.swatch'); if (!b) return; state.cat.coat = b.dataset.coat; syncPanel(); update(); });
+    $('#eyes').innerHTML = EYES.map(([k, col]) => `<button class="swatch" data-eyes="${k}" title="${k}" style="background:${k === 'odd' ? 'linear-gradient(90deg,#5fa2d8 50%,#d9a62d 50%)' : col}"></button>`).join('');
+    $('#eyes').addEventListener('click', (e) => { const b = e.target.closest('.swatch'); if (!b) return; state.cat.eyes = b.dataset.eyes; syncPanel(); update(); });
+
+    // view toggles
+    $('#show-sa').addEventListener('change', () => { state.view.showSA = $('#show-sa').checked; renderPattern(); save(); });
+    $('#show-mirror').addEventListener('change', () => { state.view.mirror = $('#show-mirror').checked; renderPattern(true); save(); });
+    $('#show-dims').addEventListener('change', () => { state.view.dims = $('#show-dims').checked; renderPattern(); save(); });
+    $('#fit-btn').addEventListener('click', () => renderPattern(true));
+    $$('#pane-cat [data-view]').forEach((b) => b.addEventListener('click', () => { state.view.cam = b.dataset.view; $$('#pane-cat [data-view]').forEach((x) => x.classList.toggle('on', x === b)); CAT3D.setView(b.dataset.view); }));
+    $('#auto-rotate').addEventListener('change', () => CAT3D.autoRotate($('#auto-rotate').checked));
+    $('#show-garment').addEventListener('change', () => CAT3D.showGarment($('#show-garment').checked));
+    CAT3D.onInteract = () => { $('#auto-rotate').checked = false; };
+
+    // tabs and the narrow-screen panel
+    $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+    $('#menu-btn').addEventListener('click', () => $('#panel').classList.toggle('open'));
+    $('#main').addEventListener('pointerdown', () => { if (window.innerWidth <= 900) $('#panel').classList.remove('open'); });
+    $('#print-btn').addEventListener('click', printPattern);
+    $('#svg-btn').addEventListener('click', downloadSvg);
+    $('#share-btn').addEventListener('click', share);
+    window.addEventListener('resize', () => { layoutPanes(); renderPattern(true); });
+  }
+  function seg(sel, attr, onPick, loose) {
+    const root = loose ? document : $(sel);
+    const buttons = loose ? $$(sel) : Array.from(root.querySelectorAll('button[data-' + attr + ']'));
+    for (const b of buttons) b.addEventListener('click', () => { buttons.forEach((x) => x.classList.toggle('on', x === b)); onPick(b.dataset[attr]); });
+  }
+  function setSeg(attr, value) { $$('.panel [data-' + attr + ']').forEach((b) => b.classList.toggle('on', b.dataset[attr] === value)); }
+
+  // the inputs from the state: typed values as typed, estimates greyed
+  function fillMeasures() {
+    const d = SWEATER.derive(state.m);
+    for (const mm of MEASURES) {
+      const inp = $(`.measure input[data-m="${mm.id}"]`);
+      const given = state.m[mm.id] != null;
+      const v = given ? state.m[mm.id] : d[mm.id];
+      if (document.activeElement !== inp) inp.value = isFinite(v) ? (+SWEATER.toUnit(v, state.unit).toFixed(state.unit === 'in' ? 2 : 1)).toString() : '';
+      inp.classList.toggle('est', !given && !mm.req);
+      inp.placeholder = state.unit;
+      const tag = inp.parentElement.querySelector('.tag');
+      if (tag) { tag.textContent = given ? 'measured' : 'estimated'; tag.classList.toggle('measured', given); }
+      const clr = inp.parentElement.querySelector('.clear');
+      if (clr) clr.style.visibility = given ? 'visible' : 'hidden';
+    }
+    $('#cat-name').value = state.cat.name || '';
+  }
+  function syncPanel() {
+    setSeg('unit', state.unit); setSeg('garment', state.garment); setSeg('closure', state.closure); setSeg('band', state.look.band); setSeg('paper', state.paper);
+    const harness = state.garment === 'harness';
+    $('#closure-row').style.display = harness ? 'none' : '';
+    $('#sweater-opts').style.display = harness ? 'none' : '';
+    $('#harness-hint').style.display = harness ? '' : 'none';
+    $('#fabric').value = state.fabric;
+    const fab = SWEATER.FABRICS[state.fabric];
+    $('#fabric-hint').textContent = fab.stretch > 0
+      ? `Stretches about ${Math.round(fab.stretch * 100)}%: cut a little smaller than the cat (${Math.round(fab.ease * 100)}% ease) and it hugs. Sew with a stretch stitch.`
+      : `No stretch: cut a little bigger than the cat (+${Math.round(fab.ease * 100)}% ease). A pull-over needs the head to pass the neck, so pair it with the velcro back.`;
+    $('#ease-auto').checked = state.ease == null;
+    $('#ease').disabled = state.ease == null;
+    const easeNow = state.ease == null ? Math.round(fab.ease * 100) : state.ease;
+    $('#ease').value = easeNow;
+    $('#ease-val').textContent = (easeNow > 0 ? '+' : '') + easeNow + '%' + (easeNow < 0 ? ' (hugs)' : easeNow > 0 ? ' (room)' : '');
+    $('#sa-auto').checked = state.sa == null;
+    $('#sa').disabled = state.sa == null;
+    $('#sa').value = state.sa == null ? fab.sa : state.sa;
+    $('#collar').value = state.opt.collar;
+    $('#collar-height-row').style.display = state.opt.collar === 'band' ? '' : 'none';
+    $('#collar-height').value = state.opt.collarHeight;
+    $('#cuffs').checked = state.opt.cuffs; $('#hem-band').checked = state.opt.hemBand;
+    $('#pattern').value = state.look.pattern;
+    for (const c of ['c1', 'c2', 'c3']) $('#' + c).value = state.look[c];
+    $('#knit').checked = state.look.knit;
+    $$('#coats .swatch').forEach((b) => b.classList.toggle('on', b.dataset.coat === state.cat.coat));
+    $$('#eyes .swatch').forEach((b) => b.classList.toggle('on', b.dataset.eyes === state.cat.eyes));
+    $('#show-sa').checked = state.view.showSA; $('#show-mirror').checked = state.view.mirror; $('#show-dims').checked = state.view.dims;
+  }
+
+  // -------------------------------------------------------------- tabs
+  function showTab(tab, keepPattern) {
+    state.view.tab = tab;
+    $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+    layoutPanes();
+    if (tab !== 'pattern') $('#panel').classList.remove('open');
+  }
+  // wide screens show the pattern and the cat side by side; the sewing guide takes the whole width
+  function layoutPanes() {
+    const wide = window.innerWidth > 1180 && window.innerWidth - 350 > 760;
+    const tab = state.view.tab;
+    const show = { pattern: false, cat: false, sew: false };
+    if (tab === 'sew') show.sew = true;
+    else if (wide) { show.pattern = true; show.cat = true; }
+    else show[tab] = true;
+    for (const k in show) $('#pane-' + k).classList.toggle('show', show[k]);
+    $('#main').classList.toggle('single', !(show.pattern && show.cat));
+    CAT3D.resize();
+    if (show.pattern && garment) renderPattern(view.w === 100);
+  }
+
+  // -------------------------------------------------------------- update
+  let pending = null;
+  function update(light) {
+    if (pending) cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(() => {
+      pending = null;
+      const d = SWEATER.derive(state.m);
+      if (!(d.neck > 0 && d.chest > 0 && d.back > 0)) return;
+      try { garment = SWEATER.build(settings()); } catch (e) { console.error(e); return; }
+      renderPattern(!light && lastShape !== shapeKey(garment));
+      renderFit();
+      renderSew();
+      CAT3D.update(garment, state);
+      syncPanel();
+      if (!light) fillMeasures();
+      save();
+    });
+  }
+  // what was last drawn, so a change of pieces refits the view and a change of size does not
+  let lastShape = null;
+  const shapeKey = (g) => g ? g.pieces.map((p) => p.id + (p.extension > 0 ? '+' : '')).join('|') + '|' + state.view.mirror : null;
+
+  function renderFit() {
+    const items = [];
+    for (const w of garment.warnings) items.push(`<div class="fit warn">⚠ ${esc(w)}</div>`);
+    for (const n of garment.fit.notes) items.push(`<div class="fit note">${esc(n)}</div>`);
+    $('#fit').innerHTML = items.join('') || '<p class="hint">Nothing to flag.</p>';
+  }
+  function highlight(id) { CAT3D.highlight(id); $$('.measure').forEach((el) => el.classList.toggle('active', el.dataset.id === id)); }
+
+  // --------------------------------------------------------- the pattern
+  // Pieces laid side by side at true size (mm), tallest first.
+  // bandsBelow puts the plain bands in rows under the shaped pieces; cap draws a
+  // band longer than that many mm short, with a break mark, so a long hem band
+  // does not shrink the whole drawing on screen
+  function layoutPieces(pieces, mirror, gap, bandsBelow, cap) {
+    const placed = [];
+    let x = 0, y = 0, rowH = 0, W = 0;
+    const order = pieces.slice().sort((a, b) => (b.bbox[3] - b.bbox[1]) - (a.bbox[3] - a.bbox[1]));
+    const rows = bandsBelow ? [order.filter((p) => p.kind === 'piece'), order.filter((p) => p.kind !== 'piece')] : [order];
+    for (const row of rows) {
+      x = 0;
+      for (const p of row) {
+        let bw = p.bbox[2] - p.bbox[0];
+        const bh = p.bbox[3] - p.bbox[1];
+        const whole = mirror && p.fold;
+        let capLen = null;
+        if (cap && p.kind === 'band' && bw > cap) { capLen = cap; bw = cap; }
+        if (bandsBelow && p.kind === 'band' && x > 0 && x + bw > W) { x = 0; y += rowH + gap; rowH = 0; }   // bands wrap under each other
+        const w = whole ? 2 * p.bbox[2] : bw;
+        // ox, oy: where the piece's own origin lands
+        placed.push({ p, w, h: bh, x, y, ox: x + (whole ? p.bbox[2] : -p.bbox[0]), oy: y - p.bbox[1], whole, capLen });
+        x += w + gap; rowH = Math.max(rowH, bh);
+        W = Math.max(W, x - gap);
+      }
+      if (row.length) { y += rowH + gap; rowH = 0; }
+    }
+    return { placed, width: W, height: y - gap };
+  }
+  const path = (pts, close) => pts.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(2) + ' ' + q[1].toFixed(2)).join('') + (close ? 'Z' : '');
+
+  // One piece in its own coordinates (the stitch line's), as SVG markup.
+  function drawPiece(p, { showSA, whole, dims, forPrint, capLen }) {
+    const out = [];
+    if (p.kind === 'band') return drawBand(p, showSA, capLen);
+    const cut = showSA ? p.cutLine : p.outline;
+    if (whole) out.push(`<g transform="scale(-1,1)"><path class="piece-ghost" d="${path(cut, true)}"/></g>`);
+    out.push(`<path class="piece-cut" d="${path(cut, true)}"/>`);
+    if (showSA) out.push(`<path class="piece-stitch" d="${path(p.outline, true)}"/>`);
+    const bb = p.bbox;
+    const cx = (bb[0] + bb[2]) / 2, cy = (bb[1] + bb[3]) / 2;
+    const foldPts = p.segs.filter((s) => s.tag === 'fold').map((s) => s.pts)[0];
+    if (p.kind === 'piece') {
+      // the fold, or the centre line with its overlap strip
+      const yTop = foldPts ? Math.min(foldPts[0][1], foldPts[1][1]) : bb[1], yBot = foldPts ? Math.max(foldPts[0][1], foldPts[1][1]) : bb[3];
+      if (p.fold) {
+        out.push(`<line class="piece-fold" x1="0" y1="${yTop.toFixed(1)}" x2="0" y2="${yBot.toFixed(1)}"/>`);
+        out.push(`<text class="label" font-size="4" transform="translate(3 ${((yTop + yBot) / 2).toFixed(1)}) rotate(90)" text-anchor="middle">PLACE ON FOLD</text>`);
+      } else if (p.extension > 0) {
+        const e = p.extension;
+        out.push(`<line class="piece-fold" x1="0" y1="${yTop.toFixed(1)}" x2="0" y2="${yBot.toFixed(1)}"/>`);
+        out.push(`<rect class="velcro" x="${-e}" y="${(yTop + 2).toFixed(1)}" width="${2 * e}" height="${(yBot - yTop - 4).toFixed(1)}"/>`);
+        out.push(`<text class="label" font-size="3.2" transform="translate(-${e - 1.5} ${((yTop + yBot) / 2).toFixed(1)}) rotate(90)" text-anchor="middle">CENTRE BACK · hook-and-loop ${2 * e} mm strip · the other half overlaps here</text>`);
+      }
+      // notches: a tick across the cutting line, perpendicular to the edge
+      for (const n of p.notches) {
+        const t = tangentAt(p.outline, n.p);
+        const cw = SWEATER.signedArea(p.outline) > 0;
+        const nx = cw ? t[1] : -t[1], ny = cw ? -t[0] : t[0];
+        const len = (showSA ? p.sa : 0) + 3;
+        out.push(`<line class="notch" x1="${n.p[0].toFixed(2)}" y1="${n.p[1].toFixed(2)}" x2="${(n.p[0] + nx * len).toFixed(2)}" y2="${(n.p[1] + ny * len).toFixed(2)}"/>`);
+      }
+      // the D-ring tab on a harness: on the overlap strip of the upper half
+      for (const mk of p.marks) if (mk.kind === 'dring') {
+        out.push(`<rect class="dring" x="${(-mk.w / 2).toFixed(1)}" y="${(mk.y - mk.l / 2).toFixed(1)}" width="${mk.w}" height="${mk.l}" rx="2"/>`);
+        out.push(`<text class="label" font-size="3" transform="translate(${(mk.w / 2 + 3).toFixed(1)} ${mk.y.toFixed(1)}) rotate(90)" text-anchor="middle">D-RING TAB (upper half only)</text>`);
+      }
+      // grainline: along the fold, in the wider part of the piece
+      const gx = Math.min(bb[2] - 14, Math.max(18, bb[2] * 0.62)), gy0 = cy - Math.min(40, (bb[3] - bb[1]) * 0.18), gy1 = cy + Math.min(40, (bb[3] - bb[1]) * 0.18);
+      out.push(`<path class="grain" d="M${gx} ${gy0.toFixed(1)}L${gx} ${gy1.toFixed(1)}M${gx - 2} ${(gy0 + 4).toFixed(1)}L${gx} ${gy0.toFixed(1)}L${gx + 2} ${(gy0 + 4).toFixed(1)}M${gx - 2} ${(gy1 - 4).toFixed(1)}L${gx} ${gy1.toFixed(1)}L${gx + 2} ${(gy1 - 4).toFixed(1)}"/>`);
+      // the label block
+      const wide = bb[2] - bb[0] > 64;
+      const lines = [[p.name.toUpperCase(), 7, 700], [p.cut, 4.2, 400], [garment.title + (state.cat.name ? ' for ' + state.cat.name : ''), 3.4, 400], [`seam allowance ${garment.settings.sa} mm included`, 3, 400]];
+      const lx = wide ? Math.max(14, bb[2] * 0.36) : 0, ly = cy - 8;
+      if (wide) {
+        lines.forEach(([txt, size, weight], i) => out.push(`<text class="label" x="${lx.toFixed(1)}" y="${(ly + i * 6.5 + (i ? 2 : 0)).toFixed(1)}" font-size="${size}" font-weight="${weight}" text-anchor="middle">${esc(txt)}</text>`));
+      } else {
+        // a narrow piece: the lines run along it, side by side, clear of the fold label
+        let lx2 = 11;
+        lines.forEach(([txt, size, weight], i) => { const sz = size * 0.72; out.push(`<text class="label" transform="translate(${lx2.toFixed(1)} ${(cy - 10).toFixed(1)}) rotate(90)" font-size="${sz}" font-weight="${weight}" text-anchor="middle">${esc(txt)}</text>`); lx2 += sz + 1.2; });
+      }
+      if (dims) out.push(pieceDims(p, whole));
+    }
+    return out.join('');
+  }
+  // A band is a plain rectangle: drawn at its size, or short with a break
+  // mark when it is longer than the drawing has room for.
+  function drawBand(p, showSA, capLen) {
+    const out = [];
+    const sa = showSA ? p.sa : 0;
+    const len = capLen && p.length + 2 * p.sa > capLen ? capLen - 2 * p.sa : p.length;
+    const short = len < p.length - 0.5;
+    const h = p.height;
+    out.push(`<rect class="piece-cut" x="${-sa}" y="${-sa}" width="${(len + 2 * sa).toFixed(1)}" height="${(h + 2 * sa).toFixed(1)}"/>`);
+    if (showSA) out.push(`<rect class="piece-stitch" x="0" y="0" width="${len.toFixed(1)}" height="${h.toFixed(1)}"/>`);
+    out.push(`<line class="piece-fold" x1="0" y1="${(h / 2).toFixed(1)}" x2="${len.toFixed(1)}" y2="${(h / 2).toFixed(1)}" opacity="0.5"/>`);
+    if (short) { // a break: two zigzags with the paper colour between
+      const bx = len * 0.72;
+      out.push(`<path d="M${(bx - 3).toFixed(1)} ${-sa - 1}l2 ${h * 0.25}l-4 ${h * 0.25}l4 ${h * 0.25}l-2 ${h * 0.25 + sa + 2}" fill="none" stroke="#f6efe1" stroke-width="5"/>`);
+      out.push(`<path d="M${(bx - 3).toFixed(1)} ${-sa - 1}l2 ${h * 0.25}l-4 ${h * 0.25}l4 ${h * 0.25}l-2 ${h * 0.25 + sa + 2}M${(bx + 3).toFixed(1)} ${-sa - 1}l2 ${h * 0.25}l-4 ${h * 0.25}l4 ${h * 0.25}l-2 ${h * 0.25 + sa + 2}" fill="none" class="notch"/>`);
+    }
+    out.push(`<text class="label" x="${(len * 0.36).toFixed(1)}" y="${(h / 2 - 1).toFixed(1)}" font-size="5" font-weight="700" text-anchor="middle">${esc(p.name.toUpperCase())} — ${esc(p.cut)}</text>`);
+    out.push(`<text class="label" x="${(len * 0.36).toFixed(1)}" y="${(h / 2 + 5).toFixed(1)}" font-size="3.4" text-anchor="middle">${fmtU(p.length)} × ${fmtU(p.height)} finished${short ? ' (drawn short)' : ''} · ${esc(p.note || '')} · fold in half lengthwise</text>`);
+    return out.join('');
+  }
+  function tangentAt(outline, q) {
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < outline.length; i++) { const d = Math.hypot(outline[i][0] - q[0], outline[i][1] - q[1]); if (d < bd) { bd = d; best = i; } }
+    const a = outline[(best - 1 + outline.length) % outline.length], b = outline[(best + 1) % outline.length];
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+    return [dx / l, dy / l];
+  }
+  // the few sizes a sewer checks against the cat
+  function pieceDims(p, whole) {
+    const out = [];
+    const hole = p.segs.find((s) => s.tag === 'hole');
+    const fold = p.segs.find((s) => s.tag === 'fold');
+    const dim = (x1, y1, x2, y2, text, side) => {
+      out.push(`<line class="dimline" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`);
+      const vert = Math.abs(x2 - x1) < 0.01;
+      const tick = (x, y) => out.push(vert ? `<line class="dimline" x1="${x - 1.5}" y1="${y.toFixed(1)}" x2="${x + 1.5}" y2="${y.toFixed(1)}"/>` : `<line class="dimline" x1="${x.toFixed(1)}" y1="${y - 1.5}" x2="${x.toFixed(1)}" y2="${y + 1.5}"/>`);
+      tick(x1, y1); tick(x2, y2);
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      out.push(vert ? `<text class="dimtext" transform="translate(${(mx - 1.2).toFixed(1)} ${my.toFixed(1)}) rotate(-90)" text-anchor="middle">${esc(text)}</text>` : `<text class="dimtext" x="${(side === 'start' ? x1 + 1 : mx).toFixed(1)}" y="${(my - 1.5).toFixed(1)}" text-anchor="${side === 'start' ? 'start' : 'middle'}">${esc(text)}</text>`);
+    };
+    if (fold) {
+      const y0 = Math.min(fold.pts[0][1], fold.pts[1][1]), y1 = Math.max(fold.pts[0][1], fold.pts[1][1]);
+      const x = (whole ? -p.bbox[2] : p.bbox[0]) - (p.sa + 6);
+      dim(x, y0, x, y1, `${p.id === 'back' ? 'back' : 'belly'} ${fmtU(y1 - y0)} along the fold`, 'left');
+    }
+    if (hole) {
+      const deepest = hole.pts[12] || hole.pts[Math.floor(hole.pts.length / 2)];
+      const y = deepest[1];
+      const text = p.id === 'back' ? `${fmtU(deepest[0])} to the leg hole (×2 = ${fmtU(2 * deepest[0])})` : `${fmtU(deepest[0])} (×2 = ${fmtU(2 * deepest[0])} between the legs)`;
+      dim(whole ? -deepest[0] : 0, y, deepest[0], y, text, p.id === 'belly' && !whole ? 'start' : null);
+    }
+    return out.join('');
+  }
+
+  // scale bar and title in the drawing's corner
+  function drawingChrome(x, y) {
+    const cm = state.unit !== 'in';
+    const len = cm ? 100 : 101.6, n = cm ? 10 : 4;
+    const out = [`<g transform="translate(${x} ${y})">`, `<line class="scalebar" x1="0" y1="0" x2="${len}" y2="0"/>`];
+    for (let k = 0; k <= n; k++) { const xx = len * k / n; out.push(`<line class="scalebar" x1="${xx.toFixed(1)}" y1="0" x2="${xx.toFixed(1)}" y2="${k % (cm ? 5 : 2) === 0 ? -4 : -2.5}"/>`); }
+    out.push(`<text class="scaletext" x="0" y="6">0</text><text class="scaletext" x="${len}" y="6" text-anchor="end">${cm ? '10 cm' : '4 in'}</text>`);
+    out.push('</g>');
+    return out.join('');
+  }
+
+  // --- the on-screen drawing, with pan and zoom
+  const svg = $('#pattern-svg');
+  let view = { x: 0, y: 0, w: 100, h: 100 }, drawing = { w: 100, h: 100 };
+  function renderPattern(refit) {
+    if (!garment) return;
+    const mirror = state.view.mirror;
+    const shaped = garment.pieces.filter((p) => p.kind === 'piece');
+    const rowW = shaped.reduce((t, p) => t + (mirror && p.fold ? 2 * p.bbox[2] : p.bbox[2] - p.bbox[0]) + 28, -28);
+    const lay = layoutPieces(garment.pieces, mirror, 28, true, Math.max(rowW, 220));
+    const parts = [];
+    for (const pl of lay.placed) {
+      parts.push(`<g transform="translate(${pl.ox.toFixed(2)} ${pl.oy.toFixed(2)})">${drawPiece(pl.p, { showSA: state.view.showSA, whole: pl.whole, dims: state.view.dims, capLen: pl.capLen })}</g>`);
+    }
+    const summary = `${garment.title}${state.cat.name ? ' for ' + state.cat.name : ''} · neck ${fmtU(garment.measurements.neck)} · chest ${fmtU(garment.measurements.chest)} · back ${fmtU(garment.measurements.back)} · ${SWEATER.FABRICS[garment.settings.fabric].name.toLowerCase()}, ease ${Math.round(garment.settings.ease * 100)}%`;
+    parts.push(`<text class="bg-text" x="0" y="${(lay.height + 14).toFixed(1)}">${esc(summary)}</text>`);
+    parts.push(drawingChrome(0, lay.height + 26));
+    drawing = { w: lay.width, h: lay.height + 30 };
+    svg.innerHTML = parts.join('');
+    if (refit || view.w === 100) fitView();
+    else applyView();
+    lastShape = shapeKey(garment);
+  }
+  function fitView() {
+    const r = svg.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) { view.w = 100; return; }   // the pane is hidden: fit when it is next shown
+    const pad = 40;
+    const aspect = r.width / Math.max(1, r.height);
+    const left = 26;                                   // the dimension line sits left of the fold
+    let w = drawing.w + left + 2 * pad, h = drawing.h + 2 * pad;
+    if (w / h < aspect) w = h * aspect; else h = w / aspect;
+    view = { x: (drawing.w - left - w) / 2, y: (drawing.h - h) / 2 - 12, w, h };
+    applyView();
+  }
+  function applyView() { svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`); }
+  (function panZoom() {
+    let drag = null, pinch = null;
+    const pt = (e) => { const r = svg.getBoundingClientRect(); return [view.x + (e.clientX - r.left) / r.width * view.w, view.y + (e.clientY - r.top) / r.height * view.h]; };
+    svg.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const k = Math.exp((e.deltaMode === 1 ? e.deltaY * 20 : e.deltaY) * 0.0015);
+      const [mx, my] = pt(e);
+      view = { x: mx - (mx - view.x) * k, y: my - (my - view.y) * k, w: view.w * k, h: view.h * k };
+      applyView();
+    }, { passive: false });
+    const touches = new Map();
+    svg.addEventListener('pointerdown', (e) => {
+      svg.setPointerCapture(e.pointerId);
+      touches.set(e.pointerId, [e.clientX, e.clientY]);
+      if (touches.size === 1) drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+      else if (touches.size === 2) { const [a, b] = Array.from(touches.values()); pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), view: { ...view } }; drag = null; }
+    });
+    svg.addEventListener('pointermove', (e) => {
+      if (!touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, [e.clientX, e.clientY]);
+      const r = svg.getBoundingClientRect();
+      if (pinch && touches.size === 2) {
+        const [a, b] = Array.from(touches.values());
+        const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        const k = pinch.d / Math.max(1, d);
+        const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2;
+        const mx = pinch.view.x + (cx - r.left) / r.width * pinch.view.w, my = pinch.view.y + (cy - r.top) / r.height * pinch.view.h;
+        view = { x: mx - (mx - pinch.view.x) * k, y: my - (my - pinch.view.y) * k, w: pinch.view.w * k, h: pinch.view.h * k };
+        applyView();
+      } else if (drag) {
+        view.x = drag.vx - (e.clientX - drag.x) / r.width * view.w;
+        view.y = drag.vy - (e.clientY - drag.y) / r.height * view.h;
+        applyView();
+      }
+    });
+    const end = (e) => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; if (touches.size === 0) drag = null; };
+    svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+  })();
+
+  // --- the full-size drawing as a standalone SVG (mm)
+  function fullSvg() {
+    const lay = layoutPieces(garment.pieces, false, 20, true);
+    const W = lay.width + 20, H = lay.height + 50;
+    const css = `.piece-cut{fill:none;stroke:#000;stroke-width:0.35;stroke-dasharray:2.4 1.6}.piece-stitch{fill:none;stroke:#000;stroke-width:0.25}.piece-fold{stroke:#000;stroke-width:0.4;stroke-dasharray:5 1.5 1 1.5}.notch,.grain,.dimline{stroke:#000;stroke-width:0.4;fill:none}.label,.dimtext,.scaletext,.bg-text{fill:#000;font-family:Georgia,serif}.dimtext{font-size:4px}.scaletext{font-size:4.5px}.bg-text{font-size:5px}.velcro,.dring{fill:none;stroke:#000;stroke-width:0.35}.scalebar{stroke:#000;stroke-width:0.5}`;
+    const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${H}mm" viewBox="-10 -10 ${W} ${H}"><style>${css}</style><rect x="-10" y="-10" width="${W}" height="${H}" fill="#fff"/>`];
+    for (const pl of lay.placed) parts.push(`<g transform="translate(${pl.ox.toFixed(2)} ${pl.oy.toFixed(2)})">${drawPiece(pl.p, { showSA: true, whole: false, dims: true, forPrint: true })}</g>`);
+    parts.push(`<text class="bg-text" x="0" y="${(lay.height + 14).toFixed(1)}">${esc(garment.title + (state.cat.name ? ' for ' + state.cat.name : ''))} · true size, millimetres · ${esc(new Date().toISOString().slice(0, 10))} · peligaming.com</text>`);
+    parts.push(drawingChrome(0, lay.height + 28));
+    parts.push('</svg>');
+    return parts.join('');
+  }
+  function downloadSvg() {
+    if (!garment) return;
+    const blob = new Blob([fullSvg()], { type: 'image/svg+xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${garment.title.toLowerCase().replace(/\s+/g, '-')}${state.cat.name ? '-' + state.cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : ''}.svg`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  // --- print: a cover page, then the drawing tiled over pages at true size
+  function printPattern() {
+    if (!garment) return;
+    const paper = PAPERS[state.paper];
+    const margin = 10;
+    const tw = paper.w - 2 * margin, th = paper.h - 2 * margin;
+    const lay = layoutPieces(garment.pieces.filter((p) => p.kind === 'piece'), false, 18, true);
+    const W = lay.width + 8, H = lay.height + 8;
+    // a tile with no piece on it is not printed
+    const used = (r, c) => lay.placed.some((pl) => pl.x + 4 < (c + 1) * tw && pl.x + 4 + pl.w > c * tw && pl.y + 4 < (r + 1) * th && pl.y + 4 + pl.h > r * th);
+    const cols = Math.max(1, Math.ceil(W / tw)), rows = Math.max(1, Math.ceil(H / th));
+    const art = lay.placed.map((pl) => `<g transform="translate(${(pl.ox + 4).toFixed(2)} ${(pl.oy + 4).toFixed(2)})">${drawPiece(pl.p, { showSA: true, whole: false, dims: true, forPrint: true })}</g>`).join('');
+    const letter = (r) => String.fromCharCode(65 + r);
+    const pages = [];
+    // cover
+    const m = garment.measurements;
+    const mrows = MEASURES.map((mm) => `<tr><th>${esc(mm.name)}</th><td>${fmtU(m[mm.id])}${m.derived[mm.id] ? ' <i>(estimated)</i>' : ''}</td></tr>`).join('');
+    const prow = garment.pieces.map((p) => `<tr><th>${esc(p.name)}</th><td>${esc(p.cut)}</td><td>${fmtU(p.bbox[2] - p.bbox[0])} × ${fmtU(p.bbox[3] - p.bbox[1])}${p.fold ? ' (half, on the fold)' : p.kind === 'band' ? ' — a plain rectangle, cut to these sizes with the allowance; not on the tiles' : ''}</td></tr>`).join('');
+    const nrow = garment.notions.map((n) => `<tr><th>${esc(n.item)}</th><td>${esc(n.qty)}</td></tr>`).join('');
+    const mapScale = Math.min(110 / Math.max(cols * tw, 1), 70 / Math.max(rows * th, 1));
+    let map = `<svg viewBox="0 0 ${(cols * tw).toFixed(1)} ${(rows * th).toFixed(1)}" style="width:${(cols * tw * mapScale).toFixed(1)}mm;height:${(rows * th * mapScale).toFixed(1)}mm">`;
+    map += `<g>${art}</g>`;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) map += `<rect x="${(c * tw).toFixed(1)}" y="${(r * th).toFixed(1)}" width="${tw}" height="${th}" fill="none" stroke="#000" stroke-width="0.6"/><text x="${(c * tw + 4).toFixed(1)}" y="${(r * th + 12).toFixed(1)}" font-size="11" font-family="Georgia,serif">${letter(r)}${c + 1}${used(r, c) ? '' : ' (blank, not printed)'}</text>`;
+    map += '</svg>';
+    pages.push(`<div class="page cover" style="width:${paper.w}mm;min-height:${paper.h}mm">
+      <h1>${esc(garment.title)}${state.cat.name ? ' for ' + esc(state.cat.name) : ''}</h1>
+      <div>Drafted ${esc(new Date().toISOString().slice(0, 10))} at peligaming.com/tools/irl/cat-sweater · ${esc(SWEATER.FABRICS[garment.settings.fabric].name)}, ease ${Math.round(garment.settings.ease * 100)}%, seam allowance ${garment.settings.sa} mm included on every cut edge except the fold.</div>
+      <h2>Check the print</h2>
+      <div>Print at 100% — “actual size”, not “fit to page”. These squares must measure exactly:</div>
+      <div class="squares"><div class="sq" style="width:50mm;height:50mm">5 cm</div><div class="sq" style="width:2in;height:2in">2 in</div>
+        <div style="font-size:10pt"><div>Pages ${rows * cols > 1 ? `A1 to ${letter(rows - 1)}${cols}` : 'A1'} follow, each with a thin frame. Trim or fold along the frame and tape the pages edge to edge in this arrangement:</div><div class="map">${map}</div></div></div>
+      <div style="display:flex;gap:12mm;margin-top:4mm">
+        <div><h2>The cat</h2><table>${mrows}</table></div>
+        <div><h2>Pieces</h2><table>${prow}</table><h2>Notions</h2><table>${nrow}</table><div style="margin-top:2mm">Fabric: ${fmtU(garment.yardage.length)} of ${fmtU(garment.yardage.width)} wide${garment.yardage.lined ? ', and the same again in lining' : ''}.</div></div>
+      </div>
+    </div>`);
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (!used(r, c)) continue;
+      const x0 = c * tw, y0 = r * th;
+      pages.push(`<div class="page" style="width:${paper.w}mm;height:${paper.h}mm;padding:${margin}mm">
+        <svg viewBox="${x0.toFixed(2)} ${y0.toFixed(2)} ${tw.toFixed(2)} ${th.toFixed(2)}" width="${tw}mm" height="${th}mm">
+          <g>${art}</g>
+          <rect class="tile-frame" x="${x0.toFixed(2)}" y="${y0.toFixed(2)}" width="${tw}" height="${th}"/>
+          <text class="tile-label" x="${(x0 + 3).toFixed(1)}" y="${(y0 + 5).toFixed(1)}">${letter(r)}${c + 1}</text>
+          <text class="tile-label" x="${(x0 + tw - 3).toFixed(1)}" y="${(y0 + th - 2).toFixed(1)}" text-anchor="end">${esc(garment.title)}${state.cat.name ? ' · ' + esc(state.cat.name) : ''} · ${letter(r)}${c + 1} of ${letter(rows - 1)}${cols}</text>
+        </svg></div>`);
+    }
+    $('#print').innerHTML = `<style>@page { size: ${paper.name} portrait; margin: 0; }</style>` + pages.join('');
+    setTimeout(() => window.print(), 50);
+  }
+
+  // --------------------------------------------------------- the sewing guide
+  function renderSew() {
+    if (!garment) return;
+    const g = garment, m = g.measurements, s = g.settings, fab = SWEATER.FABRICS[s.fabric];
+    const harness = s.harness, split = s.split, knit = fab.stretch > 0;
+    const back = g.pieces.find((p) => p.id === 'back');
+    const li = (t) => `<li>${t}</li>`;
+    const steps = [];
+    steps.push(li(`<b>Print and cut.</b> Print at 100% and check the test square; tape the pages along their frames. Cut each piece on the dashed cutting line — the seam allowance of ${s.sa} mm is already in it. The back and belly pieces are drawn as halves: ${split ? 'the back is cut twice, the second mirrored, so flip the paper; the belly is cut on the fold' : 'place the fold line on a fold of the fabric'} with the grainline along the fabric's length${knit ? ' (the greatest stretch going round the cat)' : ''}. Snip the notches a couple of millimetres into the allowance.`));
+    if (harness) {
+      steps.push(li(`<b>Cut the lining too.</b> The same pieces again in a stable woven. Mark the D-ring tab on the outer fabric of the half that will lie on top.`));
+      steps.push(li(`<b>Make the D-ring tab.</b> Fold 80 mm of webbing through the ring, lay the ends on the tab mark of the upper back half with the ring standing toward the tail, and box-stitch them down through the outer fabric, going over it twice. This is what the leash pulls on, so stitch it as if it matters.`));
+      steps.push(li(`<b>Join the outer pieces.</b> Right sides together, sew each back half to the chest piece along the side seam from the neck to the first leg-hole notch, then from the second notch down to the end-of-seam notch. Do the same with the lining pieces.`));
+      steps.push(li(`<b>Bag the lining.</b> Lay the lining on the outer, right sides together, and sew round the neck edge, both long centre-back edges and the hem, leaving a 60 mm gap in the hem to turn through. Clip the curves, turn, press, close the gap, and topstitch the edges.`));
+      steps.push(li(`<b>Finish the leg holes.</b> Trim the two layers even and bind each hole with bias binding; or turn both layers in and topstitch them together.`));
+      steps.push(li(`<b>Velcro.</b> Hook tape on the <i>underside</i> of the upper half's centre strip, loop tape on the <i>top</i> of the lower half's strip, the full length of the opening (${fmtU(back.bbox[3] - back.bbox[1] - 2 * s.sa)}). Loop faces out so the hook never touches fur. The overlap gives a little adjustment either way.`));
+      steps.push(li(`<b>Fit.</b> Lay it open on the floor, front legs through the holes, close the velcro along the spine. Two fingers should fit under it at the chest, no more. Walk indoors first; the leash clips to the D-ring. A determined cat can back out of any harness — stay close.`));
+    } else {
+      steps.push(li(`<b>Side seams.</b> Right sides together, sew the back to the belly along each side from the neck to the first leg-hole notch, then from the second notch down to the end-of-seam notch (the belly piece's lower corner). ${knit ? 'Use a narrow zigzag or a stretch stitch so the seam gives with the fabric.' : 'Press the seams open.'} Below the belly piece, the back's side edges are free: ${s.opt.hemBand ? 'they are caught in the hem band' : 'turn them under and stitch'}.`));
+      steps.push(li(`<b>Leg holes.</b> ${s.opt.cuffs ? `Fold each cuff in half along its length, join the short ends into a ring, mark it in quarters, and with the ring inside the hole, raw edges together, stretch it to fit as you sew. Each hole is ${fmtU(g.edges.holeOpening)} round; the cuff is cut shorter so it hugs the leg.` : knit ? `Each hole is ${fmtU(g.edges.holeOpening)} round. Turn the edge under by the allowance and zigzag it, stretching gently, or bind it with a strip of the same knit.` : `Each hole is ${fmtU(g.edges.holeOpening)} round. Bind it with bias binding, easing round the curve.`}`));
+      if (s.opt.collar === 'band') steps.push(li(`<b>Collar.</b> ${split ? 'Fold the collar band in half along its length. Pin it to the neck edge, raw edges together, stretching it evenly to fit, and sew; the band ends at the centre back with the opening.' : 'Join the collar band into a ring, fold it in half along its length, quarter-mark it and the neck edge, and sew it on stretched to fit.'} The band is cut shorter than the ${fmtU(g.edges.neckOpening)} neck so it stands up and hugs.`));
+      else if (s.opt.collar === 'binding') steps.push(li(`<b>Collar.</b> Bind the ${fmtU(g.edges.neckOpening)} neck edge with ${knit ? 'a strip of the knit' : 'bias binding'}, stretching slightly round the curve.`));
+      else steps.push(li(`<b>Collar.</b> Turn the neck edge under by the allowance and stitch${knit ? ' with a zigzag, stretching gently' : ', clipping the curve first'}.`));
+      steps.push(li(`<b>Hem.</b> ${s.opt.hemBand ? 'Join the hem band into a ring, fold it along its length, and sew it round the bottom of the sweater — the belly hem, the back’s side edges and the back hem in one go — stretched to fit.' : 'Turn the belly hem, the back’s free side edges and the back hem under and stitch.'}`));
+      if (split) steps.push(li(`<b>Velcro.</b> Hook tape on the <i>underside</i> of one back half's centre strip, loop tape on the <i>top</i> of the other's, the full length of the opening (${fmtU(back.bbox[3] - back.bbox[1] - 2 * s.sa)}). Loop faces out so the hook never touches fur.`));
+      steps.push(li(`<b>Try it on.</b> ${split ? 'Open flat, front legs through the holes, close along the spine.' : 'Head through the collar first, then one front leg at a time.'} It should sit snug without pulling at the leg holes, and end clear of the belly underneath. Most cats need a few short wearings to stop walking sideways.`));
+    }
+    const mrows = MEASURES.map((mm) => `<tr><th>${esc(mm.name)}</th><td>${fmtU(m[mm.id])}${m.derived[mm.id] ? ' <span class="est">estimated</span>' : ''}</td><td class="muted">${esc(mm.how)}</td></tr>`).join('');
+    const prow = g.pieces.map((p) => `<tr><th>${esc(p.name)}</th><td>${esc(p.cut)}</td><td>${fmtU(p.bbox[2] - p.bbox[0])} × ${fmtU(p.bbox[3] - p.bbox[1])}${p.fold ? ' <span class="muted">(the half, on the fold)</span>' : ''}</td></tr>`).join('');
+    const nrow = g.notions.map((n) => `<tr><th>${esc(n.item)}</th><td>${esc(n.qty)}</td></tr>`).join('');
+    const notes = g.warnings.map((w) => `<p class="warn">⚠ ${esc(w)}</p>`).concat(g.fit.notes.map((n) => `<p>${esc(n)}</p>`)).join('');
+    $('#sew').innerHTML = `
+      <h1>${esc(g.title)}${state.cat.name ? ' for ' + esc(state.cat.name) : ''}</h1>
+      <p class="muted">${esc(fab.name)} (${esc(fab.detail)}), ease ${Math.round(s.ease * 100)}%, seam allowance ${s.sa} mm. ${harness ? 'Lined, opening along the spine with velcro, a D-ring between the shoulders.' : split ? 'Opens along the spine with velcro.' : 'A pull-over.'}</p>
+      <h2>Fit</h2>${notes}
+      <h2>You need</h2>
+      <p>Fabric: <b>${fmtU(g.yardage.length)}</b> of ${fmtU(g.yardage.width)}-wide ${esc(fab.name.toLowerCase())}${g.yardage.lined ? ', and the same in lining' : ''}. ${knit ? 'A ballpoint needle and a stretch or zigzag stitch.' : 'A universal needle.'}</p>
+      <table>${nrow}</table>
+      <h2>Pieces</h2>
+      <table><tr><th>Piece</th><th>Cut</th><th>Size, with allowance</th></tr>${prow}</table>
+      <h2>Sewing</h2>
+      <ol>${steps.join('')}</ol>
+      <h2>How to measure</h2>
+      <p>A soft tape, the cat standing (or at least not curled up), snug but not pulled tight. The three on top are what the pattern is drafted from; the rest are estimated from them in the proportions of an ordinary cat and are worth measuring if your cat is long, stocky or a kitten. Hover a name in the panel and the tape is drawn on the cat.</p>
+      <table>${mrows}</table>
+      <h2>How the pattern is drafted</h2>
+      <p>The cat is modelled as a tube whose cross-sections are ellipses a little deeper than wide, with the girth blending from the neck through the chest to the waist. The garment is that tube with the fabric's ease applied, cut into a back piece and a belly piece along a side seam placed so the belly piece between the leg holes is the chest width. The neckline is the collar ring, which sits at an angle on a neck that rises from the body; the leg holes are discs centred on the seam. Each piece is then flattened by triangulation development, the sheet-metal method: a grid of rays and rings on the body is laid out flat triangle by triangle with its true lengths, keeping the fold straight, so every width is right and the side seam comes out the same length on both pieces. The chest front is doubly curved, so a few millimetres of that is eased into the belly piece's leg notches; everything else fits by construction.</p>`;
+  }
+
+  // --------------------------------------------------------- share
+  function share() {
+    const url = location.origin + location.pathname + '#' + toHash();
+    const done = () => { $('#share-btn').textContent = '✓ Link copied'; setTimeout(() => { $('#share-btn').textContent = '🔗 Share'; }, 1800); };
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => prompt('Copy this link', url));
+    else prompt('Copy this link', url);
+  }
+
+  // --------------------------------------------------------- go
+  load();
+  buildPanel();
+  CAT3D.setup($('#cat-canvas'));
+  fillMeasures();
+  syncPanel();
+  layoutPanes();
+  update();
+  CAT3D.autoRotate(true);
+})();
+</script>
+</body>
+</html>
