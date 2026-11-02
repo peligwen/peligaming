@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Azeroth Survivors Save Editor</title>
+<meta name="description" content="An unofficial save editor for Azeroth Survivors, the fan-made survivors-style roguelike set in vanilla Azeroth: unseal an exported .sav, edit heroes, talents, zones, gear and stars, companion perks and achievements, and seal it again for import. Runs entirely in the browser.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧟</text></svg>">
+<style>
+  :root { --bg: #15120f; --panel: #221c16; --panel2: #2b241c; --line: #4a3b2a; --text: #e8dcc4; --dim: #a08f74; --gold: #e6b85c; --ok: #7fc47f; --warn: #e3b25a; --bad: #e06c6c; --accent: #c9963c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 18px 24px 10px; border-bottom: 1px solid var(--line); background: linear-gradient(#1c1712, var(--bg)); }
+  h1 { margin: 0 110px 4px 0; font-size: 22px; color: var(--gold); letter-spacing: .5px; }
+  h3 { margin: 0 0 10px; font-size: 16px; color: var(--gold); }
+  .sub { color: var(--dim); font-size: 13px; margin: 0 0 12px; }
+  .load { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+  .load > div { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 280px; flex: 1; }
+  .load label.file { display: inline-block; padding: 8px 14px; background: var(--accent); color: #1a1208; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  .load input[type=file] { display: none; }
+  textarea { width: 100%; background: #110e0b; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: 13px/1.4 ui-monospace, Consolas, monospace; resize: vertical; }
+  textarea.raw { min-height: 420px; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+  .status { margin-top: 8px; font-size: 13px; color: var(--dim); min-height: 1.4em; }
+  .status.ok { color: var(--ok); } .status.warn { color: var(--warn); } .status.bad { color: var(--bad); }
+  nav { display: flex; gap: 4px; padding: 10px 24px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .tab { background: transparent; color: var(--dim); border: 1px solid transparent; border-bottom: none; padding: 8px 14px; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 14px; }
+  .tab.active { background: var(--panel); color: var(--gold); border-color: var(--line); }
+  main { padding: 16px 24px 90px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0; }
+  .row.col { flex-direction: column; align-items: stretch; }
+  .row label { color: var(--dim); font-size: 13px; }
+  .hint { color: var(--dim); font-size: 12.5px; margin: 6px 0; }
+  .dim { color: var(--dim); font-size: 12px; }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+  input[type=number], input[type=text], select { background: #110e0b; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 14px; }
+  input[type=number] { width: 120px; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  button:hover { border-color: var(--accent); color: var(--gold); }
+  button.primary { background: var(--accent); color: #1a1208; font-weight: 600; border-color: var(--accent); }
+  .class-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .chip { border-radius: 999px; padding: 6px 14px; }
+  .chip.active { background: var(--accent); color: #1a1208; font-weight: 600; border-color: var(--accent); }
+  .chip.absent { opacity: .55; }
+  table { border-collapse: collapse; width: 100%; }
+  table.zones th, table.zones td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #3a2f23; vertical-align: top; }
+  table.zones th { color: var(--dim); font-weight: 600; font-size: 12.5px; }
+  table.ach td:nth-child(3) { max-width: 420px; }
+  table.gear { table-layout: fixed; }
+  table.gear th, table.gear td { padding: 4px 5px; border-bottom: 1px solid #3a2f23; font-size: 12.5px; vertical-align: top; }
+  table.gear th { color: var(--dim); font-weight: 600; }
+  table.gear td:first-child, table.gear th:first-child { width: 80px; color: var(--text); font-weight: 600; }
+  .cell { background: #1b1612; border-radius: 6px; }
+  .cell.have { background: #2a2418; }
+  .cell label { display: block; cursor: pointer; }
+  .cell .nm { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell select { margin-top: 3px; font-size: 12px; padding: 2px 4px; width: 100%; }
+  th.r0 { color: #c8c8c8; } th.r1 { color: #4fd14f; } th.r2 { color: #4f8fff; } th.r3 { color: #b56cff; } th.r4 { color: #ff9a2b; } th.r5 { color: #e86a6a; }
+  #save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #1c1712; border-top: 1px solid var(--line); padding: 10px 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #dirty { color: var(--warn); font-size: 13px; }
+  .format p { font-size: 14px; } .format code { color: var(--gold); }
+  .sub a, .format a { color: var(--gold); }
+  .peligaming-home { position: fixed; right: 10px; top: 8px; z-index: 9999; font: 12px/1 system-ui, sans-serif; color: #fff; opacity: .35; text-decoration: none; background: #00000073; padding: 4px 9px; border-radius: 12px; transition: opacity .15s; }
+  .peligaming-home:hover { opacity: 1; }
+  @media (max-width: 700px) { header, main, nav, #save-bar { padding-left: 14px; padding-right: 14px; } .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Azeroth Survivors — Save Editor</h1>
+  <p class="sub">An unofficial editor for the saves of <a href="https://wow.aethus.pl" target="_blank" rel="noopener">Azeroth Survivors</a>, the fan-made survivors-style roguelike set in vanilla Azeroth. It unseals an exported <code>.sav</code>, lets you edit heroes, talents, zones and heroic tiers, the gear collection and its stars, companion perks, statistics and achievements, and seals it again for import. Everything runs in this page; nothing is uploaded. Keep a backup of your original save: an import replaces what is in the game. Not affiliated with the game or its developer.</p>
+  <div class="load">
+    <div>
+      <label class="file">Open .sav file<input type="file" id="file" accept=".sav,.txt"></label>
+      <span class="dim"> or drop a file anywhere on the page</span>
+    </div>
+    <div>
+      <textarea id="paste" rows="3" placeholder="…or paste the save text here (RSE1:… or decrypted lines)"></textarea>
+      <div class="row"><button id="paste-load" class="primary">Load pasted text</button><button id="paste-clear">Clear</button></div>
+    </div>
+  </div>
+  <div id="status" class="status">No save loaded. In the game: Options → Saves → Export Save, then open the <code>AzerothSurvivors ….sav</code> it writes here. A desktop build’s <code>Backup ….sav</code> files open the same way.</div>
+</header>
+<div id="editor" hidden>
+  <nav>
+    <button class="tab active" data-tab="heroes">Heroes &amp; Talents</button>
+    <button class="tab" data-tab="gear">Gear &amp; Stars</button>
+    <button class="tab" data-tab="account">Perks &amp; Account</button>
+    <button class="tab" data-tab="achievements">Achievements</button>
+    <button class="tab" data-tab="raw">Raw</button>
+    <button class="tab" data-tab="format">Format notes</button>
+  </nav>
+  <main id="content"></main>
+</div>
+<div id="save-bar" hidden>
+  <button id="dl-sealed" class="primary">Download sealed .sav</button>
+  <button id="copy-sealed">Copy sealed text</button>
+  <button id="dl-plain">Download decrypted .txt</button>
+  <span id="dirty" hidden>Unsaved changes</span>
+  <span class="dim">Import in game: Options → Saves → Import Save.</span>
+</div>
+<a class="peligaming-home" href="../../" title="peligaming — all tools">⌂ peligaming</a>
+<script id="save-engine">
+// The engine: the save sealing, the game's data tables and the line-based save
+// model with its typed accessors. No DOM in here; scripts/check-save-editor.mjs
+// runs this block in Node against test vectors and round trips.
+// ---- Azeroth Survivors "RSE1" save sealing (reverse engineered) ----
+// seal:   "RSE1:" + base64( nonce[16] || ciphertext || tag[20] )
+// stream: block i (20 bytes) = HMAC-SHA1(KEY, "ks" || nonce || u64le(i)), XORed over the plaintext
+// tag:    HMAC-SHA1(KEY, "tag" || nonce || ciphertext)
+// KEY:    "azeroth-survivors/save/v1/" + 16 fixed bytes (zero padded to the 64-byte HMAC block)
+const RSE = (() => {
+  const KEY = new Uint8Array([
+    ...new TextEncoder().encode('azeroth-survivors/save/v1/'),
+    0x9c,0x4e,0x27,0xd1,0x6a,0xf0,0x13,0xb8,0x5d,0xe2,0x71,0x0c,0xa9,0x36,0xc4,0x8f]);
+
+  function sha1(bytes) {
+    const ml = bytes.length, withOne = ml + 1;
+    const padLen = (64 - ((withOne + 8) % 64)) % 64;
+    const total = withOne + padLen + 8;
+    const buf = new Uint8Array(total); buf.set(bytes); buf[ml] = 0x80;
+    const dv = new DataView(buf.buffer);
+    const bitLen = ml * 8;
+    dv.setUint32(total - 8, Math.floor(bitLen / 0x100000000));
+    dv.setUint32(total - 4, bitLen >>> 0);
+    let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
+    const w = new Uint32Array(80);
+    for (let off = 0; off < total; off += 64) {
+      for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + 4 * i);
+      for (let i = 16; i < 80; i++) { const x = w[i-3] ^ w[i-8] ^ w[i-14] ^ w[i-16]; w[i] = (x << 1) | (x >>> 31); }
+      let a = h0, b = h1, c = h2, d = h3, e = h4;
+      for (let i = 0; i < 80; i++) {
+        let f, k;
+        if (i < 20) { f = (b & c) | (~b & d); k = 0x5A827999; }
+        else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
+        else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
+        else { f = b ^ c ^ d; k = 0xCA62C1D6; }
+        const t = (((a << 5) | (a >>> 27)) + f + e + k + w[i]) >>> 0;
+        e = d; d = c; c = (b << 30) | (b >>> 2); b = a; a = t;
+      }
+      h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0; h4 = (h4 + e) >>> 0;
+    }
+    const out = new Uint8Array(20), o = new DataView(out.buffer);
+    o.setUint32(0, h0); o.setUint32(4, h1); o.setUint32(8, h2); o.setUint32(12, h3); o.setUint32(16, h4);
+    return out;
+  }
+
+  function concat(...parts) {
+    let n = 0; for (const p of parts) n += p.length;
+    const out = new Uint8Array(n); let o = 0;
+    for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  }
+
+  function hmacSha1(key, msg) {
+    const k = new Uint8Array(64); k.set(key.length > 64 ? sha1(key) : key);
+    const ipad = new Uint8Array(64), opad = new Uint8Array(64);
+    for (let i = 0; i < 64; i++) { ipad[i] = k[i] ^ 0x36; opad[i] = k[i] ^ 0x5c; }
+    return sha1(concat(opad, sha1(concat(ipad, msg))));
+  }
+
+  const enc = (s) => new TextEncoder().encode(s);
+  const KS = enc('ks'), TAG = enc('tag');
+
+  function keystreamXor(nonce, data) {
+    const out = new Uint8Array(data);
+    const ctr = new Uint8Array(8), dv = new DataView(ctr.buffer);
+    for (let i = 0, blk = 0; i < out.length; i += 20, blk++) {
+      dv.setUint32(0, blk >>> 0, true); dv.setUint32(4, Math.floor(blk / 0x100000000), true);
+      const ks = hmacSha1(KEY, concat(KS, nonce, ctr));
+      for (let j = 0; j < 20 && i + j < out.length; j++) out[i + j] ^= ks[j];
+    }
+    return out;
+  }
+
+  function b64decode(s) {
+    s = s.replace(/[^A-Za-z0-9+/=]/g, '');
+    const bin = atob(s); const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function b64encode(bytes) {
+    let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+
+  function unseal(text) {
+    text = text.trim();
+    if (!text.startsWith('RSE1:')) throw new Error('Not an RSE1 save (no "RSE1:" prefix).');
+    const blob = b64decode(text.slice(5));
+    if (blob.length < 36) throw new Error('Save is too short.');
+    const nonce = blob.slice(0, 16), ct = blob.slice(16, blob.length - 20), tag = blob.slice(blob.length - 20);
+    const calc = hmacSha1(KEY, concat(TAG, nonce, ct));
+    let tagOk = true; for (let i = 0; i < 20; i++) if (calc[i] !== tag[i]) tagOk = false;
+    const plain = new TextDecoder().decode(keystreamXor(nonce, ct));
+    return { plain, tagOk, nonce };
+  }
+
+  function seal(plain, nonce) {
+    if (!nonce) { nonce = new Uint8Array(16); crypto.getRandomValues(nonce); }
+    const ct = keystreamXor(nonce, enc(plain));
+    const tag = hmacSha1(KEY, concat(TAG, nonce, ct));
+    return 'RSE1:' + b64encode(concat(nonce, ct, tag));
+  }
+
+  return { sha1, hmacSha1, unseal, seal, b64decode, b64encode };
+})();
+
+// ---- Game data tables (recovered from the game's wasm / i18n) ----
+const CLASSES = {
+  1:  { name: 'Warrior', armor: 'plate',   sets: ["Recruit's", 'Valor', 'Might', 'Wrath', 'Dreadnaught'],
+        weapons: [['Worn Claymore', 'Bastard Sword of Valor', 'Blackhand Doomsaw', "Ravager's Greatblade", 'Sulfuras, Hand of Ragnaros']] },
+  2:  { name: 'Paladin', armor: 'plate',   sets: ["Squire's", 'Lightforge', 'Lawbringer', 'Judgement', 'Redemption'],
+        weapons: [['Wooden Maul', 'Hammer of the Squire', 'Hammer of the Lightforge', 'Lightforged Hammer', 'Ashbringer']] },
+  3:  { name: 'Hunter',  armor: 'mail',    sets: ["Tracker's", "Beaststalker's", "Giantstalker's", "Dragonstalker's", 'Cryptstalker'],
+        weapons: [['Short Bow', 'Hunting Bow of the Wilds', 'Bow of the Dragonflight', "Ahn'Qiraj Rifle", "Rhok'delar, Longbow of the Ancient Keepers"]] },
+  4:  { name: 'Rogue',   armor: 'leather', sets: ["Footpad's", 'Shadowcraft', 'Nightslayer', 'Bloodfang', 'Bonescythe'],
+        weapons: [['Worn Dagger', "Assassin's Blade", 'Shadowcraft Dirk', 'Blackwing Shiv', 'Thunderfury, Blessed Blade of the Windseeker'],
+                  ['Rusty Shiv', "Thief's Blade", 'Nightslayer Kris', 'Fang of the Faceless', 'Kingsfall']] },
+  5:  { name: 'Priest',  armor: 'cloth',   sets: ["Acolyte's", 'Devout', 'Prophecy', 'Transcendence', 'Faith'],
+        weapons: [["Acolyte's Staff", 'Staff of the Devout', 'Staff of Prophecy', 'Benediction', 'Anathema']] },
+  7:  { name: 'Shaman',  armor: 'mail',    sets: ['Primal', 'Elements', 'Earthfury', 'Ten Storms', 'Earthshatter'],
+        weapons: [['Spiked Club', 'Mace of the Elements', 'Earthfury Hammer', 'Blackwing Mace', 'Doomhammer'],
+                  ['Round Buckler', 'Crested Shield', 'Totem Shield', 'Aegis of the Ten Storms', 'Shield of the Earthshatter']] },
+  8:  { name: 'Mage',    armor: 'cloth',   sets: ["Apprentice's", "Magister's", 'Arcanist', 'Netherwind', 'Frostfire'],
+        weapons: [["Apprentice's Staff", "Magister's Staff", "Arcanist's Staff", 'Staff of Dominance', 'Atiesh, Greatstaff of the Guardian']] },
+  9:  { name: 'Warlock', armor: 'cloth',   sets: ["Novice's", 'Dreadmist', 'Felheart', 'Nemesis', 'Plagueheart'],
+        weapons: [["Novice's Staff", 'Dreadmist Staff', 'Felheart Staff', 'Staff of the Shadow Flame', 'Legendary staff']] },
+  11: { name: 'Druid',   armor: 'leather', sets: ['Thicket', 'Wildheart', 'Cenarion', 'Stormrage', 'Dreamwalker'],
+        weapons: [['Gnarled Staff', 'Wildheart Staff', 'Cenarion Staff', 'Staff of the Moon', 'Legendary staff']] },
+};
+const CLASS_ORDER = [1, 2, 3, 4, 5, 7, 8, 9, 11];
+const NOUNS = {
+  cloth:   ['Circlet', 'Mantle', 'Robes', 'Belt', 'Leggings', 'Boots', 'Bindings', 'Gloves'],
+  leather: ['Cover', 'Spaulders', 'Chestpiece', 'Belt', 'Pants', 'Boots', 'Bracers', 'Gloves'],
+  mail:    ['Helm', 'Spaulders', 'Breastplate', 'Belt', 'Legguards', 'Greaves', 'Bracers', 'Gauntlets'],
+  plate:   ['Helm', 'Pauldrons', 'Breastplate', 'Girdle', 'Legplates', 'Sabatons', 'Bracers', 'Gauntlets'],
+};
+// sets whose names read "{noun} of {set}"
+const OF_SETS = new Set(['Valor', 'Might', 'Wrath', 'Elements', 'Ten Storms', 'Prophecy', 'Transcendence', 'Faith']);
+const RARITY = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'PvP'];
+// item id = 100000 + class*1000 + slotIndex*100 + tier*10
+const SLOT_INDEX = [
+  { s: 0, equip: 0,  name: 'Head' }, { s: 1, equip: 2,  name: 'Shoulder' }, { s: 2, equip: 4, name: 'Chest' },
+  { s: 3, equip: 5,  name: 'Waist' }, { s: 4, equip: 6, name: 'Legs' }, { s: 5, equip: 7, name: 'Feet' },
+  { s: 6, equip: 8,  name: 'Wrist' }, { s: 7, equip: 9, name: 'Hands' }, { s: 8, equip: 15, name: 'Weapon' },
+  { s: 9, equip: 16, name: 'Off Hand' },
+];
+const EQUIP_SLOT_NAMES = { 0: 'Head', 2: 'Shoulder', 4: 'Chest', 5: 'Waist', 6: 'Legs', 7: 'Feet', 8: 'Wrist', 9: 'Hands', 14: 'Back', 15: 'Main Hand', 16: 'Off Hand', 17: 'Ranged', 18: 'Tabard' };
+function itemId(cls, s, t) { return 100000 + cls * 1000 + s * 100 + t * 10; }
+function decodeItem(id) {
+  if (id < 100000 || id >= 200000) return null;
+  const cls = Math.floor((id - 100000) / 1000), rest = (id - 100000) % 1000;
+  const s = Math.floor(rest / 100), t = Math.floor((rest % 100) / 10);
+  if (!CLASSES[cls] || s > 9 || t > 5) return null;
+  return { cls, s, t };
+}
+function itemName(id) {
+  const d = decodeItem(id); if (!d) return (TABARDS[id] || COSMETICS[id] || ('item ' + id));
+  const c = CLASSES[d.cls];
+  if (d.s >= 8) {
+    const kind = d.s - 8;
+    if (d.t === 5) return 'PvP ' + (kind ? 'off-hand' : 'weapon');
+    const w = (c.weapons[kind] || [])[d.t];
+    return w || (RARITY[d.t] + ' ' + (kind ? 'off-hand' : 'weapon'));
+  }
+  const noun = NOUNS[c.armor][d.s];
+  if (d.t === 5) return "Field Marshal's / Warlord's " + noun;
+  const set = c.sets[d.t];
+  return OF_SETS.has(set) ? `${noun} of ${set}` : `${set} ${noun}`;
+}
+const ZONES = [
+  ['elwynn', 'Elwynn Forest'], ['duskwood', 'Duskwood'], ['wsg', 'Warsong Gulch'], ['ungoro', "Un'Goro Crater"],
+  ['ab', 'Arathi Basin'], ['feralas', 'Feralas'], ['arena', 'Gurubashi Arena'], ['sm', 'Scarlet Monastery'],
+  ['av', 'Alterac Valley'], ['brm', 'Blackrock Mountain'], ['aq', "Gates of Ahn'Qiraj"], ['naxx', 'Naxxramas'],
+];
+const ZONE_NAME = Object.fromEntries(ZONES);
+const RACES = { 1: 'Human', 2: 'Orc', 3: 'Dwarf', 4: 'Night Elf', 5: 'Undead', 6: 'Tauren', 7: 'Gnome', 8: 'Troll' };
+const DIFFICULTY = ['Normal', 'Heroic I', 'Heroic II', 'Heroic III', 'Heroic IV', 'Heroic V'];
+const GLOWS = { 1894: 'Icy Chill', 1900: 'Crusader', 803: 'Fiery Weapon', 1898: 'Unholy Weapon' };
+const TABARDS = {
+  90001: 'Warsong Battle Tabard', 90002: 'Silverwing Battle Tabard', 90003: 'Arathor Battle Tabard', 90004: 'Defilers Battle Tabard',
+  90005: 'Stormpike Battle Tabard', 90006: 'Frostwolf Battle Tabard', 90011: 'Stormwind Tabard', 90012: 'Tabard of Lordaeron',
+  90013: 'Tabard of Stromgarde', 90014: 'Tabard of Theramore', 90015: 'Tabard of Dalaran', 90016: 'Scarlet Crusade Tabard',
+  90017: 'Darkmoon Faire Tabard', 90018: 'Tabard of the Alliance', 90019: 'Tabard of the Horde', 90020: 'Tabard of the Argent Dawn',
+  90021: 'Tabard of Flame', 90022: 'Tabard of Frost', 90023: "Alliance Officer's Tabard", 90024: "Horde Officer's Tabard", 90025: "Contest Winner's Tabard",
+};
+const COSMETICS = {
+  90101: 'Defias Bandana', 90102: "Zul'Gurub Mask", 90103: 'Gnomish Mind Control Cap', 90104: 'Gnomish Goggles', 90105: 'Onyxia Scale Cloak',
+  90106: 'Glacial Cloak', 90107: 'Dashing Scarlet Cloak', 90108: "Admiral's Hat", 90109: "Bloodsail Admiral's Hat", 90110: 'Cape of the Brotherhood',
+  90111: 'Embrace of the Lycan', 90112: "Whitemane's Chapeau", 90113: 'Cloak of the Brood Lord', 90114: 'Cloak of the Devoured',
+};
+// Talent experience: point k costs 65 + 15k XP (80, 95, 110, ...), 51 points at most.
+const MAX_TALENT_POINTS = 51;
+function talentCost(k) { return 65 + 15 * k; }
+function talentPointsFor(xp) {
+  let n = 0, spent = 0;
+  while (n < MAX_TALENT_POINTS && spent + talentCost(n + 1) <= xp) { spent += talentCost(n + 1); n++; }
+  return { points: n, into: xp - spent, next: n < MAX_TALENT_POINTS ? talentCost(n + 1) : 0 };
+}
+function xpForPoints(n) { let s = 0; for (let k = 1; k <= n; k++) s += talentCost(k); return s; }
+const PERKS = [
+  ['rerolls', 'Second Thoughts', 3, 'One/two/three more free rerolls every run.'],
+  ['banish', 'Banish', 3, 'Once/twice/three times a run, banish a card. Needs: Regular (count:runs10).'],
+  ['skip', 'Skip', 1, 'Pass on any hand and take some gold instead. Needs: zone:elwynn.'],
+  ['opening', 'Opening Hand', 1, 'Your first level-up of every run deals four cards. Needs: zone:duskwood.'],
+  ['veteran', "Veteran's Lessons", 2, 'A class with less talent experience than your best earns 20%/40% more. Needs: feat:kills2500.'],
+  ['keen', 'Keen Eye', 2, 'Bosses are 5%/10% more likely to drop each piece. Needs: zone:wsg.'],
+  ['companion', 'Companion', 1, 'A companion follows you and sweeps up coins and wisps. Needs: Collector (pieces:25).'],
+  ['leash', 'Long Leash', 3, 'Companions fetch up to 35/45/55 yd beyond your pickup radius. Needs: count:gold5k + Companion.'],
+  ['paws', 'Quick Paws', 3, 'Companions run 20%/40%/60% faster. Needs: count:gold5k + Companion.'],
+  ['instinct_gold', 'Gold-sniffer', 1, 'Instinct: coins first, worth 10% more. Needs: count:gold5k + Companion.'],
+  ['instinct_wisps', 'Wisp-herder', 1, 'Instinct: experience wisps first, from twice as far. Needs: count:gold5k + Companion.'],
+  ['instinct_runes', 'Rune-hound', 1, 'Instinct: also fetches battleground runes. Needs: count:gold5k + Companion.'],
+  ['second', 'Second Companion', 1, 'A second companion with an instinct of its own. Needs: Treasure Hunter (count:gold50k) + Companion.'],
+];
+const PETS = [
+  ['squirrel', 'Squirrel'], ['rabbit', 'Snowshoe Rabbit'], ['macaw', 'Crimson Macaw'], ['owl', 'Great Horned Owl'], ['frog', 'Tree Frog'],
+  ['kingsnake', 'Black Kingsnake'], ['darter', 'Sprite Darter'], ['whelp', 'Black Whelpling'], ['zergling', 'Zergling'], ['chicken', 'Westfall Chicken'],
+  ['roach', 'Undercity Cockroach'], ['panda', 'Panda Cub'], ['sapphiron', 'Sapphiron'], ['zulian_tiger', 'Swift Zulian Tiger'],
+  ['drakonid', 'Mini Chromatic Drakonid'], ['eye_of_cthun', "Mini Eye of C'Thun"], ['stitches', 'Mini Stitches'], ['doomguard', 'Mini Doomguard'],
+  ['devilsaur', 'Baby Devilsaur'], ['ogre', 'Mini Ogre'], ['gordok', 'Tiny Gordok'], ['azure_whelp', 'Azure Whelpling'], ['ancient_protector', 'Ancient Protector'],
+  ['herod', 'Mini Herod'], ['nefarian', 'Mini Nefarian'], ['bigglesworth', 'Mr. Bigglesworth'],
+];
+const STAT_KEYS = ['kills', 'gold', 'guardians', 'bosses', 'runs', 'wins', 'caches', 'marks'];
+// Achievements: [key, name, description, points (null = unknown)]
+const ACHIEVEMENTS = (() => {
+  const a = [];
+  for (const c of CLASS_ORDER) a.push([`class:${CLASSES[c].name.toLowerCase()}`, `${CLASSES[c].name} Victorious`, `Win a run with a ${CLASSES[c].name}.`, null]);
+  for (const [z, n] of ZONES) a.push([`zone:${z}`, `${n}`, `Defeat the final boss in ${n} with any class.`, null]);
+  a.push(
+    ['count:runs10', 'Regular', 'Play 10 runs.', null], ['count:runs100', 'Veteran', 'Play 100 runs.', null], ['count:wins50', 'Conqueror', 'Win 50 runs.', null],
+    ['count:kills10k', 'Exterminator', 'Slay 10,000 enemies.', null], ['count:kills100k', 'Scourge of Azeroth', 'Slay 100,000 enemies.', null], ['count:kills1m', 'A Million Dead', 'Slay 1,000,000 enemies.', null],
+    ['count:gold5k', 'Pocket Change', 'Collect 5,000 gold.', null], ['count:gold50k', 'Treasure Hunter', 'Collect 50,000 gold.', null],
+    ['count:guardians100', 'Lair Raider', 'Slay 100 guardians.', null], ['count:guardians500', "Warden's Bane", 'Slay 500 guardians.', null],
+    ['count:bosses100', 'Boss Hunter', 'Slay 100 bosses.', null], ['count:caches100', 'Cache Cracker', 'Buy 100 caches.', null],
+    ['count:marks100', 'Marked', 'Earn 100 marks.', null], ['count:marks1k', 'Well Paid', 'Earn 1,000 marks.', null], ['count:marks10k', 'Quartermaster', 'Earn 10,000 marks.', null],
+    ['feat:kills2500', 'Slaughterhouse', 'Slay 2,500 enemies in one run.', null], ['feat:kills6000', 'Carnage', 'Slay 6,000 enemies in one run.', null],
+    ['feat:lairs', 'Lair Breaker', 'Slay four guardians before 8:00 in one run.', null], ['feat:marks100', 'Hazard Pay', 'Earn 100 marks in one run.', null],
+    ['feat:bossmarks50', 'Danger Money', 'Earn 50 marks from one boss.', null], ['feat:endless3', 'Overtime', 'Slay 3 bosses in endless in one run.', null],
+    ['feat:endless6', 'Never Ending', 'Slay 6 bosses in endless in one run.', null], ['feat:endless25', 'Endless 25', 'Survive to 25:00 in endless mode.', null],
+    ['feat:endless30', 'Unending', 'Survive to 30:00 in endless mode.', null], ['feat:endless40', 'Deathless Hour', 'Survive to 40:00 in endless mode.', null],
+    ['feat:bare', 'Bare Knuckles', 'Win a run wearing no gear.', null], ['feat:thrifty', 'Thrifty', 'Win a run without buying a cache.', null],
+    ['feat:odds', 'Against the Odds', 'Win a run on Heroic III or harder.', null], ['feat:humble', 'Humble Beginnings', "Beat a zone wearing a common set's 8-piece bonus.", null],
+    ['feat:unpolished', 'Unpolished', 'Beat Heroic II or harder with no piece of gear above 0 stars.', null],
+    ['feat:vancleef', "You're Fired", 'Defeat Edwin VanCleef with a Fire spell.', null], ['feat:stitches', 'Stitches Get Stitches', 'Defeat Stitches with a Bleed effect.', null],
+    ['feat:herod', 'Spin to Win', 'Defeat Herod with Whirlwind.', null], ['feat:hakkar', 'Suck It, Hakkar!', 'Defeat Hakkar with Drain Life.', null],
+    ['feat:kazzak', 'Not Today, Satan', 'Defeat Lord Kazzak with Holy damage.', null], ['feat:mosh', 'Clever Girl', 'Have a summoned pet kill King Mosh.', null],
+    ['feat:kovork', 'Bonk the Bonker', 'Defeat Kovork with a melee attack.', null], ['feat:gordok', 'Stop Hitting Yourself', 'Defeat King Gordok with reflected damage.', null],
+    ['feat:azuregos', 'Blue Screen of Death', 'Defeat Azuregos with an Arcane spell.', null], ['feat:nefarian', 'Bad Dragon!', 'Have a summoned pet kill Nefarian.', null],
+    ['feat:cthun', 'Eye Caramba!', "Defeat C'Thun without taking damage from him.", null], ['feat:nou', 'no u', 'Slay Sapphiron with a Frostbolt as the killing blow.', null],
+    ['heroic:1', 'Heroic Debut', 'Beat Heroic I in any zone.', 10], ['heroic:3', 'Heroic Resolve', 'Beat Heroic III in any zone.', 25],
+    ['heroic:all3', 'Heroic Across Azeroth', 'Beat Heroic III in every zone.', 50], ['heroic:naxx5', 'Champion of Naxxramas', 'Beat Heroic V in Naxxramas. Opens the Crusader glow.', 50],
+    ['stars:1', 'Polished', 'Upgrade a piece of gear to 1 star.', null], ['stars:3', 'Honed', 'Upgrade a piece of gear to 3 stars.', null],
+    ['stars:4', 'Beyond the Vault', 'Upgrade a piece of gear to 4 stars.', 10], ['stars:5', 'Five Stars', 'Upgrade a piece of gear to 5 stars.', 25],
+    ['setbonus', 'Matched', 'Open a set bonus: four armor pieces of one set at 1+ star.', null], ['sharedset', 'Shared Wisdom', "One set's eight armor pieces at 1+ star on every class.", null],
+    ['set8', 'Suited Up', 'Open an 8-piece set bonus (eight pieces at 3+ stars).', null], ['wardrobe', 'Wardrobe', 'Open the 8-piece bonus of all six sets with one class.', null],
+    ['armoryoflegends', 'Armory of Legends', "Open the legendary set's 8-piece bonus with every class.", null],
+    ['empowered', 'Empowered', "Empower an 8-piece set bonus (eight pieces at 5 stars).", 25], ['radiantarmory', 'Radiant Armory', 'Empower an 8-piece set bonus with every class. Opens the Fiery Weapon glow.', 50],
+    ['legendaryset', 'Legendary', 'Collect every legendary piece of one class.', null],
+    ['pieces:25', 'Collector', 'Collect 25 pieces of gear, of any class.', null], ['pieces:all', 'The Whole Armory', 'Collect every piece of gear of every class.', null],
+    ['talents:1', 'Fully Talented', 'Earn all 51 talent points with one class.', null], ['talents:9', 'Master of All', 'Earn all 51 talent points with every class.', null],
+    ['codex:100', 'Every Bauble', 'See every ring, trinket and amulet in the codex.', null],
+    ['coop:together', 'Together, To the End', 'Complete all 12 zones, each with at least one other player.', null], ['coop:fiveofakind', 'Five of a Kind', 'Complete any zone in co-op with all 5 players using the same class.', null],
+    ['coop:matching', 'Matching Outfits', "Win in a party of three or more, every hero wearing the same set's 8-piece bonus.", null], ['coop:raidnight', 'Raid Night', 'Beat Heroic III or harder in a party of five.', null],
+    ['coop:odds', 'Against All Odds', 'Complete any zone on Heroic III or harder with at least one other player.', null], ['coop:oldgods', 'The Old Gods Have No Friends', "Defeat C'Thun on Heroic III or harder with at least one other player.", null],
+    ['coop:photosynthesis', 'Rest in Photosynthesis', "Defeat Kel'Thuzad on Heroic III in co-op with 5 Druids.", null], ['coop:insane', 'The Insane', 'Co-op achievement. Opens the Unholy Weapon glow.', null],
+    ['coop:brotherhood', 'coop:brotherhood', 'Co-op achievement.', null], ['coop:dragonslayers', 'coop:dragonslayers', 'Co-op achievement.', null], ['coop:end', 'coop:end', 'Co-op achievement.', null],
+    ['coop:holyframe', 'coop:holyframe', 'Co-op achievement.', null], ['coop:jurassic', 'coop:jurassic', 'Co-op achievement.', null], ['coop:smoothie', 'coop:smoothie', 'Co-op achievement.', null],
+    ['coop:team', 'coop:team', 'Co-op achievement.', null], ['coop:totemly', 'coop:totemly', 'Co-op achievement.', null], ['coop:bump', 'coop:bump', 'Co-op achievement.', null],
+  );
+  return a;
+})();
+
+// ---- Save model: an ordered list of "key|field|field..." lines ----
+const KEY_ORDER = ['pick', 'open', 'unlock', 'items', 'equip', 'look', 'talent', 'spec', 'seen', 'ach', 'achat', 'stat', 'beat', 'coopbeat', 'perk', 'tabard', 'races', 'pets', 'resets', 'hero', 'marks', 'stars', 'pity', 'glow', 'hbeat'];
+const CLASS_KEYED = new Set(['open', 'unlock', 'equip', 'look', 'talent', 'spec', 'beat', 'hero', 'marks', 'glow', 'hbeat']);
+
+const model = {
+  lines: [],          // array of string[] (split on '|')
+  nonce: null,        // original nonce (Uint8Array) when loaded from a sealed save
+  sourceName: '',
+  dirty: false,
+};
+
+function parsePlain(text) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n').filter((l, i, arr) => !(l === '' && i === arr.length - 1));
+  model.lines = lines.map(l => l.split('|'));
+}
+function serializePlain() { return model.lines.map(f => f.join('|')).join('\n') + '\n'; }
+
+function keyOrder(k) { const i = KEY_ORDER.indexOf(k); return i < 0 ? 999 : i; }
+function findLine(key, cls) {
+  return model.lines.findIndex(f => f[0] === key && (cls === undefined || f[1] === String(cls)));
+}
+function getLine(key, cls) { const i = findLine(key, cls); return i < 0 ? null : model.lines[i]; }
+function setLine(key, cls, fields) {
+  // fields: the fields after key (and after class when class-keyed)
+  const full = cls === undefined ? [key, ...fields] : [key, String(cls), ...fields];
+  const i = findLine(key, cls);
+  if (i >= 0) { model.lines[i] = full; return; }
+  // insert in canonical order: after the last line of the same key, else before the first key with a higher order
+  let at = model.lines.length;
+  let lastSame = -1;
+  model.lines.forEach((f, idx) => { if (f[0] === key) lastSame = idx; });
+  if (lastSame >= 0) at = lastSame + 1;
+  else {
+    const o = keyOrder(key);
+    const idx = model.lines.findIndex(f => keyOrder(f[0]) > o);
+    if (idx >= 0) at = idx;
+  }
+  model.lines.splice(at, 0, full);
+}
+function removeLine(key, cls) { const i = findLine(key, cls); if (i >= 0) model.lines.splice(i, 1); }
+
+// "a:1,b:2" <-> Map ; "a=1,b=2" <-> Map ; "a,b,c" <-> array
+function parsePairs(s, sep) { const m = new Map(); if (!s) return m; for (const p of s.split(',')) { if (!p) continue; const i = p.indexOf(sep); if (i < 0) m.set(p, ''); else m.set(p.slice(0, i), p.slice(i + 1)); } return m; }
+function joinPairs(m, sep) { return [...m.entries()].map(([k, v]) => v === '' ? k : `${k}${sep}${v}`).join(','); }
+function parseList(s) { return s ? s.split(',').filter(Boolean) : []; }
+
+// --- typed accessors ---
+const S = {
+  pick() { const l = getLine('pick'); return l ? { cls: +l[1], race: +l[2], gender: +l[3], zone: l[4], name: l[5], look: l[6] || '0,0,0,0,0', diff: +(l[7] || 0) } : null; },
+  setPick(p) { setLine('pick', undefined, [String(p.cls), String(p.race), String(p.gender), p.zone, p.name, p.look, String(p.diff)]); },
+  hero(cls) { const l = getLine('hero', cls); return l ? { race: +l[2], gender: +l[3], look: l[4] || '0,0,0,0,0' } : null; },
+  setHero(cls, h) { setLine('hero', cls, [String(h.race), String(h.gender), h.look]); },
+  talent(cls) { const l = getLine('talent', cls); return l ? { xp: +l[2], alloc: l[3] || '' } : null; },
+  setTalent(cls, xp, alloc) { setLine('talent', cls, [String(xp), alloc]); },
+  marks(cls) { const l = getLine('marks', cls); return l ? +l[2] : 0; },
+  setMarks(cls, n) { if (n > 0) setLine('marks', cls, [String(n)]); else removeLine('marks', cls); },
+  open(cls) { const l = getLine('open', cls); return l ? l[2] : null; },
+  setOpen(cls, zone) { if (zone) setLine('open', cls, [zone]); else removeLine('open', cls); },
+  beat(cls) { const l = getLine('beat', cls); return l ? parseList(l[2]) : []; },
+  setBeat(cls, zones) { if (zones.length) setLine('beat', cls, [zones.join(',')]); else removeLine('beat', cls); },
+  hbeat(cls) { const l = getLine('hbeat', cls); return l ? parsePairs(l[2], ':') : new Map(); },
+  setHbeat(cls, m) { for (const [k, v] of [...m]) if (!(+v > 0)) m.delete(k); if (m.size) setLine('hbeat', cls, [joinPairs(m, ':')]); else removeLine('hbeat', cls); },
+  glow(cls) { const l = getLine('glow', cls); return l ? +l[2] : 0; },
+  setGlow(cls, id) { if (id) setLine('glow', cls, [String(id)]); else removeLine('glow', cls); },
+  equip(cls) { const l = getLine('equip', cls); return l ? parsePairs(l[2], ':') : new Map(); },
+  setEquip(cls, m) { setLine('equip', cls, [joinPairs(m, ':')]); },
+  look(cls) { const l = getLine('look', cls); return l ? parsePairs(l[2], ':') : new Map(); },
+  setLook(cls, m) { setLine('look', cls, [joinPairs(m, ':')]); },
+  items() { const l = getLine('items'); return l ? parseList(l[1]).map(Number) : []; },
+  setItems(arr) { const u = [...new Set(arr)].sort((a, b) => a - b); setLine('items', undefined, [u.join(',')]); },
+  stars() { const l = getLine('stars'); return l ? parsePairs(l[1], ':') : new Map(); },
+  setStars(m) { for (const [k, v] of [...m]) if (!(+v > 0)) m.delete(k); const sorted = new Map([...m].sort((a, b) => +a[0] - +b[0])); if (sorted.size) setLine('stars', undefined, [joinPairs(sorted, ':')]); else removeLine('stars'); },
+  perk() { const l = getLine('perk'); return l ? parsePairs(l[1], ':') : new Map(); },
+  setPerk(m) { for (const [k, v] of [...m]) if (!(+v > 0)) m.delete(k); if (m.size) setLine('perk', undefined, [joinPairs(m, ':')]); else removeLine('perk'); },
+  pets() { const l = getLine('pets'); return l ? parseList(l[1]) : []; },
+  setPets(arr) { if (arr.length) setLine('pets', undefined, [arr.join(',')]); else removeLine('pets'); },
+  ach() { const l = getLine('ach'); return l ? parseList(l[1]) : []; },
+  achat() { const l = getLine('achat'); return l ? parsePairs(l[1], '=') : new Map(); },
+  setAch(arr) {
+    const u = [...new Set(arr)].sort();
+    if (u.length) setLine('ach', undefined, [u.join(',')]); else removeLine('ach');
+    const at = this.achat(); const now = Math.floor(Date.now() / 1000);
+    for (const k of u) if (!at.has(k)) at.set(k, String(now));
+    for (const k of [...at.keys()]) if (!u.includes(k)) at.delete(k);
+    const sorted = new Map([...at].sort((a, b) => a[0] < b[0] ? -1 : 1));
+    if (sorted.size) setLine('achat', undefined, [joinPairs(sorted, '=')]); else removeLine('achat');
+  },
+  stat() { const l = getLine('stat'); return l ? parsePairs(l[1], '=') : new Map(); },
+  setStat(m) { setLine('stat', undefined, [joinPairs(m, '=')]); },
+  resets() { const l = getLine('resets'); return l ? +l[1] : 0; },
+  setResets(n) { if (n > 0) setLine('resets', undefined, [String(n)]); else removeLine('resets'); },
+};
+function classesInSave() {
+  const set = new Set();
+  for (const f of model.lines) if (CLASS_KEYED.has(f[0]) && CLASSES[+f[1]]) set.add(+f[1]);
+  return CLASS_ORDER.filter(c => set.has(c));
+}
+
+// Load a save into the model from either form: a sealed "RSE1:…" export or
+// its decrypted lines. Returns whether the signature checked out (null for
+// plain text); throws with a message fit to show when the text is neither.
+function loadSave(text) {
+  text = text.trim();
+  if (text.startsWith('RSE1:')) {
+    let r;
+    try { r = RSE.unseal(text); } catch (e) { throw new Error('Could not decode: ' + e.message); }
+    model.nonce = r.nonce;
+    parsePlain(r.plain);
+    return r.tagOk;
+  }
+  if (/^pick\|/.test(text) || /\n(open|items|hero|talent)\|/.test(text)) {
+    model.nonce = null;
+    parsePlain(text);
+    return null;
+  }
+  throw new Error('This does not look like an Azeroth Survivors save (expected "RSE1:..." or plain "pick|..." lines).');
+}
+
+const SAVE = {
+  RSE, CLASSES, CLASS_ORDER, NOUNS, OF_SETS, RARITY, SLOT_INDEX, EQUIP_SLOT_NAMES, itemId, decodeItem, itemName,
+  ZONES, ZONE_NAME, RACES, DIFFICULTY, GLOWS, TABARDS, COSMETICS,
+  MAX_TALENT_POINTS, talentCost, talentPointsFor, xpForPoints, PERKS, PETS, STAT_KEYS, ACHIEVEMENTS,
+  KEY_ORDER, CLASS_KEYED, model, parsePlain, serializePlain, findLine, getLine, setLine, removeLine,
+  parsePairs, joinPairs, parseList, S, classesInSave, loadSave,
+};
+</script>
+<script>
+// ---- UI ----
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let activeTab = 'heroes', activeClass = null;
+
+function setStatus(msg, kind = '') { const el = $('#status'); el.textContent = msg; el.className = 'status ' + kind; }
+function markDirty() { model.dirty = true; $('#dirty').hidden = false; }
+
+function loadText(text, name) {
+  text = text.trim();
+  if (!text) return;
+  let tagOk;
+  try { tagOk = loadSave(text); }
+  catch (e) { setStatus(e.message, 'bad'); return; }
+  model.sourceName = name || 'pasted save';
+  model.dirty = false; $('#dirty').hidden = true;
+  const p = S.pick();
+  setStatus(`Loaded ${model.sourceName}: ${model.lines.length} lines` + (tagOk === null ? ' (unsealed text)' : tagOk ? ', signature verified' : ', SIGNATURE MISMATCH (file edited or corrupted?)') + (p ? ` — last hero: ${CLASSES[p.cls]?.name || '?'} “${p.name}”` : ''), tagOk === false ? 'warn' : 'ok');
+  $('#editor').hidden = false; $('#save-bar').hidden = false;
+  const cls = classesInSave(); activeClass = (p && CLASSES[p.cls]) ? p.cls : (cls[0] || 2);
+  render();
+}
+
+function render() {
+  for (const b of document.querySelectorAll('.tab')) b.classList.toggle('active', b.dataset.tab === activeTab);
+  const main = $('#content');
+  if (activeTab === 'heroes') main.innerHTML = renderHeroes();
+  else if (activeTab === 'gear') main.innerHTML = renderGear();
+  else if (activeTab === 'account') main.innerHTML = renderAccount();
+  else if (activeTab === 'achievements') main.innerHTML = renderAchievements();
+  else if (activeTab === 'raw') main.innerHTML = renderRaw();
+  else if (activeTab === 'format') main.innerHTML = renderFormat();
+}
+
+function classPicker() {
+  const present = new Set(classesInSave());
+  return `<div class="class-picker">${CLASS_ORDER.map(c => `<button class="chip ${c === activeClass ? 'active' : ''} ${present.has(c) ? '' : 'absent'}" data-cls="${c}">${CLASSES[c].name}</button>`).join('')}</div>`;
+}
+
+function renderHeroes() {
+  const c = activeClass, info = CLASSES[c];
+  const t = S.talent(c) || { xp: 0, alloc: '' };
+  const tp = talentPointsFor(t.xp);
+  const spent = [...parsePairs(t.alloc, ':').values()].reduce((a, v) => a + (+v || 0), 0);
+  const hero = S.hero(c) || { race: 1, gender: 0, look: '0,0,0,0,0' };
+  const open = S.open(c), beat = S.beat(c), hb = S.hbeat(c), glow = S.glow(c);
+  const pick = S.pick();
+  let h = classPicker();
+  h += `<div class="grid2">`;
+  // Talents
+  h += `<section class="card"><h3>Talents — ${info.name}</h3>
+    <div class="row"><label>Talent experience</label><input type="number" min="0" step="1" data-act="talent-xp" value="${t.xp}"></div>
+    <div class="hint">${tp.points} of ${MAX_TALENT_POINTS} talent points earned${tp.points < MAX_TALENT_POINTS ? ` — ${tp.into} / ${tp.next} XP to the next point` : ' — every point earned'}. Point <i>k</i> costs 65 + 15·k XP (80, 95, 110…); all 51 cost ${xpForPoints(51)}.</div>
+    <div class="row"><label>Set points</label><input type="number" min="0" max="${MAX_TALENT_POINTS}" data-act="talent-points" value="${tp.points}"> <button data-act="talent-max">Max (51)</button></div>
+    <div class="row"><label>Spent</label><span>${spent} point${spent === 1 ? '' : 's'} in the current build</span></div>
+    <div class="row col"><label>Current build (talent:rank, comma separated — edit with care; the game validates trees itself. Clearing it is always safe: respecs are free)</label>
+      <textarea data-act="talent-alloc" rows="3">${esc(t.alloc)}</textarea></div>
+    <div class="row"><button data-act="talent-clear">Clear build (keep XP)</button></div>
+  </section>`;
+  // Zones
+  h += `<section class="card"><h3>Zones &amp; Heroic — ${info.name}</h3>
+    <div class="row"><label>Furthest zone open</label><select data-act="open"><option value="">(none)</option>${ZONES.map(([z, n]) => `<option value="${z}" ${open === z ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <button data-act="open-all">Open all</button></div>
+    <table class="zones"><tr><th>Zone</th><th>Beaten</th><th>Highest heroic beaten</th></tr>
+    ${ZONES.map(([z, n]) => `<tr><td>${n}</td><td><input type="checkbox" data-act="beat" data-zone="${z}" ${beat.includes(z) ? 'checked' : ''}></td>
+      <td><select data-act="hbeat" data-zone="${z}">${[0, 1, 2, 3, 4, 5].map(v => `<option value="${v}" ${(+hb.get(z) || 0) === v ? 'selected' : ''}>${v === 0 ? '—' : DIFFICULTY[v]}</option>`).join('')}</select></td></tr>`).join('')}
+    </table>
+    <div class="row"><button data-act="beat-all">Beat all zones</button><button data-act="hbeat-all">Heroic V everywhere</button><button data-act="hbeat-none">Clear heroic</button></div>
+    <div class="hint">“Beaten” zones unlock the next zone and its drops; heroic tiers raise the star cap of this class’s gear and open the next heroic tier.</div>
+  </section>`;
+  // Marks / glow / hero
+  h += `<section class="card"><h3>Currency &amp; cosmetics — ${info.name}</h3>
+    <div class="row"><label>Marks</label><input type="number" min="0" step="1" data-act="marks" value="${S.marks(c)}"> <span class="hint">spent on star upgrades in the armory</span></div>
+    <div class="row"><label>Weapon glow</label><select data-act="glow"><option value="0">None</option>${Object.entries(GLOWS).map(([id, n]) => `<option value="${id}" ${glow === +id ? 'selected' : ''}>${n} (${id})</option>`).join('')}</select></div>
+    <div class="row"><label>Race</label><select data-act="race">${Object.entries(RACES).map(([id, n]) => `<option value="${id}" ${hero.race === +id ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <label>Gender code</label><input type="number" min="0" max="1" data-act="gender" value="${hero.gender}"></div>
+    <div class="row"><label>Appearance (skin,face,hair,hair colour,extra)</label><input type="text" data-act="look" value="${esc(hero.look)}" pattern="\\d+,\\d+,\\d+,\\d+,\\d+"></div>
+    ${pick && pick.cls === c ? `<div class="row"><label>Last picked</label><span>${esc(pick.name)} in ${ZONE_NAME[pick.zone] || pick.zone}, ${DIFFICULTY[pick.diff] || pick.diff}</span></div>
+    <div class="row"><label>Hero name</label><input type="text" data-act="pick-name" value="${esc(pick.name)}"> <label>Difficulty</label><select data-act="pick-diff">${DIFFICULTY.map((n, i) => `<option value="${i}" ${pick.diff === i ? 'selected' : ''}>${n}</option>`).join('')}</select></div>` : ''}
+  </section>`;
+  // Equipped / look
+  const eq = S.equip(c), lk = S.look(c);
+  h += `<section class="card"><h3>Equipped — ${info.name}</h3>
+    ${eq.size ? `<table class="zones"><tr><th>Slot</th><th>Item</th></tr>${[...eq].map(([slot, id]) => `<tr><td>${EQUIP_SLOT_NAMES[slot] || 'slot ' + slot}</td><td>${esc(itemName(+id))} <span class="dim">(${id})</span></td></tr>`).join('')}</table>` : '<div class="hint">Nothing equipped (the game fills this from the armory).</div>'}
+    ${lk.size ? `<div class="hint">Looks: ${[...lk].map(([slot, id]) => `${EQUIP_SLOT_NAMES[slot] || slot}: ${esc(itemName(+id))}`).join(', ')}</div>` : ''}
+    <div class="hint">Equip and look lines are kept as-is; change them on the Raw tab if you must. Collect and star gear on the Gear tab.</div>
+  </section>`;
+  h += `</div>`;
+  return h;
+}
+
+function renderGear() {
+  const c = activeClass, info = CLASSES[c];
+  const items = new Set(S.items()), stars = S.stars();
+  const slots = SLOT_INDEX.filter(sl => sl.s < 9 || info.weapons.length > 1);
+  let h = classPicker();
+  h += `<section class="card"><h3>Gear collection &amp; stars — ${info.name}</h3>
+  <div class="hint">Tick a piece to add it to the collection; set its stars (0–5). Stars are account-wide per item id. The game caps stars by the heroic tiers this class has beaten in the set’s zones; values above the cap may be clamped or ignored in-game.</div>
+  <div class="row"><button data-act="gear-collect-all">Collect all ${info.name} gear</button>
+    <label>Set all collected ${info.name} pieces to</label><select id="gear-star-all">${[0,1,2,3,4,5].map(v => `<option value="${v}">${v}★</option>`).join('')}</select><button data-act="gear-star-all">Apply</button></div>
+  <table class="gear"><tr><th>Slot</th>${RARITY.map((r, t) => `<th class="r${t}">${r}<br><span class="dim">${t < 5 ? esc(info.sets[t]) : 'PvP'}</span></th>`).join('')}</tr>`;
+  for (const sl of slots) {
+    h += `<tr><td>${sl.name}</td>`;
+    for (let t = 0; t < 6; t++) {
+      const id = itemId(c, sl.s, t), have = items.has(id), st = +(stars.get(String(id)) || 0);
+      h += `<td class="cell ${have ? 'have' : ''}"><label title="${esc(itemName(id))} (${id})"><input type="checkbox" data-act="item" data-id="${id}" ${have ? 'checked' : ''}> <span class="nm">${esc(itemName(id))}</span></label>
+        <select data-act="star" data-id="${id}" ${have ? '' : 'disabled'}>${[0,1,2,3,4,5].map(v => `<option value="${v}" ${st === v ? 'selected' : ''}>${'★'.repeat(v) || '0★'}</option>`).join('')}</select></td>`;
+    }
+    h += `</tr>`;
+  }
+  h += `</table></section>`;
+  // Other collected items for this class not in the grid (e.g. unexpected ids)
+  const other = [...items].filter(id => { const d = decodeItem(id); return d && d.cls === c && !slots.some(sl => sl.s === d.s); });
+  if (other.length) h += `<div class="hint">Other collected ${info.name} items: ${other.map(id => `${esc(itemName(id))} (${id})`).join(', ')}</div>`;
+  return h;
+}
+
+function renderAccount() {
+  const perk = S.perk(), pets = S.pets(), stat = S.stat(), ach = S.ach();
+  const spentRanks = [...perk.values()].reduce((a, v) => a + (+v || 0), 0);
+  const knownPts = ach.reduce((a, k) => { const e = ACHIEVEMENTS.find(x => x[0] === k); return a + (e && e[3] ? e[3] : 0); }, 0);
+  let h = `<div class="grid2">`;
+  h += `<section class="card"><h3>Companion perks</h3>
+    <div class="hint">Perk points come from achievement points (see the Achievements tab). ${spentRanks} rank${spentRanks === 1 ? '' : 's'} currently bought. The game checks requirements when it shows the perk screen.</div>
+    <table class="zones"><tr><th>Perk</th><th>Rank</th><th></th></tr>
+    ${PERKS.map(([k, n, max, d]) => `<tr><td><b>${n}</b><br><span class="dim">${esc(d)}</span></td><td><select data-act="perk" data-perk="${k}">${Array.from({ length: max + 1 }, (_, v) => `<option value="${v}" ${(+perk.get(k) || 0) === v ? 'selected' : ''}>${v} / ${max}</option>`).join('')}</select></td><td class="dim">${k}</td></tr>`).join('')}
+    </table>
+    <div class="row"><button data-act="perk-max">Max all perks</button><button data-act="perk-clear">Clear all perks</button>
+      <label>Perk resets used</label><input type="number" min="0" data-act="resets" value="${S.resets()}"></div>
+  </section>`;
+  h += `<section class="card"><h3>Companions</h3>
+    <div class="hint">Which companion(s) follow your heroes: first slot needs the Companion perk, second slot the Second Companion perk. Companions themselves are unlocked by achievements/zones.</div>
+    ${[0, 1].map(i => `<div class="row"><label>Companion ${i + 1}</label><select data-act="pet" data-idx="${i}"><option value="">(none)</option>${PETS.map(([k, n]) => `<option value="${k}" ${pets[i] === k ? 'selected' : ''}>${n}</option>`).join('')}${pets[i] && !PETS.some(p => p[0] === pets[i]) ? `<option value="${esc(pets[i])}" selected>${esc(pets[i])}</option>` : ''}</select></div>`).join('')}
+  </section>`;
+  h += `<section class="card"><h3>Lifetime statistics</h3>
+    <div class="hint">Shown on the achievements screen; count:* achievements are earned from these.</div>
+    ${STAT_KEYS.map(k => `<div class="row"><label>${k}</label><input type="number" min="0" data-act="stat" data-stat="${k}" value="${+stat.get(k) || 0}"></div>`).join('')}
+    ${[...stat.keys()].filter(k => !STAT_KEYS.includes(k)).map(k => `<div class="row"><label>${esc(k)}</label><input type="number" data-act="stat" data-stat="${esc(k)}" value="${esc(stat.get(k))}"></div>`).join('')}
+  </section>`;
+  h += `<section class="card"><h3>Summary</h3>
+    <div class="row"><label>Achievements earned</label><span>${ach.length} (${knownPts}+ points from the ones with known values)</span></div>
+    <div class="row"><label>Items collected</label><span>${S.items().length}</span></div>
+    <div class="row"><label>Starred items</label><span>${S.stars().size}</span></div>
+    <div class="row"><label>Classes with progress</label><span>${classesInSave().map(c => CLASSES[c].name).join(', ') || 'none'}</span></div>
+  </section>`;
+  h += `</div>`;
+  return h;
+}
+
+function renderAchievements() {
+  const ach = new Set(S.ach()), at = S.achat();
+  const unknown = [...ach].filter(k => !ACHIEVEMENTS.some(a => a[0] === k));
+  let h = `<section class="card"><h3>Achievements</h3>
+    <div class="hint">Achievement points fund companion perks. Point values are shown where they could be recovered from the game; others are unknown (most are 10–50). Earned timestamps (achat) are written automatically.</div>
+    <div class="row"><button data-act="ach-all">Unlock all listed</button><button data-act="ach-none">Clear all</button>
+      <label>Add by key</label><input type="text" id="ach-key" placeholder="e.g. feat:thrifty"><button data-act="ach-add">Add</button></div>
+    <table class="zones ach"><tr><th></th><th>Key</th><th>Name</th><th>Points</th><th>Earned</th></tr>
+    ${ACHIEVEMENTS.map(([k, n, d, p]) => `<tr><td><input type="checkbox" data-act="ach" data-key="${k}" ${ach.has(k) ? 'checked' : ''}></td><td class="mono">${k}</td><td><b>${esc(n)}</b><br><span class="dim">${esc(d)}</span></td><td>${p ?? '?'}</td><td class="dim">${at.has(k) ? new Date(+at.get(k) * 1000).toLocaleDateString() : ''}</td></tr>`).join('')}
+    ${unknown.map(k => `<tr><td><input type="checkbox" data-act="ach" data-key="${esc(k)}" checked></td><td class="mono">${esc(k)}</td><td><span class="dim">(not in this editor’s list)</span></td><td>?</td><td class="dim">${at.has(k) ? new Date(+at.get(k) * 1000).toLocaleDateString() : ''}</td></tr>`).join('')}
+    </table></section>`;
+  return h;
+}
+
+function renderRaw() {
+  return `<section class="card"><h3>Raw save text</h3>
+    <div class="hint">The decrypted save, one record per line, fields separated by “|”. Edit anything here and press Apply; the other tabs re-read it. Unknown lines are preserved untouched.</div>
+    <textarea id="raw" class="raw" spellcheck="false" rows="28">${esc(serializePlain())}</textarea>
+    <div class="row"><button data-act="raw-apply" class="primary">Apply raw text</button><button data-act="raw-revert">Revert to current model</button></div></section>`;
+}
+
+function renderFormat() {
+  return `<section class="card format"><h3>Save format (reverse engineered)</h3>
+<p>Recovered from the game’s browser build (v0.139); the desktop build exports the same format. A <code>.sav</code> is <code>RSE1:</code> followed by base64 of <code>nonce[16] ‖ ciphertext ‖ tag[20]</code>. The game (a Rust/Bevy build, “wenilla”) XORs the plaintext with a keystream of 20-byte blocks, block <i>i</i> = HMAC‑SHA1(KEY, <code>"ks"</code> ‖ nonce ‖ i as u64 little‑endian), and authenticates with tag = HMAC‑SHA1(KEY, <code>"tag"</code> ‖ nonce ‖ ciphertext). KEY is the 42‑byte constant <code>"azeroth-survivors/save/v1/"</code> + <code>9c4e27d16af013b85de2710ca936c48f</code>, zero‑padded as usual for HMAC. The nonce is random per export, so two exports of the same progress differ but decode identically. The browser build keeps the same text in the browser’s local storage (<code>rogue.characters</code>), the desktop builds in <code>wenilla-rogue/</code> under the user’s app-data folder, with the last five hourly backups beside it.</p>
+<p>The plaintext is line based, fields split on <code>|</code>. Class ids are WoW’s: 1 warrior, 2 paladin, 3 hunter, 4 rogue, 5 priest, 7 shaman, 8 mage, 9 warlock, 11 druid. Races: 1 human, 2 orc, 3 dwarf, 4 night elf, 5 undead, 6 tauren, 7 gnome, 8 troll.</p>
+<table class="zones"><tr><th>Line</th><th>Meaning</th></tr>
+<tr><td class="mono">pick|class|race|gender|zone|name|skin,face,hair,colour,extra|difficulty</td><td>The last hero picked. Difficulty 0 = Normal, 1–5 = Heroic I–V (the game clamps to 5).</td></tr>
+<tr><td class="mono">hero|class|race|gender|appearance</td><td>Race, gender and appearance of each class’s hero.</td></tr>
+<tr><td class="mono">open|class|zone</td><td>Furthest zone unlocked for the class (zone order: elwynn, duskwood, wsg, ungoro, ab, feralas, arena, sm, av, brm, aq, naxx). <code>unlock</code> is an accepted alias.</td></tr>
+<tr><td class="mono">beat|class|zone,zone…</td><td>Zones whose final boss the class has beaten (normal).</td></tr>
+<tr><td class="mono">hbeat|class|zone:tier,…</td><td>Highest heroic tier (1–5) beaten per zone; raises the class’s star cap.</td></tr>
+<tr><td class="mono">talent|class|xp|talent:rank,…</td><td>Talent experience and the current build. Point k costs 65+15k XP; 51 points max (23,205 XP). Respecs are free.</td></tr>
+<tr><td class="mono">spec|class|active|build|build|…</td><td>Saved talent loadouts and which is active.</td></tr>
+<tr><td class="mono">items|id,id,…</td><td>Account‑wide gear collection. id = 100000 + class·1000 + slot·100 + tier·10; slots 0–7 head/shoulder/chest/waist/legs/feet/wrist/hands, 8 weapon, 9 off‑hand; tiers 0–5 common/uncommon/rare/epic/legendary/PvP. 9xxxx ids are tabards and cosmetics.</td></tr>
+<tr><td class="mono">stars|id:stars,…</td><td>Star upgrades (0–5) per item id, account‑wide.</td></tr>
+<tr><td class="mono">pity|id:n,…</td><td>Bad‑luck protection counters for drops.</td></tr>
+<tr><td class="mono">equip|class|slot:id,…  /  look|class|slot:id,…</td><td>What each class wears, and its cosmetic looks (slot numbers are WoW inventory slots; 18 = tabard).</td></tr>
+<tr><td class="mono">marks|class|n</td><td>Marks currency per class (buys star upgrades).</td></tr>
+<tr><td class="mono">glow|class|id</td><td>Weapon glow: 1894 Icy Chill, 1900 Crusader, 803 Fiery Weapon, 1898 Unholy Weapon.</td></tr>
+<tr><td class="mono">seen|name=rarity,…</td><td>Codex: highest rarity seen of each ring/trinket/amulet (4 = legendary).</td></tr>
+<tr><td class="mono">ach|key,…  /  achat|key=unixtime,…</td><td>Achievements earned and when. Their points fund companion perks.</td></tr>
+<tr><td class="mono">perk|perk:rank,…</td><td>Companion perks bought. <code>resets|n</code> counts perk resets used.</td></tr>
+<tr><td class="mono">pets|first,second</td><td>Companion choices for the two companion slots.</td></tr>
+<tr><td class="mono">stat|kills=…,gold=…,guardians=…,bosses=…,runs=…,wins=…,caches=…,marks=…</td><td>Lifetime totals.</td></tr>
+<tr><td class="mono">tabard|…  races|…  coopbeat|…</td><td>Unlocked tabards and races, co‑op clears (preserved as-is).</td></tr>
+</table></section>`;
+}
+
+// ---- events ----
+function onChange(e) {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act, c = activeClass;
+  const num = () => Math.max(0, Math.floor(+el.value || 0));
+  switch (act) {
+    case 'talent-xp': { const t = S.talent(c) || { alloc: '' }; S.setTalent(c, num(), t.alloc); break; }
+    case 'talent-points': { const t = S.talent(c) || { alloc: '' }; S.setTalent(c, xpForPoints(Math.min(MAX_TALENT_POINTS, num())), t.alloc); break; }
+    case 'talent-max': { const t = S.talent(c) || { alloc: '' }; S.setTalent(c, Math.max(t.xp || 0, xpForPoints(MAX_TALENT_POINTS)), t.alloc); break; }
+    case 'talent-alloc': { const t = S.talent(c) || { xp: 0 }; S.setTalent(c, t.xp, el.value.replace(/\s+/g, '')); break; }
+    case 'talent-clear': { const t = S.talent(c) || { xp: 0 }; S.setTalent(c, t.xp, ''); break; }
+    case 'open': S.setOpen(c, el.value); break;
+    case 'open-all': S.setOpen(c, 'naxx'); break;
+    case 'beat': { const b = new Set(S.beat(c)); el.checked ? b.add(el.dataset.zone) : b.delete(el.dataset.zone); S.setBeat(c, ZONES.map(z => z[0]).filter(z => b.has(z))); break; }
+    case 'beat-all': S.setBeat(c, ZONES.map(z => z[0])); if (!S.open(c) || S.open(c) !== 'naxx') S.setOpen(c, 'naxx'); break;
+    case 'hbeat': { const m = S.hbeat(c); m.set(el.dataset.zone, el.value); S.setHbeat(c, m); break; }
+    case 'hbeat-all': { const m = new Map(ZONES.map(z => [z[0], '5'])); S.setHbeat(c, m); break; }
+    case 'hbeat-none': S.setHbeat(c, new Map()); break;
+    case 'marks': S.setMarks(c, num()); break;
+    case 'glow': S.setGlow(c, +el.value); break;
+    case 'race': { const h = S.hero(c) || { gender: 0, look: '0,0,0,0,0' }; h.race = +el.value; S.setHero(c, h); const p = S.pick(); if (p && p.cls === c) { p.race = h.race; S.setPick(p); } break; }
+    case 'gender': { const h = S.hero(c) || { race: 1, look: '0,0,0,0,0' }; h.gender = Math.min(1, num()); S.setHero(c, h); const p = S.pick(); if (p && p.cls === c) { p.gender = h.gender; S.setPick(p); } break; }
+    case 'look': { if (!/^\d+,\d+,\d+,\d+,\d+$/.test(el.value.trim())) { alert('Appearance must be five numbers separated by commas.'); render(); return; } const h = S.hero(c) || { race: 1, gender: 0 }; h.look = el.value.trim(); S.setHero(c, h); const p = S.pick(); if (p && p.cls === c) { p.look = h.look; S.setPick(p); } break; }
+    case 'pick-name': { const p = S.pick(); if (p) { p.name = el.value.replace(/[|\n]/g, '').trim() || p.name; S.setPick(p); } break; }
+    case 'pick-diff': { const p = S.pick(); if (p) { p.diff = +el.value; S.setPick(p); } break; }
+    case 'item': { const items = new Set(S.items()); const id = +el.dataset.id; if (el.checked) items.add(id); else { items.delete(id); const st = S.stars(); st.delete(String(id)); S.setStars(st); } S.setItems([...items]); break; }
+    case 'star': { const st = S.stars(); st.set(el.dataset.id, el.value); S.setStars(st); break; }
+    case 'gear-collect-all': { const items = new Set(S.items()); const slots = SLOT_INDEX.filter(sl => sl.s < 9 || CLASSES[c].weapons.length > 1); for (const sl of slots) for (let t = 0; t < 6; t++) items.add(itemId(c, sl.s, t)); S.setItems([...items]); break; }
+    case 'gear-star-all': { const v = $('#gear-star-all').value; const st = S.stars(); for (const id of S.items()) { const d = decodeItem(id); if (d && d.cls === c) st.set(String(id), v); } S.setStars(st); break; }
+    case 'perk': { const m = S.perk(); m.set(el.dataset.perk, el.value); S.setPerk(m); break; }
+    case 'perk-max': S.setPerk(new Map(PERKS.map(p => [p[0], String(p[2])]))); break;
+    case 'perk-clear': S.setPerk(new Map()); break;
+    case 'resets': S.setResets(num()); break;
+    case 'pet': { const pets = S.pets(); const i = +el.dataset.idx; pets[i] = el.value; S.setPets(pets.filter(Boolean)); break; }
+    case 'stat': { const m = S.stat(); m.set(el.dataset.stat, String(num())); S.setStat(m); break; }
+    case 'ach': { const a = new Set(S.ach()); el.checked ? a.add(el.dataset.key) : a.delete(el.dataset.key); S.setAch([...a]); break; }
+    case 'ach-all': S.setAch([...new Set([...S.ach(), ...ACHIEVEMENTS.map(a => a[0])])]); break;
+    case 'ach-none': S.setAch([]); break;
+    case 'ach-add': { const k = $('#ach-key').value.trim(); if (!/^[a-z0-9_]+(:[a-z0-9_]+)?$/.test(k)) { alert('Keys look like feat:thrifty or set8.'); return; } S.setAch([...S.ach(), k]); break; }
+    case 'raw-apply': { try { parsePlain($('#raw').value); } catch (err) { alert(err.message); return; } break; }
+    case 'raw-revert': break;
+    default: return;
+  }
+  markDirty(); render();
+}
+
+function stampName() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `AzerothSurvivors ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}.sav`;
+}
+function download(name, text) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/octet-stream' })); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  $('#file').addEventListener('change', async (e) => { const f = e.target.files[0]; if (f) loadText(await f.text(), f.name); e.target.value = ''; });
+  $('#paste-load').addEventListener('click', () => loadText($('#paste').value, 'pasted save'));
+  $('#paste-clear').addEventListener('click', () => { $('#paste').value = ''; });
+  document.addEventListener('dragover', e => { e.preventDefault(); });
+  document.addEventListener('drop', async e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) loadText(await f.text(), f.name); });
+  for (const b of document.querySelectorAll('.tab')) b.addEventListener('click', () => { activeTab = b.dataset.tab; render(); });
+  $('#content').addEventListener('change', onChange);
+  $('#content').addEventListener('click', e => {
+    const chip = e.target.closest('.chip'); if (chip) { activeClass = +chip.dataset.cls; render(); return; }
+    const b = e.target.closest('button[data-act]'); if (b) onChange(e);
+  });
+  $('#dl-sealed').addEventListener('click', () => { download(stampName(), RSE.seal(serializePlain())); model.dirty = false; $('#dirty').hidden = true; });
+  $('#copy-sealed').addEventListener('click', async () => { const t = RSE.seal(serializePlain()); try { await navigator.clipboard.writeText(t); setStatus('Sealed save copied to the clipboard (' + t.length + ' characters).', 'ok'); } catch { $('#paste').value = t; setStatus('Clipboard blocked — the sealed save is in the paste box above; copy it from there.', 'warn'); } });
+  $('#dl-plain').addEventListener('click', () => download(stampName().replace(/\.sav$/, '.txt'), serializePlain()));
+  window.addEventListener('beforeunload', e => { if (model.dirty) { e.preventDefault(); e.returnValue = ''; } });
+});
+
+</script>
+</body>
+</html>

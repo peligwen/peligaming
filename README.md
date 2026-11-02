@@ -816,10 +816,79 @@ the aerial photography is 3 m a pixel at best, flown on another day than
 OSM was surveyed (and in two seasons across one seam), so up close it is a
 soft, lit-from-elsewhere ground under the sharp streets and buildings.
 
+## 🧟 Save Editor (Azeroth Survivors)
+
+[Azeroth Survivors](https://wow.aethus.pl) is a fan-made survivors-style
+roguelike set in vanilla Azeroth, played in the browser (it needs WebGPU) or
+as a desktop build: pick a class, a race and a zone, and stay alive while
+your spells fire on their own. All of its progress is one save the game can
+export and import, and this is an unofficial editor for that save.
+
+**Try it: [peligaming.com/tools/azeroth-survivors/save-editor](https://peligaming.com/tools/azeroth-survivors/save-editor)**
+
+- **Open a save.** Export it from the game (Options → Saves → Export Save),
+  then open or drop the `.sav` on the page, or paste its text. The page
+  unseals it, checks its signature, and says whether the file has been
+  touched since the game wrote it. A desktop build's hourly `Backup ….sav`
+  files and already-decrypted text open the same way. Nothing leaves the
+  browser.
+- **Heroes & Talents.** Per class: talent experience (set the XP, or the
+  number of talent points it buys, up to all 51) and the current build; the
+  furthest zone open, which zones are beaten and the highest heroic tier
+  beaten in each; marks, weapon glow, race and appearance; and the
+  last-picked hero's name and difficulty.
+- **Gear & Stars.** The class's armory as a grid of slot by rarity, every
+  piece named as the game names it (Lightforge Breastplate, Helm of Wrath,
+  Sulfuras, Hand of Ragnaros), ticked into the collection and starred 0–5;
+  collect-all and star-all for the class.
+- **Perks & Account.** Companion perks by rank, perk resets, which
+  companions follow you, the lifetime statistics the count achievements
+  are earned from, and a summary.
+- **Achievements.** Every achievement the editor knows, with its
+  description and its point value where that could be recovered, ticked on
+  or off; earned timestamps are written for you, and a key the editor does
+  not know can be added by hand.
+- **Raw.** The decrypted save as the game's own `key|field|field` lines,
+  editable; the other tabs re-read it. Lines the editor does not model are
+  carried through untouched.
+- **Save.** Download a sealed `.sav` named the way the game names its
+  exports, copy the sealed text, or download the decrypted text. Import in
+  the game: Options → Saves → Import Save. An import replaces the game's
+  progress, so keep the original export.
+
+### How it's built
+
+- `public/tools/azeroth-survivors/save-editor.html` is one page of vanilla
+  JS. Its `<script id="save-engine">` block is everything that is not UI:
+  the sealing, the game's data tables and the save model.
+- **The seal.** A `.sav` is `RSE1:` followed by base64 of a 16-byte nonce,
+  the ciphertext and a 20-byte tag. The plaintext is XORed with a keystream
+  of 20-byte blocks, block *i* being HMAC-SHA1(key, `"ks"` ‖ nonce ‖ *i* as
+  a little-endian u64), and the tag is HMAC-SHA1(key, `"tag"` ‖ nonce ‖
+  ciphertext); the key is a 42-byte constant recovered from the game's
+  build. SHA-1 and HMAC are implemented in the page, about sixty lines, so
+  the sealing is synchronous and the page works opened from a local file as
+  well as over https. The nonce is random per export, so two exports of the
+  same progress differ and decode alike.
+- **The save** is line based, `key|field|field…`, class-keyed where it
+  applies (WoW's class ids). The model keeps the lines in the order the game
+  writes them and inserts a new line where the game would, so a save that
+  passes through untouched comes back byte for byte and lines the editor
+  does not know survive an edit. Item ids decode as 100000 + class·1000 +
+  slot·100 + tier·10, which is how the gear grid names every piece from a
+  class's set names and its armor type's nouns.
+- `npm run check:save-editor` runs the engine block in Node: SHA-1 and
+  HMAC-SHA1 against the FIPS 180-1 and RFC 2202 test vectors, seal and
+  unseal round trips with tampering caught by the tag, the talent XP table,
+  the item id codec, the model's edits (canonical line order, byte-for-byte
+  round trip of an untouched save, each accessor's invariants) and the data
+  tables for duplicate keys.
+
 ## Other tools
 
 | Game | Tool | What it does |
 | --- | --- | --- |
+| Azeroth Survivors | Save Editor | Unseal an exported save, edit heroes, talents, zones and heroic tiers, the gear collection and its stars, perks, statistics and achievements, and seal it again for import — all in the browser |
 | WoW Forever | World Map | Azeroth at every scale from the game's own art: biomes for the zone-bound item effects, flight masters with times and a planner, boats and zeppelins with timetables, banks and auctioneers |
 | RuneScape | Sand Table | Boss & raid rehearsals: the briefing, the kit, and the fight rebuilt tile by tile in 3D with a drill mode |
 | RuneScape | Sand Table | Boss and raid rehearsals: the briefing checked against your hiscores, the kit slot by slot, and the fight rebuilt tile by tile in 3D with a tick clock — then a drill that grades your prayers and footwork |
@@ -1027,7 +1096,10 @@ Three kinds of things live here under different terms — see
   [Jagex's Fan Content Policy](https://legal.jagex.com/docs/policies/fan-content-policy).
   The World Map's map art and the data derived from the World of Warcraft
   client (`public/tools/wow-forever/data/`) are the intellectual property of
-  Blizzard Entertainment, used non-commercially as fan content.
+  Blizzard Entertainment, used non-commercially as fan content. The Save
+  Editor's tables name the Warcraft classes, sets, items, zones and bosses
+  as the fan game Azeroth Survivors uses them; those names are Blizzard's,
+  and the game itself is its author's, unaffiliated with this site.
   Material relating to other games belongs to their respective owners.
 - **Sky data** (`public/tools/irl/data/sky-pointer/sky.json`) is built from
   [d3-celestial](https://github.com/ofrohn/d3-celestial)'s data files,
