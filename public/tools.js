@@ -38,6 +38,18 @@ window.PELIGAMING = {
       ],
     },
     {
+      name: "Azeroth Survivors",
+      icon: "🧟",
+      accent: "#c9963c",
+      tools: [
+        {
+          name: "Save Editor",
+          description: "An unofficial editor for the saves of the fan-made survivors-style roguelike set in vanilla Azeroth: open an exported .sav and it is unsealed and its signature checked; edit each class's talent experience and build, zones beaten and heroic tiers, marks, glow and appearance, the whole armory as a grid of slot by rarity with stars, companion perks and companions, lifetime statistics and achievements, or the raw lines; then download it sealed again for import. Everything stays in your browser.",
+          path: "tools/azeroth-survivors/save-editor.html",
+        },
+      ],
+    },
+    {
       name: "RuneScape",
       icon: "⚔️",
       accent: "#d9a334",

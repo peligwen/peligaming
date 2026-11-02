@@ -18,7 +18,8 @@
     "check:sky": "node scripts/check-sky.mjs",
     "data:gyro": "node scripts/fetch-gyro-courier.mjs",
     "check:gyro": "node scripts/check-gyro.mjs",
-    "check:cat-sweater": "node scripts/check-cat-sweater.mjs"
+    "check:cat-sweater": "node scripts/check-cat-sweater.mjs",
+    "check:save-editor": "node scripts/check-save-editor.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",
