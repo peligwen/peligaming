@@ -5,19 +5,26 @@
 import fs from "node:fs";
 import path from "node:path";
 
-// Etiquette: wago.tools publishes no usage policy, so this client behaves
-// like a considerate one — it says who it is, fetches one thing at a time,
-// leaves a gap between requests, backs off on 429/5xx, and caches every
-// download so a rebuild of the same build touches the network only for
-// what is missing.
+// The site's rules for automated clients are its robots.txt and llms.txt:
+// take data from the structured routes — the CSV export of a table
+// (/db2/{table}/csv), the API (/api/...) — and never from its web pages
+// (the DB2 browser, its paginated tables and its diff pages are closed to
+// crawlers); pin an exact version; reuse a download rather than ask for it
+// again; and record the product and version with the results. This client
+// uses only those routes. Beyond the rules it behaves like a considerate
+// one: it says who it is, fetches one thing at a time, leaves a gap between
+// requests, backs off on 429/5xx, and caches every download so a rebuild of
+// the same build touches the network only for what is missing.
 const UA = "peligaming-map-build/1.0 (+https://github.com/peligwen/peligaming)";
 const GAP_MS = 250;
 let lastRequest = 0;
 
 export class Wago {
-  constructor(build, cacheDir) {
+  // `agent` names the build that is asking, when it is not the map's
+  constructor(build, cacheDir, agent = UA) {
     this.build = build;
     this.cacheDir = cacheDir;
+    this.agent = agent;
     fs.mkdirSync(path.join(cacheDir, "db2"), { recursive: true });
     fs.mkdirSync(path.join(cacheDir, "casc"), { recursive: true });
   }
@@ -29,7 +36,7 @@ export class Wago {
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       lastRequest = Date.now();
       try {
-        const res = await fetch(url, { headers: { "User-Agent": UA } });
+        const res = await fetch(url, { headers: { "User-Agent": this.agent } });
         if (res.status === 429 || res.status >= 500) {
           const after = Number(res.headers.get("retry-after")) || 0;
           throw Object.assign(new Error(`HTTP ${res.status} for ${url}`), { backoff: Math.max(after * 1000, 4000 * (i + 1)) });
@@ -44,13 +51,29 @@ export class Wago {
     throw lastErr;
   }
 
-  // One table as an array of row objects keyed by column name.
-  async table(name) {
-    const file = path.join(this.cacheDir, "db2", `${name}.${this.build}.csv`);
+  // The product (release channel) a build belongs to — "wowf" is Forever,
+  // "wow_classic_era" Classic Era — from the site's build list, which is
+  // refetched only when it does not know the build.
+  async product(build = this.build) {
+    const file = path.join(this.cacheDir, "builds.json");
+    const find = () => {
+      if (!fs.existsSync(file)) return null;
+      for (const [product, list] of Object.entries(JSON.parse(fs.readFileSync(file, "utf8")))) if (list.some((b) => b.version === build)) return product;
+      return null;
+    };
+    let product = find();
+    if (!product) { fs.writeFileSync(file, await this.fetchWithRetry("https://wago.tools/api/builds")); product = find(); }
+    return product;
+  }
+
+  // One table as an array of row objects keyed by column name; `build`
+  // reads the same table from another build (a Classic Era one, to compare).
+  async table(name, build = this.build) {
+    const file = path.join(this.cacheDir, "db2", `${name}.${build}.csv`);
     if (!fs.existsSync(file)) {
-      const buf = await this.fetchWithRetry(`https://wago.tools/db2/${name}/csv?build=${this.build}`);
+      const buf = await this.fetchWithRetry(`https://wago.tools/db2/${name}/csv?build=${build}`);
       const text = buf.toString("utf8");
-      if (text.startsWith("{")) throw new Error(`wago.tools has no table ${name} for build ${this.build}: ${text.slice(0, 120)}`);
+      if (text.startsWith("{")) throw new Error(`wago.tools has no table ${name} for build ${build}: ${text.slice(0, 120)}`);
       fs.writeFileSync(file, text);
     }
     return parseCsv(fs.readFileSync(file, "utf8"));

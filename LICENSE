@@ -34,6 +34,18 @@ third-party sources, and they carry different terms:
    (the full notice is carried in the file's "license" field), together
    with the public-domain WMM2025 coefficients of NOAA/NCEI.
 
+5. VANILLA SERVER VALUES — two things under public/tools/wow-forever/data/
+   are derived from the CMaNGOS classic-db
+   (https://github.com/cmangos/classic-db), which is licensed under the GNU
+   General Public License, version 3
+   (https://www.gnu.org/licenses/gpl-3.0.html): the positions of the vanilla
+   bankers, auctioneers and flight masters in world-map/world-map.json, and
+   the vanilla trainer skill levels in professions/professions.json (the
+   recipes whose "s" field is "t" or "e"). They are credited to the CMaNGOS
+   project and, so far as they are that project's to license, they remain
+   under the GPLv3 and are NOT covered by the MIT License. The game data
+   they describe is Blizzard's, as in section 3.
+
 ---------------------------------------------------------------------------
 
 MIT License

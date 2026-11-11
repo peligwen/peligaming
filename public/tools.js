@@ -35,6 +35,11 @@ window.PELIGAMING = {
           description: "Azeroth from the whole world down to a city street, drawn from the game's own map art: every zone's biomes for the new zone-bound item effects (Forest & Grassland, Swamp, Wasteland, Snowy, Mountainous, Haunted, Cavernous, Desert — and which trinkets, seals and runes key off each), every flight master with flight times and fares and a flight planner, the boats, zeppelins and skyships with sailing times and dock waits, and every banker and auctioneer. Searchable, with share links.",
           path: "tools/wow-forever/world-map.html",
         },
+        {
+          name: "Profession Catalogue",
+          description: "Every recipe of every profession from the game's own data — Alchemy to Tailoring, Mining's smelting, Cooking and First Aid, the new camping recipes, the Rogue's Poisons — with the skill at which each turns orange, yellow, green and grey, the four drawn as a bar from 1 to 300, and the estimated chance of a skill point at your skill. Tick ranks of the Working Overtime legacy talent to see what it adds. Open a recipe for what it makes and takes, how it is learned, and how many crafts it should take to ride it to grey. Search across every profession; share links.",
+          path: "tools/wow-forever/profession-catalogue.html",
+        },
       ],
     },
     {
