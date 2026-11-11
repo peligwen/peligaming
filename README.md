@@ -112,12 +112,18 @@ else is added. Rebuild with `npm run data:wow-forever`.
 
 ### Sources and their terms
 
-- **wago.tools** publishes no usage policy. The build script behaves like a
-  considerate client: it identifies itself (`peligaming-map-build/1.0`, with
-  a link here), fetches one file at a time with a gap between requests,
-  backs off on rate limiting, and caches every download so a rebuild of the
-  same build touches the network only for what is missing. Other community
-  tools draw on the same endpoints the same way.
+- **wago.tools** sets its rules for automated clients in its
+  [robots.txt](https://wago.tools/robots.txt) and
+  [llms.txt](https://wago.tools/llms.txt): take data from the structured
+  routes (a table's CSV export, the API) and never from its web pages, pin
+  an exact version, reuse a download rather than ask again, and record the
+  product and version with the results. The build scripts use only those
+  routes (`/db2/{table}/csv` and `/api/casc/{fdid}`, with a full build
+  number), and beyond the rules behave like a considerate client: they
+  identify themselves (`peligaming-map-build/1.0`, with a link here), fetch
+  one file at a time with a gap between requests, back off on rate
+  limiting, and cache every download so a rebuild of the same build touches
+  the network only for what is missing.
 - **CMaNGOS classic-db** is GPLv3; the spawn coordinates this map derives
   from it are credited in the map's own panel and here.
 - **Wowhead** is not used. Its terms bar reaching the site with anything
@@ -126,6 +132,121 @@ else is added. Rebuild with `npm run data:wow-forever`.
   sources above.
 - Blizzard's fan-content terms allow non-commercial fan maps that carry the
   proper notices, which the map and `LICENSE` do.
+
+## 📜 Profession Catalogue (WoW Forever)
+
+Every recipe of every Forever profession, from the game's own data: the
+skill at which it turns orange, yellow, green and grey, and the estimated
+chance that one craft gives a skill point at your skill, with the Working
+Overtime legacy talent counted in or left out.
+
+**Try it: [peligaming.com/tools/wow-forever/profession-catalogue](https://peligaming.com/tools/wow-forever/profession-catalogue)**
+
+![Profession Catalogue](docs/profession-catalogue.jpg)
+
+- **Fourteen professions, 2,236 recipes.** Alchemy, Blacksmithing,
+  Enchanting, Engineering, Leatherworking and Tailoring; Mining's smelting;
+  the camping recipes Forever gives Herbalism, Skinning and Fishing;
+  Cooking and First Aid; and the two class skills, the Rogue's Poisons and
+  the Mage's Comprehension. They are grouped the way the game's own
+  trade-skill window groups them (Recovery Potions, Plate Helmets, Bracer
+  Enchants, Fisherman's Delights), with Disenchant and scroll reading
+  alongside, since they colour up like recipes.
+- **The four levels.** Each row carries the skill at which the recipe turns
+  orange, yellow, green and grey, in those colours, and a bar of the same
+  four on a scale of 1 to 300 with a line at your skill, so a category reads
+  as a ladder: what is worth making now, and what takes over next.
+- **Chance now.** Set your skill (it is remembered per profession) and every
+  row shows the estimated chance of a point from one craft and how many
+  crafts a point should take. Order the list by best chance, or keep only
+  what can give a point right now.
+- **Working Overtime.** The legacy talent's five ranks are a row of buttons;
+  the client's talent data sets them at +4% each, +20% at five. The tooltip
+  does not say how the bonus is applied, so both readings are offered: ×
+  multiplies the chance (50% becomes 60%), + adds to it (50% becomes 70%).
+  Rows show the chance with the talent and what it was without.
+- **A recipe opened.** What it makes and how many, what it takes, the tools
+  and the forge or anvil, the cooldown, how it is learned, the chance drawn
+  against skill with and without the talent, and the crafts it should take
+  to ride the recipe from your skill to grey.
+- **Search** runs across every profession at once: a recipe, what it makes,
+  a reagent ("linen cloth" finds everything in four professions that eats
+  it). The address carries the profession, skill and talent, so a view can
+  be shared.
+
+### How it's built
+
+- `scripts/fetch-wow-forever-professions.mjs`
+  (`npm run data:wow-forever-professions`) builds
+  `public/tools/wow-forever/data/professions/professions.json` from the
+  Forever client's own tables as datamined by
+  [wago.tools](https://wago.tools). `SkillLineAbility` gives each recipe its
+  yellow and grey levels (green is their midpoint), its trade-skill category
+  and whether it is known from the start; the spell tables give the product,
+  the reagents, the tools, the forge or anvil and the cooldown; the items
+  that teach a recipe give the skill needed to learn it; and the trait
+  tables give Working Overtime, whose real value per rank is a curve the
+  talent points at (the spell's own "10" is a placeholder). Pass a build
+  number to target a newer build; downloads are cached in
+  `.wow-forever-cache/`.
+- **Learn levels.** For 1,708 of the 2,236 the level is exact: an item
+  teaches the recipe and states the skill it asks for, or the game hands the
+  recipe out by itself. What a *trainer* asks is decided on the server and
+  is in no client, so for those the script reads the vanilla 1.12 trainer
+  tables of the [CMaNGOS classic database](https://github.com/cmangos/classic-db)
+  (GPLv3). Forever has retuned well over a third of the old recipes, most of
+  them by 25 points, so the script also reads the vanilla yellow level from
+  a Classic Era client: where Forever left a recipe alone the vanilla
+  trainer level stands (215 recipes, marked †), and where it moved the
+  yellow level the trainer level is moved by the same amount and marked as
+  an estimate (208, marked ≈). That rule is tested on every run against the
+  recipe items, whose level is known in both games: 723 of 745 moved exactly
+  in step with their recipe. The 105 recipes that no item teaches and no
+  vanilla trainer taught are marked ? and left unknown. The client's own
+  `MinSkillLineRank` is not used for this: outside the recipes the game
+  hands out, it is a relic that matches neither vanilla's trainers nor
+  Forever's levels.
+- **What is left out.** Recipes Forever retired (the client flags them),
+  abilities whose spell is gone, and the gathering skills' own rank spells.
+  The client still carries 286 recipes filed under a category named "SEASON
+  OF DISCOVERY"; they are in the data, flagged, and hidden until asked for.
+- The page (`public/tools/wow-forever/profession-catalogue.html`) is one
+  file of vanilla JS. Its `<script id="catalogue-model">` block is the
+  arithmetic and nothing else, and `npm run check:professions` runs it in
+  Node: the colour bands and the chance at their edges, the talent's two
+  readings, expected crafts against sums worked by hand, then the same
+  properties over every recipe in the data at every skill from 1 to 300, and
+  the data file's own shape.
+
+### What the percentages are
+
+Two things about skill-ups are certain: an orange recipe gives a point every
+time and a grey one never does. Blizzard has not published the odds in
+between; the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/Skillup) records
+them only as "often" and "seldom". The page uses the straight line players
+have long used for Classic — (grey − skill) ÷ (grey − yellow), certain on
+the first yellow point, a half as the recipe turns green, nothing at grey —
+and says on the page that it is an estimate. Whether Forever uses that
+curve, and whether Working Overtime multiplies the chance or adds to it, are
+both decided on the server; the first is assumed and the second is left as a
+switch.
+
+### Sources and their terms
+
+- **wago.tools**: as for the map above — only the CSV exports and the API
+  (`/db2/{table}/csv` and `/api/builds`), an exact build, every download
+  cached, and the product and build recorded in the data file and shown on
+  the page (`wowf` 1.60.1.70888 for Forever, `wow_classic_era` 1.15.9.70576
+  for the vanilla yellow levels). The build identifies itself as
+  `peligaming-professions-build/1.0`, with a link here.
+- **CMaNGOS classic-db** is GPLv3. The trainer levels derived from it are
+  marked in the data and on the page, credited there and here, and listed
+  in `LICENSE`.
+- **Wowhead** and the other recipe sites are not read: their databases are
+  theirs, and Wowhead's terms bar both automated access and derivative
+  works. Nothing on the page is copied from a guide or a calculator.
+- The recipe, item and talent names and numbers are Blizzard's, used
+  non-commercially as fan content with the trademark notice on the page.
 
 ## ⚓ Naval Pathfinder
 
@@ -890,6 +1011,7 @@ export and import, and this is an unofficial editor for that save.
 | --- | --- | --- |
 | Azeroth Survivors | Save Editor | Unseal an exported save, edit heroes, talents, zones and heroic tiers, the gear collection and its stars, perks, statistics and achievements, and seal it again for import — all in the browser |
 | WoW Forever | World Map | Azeroth at every scale from the game's own art: biomes for the zone-bound item effects, flight masters with times and a planner, boats and zeppelins with timetables, banks and auctioneers |
+| WoW Forever | Profession Catalogue | Every recipe of every profession with the skill at which it turns orange, yellow, green and grey, the estimated chance of a skill point at your skill, and the Working Overtime talent counted in or out |
 | RuneScape | Sand Table | Boss & raid rehearsals: the briefing, the kit, and the fight rebuilt tile by tile in 3D with a drill mode |
 | RuneScape | Sand Table | Boss and raid rehearsals: the briefing checked against your hiscores, the kit slot by slot, and the fight rebuilt tile by tile in 3D with a tick clock — then a drill that grades your prayers and footwork |
 | RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer |
@@ -1081,7 +1203,7 @@ the zone first when that matters. On a fresh account, drop the
 
 ## Licensing & attribution
 
-Three kinds of things live here under different terms — see
+Several kinds of things live here under different terms — see
 [LICENSE](LICENSE) for the full text:
 
 - **Code** (the tools, scripts, worker and site chrome) is **MIT**.
@@ -1105,6 +1227,11 @@ Three kinds of things live here under different terms — see
   [d3-celestial](https://github.com/ofrohn/d3-celestial)'s data files,
   © 2015 Olaf Frohn, **BSD-3-Clause** (the notice travels inside the file),
   plus NOAA's public-domain WMM2025 coefficients.
+- **Vanilla server values** in the WoW Forever data (the positions of
+  vanilla NPCs on the World Map, the vanilla trainer levels in the
+  Profession Catalogue) are derived from the
+  [CMaNGOS classic-db](https://github.com/cmangos/classic-db), **GPLv3**,
+  and stay under it.
 
 > Created using intellectual property belonging to Jagex Limited under the
 > terms of Jagex's Fan Content Policy. This content is not endorsed by or

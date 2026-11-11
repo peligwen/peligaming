@@ -11,6 +11,8 @@
     "data:ship": "node scripts/fetch-ship-data.mjs",
     "data:bosses": "node scripts/fetch-boss-data.mjs",
     "data:wow-forever": "node scripts/fetch-wow-forever-map.mjs",
+    "data:wow-forever-professions": "node scripts/fetch-wow-forever-professions.mjs",
+    "check:professions": "node scripts/check-wow-forever-professions.mjs",
     "check:sand-table": "node scripts/validate-sand-table.mjs",
     "check:model": "node scripts/day-model-check.mjs",
     "check:baskets": "node scripts/basket-check.mjs",

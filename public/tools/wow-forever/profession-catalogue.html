@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profession Catalogue — WoW Forever: every recipe, its orange, yellow, green and grey levels, and the chance of a skill point</title>
+<meta name="description" content="Every recipe of every WoW Forever profession from the game's own data: the skill at which it turns orange, yellow, green and grey, the estimated chance of a skill point at your skill, with the Working Overtime legacy talent, and what each recipe makes and takes.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📜</text></svg>">
+<style>
+  :root{
+    --bg:#0b0906; --gold:#e0b95a; --gold-dim:#a68a3f; --parch:#efe4c8; --dim:#a89b7c; --faint:#6f6450;
+    --panel:#1b1509; --panel2:#241c0e; --edge-hi:#6a5630; --edge-lo:#0d0a05; --line:#2a2113;
+    /* the game's own recipe difficulty colours */
+    --orange:#ff8040; --yellow:#ffe24a; --green:#45c545; --grey:#8c8c8c;
+    --q0:#9d9d9d; --q1:#efe4c8; --q2:#1eff00; --q3:#3d8fff; --q4:#b55cff; --q5:#ff8000;
+    --serif:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
+    --bar-h:0px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{scroll-padding-top:calc(var(--bar-h) + 40px);}
+  body{background:var(--bg);background-image:radial-gradient(ellipse 80% 420px at 50% -120px,#3a2c1244,transparent);color:var(--parch);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.4;min-height:100vh;}
+  a{color:var(--parch);text-decoration:underline dotted var(--edge-hi);} a:hover{color:var(--gold);}
+  main{max-width:1320px;margin:0 auto;padding:0 14px 70px;}
+  .panel{background:var(--panel);border:1px solid var(--edge-hi);box-shadow:0 6px 24px rgba(0,0,0,.5),inset 0 0 0 1px var(--edge-lo);border-radius:6px;}
+
+  #hdr{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 14px;max-width:1320px;margin:0 auto;}
+  #hdr .home{color:var(--dim);text-decoration:none;font-size:13px;white-space:nowrap;} #hdr .home:hover{color:var(--gold);}
+  #hdr h1{font-family:var(--serif);font-weight:600;font-size:24px;color:var(--gold);letter-spacing:.5px;text-shadow:1px 1px 0 #000;white-space:nowrap;line-height:1;}
+  #hdr .sub{font-size:12px;color:var(--dim);}
+  .search{flex:1;min-width:200px;max-width:460px;margin-left:auto;}
+  .search input{width:100%;font-size:14px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:7px 10px;outline:none;}
+  .search input:focus{border-color:var(--gold);} .search input::placeholder{color:var(--faint);}
+
+  /* professions */
+  #profs{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:2px 0 12px;}
+  #profs .grp{display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
+  #profs .lbl{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.8px;margin-right:2px;}
+  .chip{font:inherit;font-size:13px;color:var(--dim);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:999px;padding:4px 11px;cursor:pointer;white-space:nowrap;}
+  .chip small{color:var(--faint);margin-left:5px;font-size:11.5px;}
+  .chip:hover{color:#fff;} .chip.on{color:var(--ink,#1a1408);background:var(--gold);border-color:var(--gold);font-weight:600;} .chip.on small{color:#5a4717;}
+  .chip:focus-visible,.seg button:focus-visible,.step:focus-visible,tr.r:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+
+  /* the sticky bar: your skill and the talent */
+  #bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;padding:9px 14px;margin:0 -2px;
+    background:linear-gradient(#2a2113,#1b1509);border:1px solid var(--edge-hi);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.55);}
+  #bar .ctl{display:flex;align-items:center;gap:8px;min-width:0;}
+  #bar .ctl > b{font-family:var(--serif);font-weight:600;color:var(--gold);font-size:15px;white-space:nowrap;line-height:1.05;}
+  #bar .skill{flex:1 1 330px;}
+  .step{font:inherit;width:26px;height:28px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;cursor:pointer;font-size:16px;line-height:1;}
+  .step:hover{border-color:var(--gold);color:#fff;}
+  #skillN{width:62px;font:inherit;font-size:16px;font-weight:600;text-align:center;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:3px 2px;outline:none;font-variant-numeric:tabular-nums;}
+  #skillN:focus{border-color:var(--gold);}
+  #skillR{flex:1;min-width:110px;accent-color:var(--gold);cursor:pointer;}
+  .seg{display:inline-flex;flex:none;border:1px solid var(--edge-hi);border-radius:4px;overflow:hidden;}
+  .seg button{font:inherit;font-size:13px;min-width:28px;padding:4px 8px;color:var(--dim);background:#0d0a05;border:0;border-left:1px solid var(--edge-hi);cursor:pointer;font-variant-numeric:tabular-nums;}
+  .seg button:first-child{border-left:0;} .seg button:hover{color:#fff;}
+  .seg button.on{background:var(--gold);color:#1a1408;font-weight:700;}
+  #woGain{font-size:13px;color:var(--parch);white-space:nowrap;min-width:44px;font-variant-numeric:tabular-nums;} #woGain.zero{color:var(--faint);}
+  #opts{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:0 2px 10px;}
+  #opts select{margin-left:auto;}
+  label.chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--dim);cursor:pointer;white-space:nowrap;} label.chk:hover{color:var(--parch);}
+  label.chk input{accent-color:var(--gold);width:15px;height:15px;}
+  select{font:inherit;font-size:13px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:4px 6px;outline:none;max-width:100%;}
+  .help{display:inline-block;width:17px;height:17px;border-radius:50%;border:1px solid var(--edge-hi);color:var(--dim);font-size:11px;line-height:15px;text-align:center;cursor:help;flex:none;text-decoration:none;}
+  .help:hover{color:var(--gold);border-color:var(--gold);}
+
+  #summary{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin:14px 2px 8px;}
+  #summary h2{font-family:var(--serif);font-weight:600;font-size:21px;color:var(--gold);text-shadow:1px 1px 0 #000;}
+  #summary .about{color:var(--dim);font-size:13px;flex:1 1 320px;min-width:0;}
+  #counts{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:13px;color:var(--dim);margin:0 2px 10px;align-items:center;}
+  #counts .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0;}
+  #counts b{color:var(--parch);font-weight:600;font-variant-numeric:tabular-nums;}
+  .btn{font:inherit;font-size:12.5px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:3px 10px;cursor:pointer;} .btn:hover{border-color:var(--gold);color:#fff;}
+
+  /* the table */
+  #list{--sx:0%;}
+  table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;}
+  col.c-name{width:24%;} col.c-n{width:66px;} col.c-band{width:23%;} col.c-ch{width:128px;} col.c-needs{width:auto;}
+  thead th{position:sticky;top:var(--bar-h);z-index:10;background:#16110a;color:var(--dim);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;
+    text-align:left;padding:7px 8px;border-bottom:1px solid var(--edge-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  thead th.n{text-align:right;letter-spacing:.2px;padding-left:2px;} thead th .s{display:none;} thead th.o{color:var(--orange);} thead th.y{color:var(--yellow);} thead th.g{color:var(--green);} thead th.t{color:var(--grey);}
+  thead th .scale{display:flex;justify-content:space-between;font-weight:400;letter-spacing:0;color:var(--faint);font-variant-numeric:tabular-nums;}
+  tbody td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle;overflow:hidden;}
+  tr.cat th{font-family:var(--serif);font-weight:600;font-size:15px;color:var(--gold-dim);text-align:left;padding:14px 8px 4px;border-bottom:1px solid var(--edge-hi);letter-spacing:.3px;}
+  tr.cat.sub th{font-size:13.5px;color:var(--dim);padding-top:10px;}
+  tr.cat th small{font-family:"Segoe UI",system-ui,sans-serif;font-weight:400;color:var(--faint);font-size:12px;margin-left:8px;letter-spacing:0;}
+  tr.r{cursor:pointer;} tr.r:hover td{background:#1d170c;} tr.r.open td{background:#201909;border-bottom-color:transparent;}
+  tr.r td:first-child{border-left:3px solid var(--st,transparent);}
+  tr.st-orange{--st:var(--orange);} tr.st-yellow{--st:var(--yellow);} tr.st-green{--st:var(--green);} tr.st-grey{--st:#4a4a4a;} tr.st-none,tr.st-later{--st:#33291a;}
+  tr.r.later .nm,tr.r.later .needs,tr.r.st-grey .nm,tr.r.st-grey .needs{opacity:.55;}
+  .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .nm .x{font-weight:400;color:var(--dim);margin-left:4px;}
+  .mk{color:var(--dim);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .q0{color:var(--q0);} .q1{color:var(--q1);} .q2{color:var(--q2);} .q3{color:var(--q3);} .q4{color:var(--q4);} .q5{color:var(--q5);}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:0 5px;border-radius:3px;margin-left:5px;vertical-align:1px;line-height:15px;}
+  .tag.A{background:#1e4d8a;color:#cfe4ff;} .tag.H{background:#8a2a1e;color:#ffd6cf;} .tag.sod{background:#3a2e17;color:var(--dim);font-weight:600;}
+  td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}
+  td.n.o{color:var(--orange);} td.n.y{color:var(--yellow);} td.n.g{color:var(--green);} td.n.t{color:var(--grey);}
+  td.n .q{font-weight:400;opacity:.8;} td.n.none{color:var(--faint);font-weight:400;text-align:center;}
+  .band{position:relative;height:12px;border-radius:2px;background:#120e07;box-shadow:inset 0 0 0 1px #2a2113;overflow:hidden;}
+  .band i{position:absolute;top:0;bottom:0;display:block;}
+  .band .o{background:var(--orange);} .band .y{background:var(--yellow);} .band .g{background:var(--green);} .band .t{background:#3a3a3a;}
+  .band .o.unk{background:repeating-linear-gradient(135deg,var(--orange) 0 3px,#7a3d1f 3px 6px);opacity:.7;}
+  .band b{position:absolute;top:0;bottom:0;width:1px;background:#0b090688;}
+  .bandwrap{position:relative;}
+  .bandwrap::after{content:"";position:absolute;top:-4px;bottom:-4px;left:var(--sx);width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 0 1px #000;border-radius:1px;pointer-events:none;}
+  td.ch{white-space:nowrap;}
+  .pct{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .pct.orange{color:var(--orange);} .pct.yellow{color:var(--yellow);} .pct.green{color:var(--green);} .pct.grey,.pct.none{color:var(--faint);font-weight:600;}
+  .chsub{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pct .was{font-size:11.5px;font-weight:400;color:var(--gold);margin-left:6px;}
+  .needs{font-size:12.5px;color:var(--dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .needs b{font-weight:400;color:var(--parch);}
+  #empty{padding:40px 10px;text-align:center;color:var(--dim);}
+
+  /* an opened recipe */
+  tr.d td{background:#201909;padding:4px 12px 16px 14px;border-left:3px solid var(--st,transparent);border-bottom:1px solid var(--edge-hi);overflow:visible;}
+  .det{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 340px;gap:10px 28px;}
+  .det h4{font-family:var(--serif);font-weight:600;font-size:13.5px;color:var(--gold-dim);margin:8px 0 3px;letter-spacing:.3px;}
+  .det ul{list-style:none;} .det li{padding:1px 0;} .det p{margin:2px 0;} .det .dim{color:var(--dim);font-size:12.5px;}
+  .det .num{color:var(--dim);font-variant-numeric:tabular-nums;display:inline-block;min-width:26px;}
+  .det .proj b{color:var(--gold);font-variant-numeric:tabular-nums;}
+  .det svg{display:block;width:100%;height:auto;max-width:340px;}
+  .lv{font-variant-numeric:tabular-nums;font-weight:600;}
+  .lv.o{color:var(--orange);} .lv.y{color:var(--yellow);} .lv.g{color:var(--green);} .lv.t{color:var(--grey);}
+
+  /* the small print */
+  #aboutbox{margin-top:34px;padding:16px 20px 18px;}
+  #aboutbox h3{font-family:var(--serif);font-weight:600;font-size:17px;color:var(--gold);margin:14px 0 5px;}
+  #aboutbox h3:first-child{margin-top:0;}
+  #aboutbox p{margin:6px 0;max-width:92ch;color:var(--parch);} #aboutbox p.note{color:var(--dim);font-size:13px;}
+  #aboutbox .f{font-family:var(--serif);font-size:15.5px;color:var(--gold);white-space:nowrap;}
+  #aboutbox table.ex{width:auto;margin:8px 0;table-layout:auto;} #aboutbox table.ex td,#aboutbox table.ex th{padding:3px 14px 3px 0;border:0;text-align:right;font-variant-numeric:tabular-nums;font-size:13px;}
+  #aboutbox table.ex th{color:var(--dim);font-weight:600;text-transform:none;letter-spacing:0;position:static;background:none;}
+  #aboutbox table.ex td:first-child,#aboutbox table.ex th:first-child{text-align:left;}
+  #loading{padding:70px 10px;text-align:center;color:var(--dim);} #loading h2{font-family:var(--serif);color:var(--gold);font-weight:600;font-size:24px;margin-bottom:6px;}
+
+  @media (max-width:1100px){
+    col.c-needs,th.needsh,td.needsc{display:none;} col.c-name{width:34%;} col.c-band{width:auto;}
+    .det{grid-template-columns:minmax(0,1fr) minmax(0,1fr);} .det .curve{grid-column:1 / -1;}
+  }
+  @media (max-width:760px){
+    main{padding:0 8px 60px;} #hdr{padding:8px;} #hdr h1{font-size:20px;} .search{max-width:none;flex-basis:100%;}
+    #bar{padding:7px 8px;gap:7px 12px;border-radius:0 0 6px 6px;margin:0 -8px;border-left:0;border-right:0;}
+    #bar .ctl{gap:6px;} #bar .ctl > b{white-space:normal;font-size:14px;max-width:74px;} #bar .help{display:none;}
+    #skillN{width:52px;} .seg button{min-width:26px;padding:4px 6px;} #woGain{min-width:36px;}
+    #opts select{margin-left:0;}
+    col.c-band,th.bandh,td.bandc{display:none;} col.c-name{width:auto;} col.c-n{width:36px;} col.c-ch{width:82px;} .pct .was{display:block;margin-left:0;}
+    thead th{padding:6px 3px;font-size:10.5px;letter-spacing:0;} tbody td{padding:6px 3px;} tbody td:first-child{padding-left:6px;}
+    thead th .w{display:none;} thead th .s{display:inline;}
+    .nm,.mk,.chsub{white-space:normal;} .pct{font-size:15px;} .chsub{font-size:11px;}
+    .det{grid-template-columns:minmax(0,1fr);} tr.d td{padding:4px 8px 14px 9px;}
+  }
+</style>
+</head>
+<body>
+<header id="hdr">
+  <a class="home" href="../../">← peligaming</a>
+  <h1>Profession Catalogue</h1>
+  <span class="sub">WoW Forever</span>
+  <div class="search"><input id="q" type="search" autocomplete="off" placeholder="Search every profession: a recipe, what it makes, a reagent…" aria-label="Search recipes in every profession"></div>
+</header>
+<main>
+  <nav id="profs" aria-label="Professions"></nav>
+  <section id="bar" aria-label="Your skill and talents">
+    <div class="ctl skill">
+      <b><label for="skillN">Your skill</label></b>
+      <button class="step" id="skillDn" aria-label="One point less">−</button>
+      <input id="skillN" type="number" min="1" max="300" step="1" value="1" inputmode="numeric">
+      <button class="step" id="skillUp" aria-label="One point more">+</button>
+      <input id="skillR" type="range" min="1" max="300" step="1" value="1" list="ranks" aria-label="Your skill">
+      <datalist id="ranks"><option value="75"><option value="150"><option value="225"><option value="300"></datalist>
+    </div>
+    <div class="ctl">
+      <b id="woName">Working Overtime</b>
+      <span class="seg" id="woRanks" role="group" aria-label="Working Overtime rank"></span>
+      <span id="woGain" class="zero"></span>
+      <span class="seg" id="woMode" role="group" aria-label="How the bonus is applied">
+        <button data-mode="x" title="Multiplies the chance: 50% becomes 60% at five ranks">×</button><button data-mode="+" title="Adds points to the chance: 50% becomes 70% at five ranks">+</button>
+      </span>
+      <a class="help" href="#about-talent" title="What the talent does, and the two ways its bonus might be applied">?</a>
+    </div>
+  </section>
+
+  <div id="loading"><h2>Profession Catalogue</h2><div id="loadmsg">Opening the recipe books…</div></div>
+  <div id="body" hidden>
+    <div id="summary"></div>
+    <div id="opts">
+      <label class="chk"><input type="checkbox" id="onlyPts"> Only what can give a point now</label>
+      <label class="chk" id="sodWrap" title="Recipes the client files under “Season of Discovery”: leftovers from that game, probably not obtainable in Forever"><input type="checkbox" id="sod"> <span id="sodLabel"></span></label>
+      <select id="sort" aria-label="Order">
+        <option value="game">Order: as the game lists them</option>
+        <option value="chance">Order: best chance at my skill</option>
+        <option value="level">Order: by the level they go yellow</option>
+        <option value="name">Order: by name</option>
+      </select>
+      <button class="btn" id="copy">Copy a link to this view</button>
+    </div>
+    <div id="counts"></div>
+    <div id="list">
+      <table>
+        <colgroup><col class="c-name"><col class="c-n"><col class="c-n"><col class="c-n"><col class="c-n"><col class="c-band"><col class="c-ch"><col class="c-needs"></colgroup>
+        <thead><tr>
+          <th>Recipe</th>
+          <th class="n o" title="Orange from the skill at which the recipe can be learned: a point every time"><span class="w">Orange</span><span class="s" aria-hidden="true">Or</span></th>
+          <th class="n y" title="The skill at which it turns yellow"><span class="w">Yellow</span><span class="s" aria-hidden="true">Yel</span></th>
+          <th class="n g" title="The skill at which it turns green: halfway from yellow to grey"><span class="w">Green</span><span class="s" aria-hidden="true">Grn</span></th>
+          <th class="n t" title="The skill at which it turns grey and gives no more points"><span class="w">Grey</span><span class="s" aria-hidden="true">Gry</span></th>
+          <th class="bandh"><div class="scale"><span>1</span><span>75</span><span>150</span><span>225</span><span>300</span></div></th>
+          <th title="Estimated chance of a skill point from one craft at your skill">Chance<span class="w"> now</span></th>
+          <th class="needsh">Takes</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="empty" hidden></div>
+    </div>
+
+    <section id="aboutbox" class="panel">
+      <h3>Reading the table</h3>
+      <p>The four numbers are the skill at which a recipe turns <b class="lv o">orange</b>, <b class="lv y">yellow</b>, <b class="lv g">green</b> and <b class="lv t">grey</b>. Yellow and grey are the client's own numbers for the recipe; green is the point halfway between them; orange starts where the recipe can be learned, and whatever your skill, a recipe below its yellow level is orange. The bar draws the same four on a scale of 1 to 300, with a white line at your skill.</p>
+      <p id="about-learn">Where a recipe is learned from an item, the first number is the skill that item asks for, and it is exact. What a trainer asks is decided on the server and no client carries it, so those levels are marked: <b>†</b> is what vanilla's trainers asked, for a recipe Forever has left where it was; <b>≈</b> is vanilla's level moved by as much as Forever moved the recipe's yellow level<span id="shiftnote"></span>; <b>?</b> is a recipe no item teaches and no vanilla trainer taught, so its level is not in the data.</p>
+
+      <h3 id="about-chance">How the chance is estimated</h3>
+      <p>Two things are certain: an orange recipe gives a point every time, and a grey one never does. Blizzard has not published what happens in between. This page uses the straight line players have long used for Classic: certain up to the yellow level, then falling evenly to nothing at grey,</p>
+      <p class="f">chance = (grey − skill) ÷ (grey − yellow)</p>
+      <p>which is 100% on the first yellow point, 50% as the recipe turns green and 0% as it turns grey, and averages 75% across the yellow band and 25% across the green one. Forever may not use exactly this curve, so read every percentage here as an estimate, good for comparing recipes and planning materials rather than for counting on the last craft.</p>
+      <p class="note">“Crafts per point” is one divided by the chance; the totals in an opened recipe add that up point by point from your skill to where the recipe turns grey (or to the cap of 300). A recipe that gives no skill at all shows a dash.</p>
+
+      <h3 id="about-talent">Working Overtime</h3>
+      <p id="talentText"></p>
+      <p>The tooltip does not say how that bonus is applied, and the arithmetic is on the server. So the page offers both readings: <b>×</b> multiplies the chance (at five ranks, 50% becomes 60%), <b>+</b> adds to it (50% becomes 70%). Either way an orange recipe stays certain and a grey one still gives nothing. <b>×</b> is the default because it is the lower of the two estimates.</p>
+      <table class="ex" id="talentTable"></table>
+
+      <h3>What is in the catalogue</h3>
+      <p id="scopeText"></p>
+
+      <h3>Sources &amp; credits</h3>
+      <p class="note" id="creditText"></p>
+      <p class="note">World of Warcraft® and Blizzard Entertainment® are trademarks or registered trademarks of Blizzard Entertainment, Inc. Recipe, item and talent names and data are Blizzard's. This is a non-commercial fan site, not affiliated with or endorsed by Blizzard.</p>
+    </section>
+  </div>
+  <noscript><p style="padding:40px 10px;text-align:center;color:#a89b7c">The catalogue needs JavaScript to read its data.</p></noscript>
+</main>
+
+<script id="catalogue-model">
+// The catalogue's arithmetic, kept apart from the page so it can be checked
+// on its own (npm run check:professions). A recipe here is { y, g, u } — the
+// skill at which it turns yellow, the skill at which it turns grey, and the
+// points one success gives (1 unless stated); a recipe that never gives a
+// point has no g.
+const CATALOGUE = (() => {
+  // green starts halfway from yellow to grey
+  const green = (r) => Math.floor((r.y + r.g) / 2);
+  // the recipe's colour at a skill: "orange", "yellow", "green", "grey", or "none" if it never gives a point
+  function colour(r, skill) {
+    if (r.g == null) return "none";
+    if (skill >= r.g) return "grey";
+    if (skill < r.y) return "orange";
+    return skill >= green(r) ? "green" : "yellow";
+  }
+  // certain below yellow, nothing from grey on, a straight line between
+  function baseChance(r, skill) {
+    if (r.g == null || skill >= r.g) return 0;
+    if (skill < r.y) return 1;
+    return (r.g - skill) / (r.g - r.y);
+  }
+  // with a talent worth `bonus` percent: mode "x" multiplies the chance,
+  // mode "+" adds to it; neither lifts a recipe that gives nothing
+  function chance(r, skill, bonus = 0, mode = "x") {
+    const p = baseChance(r, skill);
+    if (p <= 0 || !bonus) return p;
+    return Math.min(1, mode === "+" ? p + bonus / 100 : p * (1 + bonus / 100));
+  }
+  // expected crafts to take the skill from `from` up to `to`
+  function crafts(r, from, to, bonus = 0, mode = "x") {
+    const step = r.u || 1;
+    let n = 0;
+    for (let s = from; s < to; s += step) {
+      const p = chance(r, s, bonus, mode);
+      if (p <= 0) return Infinity;
+      n += 1 / p;
+    }
+    return n;
+  }
+  return { green, colour, baseChance, chance, crafts };
+})();
+if (typeof module !== "undefined") module.exports = CATALOGUE;
+</script>
+<script>
+(function () {
+"use strict";
+const DATA_URL = "data/professions/professions.json";
+const STORE = "wowf-profession-catalogue";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const M = CATALOGUE;
+const MAX_ROWS = 600;
+// the table drops its last column, then its bar, as the window narrows (the same widths as the stylesheet)
+const NARROW = window.matchMedia("(max-width:1100px)"), PHONE = window.matchMedia("(max-width:760px)");
+const span = () => (PHONE.matches ? 6 : NARROW.matches ? 7 : 8);
+
+let D = null;                 // the dataset
+const state = { prof: null, skill: 1, wo: 0, mode: "x", onlyPts: false, sort: "game", sod: false, q: "", open: new Set(), more: false };
+let saved = { skills: {} };   // what this browser remembers: a skill per profession, the talent, the options
+
+// ---- data ------------------------------------------------------------------
+const itemName = (id) => (D.items[id] && D.items[id][0]) || null;
+const itemQ = (id) => { const q = D.items[id] && D.items[id][1]; return q == null ? 1 : Math.min(5, q); };
+const itemHtml = (id, fallback) => `<span class="q${itemQ(id)}">${esc(itemName(id) || fallback || "an item the client has no name for")}</span>`;
+const bonus = () => (state.wo ? D.talent.ranks[state.wo - 1] : 0);
+const pct = (p) => (p >= 0.995 ? "100%" : p <= 0 ? "0%" : p < 0.01 ? "<1%" : Math.round(p * 100) + "%");
+const fmtCrafts = (n) => (!isFinite(n) ? "—" : n < 10 ? n.toFixed(1) : String(Math.round(n)));
+function fmtTime(sec) {
+  if (sec >= 86400) { const d = sec / 86400; return (Number.isInteger(d) ? d : d.toFixed(1)) + (d === 1 ? " day" : " days"); }
+  if (sec >= 3600) { const h = sec / 3600; return (Number.isInteger(h) ? h : h.toFixed(1)) + (h === 1 ? " hour" : " hours"); }
+  return Math.round(sec / 60) + " min";
+}
+function prepare() {
+  for (const p of D.professions) {
+    p.slug = slug(p.name);
+    p.live = p.recipes.filter((r) => !r.x).length;
+    for (const r of p.recipes) {
+      r.prof = p;
+      const words = [r.n, p.categories[r.c], r.e || ""];
+      if (r.p) words.push(itemName(r.p[0]) || "");
+      for (const [id] of r.r || []) words.push(itemName(id) || "");
+      for (const t of r.t || []) words.push(t);
+      if (r.f) words.push(r.f);
+      r.words = words.join(" · ").toLowerCase();
+    }
+  }
+}
+
+// ---- state: the address, and what the browser remembers ----------------------
+function load() {
+  try { saved = Object.assign({ skills: {} }, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) { /* private mode */ }
+  if (saved.wo != null) state.wo = saved.wo;
+  if (saved.mode) state.mode = saved.mode;
+  if (saved.sort) state.sort = saved.sort;
+  state.onlyPts = !!saved.onlyPts; state.sod = !!saved.sod;
+  const h = new URLSearchParams(location.hash.slice(1));
+  const p = D.professions.find((p) => p.slug === h.get("p")) || D.professions.find((p) => p.id === saved.prof) || D.professions[0];
+  state.prof = p.id;
+  state.skill = clampSkill(h.has("s") ? h.get("s") : saved.skills[p.id] || 1);
+  if (h.has("wo")) state.wo = Math.max(0, Math.min(D.talent.ranks.length, parseInt(h.get("wo"), 10) || 0));
+  if (h.get("m") === "mul") state.mode = "x"; else if (h.get("m") === "add") state.mode = "+";
+  state.q = h.get("q") || "";
+  if (h.get("sod") === "1") state.sod = true;
+}
+function save() {
+  saved.prof = state.prof; saved.skills[state.prof] = state.skill;
+  Object.assign(saved, { wo: state.wo, mode: state.mode, sort: state.sort, onlyPts: state.onlyPts, sod: state.sod });
+  try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { /* private mode */ }
+  const h = new URLSearchParams();
+  h.set("p", profOf(state.prof).slug); h.set("s", state.skill);
+  if (state.wo) { h.set("wo", state.wo); h.set("m", state.mode === "+" ? "add" : "mul"); }
+  if (state.sod) h.set("sod", "1");
+  if (state.q.trim()) h.set("q", state.q.trim());
+  history.replaceState(null, "", "#" + h.toString());
+}
+const clampSkill = (v) => Math.max(1, Math.min(D.skillCap, parseInt(v, 10) || 1));
+const profOf = (id) => D.professions.find((p) => p.id === id);
+
+// ---- the recipes to show -----------------------------------------------------
+function learnable(r) { return r.l == null || r.l <= state.skill; }
+// for ordering: 0 can be learned by now, 1 nobody knows when, 2 not yet
+const reach = (r) => (r.l == null ? 1 : r.l <= state.skill ? 0 : 2);
+function selection() {
+  const q = state.q.trim().toLowerCase();
+  const terms = q.split(/\s+/).filter(Boolean);
+  const groups = [];
+  for (const p of q ? D.professions : [profOf(state.prof)]) {
+    let list = p.recipes.filter((r) => (state.sod || !r.x) && terms.every((t) => r.words.includes(t)));
+    if (state.onlyPts) list = list.filter((r) => learnable(r) && M.baseChance(r, state.skill) > 0);
+    if (list.length) groups.push({ p, list });
+  }
+  const b = bonus();
+  for (const g of groups) {
+    if (state.sort === "chance") g.list = g.list.slice().sort((x, y) => reach(x) - reach(y) || (reach(x) === 2 ? x.l - y.l : M.chance(y, state.skill, b, state.mode) - M.chance(x, state.skill, b, state.mode)) || (y.y ?? -1) - (x.y ?? -1) || x.n.localeCompare(y.n));
+    else if (state.sort === "level") g.list = g.list.slice().sort((x, y) => (x.y ?? 9999) - (y.y ?? 9999) || (x.g ?? 9999) - (y.g ?? 9999) || x.n.localeCompare(y.n));
+    else if (state.sort === "name") g.list = g.list.slice().sort((x, y) => x.n.localeCompare(y.n) || x.i - y.i);
+  }
+  return groups;
+}
+
+// ---- rows --------------------------------------------------------------------
+const X = (s) => Math.max(0, Math.min(100, ((s - 1) / (D.skillCap - 1)) * 100));
+function bandHtml(r) {
+  if (r.g == null) return `<div class="bandwrap"><div class="band"></div></div>`;
+  const from = r.l == null ? 1 : Math.min(r.l, r.g), gr = M.green(r);
+  const seg = (cls, a, b) => (b > a && X(b) > X(a) ? `<i class="${cls}" style="left:${X(a).toFixed(2)}%;width:${(X(b) - X(a)).toFixed(2)}%"></i>` : "");
+  return `<div class="bandwrap"><div class="band">${seg("o" + (r.l == null ? " unk" : ""), from, r.y)}${seg("y", Math.max(from, r.y), gr)}${seg("g", Math.max(from, gr), r.g)}${seg("t", r.g, D.skillCap + 1)}</div></div>`;
+}
+function learnCell(r) {
+  if (r.s === "u") return `<td class="n o" title="No item teaches this and no vanilla trainer taught it: the level it is learned at is not in the data"><span class="q">?</span></td>`;
+  const mark = r.s === "t" ? "†" : "", pre = r.s === "e" ? "≈" : "";
+  const why = { a: r.l > 1 ? `Learned by itself at ${r.l}` : "Known as soon as you take the profession", i: "The skill its recipe item asks for", t: "What vanilla's trainers asked; Forever has not moved this recipe", e: `Vanilla's trainers asked ${r.v}; moved by ${r.dy > 0 ? "+" : "−"}${Math.abs(r.dy)}, as Forever moved this recipe's yellow level` }[r.s];
+  return `<td class="n o" title="${esc(why)}"><span class="q">${pre}</span>${r.l}<span class="q">${mark}</span></td>`;
+}
+function makesText(r) {
+  if (r.p) { const nm = itemName(r.p[0]), named = nm && nm.toLowerCase() !== r.n.toLowerCase(); return r.p[1] > 1 ? (named ? `${r.p[1]} × ${esc(nm)}` : `makes ${r.p[1]}`) : named ? esc(nm) : ""; }
+  return esc(r.e || r.d || "");
+}
+function needsHtml(r) {
+  const parts = (r.r || []).map(([id, n]) => `${n} <b>${esc(itemName(id) || "?")}</b>`);
+  const extra = [...(r.t || []), ...(r.f ? [r.f] : [])];
+  return parts.join(", ") + (extra.length ? `${parts.length ? " · " : ""}${esc(extra.join(", "))}` : "");
+}
+function rowHtml(r, key, b) {
+  const st = M.colour(r, state.skill), p = M.chance(r, state.skill, b, state.mode), p0 = M.baseChance(r, state.skill);
+  const later = !learnable(r);
+  const q = r.p ? itemQ(r.p[0]) : 1;
+  const mk = makesText(r);
+  let chance;
+  if (st === "none") chance = `<div class="pct none">—</div><div class="chsub">gives no skill</div>`;
+  else if (later) chance = `<div class="pct none">—</div><div class="chsub">learn at ${r.l}</div>`;
+  else {
+    const sub = st === "grey" ? "grey" : r.s === "u" && st === "orange" ? "if you have it" : p >= 0.995 ? `${st}, every time` : `${st}, 1 in ${fmtCrafts(1 / p)}`;
+    const was = b && p - p0 >= 0.005 ? ` <small class="was" title="Without ${esc(D.talent.name)}">was ${pct(p0)}</small>` : "";
+    chance = `<div class="pct ${st}">${pct(p)}${was}</div><div class="chsub">${sub}</div>`;
+  }
+  const tags = (r.fa ? `<span class="tag ${r.fa}" title="${r.fa === "A" ? "Alliance" : "Horde"} only">${r.fa}</span>` : "") + (r.x ? `<span class="tag sod" title="Filed by the client under “Season of Discovery”: a leftover, probably not obtainable in Forever">SoD</span>` : "");
+  const lv = r.g == null ? `<td class="n none" colspan="3">no skill-ups</td>` : `<td class="n y">${r.y}</td><td class="n g">${M.green(r)}</td><td class="n t">${r.g}</td>`;
+  return `<tr class="r st-${later ? "later" : st}${later ? " later" : ""}${state.open.has(key) ? " open" : ""}" data-key="${key}" tabindex="0" aria-expanded="${state.open.has(key)}">
+<td><div class="nm q${q}">${esc(r.n)}${tags}</div>${mk ? `<div class="mk">${mk}</div>` : ""}</td>
+${learnCell(r)}${lv}
+<td class="bandc">${bandHtml(r)}</td>
+<td class="ch">${chance}</td>
+<td class="needsc"><div class="needs">${needsHtml(r)}</div></td></tr>` + (state.open.has(key) ? detailRow(r, st, b) : "");
+}
+
+// ---- an opened recipe --------------------------------------------------------
+function curveSvg(r, b) {
+  const W = 340, H = 132, L = 34, R = 10, T = 8, B = 30, cap = D.skillCap;
+  const start = r.l == null ? r.y : Math.min(r.l, r.y);
+  let a = Math.max(1, start - Math.max(6, Math.round((r.g - start) * 0.15))), z = Math.min(cap, r.g + Math.max(6, Math.round((r.g - start) * 0.15)));
+  if (z - a < 12) { a = Math.max(1, z - 12); z = Math.min(cap, a + 12); }
+  const x = (s) => L + ((s - a) / (z - a)) * (W - L - R), y = (p) => T + (1 - p) * (H - T - B);
+  const path = (fn) => { let d = ""; for (let s = a; s <= z; s++) d += `${s === a ? "M" : "L"}${x(s).toFixed(1)},${y(fn(s)).toFixed(1)}`; return d; };
+  const gr = M.green(r), base = H - B;
+  const strip = (cls, s0, s1) => { const x0 = x(Math.max(a, s0)), x1 = x(Math.min(z, s1)); return x1 > x0 ? `<rect x="${x0.toFixed(1)}" y="${base + 2}" width="${(x1 - x0).toFixed(1)}" height="5" fill="var(--${cls})"/>` : ""; };
+  const tick = (s, cls) => (s >= a && s <= z ? `<text x="${x(s).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--${cls})" font-weight="600">${s}</text>` : "");
+  const me = state.skill >= a && state.skill <= z ? `<line x1="${x(state.skill).toFixed(1)}" y1="${T}" x2="${x(state.skill).toFixed(1)}" y2="${base + 8}" stroke="#fff" stroke-width="1.5"/><circle cx="${x(state.skill).toFixed(1)}" cy="${y(M.chance(r, state.skill, b, state.mode)).toFixed(1)}" r="3.5" fill="#fff" stroke="#000"/>` : "";
+  // labels that would sit on top of each other are dropped, grey and yellow first
+  const ticks = []; let last = -99;
+  for (const [s, cls] of [[r.y, "yellow"], [gr, "green"], [r.g, "grey"]]) if (s >= a && s <= z && x(s) - last > 24) { ticks.push(tick(s, cls)); last = x(s); }
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Chance of a skill point from ${esc(r.n)} by skill">
+<g font-size="10.5" fill="#a89b7c" font-family="Segoe UI,system-ui,sans-serif">
+${[0, 0.5, 1].map((p) => `<line x1="${L}" y1="${y(p)}" x2="${W - R}" y2="${y(p)}" stroke="#2a2113"/><text x="${L - 6}" y="${y(p) + 3.5}" text-anchor="end">${p * 100}%</text>`).join("")}
+${strip("orange", a, r.y)}${strip("yellow", r.y, gr)}${strip("green", gr, r.g)}${strip("grey", r.g, z)}
+${b ? `<path d="${path((s) => M.baseChance(r, s))}" fill="none" stroke="#a89b7c" stroke-width="1.5" stroke-dasharray="4 3"/>` : ""}
+<path d="${path((s) => M.chance(r, s, b, state.mode))}" fill="none" stroke="#e0b95a" stroke-width="2"/>
+${me}${ticks.join("")}</g></svg>`;
+}
+function projection(r, st, b) {
+  if (st === "none") return `<p class="dim">This never gives a skill point.</p>`;
+  const cap = D.skillCap, s = state.skill, end = Math.min(r.g, cap);
+  if (st === "grey") return `<p class="dim">Grey at ${s}: no more points from this.</p>`;
+  const from = r.l != null && r.l > s ? r.l : s;
+  if (from >= end) return `<p class="dim">Learned at ${r.l}, when it is already grey.</p>`;
+  const n = M.crafts(r, from, end, b, state.mode), n0 = M.crafts(r, from, end, 0, state.mode);
+  const where = r.g > cap ? `the cap of ${cap}` : `grey at ${r.g}`;
+  let out = `<p class="proj">From <b>${from}</b> to ${where}: <b>${end - from}</b> point${end - from === 1 ? "" : "s"} in about <b>${fmtCrafts(n)}</b> craft${n >= 1.05 || n < 0.95 ? "s" : ""}`;
+  if (b && n0 - n >= 0.05) out += `, against ${fmtCrafts(n0)} without ${esc(D.talent.name)}`;
+  out += ".</p>";
+  if (s < r.y && from < r.y) out += `<p class="dim">The first ${Math.min(r.y, end) - from} of those are certain: it stays orange until ${r.y}.</p>`;
+  if (from > s) out += `<p class="dim">Counted from ${from}, where it can be learned.</p>`;
+  if (r.s === "u") out += `<p class="dim">The level it is learned at is not in the data, so this counts as if you already had it.</p>`;
+  return out;
+}
+function learnedHtml(r, p) {
+  const prof = esc(p.name);
+  if (r.s === "a") return r.l > 1 ? `Learned by itself when your ${prof} reaches <b class="lv o">${r.l}</b>.` : `Known as soon as you take ${prof}.`;
+  if (r.s === "i") return `${itemHtml(r.ri)}, which asks for ${prof} <b class="lv o">${r.l}</b>.`;
+  if (r.s === "t") return `A trainer. Vanilla's asked for ${prof} <b class="lv o">${r.l}</b>, and Forever has left this recipe's levels where they were, so that is probably still the level. <span class="dim">†</span>`;
+  if (r.s === "e") return `A trainer. Vanilla's asked for ${prof} ${r.v}; Forever moved this recipe's yellow level by ${r.dy > 0 ? "+" : "−"}${Math.abs(r.dy)}, so the trainer's level is estimated at <b class="lv o">${r.l}</b>. <span class="dim">≈</span>`;
+  return `Not in the data: no item in the client teaches it and no vanilla trainer did. A Forever trainer, a quest or a discovery, most likely.`;
+}
+function detailRow(r, st, b) {
+  const p = r.prof;
+  let makes = "";
+  if (r.p) makes = `${r.p[1] > 1 ? `<span class="num">${r.p[1]} ×</span> ` : ""}${itemHtml(r.p[0], r.n)}`;
+  else if (r.e) makes = `An enchantment: ${esc(r.e)}`;
+  else if (r.d) makes = esc(r.d);
+  const takes = (r.r || []).map(([id, n]) => `<li><span class="num">${n} ×</span> ${itemHtml(id)}</li>`).join("");
+  const facts = [];
+  if (r.t) facts.push(`Tool${r.t.length > 1 ? "s" : ""}: ${esc(r.t.join(", "))}`);
+  if (r.f) facts.push(`At: ${esc(r.f)}`);
+  if (r.ct) facts.push(`${r.ct} sec to make`);
+  if (r.cd) facts.push(`Cooldown: ${fmtTime(r.cd)}`);
+  if (r.fa) facts.push(r.fa === "A" ? "Alliance only" : "Horde only");
+  const levels = r.g == null ? "" : `<p><b class="lv o">${r.s === "u" ? "?" : (r.s === "e" ? "≈" : "") + r.l}</b> orange · <b class="lv y">${r.y}</b> yellow · <b class="lv g">${M.green(r)}</b> green · <b class="lv t">${r.g}</b> grey</p>`;
+  return `<tr class="d st-${learnable(r) ? st : "later"}"><td colspan="${span()}"><div class="det">
+<div>${makes ? `<h4>Makes</h4><p>${makes}</p>` : ""}${takes ? `<h4>Takes</h4><ul>${takes}</ul>` : ""}${facts.length ? `<h4>Needs</h4><p class="dim">${facts.join(" · ")}</p>` : ""}</div>
+<div><h4>Learned from</h4><p>${learnedHtml(r, p)}</p>${r.x ? `<p class="dim">The client files this under “Season of Discovery”: a leftover from that game, and probably not something Forever hands out.</p>` : ""}
+<h4>Skill points</h4>${levels}${projection(r, st, b)}<p class="dim">${esc(p.name)} · ${esc(p.categories[r.c])} · spell ${r.i}</p></div>
+<div class="curve">${r.g == null ? "" : `<h4>Chance by skill${b ? ` <span class="dim">— gold with ${esc(D.talent.name)} ${state.wo}/${D.talent.ranks.length}, dashed without</span>` : ""}</h4>${curveSvg(r, b)}`}</div>
+</div></td></tr>`;
+}
+
+// ---- render ------------------------------------------------------------------
+let queued = false;
+function render() { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; draw(); }); }
+function draw() {
+  const groups = selection(), b = bonus(), q = state.q.trim();
+  const total = groups.reduce((n, g) => n + g.list.length, 0);
+  const cur = profOf(state.prof);
+  $("list").style.setProperty("--sx", X(state.skill).toFixed(2) + "%");
+
+  // the heading and the colour counts
+  if (q) $("summary").innerHTML = `<h2>“${esc(q)}”</h2><span class="about">${total} recipe${total === 1 ? "" : "s"} in ${groups.length} profession${groups.length === 1 ? "" : "s"}, read at a skill of ${state.skill} in each. <button class="btn" id="clearQ">Clear the search</button></span>`;
+  else $("summary").innerHTML = `<h2>${esc(cur.name)}${cur.class ? ` <span style="font-size:14px;color:var(--dim)">${esc(cur.class)} only</span>` : ""}</h2><span class="about">${esc(cur.about)}</span>`;
+  const c = { orange: 0, yellow: 0, green: 0, grey: 0, none: 0, later: 0 };
+  for (const g of groups) for (const r of g.list) { if (!learnable(r)) c.later++; else c[M.colour(r, state.skill)]++; }
+  const hidden = q ? D.professions.reduce((n, p) => n + p.recipes.length - p.live, 0) : cur.recipes.length - cur.live;
+  $("counts").innerHTML = `<span>At <b>${state.skill}</b>:</span>
+<span><i class="dot" style="background:var(--orange)"></i><b>${c.orange}</b> orange</span><span><i class="dot" style="background:var(--yellow)"></i><b>${c.yellow}</b> yellow</span>
+<span><i class="dot" style="background:var(--green)"></i><b>${c.green}</b> green</span><span><i class="dot" style="background:#4a4a4a"></i><b>${c.grey}</b> grey</span>
+${c.later ? `<span><b>${c.later}</b> not yet learnable</span>` : ""}${c.none ? `<span><b>${c.none}</b> that give no skill</span>` : ""}
+`;
+  $("sodWrap").hidden = !hidden; $("sodLabel").textContent = `Season of Discovery leftovers (${hidden})`; $("sod").checked = state.sod;
+
+  // the rows
+  let html = "", shown = 0;
+  const limit = state.more ? Infinity : MAX_ROWS;
+  outer: for (const g of groups) {
+    if (q) html += `<tr class="cat"><th colspan="${span()}">${esc(g.p.name)}<small>${g.list.length}</small></th></tr>`;
+    let lastCat = -1, lastReach = 0;
+    for (const r of g.list) {
+      if (shown >= limit) break outer;
+      if (!q && state.sort === "game" && r.c !== lastCat) {
+        lastCat = r.c;
+        html += `<tr class="cat"><th colspan="${span()}">${esc(g.p.categories[r.c])}<small>${g.list.filter((o) => o.c === r.c).length}</small></th></tr>`;
+      }
+      if (state.sort === "chance" && reach(r) !== lastReach) {
+        lastReach = reach(r);
+        html += `<tr class="cat sub"><th colspan="${span()}">${lastReach === 1 ? "If you have them" : `Not yet learnable at ${state.skill}`}<small>${lastReach === 1 ? "the level these are learned at is not in the data" : "by the level they are learned at"}</small></th></tr>`;
+      }
+      html += rowHtml(r, `${g.p.id}:${r.i}`, b);
+      shown++;
+    }
+  }
+  $("rows").innerHTML = html;
+  const empty = $("empty");
+  if (!total) { empty.hidden = false; empty.textContent = q ? `Nothing matches “${q}”${state.onlyPts ? " that can give a point at your skill" : ""}.` : "Nothing here can give a point at your skill. Untick “Only what can give a point now” to see the rest."; }
+  else if (shown < total) { empty.hidden = false; empty.innerHTML = `Showing the first ${shown} of ${total}. <button class="btn" id="more">Show them all</button>`; }
+  else empty.hidden = true;
+
+  // the controls
+  for (const el of document.querySelectorAll("#profs .chip")) el.classList.toggle("on", !q && Number(el.dataset.prof) === state.prof);
+  for (const el of document.querySelectorAll("#woRanks button")) el.classList.toggle("on", Number(el.dataset.rank) === state.wo);
+  for (const el of document.querySelectorAll("#woMode button")) el.classList.toggle("on", el.dataset.mode === state.mode);
+  $("woMode").style.visibility = state.wo ? "visible" : "hidden";
+  $("woGain").textContent = state.wo ? `+${b}%` : "off";
+  $("woGain").classList.toggle("zero", !state.wo);
+  if (document.activeElement !== $("skillN")) $("skillN").value = state.skill;
+  $("skillR").value = state.skill;
+  $("onlyPts").checked = state.onlyPts; $("sort").value = state.sort;
+  if (document.activeElement !== $("q")) $("q").value = state.q;
+  save();
+}
+
+// ---- wiring ------------------------------------------------------------------
+function setSkill(v) { state.skill = clampSkill(v); render(); }
+function build() {
+  const kinds = [["primary", "Primary"], ["secondary", "Secondary"], ["class", "Class skills"]];
+  $("profs").innerHTML = kinds.map(([k, label]) => {
+    const list = D.professions.filter((p) => p.kind === k);
+    return list.length ? `<div class="grp"><span class="lbl">${label}</span>${list.map((p) => `<button class="chip" data-prof="${p.id}">${esc(p.name)}<small>${p.live}</small></button>`).join("")}</div>` : "";
+  }).join("");
+  $("woName").textContent = D.talent.name;
+  $("woRanks").innerHTML = [0, ...D.talent.ranks.map((_, i) => i + 1)].map((r) => `<button data-rank="${r}" title="${r ? `Rank ${r}: +${D.talent.ranks[r - 1]}%` : "Not taken"}">${r}</button>`).join("");
+  $("skillN").max = $("skillR").max = D.skillCap;
+
+  const top = D.talent.ranks[D.talent.ranks.length - 1], n = D.talent.ranks.length;
+  $("talentText").innerHTML = `A legacy talent with ${n} ranks. The client's talent data sets it at ${D.talent.ranks.map((r) => `+${r}%`).join(", ")}; at ${n} ranks its tooltip reads: “${esc(D.talent.text.replace("$s1", top))}” It covers every profession on this page, the Rogue's and the Mage's own included.`;
+  const ex = { y: 100, g: 140 };
+  $("talentTable").innerHTML = `<tr><th>A recipe yellow at 100, grey at 140</th>${[100, 110, 120, 130, 139, 140].map((s) => `<th>at ${s}</th>`).join("")}</tr>
+<tr><td>without the talent</td>${[100, 110, 120, 130, 139, 140].map((s) => `<td>${pct(M.chance(ex, s))}</td>`).join("")}</tr>
+<tr><td>${n} ranks, ×</td>${[100, 110, 120, 130, 139, 140].map((s) => `<td>${pct(M.chance(ex, s, top, "x"))}</td>`).join("")}</tr>
+<tr><td>${n} ranks, +</td>${[100, 110, 120, 130, 139, 140].map((s) => `<td>${pct(M.chance(ex, s, top, "+"))}</td>`).join("")}</tr>`;
+  const S = D.stats, live = S.recipes - S.leftovers, L = { a: 0, i: 0, t: 0, e: 0, u: 0 };
+  for (const p of D.professions) for (const r of p.recipes) if (!r.x) L[r.s]++;
+  $("shiftnote").textContent = ` (of the ${S.shiftCheck.total} recipe items whose level is known in both games, ${S.shiftCheck.match} moved exactly in step with their recipe)`;
+  $("scopeText").innerHTML = `${live.toLocaleString("en")} recipes across ${D.professions.length} professions, from build ${esc(D.build)} of the Forever client: everything the trade-skill window lists, plus Disenchant and the Mage's scroll reading, which colour up the same way. Gathering professions have only their new camping recipes and, for Mining, smelting; what a node or a corpse needs is not a recipe and is not here. The recipes Forever retired are left out. The client also still carries ${S.leftovers} recipes filed under “Season of Discovery”; they are hidden until you tick the box above the table. Of the ${live.toLocaleString("en")}, ${(L.i + L.a).toLocaleString("en")} have an exact learn level, ${L.t} carry vanilla's trainer level (†), ${L.e} an estimate (≈) and ${L.u} none (?). The skill cap is ${D.skillCap}; a recipe whose yellow level is above that stays orange for good.`;
+  $("creditText").innerHTML = `Recipes, their yellow and grey levels, categories, products, reagents, tools and cooldowns, the items that teach them and the ${esc(D.talent.name)} talent are the Forever client's own data (product ${esc(D.product)}, build ${esc(D.build)}), read through the table exports of <a href="https://wago.tools" target="_blank" rel="noopener">wago.tools</a>, as are the vanilla yellow levels of a Classic Era client (${esc(D.eraProduct)}, build ${esc(D.eraBuild)}) used to see what Forever moved. Vanilla trainer levels are from the trainer tables of the <a href="https://github.com/cmangos/classic-db" target="_blank" rel="noopener">CMaNGOS classic-db</a> (GPLv3). The chance formula is the community's long-standing estimate, not Blizzard's published figure; the <a href="https://warcraft.wiki.gg/wiki/Skillup" target="_blank" rel="noopener">Warcraft Wiki</a> records only the two certain ends, orange and grey. No recipe database website was read to build this page.`;
+
+  $("profs").addEventListener("click", (e) => {
+    const el = e.target.closest(".chip"); if (!el) return;
+    saved.skills[state.prof] = state.skill;
+    state.prof = Number(el.dataset.prof); state.q = ""; state.more = false;
+    state.skill = clampSkill(saved.skills[state.prof] || 1);
+    $("q").value = ""; render();
+  });
+  $("skillN").addEventListener("input", (e) => { if (e.target.value !== "") setSkill(e.target.value); });
+  $("skillN").addEventListener("blur", (e) => { e.target.value = state.skill; });
+  $("skillR").addEventListener("input", (e) => setSkill(e.target.value));
+  $("skillDn").addEventListener("click", () => setSkill(state.skill - 1));
+  $("skillUp").addEventListener("click", () => setSkill(state.skill + 1));
+  $("woRanks").addEventListener("click", (e) => { const el = e.target.closest("button"); if (el) { state.wo = Number(el.dataset.rank); render(); } });
+  $("woMode").addEventListener("click", (e) => { const el = e.target.closest("button"); if (el) { state.mode = el.dataset.mode; render(); } });
+  $("onlyPts").addEventListener("change", (e) => { state.onlyPts = e.target.checked; render(); });
+  $("sort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
+  $("q").addEventListener("input", (e) => { state.q = e.target.value; state.more = false; render(); });
+  const toggle = (tr) => { const k = tr.dataset.key; if (state.open.has(k)) state.open.delete(k); else state.open.add(k); render(); };
+  $("rows").addEventListener("click", (e) => { if (e.target.closest("a")) return; const tr = e.target.closest("tr.r"); if (tr) toggle(tr); });
+  $("rows").addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr.r")) { e.preventDefault(); const k = e.target.dataset.key; toggle(e.target); requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector(`tr.r[data-key="${k}"]`)?.focus())); } });
+  document.addEventListener("click", (e) => {
+    if (e.target.id === "clearQ") { state.q = ""; $("q").value = ""; render(); }
+    else if (e.target.id === "more") { state.more = true; render(); }
+    else if (e.target.id === "copy") {
+      const done = () => { e.target.textContent = "Link copied"; setTimeout(() => { if (e.target.isConnected) e.target.textContent = "Copy a link to this view"; }, 1500); };
+      if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(done, () => prompt("Copy this link", location.href)); else prompt("Copy this link", location.href);
+    }
+  });
+  $("sod").addEventListener("change", (e) => { state.sod = e.target.checked; render(); });
+  window.addEventListener("hashchange", () => { load(); render(); });
+  for (const mq of [NARROW, PHONE]) mq.addEventListener("change", render);
+  const bar = $("bar");
+  const size = () => document.documentElement.style.setProperty("--bar-h", bar.offsetHeight + "px");
+  if (window.ResizeObserver) new ResizeObserver(size).observe(bar);
+  window.addEventListener("resize", size); size();
+}
+
+fetch(DATA_URL).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((d) => {
+  D = d; prepare(); load(); build();
+  $("loading").hidden = true; $("body").hidden = false;
+  draw();
+}).catch((e) => { $("loadmsg").textContent = "The recipe data did not load (" + e.message + "). Reload to try again."; });
+})();
+</script>
+</body>
+</html>
