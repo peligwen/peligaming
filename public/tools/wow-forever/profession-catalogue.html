@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Profession Catalogue — WoW Forever: every recipe, its orange, yellow, green and grey levels, and the chance of a skill point</title>
-<meta name="description" content="Every recipe of every WoW Forever profession from the game's own data: the skill at which it turns orange, yellow, green and grey, the estimated chance of a skill point at your skill, with the Working Overtime legacy talent, and what each recipe makes and takes.">
+<title>Profession Catalogue — WoW Forever: a levelling route for your skill, a shopping list, and every recipe's orange, yellow, green and grey levels</title>
+<meta name="description" content="Level a WoW Forever profession with a route worked out from your skill and the recipes you have: what to make over which skill range, how many crafts, and the materials for the whole way. Underneath, every recipe with the skill at which it turns orange, yellow, green and grey and the estimated chance of a skill point, with the Working Overtime legacy talent.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📜</text></svg>">
 <style>
   :root{
     --bg:#0b0906; --gold:#e0b95a; --gold-dim:#a68a3f; --parch:#efe4c8; --dim:#a89b7c; --faint:#6f6450;
     --panel:#1b1509; --panel2:#241c0e; --edge-hi:#6a5630; --edge-lo:#0d0a05; --line:#2a2113;
     /* the game's own recipe difficulty colours */
-    --orange:#ff8040; --yellow:#ffe24a; --green:#45c545; --grey:#8c8c8c;
+    --orange:#ff8040; --yellow:#ffe24a; --green:#45c545; --grey:#8c8c8c; --warn:#ffb3a3;
     --q0:#9d9d9d; --q1:#efe4c8; --q2:#1eff00; --q3:#3d8fff; --q4:#b55cff; --q5:#ff8000;
     --serif:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
     --bar-h:0px;
@@ -23,6 +23,7 @@
   a{color:var(--parch);text-decoration:underline dotted var(--edge-hi);} a:hover{color:var(--gold);}
   main{max-width:1320px;margin:0 auto;padding:0 14px 70px;}
   .panel{background:var(--panel);border:1px solid var(--edge-hi);box-shadow:0 6px 24px rgba(0,0,0,.5),inset 0 0 0 1px var(--edge-lo);border-radius:6px;}
+  [hidden]{display:none !important;}
 
   #hdr{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 14px;max-width:1320px;margin:0 auto;}
   #hdr .home{color:var(--dim);text-decoration:none;font-size:13px;white-space:nowrap;} #hdr .home:hover{color:var(--gold);}
@@ -38,8 +39,8 @@
   #profs .lbl{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.8px;margin-right:2px;}
   .chip{font:inherit;font-size:13px;color:var(--dim);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:999px;padding:4px 11px;cursor:pointer;white-space:nowrap;}
   .chip small{color:var(--faint);margin-left:5px;font-size:11.5px;}
-  .chip:hover{color:#fff;} .chip.on{color:var(--ink,#1a1408);background:var(--gold);border-color:var(--gold);font-weight:600;} .chip.on small{color:#5a4717;}
-  .chip:focus-visible,.seg button:focus-visible,.step:focus-visible,tr.r:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+  .chip:hover{color:#fff;} .chip.on{color:#1a1408;background:var(--gold);border-color:var(--gold);font-weight:600;} .chip.on small{color:#5a4717;}
+  .chip:focus-visible,.seg button:focus-visible,.step:focus-visible,tr.r:focus-visible,.btn:focus-visible,.lnk:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
 
   /* the sticky bar: your skill and the talent */
   #bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;padding:9px 14px;margin:0 -2px;
@@ -49,37 +50,89 @@
   #bar .skill{flex:1 1 330px;}
   .step{font:inherit;width:26px;height:28px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;cursor:pointer;font-size:16px;line-height:1;}
   .step:hover{border-color:var(--gold);color:#fff;}
-  #skillN{width:62px;font:inherit;font-size:16px;font-weight:600;text-align:center;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:3px 2px;outline:none;font-variant-numeric:tabular-nums;}
-  #skillN:focus{border-color:var(--gold);}
+  #skillN,#goal{width:62px;font:inherit;font-size:16px;font-weight:600;text-align:center;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:3px 2px;outline:none;font-variant-numeric:tabular-nums;}
+  #skillN:focus,#goal:focus{border-color:var(--gold);}
   #skillR{flex:1;min-width:110px;accent-color:var(--gold);cursor:pointer;}
   .seg{display:inline-flex;flex:none;border:1px solid var(--edge-hi);border-radius:4px;overflow:hidden;}
-  .seg button{font:inherit;font-size:13px;min-width:28px;padding:4px 8px;color:var(--dim);background:#0d0a05;border:0;border-left:1px solid var(--edge-hi);cursor:pointer;font-variant-numeric:tabular-nums;}
+  .seg button{font:inherit;font-size:13px;min-width:28px;padding:4px 8px;color:var(--dim);background:#0d0a05;border:0;border-left:1px solid var(--edge-hi);cursor:pointer;font-variant-numeric:tabular-nums;white-space:nowrap;}
   .seg button:first-child{border-left:0;} .seg button:hover{color:#fff;}
   .seg button.on{background:var(--gold);color:#1a1408;font-weight:700;}
   #woGain{font-size:13px;color:var(--parch);white-space:nowrap;min-width:44px;font-variant-numeric:tabular-nums;} #woGain.zero{color:var(--faint);}
   #opts{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:0 2px 10px;}
   #opts select{margin-left:auto;}
   label.chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--dim);cursor:pointer;white-space:nowrap;} label.chk:hover{color:var(--parch);}
-  label.chk input{accent-color:var(--gold);width:15px;height:15px;}
+  label.chk input,input.use{accent-color:var(--gold);width:15px;height:15px;}
   select{font:inherit;font-size:13px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:4px 6px;outline:none;max-width:100%;}
   .help{display:inline-block;width:17px;height:17px;border-radius:50%;border:1px solid var(--edge-hi);color:var(--dim);font-size:11px;line-height:15px;text-align:center;cursor:help;flex:none;text-decoration:none;}
   .help:hover{color:var(--gold);border-color:var(--gold);}
+  .btn{font:inherit;font-size:12.5px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:3px 10px;cursor:pointer;white-space:nowrap;} .btn:hover{border-color:var(--gold);color:#fff;}
+  .lnk{font:inherit;color:var(--parch);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline dotted var(--gold-dim);text-align:left;} .lnk:hover{color:var(--gold);}
 
-  #summary{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin:14px 2px 8px;}
+  /* the route */
+  #plan{margin-top:14px;padding:13px 16px 14px;}
+  .planhead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;}
+  .planhead h2{font-family:var(--serif);font-weight:600;font-size:21px;color:var(--gold);text-shadow:1px 1px 0 #000;}
+  .planhead label,.planhead .lab{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px;white-space:nowrap;}
+  .planhead .push{margin-left:auto;}
+  #goal{width:56px;font-size:15px;}
+  #planSum{margin:10px 0 0;font-size:14px;color:var(--parch);} #planSum b{color:var(--gold);font-variant-numeric:tabular-nums;} #planSum .dim{color:var(--dim);}
+  #ladder{position:relative;height:28px;border-radius:4px;background:#120e07;box-shadow:inset 0 0 0 1px var(--edge-hi);overflow:hidden;margin-top:10px;}
+  #ladder a{position:absolute;top:0;bottom:0;display:block;padding:0 5px;font-size:11.5px;line-height:28px;color:#1a1408;font-weight:600;white-space:nowrap;overflow:hidden;text-decoration:none;border-left:1px solid #0b0906;}
+  #ladder a.a0{background:#e0b95a;} #ladder a.a1{background:#b5924a;} #ladder a:hover{filter:brightness(1.15);color:#000;}
+  #ladder a.gap{background:repeating-linear-gradient(135deg,#55291f 0 5px,#2c1611 5px 10px);color:var(--warn);}
+  #ticks{position:relative;height:17px;font-size:11px;color:var(--faint);margin:1px 0 8px;font-variant-numeric:tabular-nums;}
+  #ticks span{position:absolute;top:1px;transform:translateX(-50%);white-space:nowrap;} #ticks span.l{transform:none;} #ticks span.r{transform:translateX(-100%);}
+  #ticks span.cap{color:var(--dim);} #ticks span.cap::before{content:"";position:absolute;left:50%;top:-4px;height:4px;border-left:1px solid var(--dim);}
+  .plancols{display:grid;grid-template-columns:minmax(0,2.1fr) minmax(290px,1fr);gap:6px 28px;align-items:start;}
+  .plancols h3{font-family:var(--serif);font-weight:600;font-size:15px;color:var(--gold-dim);margin:4px 0 4px;display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;letter-spacing:.3px;}
+  .plancols h3 small{font-family:"Segoe UI",system-ui,sans-serif;font-weight:400;font-size:12px;color:var(--faint);letter-spacing:0;}
+  #legs{list-style:none;border-top:1px solid var(--line);}
+  .leg{display:grid;grid-template-columns:86px minmax(0,1fr) 118px 92px 74px 18px;gap:1px 10px;align-items:start;padding:8px 2px 8px 9px;border-bottom:1px solid var(--line);border-left:3px solid transparent;}
+  .leg.now{border-left-color:var(--gold);background:#201909;}
+  .leg .rng{font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;white-space:nowrap;} .leg .rng i{font-style:normal;color:var(--faint);font-weight:400;margin:0 3px;}
+  .leg .rng small{display:block;font-weight:400;font-size:11.5px;color:var(--dim);}
+  .leg .what{min-width:0;}
+  .leg .nm{white-space:normal;font-size:14.5px;}
+  .leg .per{font-size:12.5px;color:var(--parch);} .leg .note{font-size:12.5px;color:var(--dim);} .leg .note b{color:var(--parch);font-weight:400;} .leg .note.warn{color:var(--warn);}
+  .leg .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;} .leg .num b{font-size:15px;} .leg .num small{display:block;font-size:11.5px;color:var(--dim);}
+  .leg .drop{font:inherit;font-size:13px;line-height:1;color:var(--faint);background:none;border:0;cursor:pointer;padding:3px 2px;} .leg .drop:hover{color:var(--warn);}
+  .leg .got{margin-top:6px;border-color:var(--gold-dim);color:var(--gold);font-weight:600;}
+  .leg.gap .nm{color:var(--warn);}
+  .tag.plan{background:#2a2113;color:var(--dim);font-weight:400;font-size:11.5px;line-height:17px;margin-left:0;}
+  #shop{min-width:0;}
+  table.shop{table-layout:auto;border-top:1px solid var(--line);}
+  table.shop td{padding:3px 5px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle;overflow:visible;}
+  table.shop td.qty{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;width:1%;padding-left:0;}
+  table.shop td.pr{width:1%;} table.shop td.tot{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;width:1%;padding-right:0;}
+  table.shop tr.hd td{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.5px;text-align:right;padding-top:5px;}
+  table.shop input{width:78px;font:inherit;font-size:12.5px;text-align:right;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:3px;padding:2px 5px;outline:none;}
+  table.shop input:focus{border-color:var(--gold);} table.shop input.mine{color:var(--gold);border-color:var(--gold);}
+  table.shop tr.unused td.qty,table.shop tr.unused td.tot{color:var(--faint);font-weight:400;} table.shop tr.unused td span{opacity:.6;}
+  table.shop tr.sum td{border-bottom:0;font-weight:600;padding-top:6px;} table.shop tr.sum td.tot{color:var(--gold);font-size:14px;}
+  #shop p,#finds p{font-size:12.5px;color:var(--dim);margin:6px 0 0;}
+  #finds:not(:empty){margin:2px 0 12px;padding:9px 12px 10px;border:1px solid var(--gold-dim);border-radius:5px;background:#231b0c;}
+  #finds h3{font-family:var(--serif);font-weight:600;font-size:15px;color:var(--gold);letter-spacing:.3px;}
+  #finds h3 small{font-family:"Segoe UI",system-ui,sans-serif;font-weight:400;font-size:12px;color:var(--dim);letter-spacing:0;margin-left:8px;}
+  #finds ul{list-style:none;margin-top:5px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:3px 28px;}
+  #finds li{display:flex;gap:8px;align-items:baseline;font-size:13px;min-width:0;} #finds li .it{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} #finds li small{color:var(--dim);}
+  #finds .gain{color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  #planEmpty{padding:14px 2px 4px;color:var(--dim);}
+
+  #summary{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin:22px 2px 8px;}
   #summary h2{font-family:var(--serif);font-weight:600;font-size:21px;color:var(--gold);text-shadow:1px 1px 0 #000;}
   #summary .about{color:var(--dim);font-size:13px;flex:1 1 320px;min-width:0;}
   #counts{display:flex;flex-wrap:wrap;gap:5px 12px;font-size:13px;color:var(--dim);margin:0 2px 10px;align-items:center;}
   #counts .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0;}
   #counts b{color:var(--parch);font-weight:600;font-variant-numeric:tabular-nums;}
-  .btn{font:inherit;font-size:12.5px;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:3px 10px;cursor:pointer;} .btn:hover{border-color:var(--gold);color:#fff;}
 
   /* the table */
   #list{--sx:0%;}
   table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;}
-  col.c-name{width:24%;} col.c-n{width:66px;} col.c-band{width:23%;} col.c-ch{width:128px;} col.c-needs{width:auto;}
+  col.c-name{width:24%;} col.c-n{width:62px;} col.c-band{width:20%;} col.c-ch{width:124px;} col.c-cost{width:88px;} col.c-needs{width:auto;}
   thead th{position:sticky;top:var(--bar-h);z-index:10;background:#16110a;color:var(--dim);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;
     text-align:left;padding:7px 8px;border-bottom:1px solid var(--edge-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   thead th.n{text-align:right;letter-spacing:.2px;padding-left:2px;} thead th .s{display:none;} thead th.o{color:var(--orange);} thead th.y{color:var(--yellow);} thead th.g{color:var(--green);} thead th.t{color:var(--grey);}
+  thead th.costh{text-align:right;}
   thead th .scale{display:flex;justify-content:space-between;font-weight:400;letter-spacing:0;color:var(--faint);font-variant-numeric:tabular-nums;}
   tbody td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle;overflow:hidden;}
   tr.cat th{font-family:var(--serif);font-weight:600;font-size:15px;color:var(--gold-dim);text-align:left;padding:14px 8px 4px;border-bottom:1px solid var(--edge-hi);letter-spacing:.3px;}
@@ -89,12 +142,13 @@
   tr.r td:first-child{border-left:3px solid var(--st,transparent);}
   tr.st-orange{--st:var(--orange);} tr.st-yellow{--st:var(--yellow);} tr.st-green{--st:var(--green);} tr.st-grey{--st:#4a4a4a;} tr.st-none,tr.st-later{--st:#33291a;}
   tr.r.later .nm,tr.r.later .needs,tr.r.st-grey .nm,tr.r.st-grey .needs{opacity:.55;}
+  .rw{display:flex;gap:8px;align-items:center;min-width:0;} .rw > div{min-width:0;flex:1;} input.use{flex:none;cursor:pointer;}
   .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .nm .x{font-weight:400;color:var(--dim);margin-left:4px;}
   .mk{color:var(--dim);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .q0{color:var(--q0);} .q1{color:var(--q1);} .q2{color:var(--q2);} .q3{color:var(--q3);} .q4{color:var(--q4);} .q5{color:var(--q5);}
   .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:0 5px;border-radius:3px;margin-left:5px;vertical-align:1px;line-height:15px;}
   .tag.A{background:#1e4d8a;color:#cfe4ff;} .tag.H{background:#8a2a1e;color:#ffd6cf;} .tag.sod{background:#3a2e17;color:var(--dim);font-weight:600;}
+  .tag.inroute{background:var(--gold);color:#1a1408;font-variant-numeric:tabular-nums;}
   td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}
   td.n.o{color:var(--orange);} td.n.y{color:var(--yellow);} td.n.g{color:var(--green);} td.n.t{color:var(--grey);}
   td.n .q{font-weight:400;opacity:.8;} td.n.none{color:var(--faint);font-weight:400;text-align:center;}
@@ -102,7 +156,6 @@
   .band i{position:absolute;top:0;bottom:0;display:block;}
   .band .o{background:var(--orange);} .band .y{background:var(--yellow);} .band .g{background:var(--green);} .band .t{background:#3a3a3a;}
   .band .o.unk{background:repeating-linear-gradient(135deg,var(--orange) 0 3px,#7a3d1f 3px 6px);opacity:.7;}
-  .band b{position:absolute;top:0;bottom:0;width:1px;background:#0b090688;}
   .bandwrap{position:relative;}
   .bandwrap::after{content:"";position:absolute;top:-4px;bottom:-4px;left:var(--sx);width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 0 1px #000;border-radius:1px;pointer-events:none;}
   td.ch{white-space:nowrap;}
@@ -110,6 +163,7 @@
   .pct.orange{color:var(--orange);} .pct.yellow{color:var(--yellow);} .pct.green{color:var(--green);} .pct.grey,.pct.none{color:var(--faint);font-weight:600;}
   .chsub{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .pct .was{font-size:11.5px;font-weight:400;color:var(--gold);margin-left:6px;}
+  td.costc{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;} td.costc small{display:block;font-size:11.5px;color:var(--dim);}
   .needs{font-size:12.5px;color:var(--dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
   .needs b{font-weight:400;color:var(--parch);}
   #empty{padding:40px 10px;text-align:center;color:var(--dim);}
@@ -137,8 +191,9 @@
   #loading{padding:70px 10px;text-align:center;color:var(--dim);} #loading h2{font-family:var(--serif);color:var(--gold);font-weight:600;font-size:24px;margin-bottom:6px;}
 
   @media (max-width:1100px){
-    col.c-needs,th.needsh,td.needsc{display:none;} col.c-name{width:34%;} col.c-band{width:auto;}
+    col.c-needs,th.needsh,td.needsc,col.c-cost,th.costh,td.costc{display:none;} col.c-name{width:34%;} col.c-band{width:auto;}
     .det{grid-template-columns:minmax(0,1fr) minmax(0,1fr);} .det .curve{grid-column:1 / -1;}
+    .plancols{grid-template-columns:minmax(0,1fr);} #shop{max-width:560px;margin-top:10px;}
   }
   @media (max-width:760px){
     main{padding:0 8px 60px;} #hdr{padding:8px;} #hdr h1{font-size:20px;} .search{max-width:none;flex-basis:100%;}
@@ -146,10 +201,17 @@
     #bar .ctl{gap:6px;} #bar .ctl > b{white-space:normal;font-size:14px;max-width:74px;} #bar .help{display:none;}
     #skillN{width:52px;} .seg button{min-width:26px;padding:4px 6px;} #woGain{min-width:36px;}
     #opts select{margin-left:0;}
+    #plan{padding:11px 10px 12px;margin-left:-4px;margin-right:-4px;} .planhead .push{margin-left:0;}
+    #finds:not(:empty){padding:8px 9px 9px;} #finds li{flex-wrap:wrap;gap:2px 8px;padding:3px 0;} #finds li .it{white-space:normal;flex-basis:60%;} #finds h3 small{display:block;margin-left:0;}
+    .leg{grid-template-columns:minmax(0,1fr) auto 20px;gap:1px 8px;padding-left:7px;}
+    .leg .rng{grid-column:1 / 3;grid-row:1;} .leg .rng small{display:inline;margin-left:8px;} .leg .drop{grid-column:3;grid-row:1;}
+    .leg .what{grid-column:1 / -1;grid-row:2;}
+    .leg .num{grid-row:3;grid-column:1;text-align:left;} .leg .num small{display:inline;margin-left:6px;} .leg .num.odds{display:none;}
+    .leg .num.cost{grid-column:2 / 4;text-align:right;} .leg > div:empty{display:none;}
     col.c-band,th.bandh,td.bandc{display:none;} col.c-name{width:auto;} col.c-n{width:36px;} col.c-ch{width:82px;} .pct .was{display:block;margin-left:0;}
     thead th{padding:6px 3px;font-size:10.5px;letter-spacing:0;} tbody td{padding:6px 3px;} tbody td:first-child{padding-left:6px;}
     thead th .w{display:none;} thead th .s{display:inline;}
-    .nm,.mk,.chsub{white-space:normal;} .pct{font-size:15px;} .chsub{font-size:11px;}
+    .nm,.mk,.chsub{white-space:normal;} .pct{font-size:15px;} .chsub{font-size:11px;} .rw{gap:6px;}
     .det{grid-template-columns:minmax(0,1fr);} tr.d td{padding:4px 8px 14px 9px;}
   }
 </style>
@@ -166,9 +228,9 @@
   <section id="bar" aria-label="Your skill and talents">
     <div class="ctl skill">
       <b><label for="skillN">Your skill</label></b>
-      <button class="step" id="skillDn" aria-label="One point less">−</button>
+      <button class="step" id="skillDn" aria-label="One point less" title="One point less (the − key)">−</button>
       <input id="skillN" type="number" min="1" max="300" step="1" value="1" inputmode="numeric">
-      <button class="step" id="skillUp" aria-label="One point more">+</button>
+      <button class="step" id="skillUp" aria-label="One point more" title="One point more (the + key)">+</button>
       <input id="skillR" type="range" min="1" max="300" step="1" value="1" list="ranks" aria-label="Your skill">
       <datalist id="ranks"><option value="75"><option value="150"><option value="225"><option value="300"></datalist>
     </div>
@@ -185,12 +247,43 @@
 
   <div id="loading"><h2>Profession Catalogue</h2><div id="loadmsg">Opening the recipe books…</div></div>
   <div id="body" hidden>
+    <section id="plan" class="panel" aria-label="Your route">
+      <div class="planhead">
+        <h2 id="planTitle">Your route</h2>
+        <label>to <input id="goal" type="number" min="2" max="300" step="1" value="300" inputmode="numeric" aria-label="The skill you are aiming for"></label>
+        <span class="seg" id="objective" role="group" aria-label="What the route keeps low">
+          <button data-goal="cost" title="At every point, make whatever gets the next point for the least in materials">Cheapest</button><button data-goal="time" title="At every point, make whatever gets the next point in the least time at the anvil: a quick craft with a good chance">Quickest</button>
+        </span>
+        <span class="lab">with <span class="seg" id="poolMode" role="group" aria-label="Which recipes the route may use">
+          <button data-all="0" title="What a trainer teaches and what you start with, plus anything you tick in the list below">my recipes</button><button data-all="1" title="Every recipe a plan, pattern or formula teaches as well: the best route there is, and which plans it would take">every recipe</button>
+        </span></span>
+        <label title="A recipe is left once its chance drops under this, if something better is to hand">leave a recipe under
+          <select id="least" aria-label="Leave a recipe when its chance drops under"><option value="0">never</option><option value="0.25">1 in 4</option><option value="0.5">1 in 2</option></select></label>
+        <button class="btn push" id="resetUse" hidden>Undo my ticks</button>
+      </div>
+      <div id="planBody">
+        <p id="planSum"></p>
+        <div id="ladder"></div>
+        <div id="ticks"></div>
+        <div id="finds"></div>
+        <div class="plancols">
+          <div>
+            <h3>What to make <small id="legsHow"></small></h3>
+            <ol id="legs"></ol>
+          </div>
+          <div id="shop"></div>
+        </div>
+      </div>
+      <div id="planEmpty" hidden></div>
+    </section>
+
     <div id="summary"></div>
     <div id="opts">
       <label class="chk"><input type="checkbox" id="onlyPts"> Only what can give a point now</label>
       <label class="chk" id="sodWrap" title="Recipes the client files under “Season of Discovery”: leftovers from that game, probably not obtainable in Forever"><input type="checkbox" id="sod"> <span id="sodLabel"></span></label>
       <select id="sort" aria-label="Order">
         <option value="game">Order: as the game lists them</option>
+        <option value="cheap">Order: cheapest point at my skill</option>
         <option value="chance">Order: best chance at my skill</option>
         <option value="level">Order: by the level they go yellow</option>
         <option value="name">Order: by name</option>
@@ -200,15 +293,16 @@
     <div id="counts"></div>
     <div id="list">
       <table>
-        <colgroup><col class="c-name"><col class="c-n"><col class="c-n"><col class="c-n"><col class="c-n"><col class="c-band"><col class="c-ch"><col class="c-needs"></colgroup>
+        <colgroup><col class="c-name"><col class="c-n"><col class="c-n"><col class="c-n"><col class="c-n"><col class="c-band"><col class="c-ch"><col class="c-cost"><col class="c-needs"></colgroup>
         <thead><tr>
-          <th>Recipe</th>
+          <th title="The tick says the route may use the recipe">Recipe</th>
           <th class="n o" title="Orange from the skill at which the recipe can be learned: a point every time"><span class="w">Orange</span><span class="s" aria-hidden="true">Or</span></th>
           <th class="n y" title="The skill at which it turns yellow"><span class="w">Yellow</span><span class="s" aria-hidden="true">Yel</span></th>
           <th class="n g" title="The skill at which it turns green: halfway from yellow to grey"><span class="w">Green</span><span class="s" aria-hidden="true">Grn</span></th>
           <th class="n t" title="The skill at which it turns grey and gives no more points"><span class="w">Grey</span><span class="s" aria-hidden="true">Gry</span></th>
           <th class="bandh"><div class="scale"><span>1</span><span>75</span><span>150</span><span>225</span><span>300</span></div></th>
           <th title="Estimated chance of a skill point from one craft at your skill">Chance<span class="w"> now</span></th>
+          <th class="costh" title="What the materials for one point should cost at your skill, at the prices in the shopping list">Per point</th>
           <th class="needsh">Takes</th>
         </tr></thead>
         <tbody id="rows"></tbody>
@@ -217,6 +311,12 @@
     </div>
 
     <section id="aboutbox" class="panel">
+      <h3 id="about-route">The route</h3>
+      <p>Set your skill and where you are going. At every skill on the way the route makes whatever gives the next point for the least in materials (or, if you ask for the quickest, in the least time at the anvil: this build's crafts run from three seconds for a sharpening stone to a minute for a breastplate), out of the recipes you have by then. It counts what you have already made as yours to use, so the grinding stones from one step feed the bracers of the next, and anything one of your recipes can make is made rather than bought. It stays on a recipe while that is within a twentieth of the best, and leaves one whose chance has dropped under the mark you set if something better is to hand.</p>
+      <p>“My recipes” are the ones a trainer teaches and the ones you start with; tick a plan, pattern or formula in the list once you own it and the route will use it, or untick anything you cannot get. “Every recipe” shows the best route the game allows and the plans it would take. Recipes on a cooldown are left out unless you tick them. Where nothing you have gives a point, the route says so and names the cheapest thing that would.</p>
+      <p>Crafts are given twice: what it takes on average, and what is enough nine times out of ten, worked out exactly from the chance at each point. The shopping list can be switched to the second; it then buys for every step as if that step went badly, which is more than a whole run of bad luck would need.</p>
+      <p class="note" id="priceNote"></p>
+
       <h3>Reading the table</h3>
       <p>The four numbers are the skill at which a recipe turns <b class="lv o">orange</b>, <b class="lv y">yellow</b>, <b class="lv g">green</b> and <b class="lv t">grey</b>. Yellow and grey are the client's own numbers for the recipe; green is the point halfway between them; orange starts where the recipe can be learned, and whatever your skill, a recipe below its yellow level is orange. The bar draws the same four on a scale of 1 to 300, with a white line at your skill.</p>
       <p id="about-learn">Where a recipe is learned from an item, the first number is the skill that item asks for, and it is exact. What a trainer asks is decided on the server and no client carries it, so those levels are marked: <b>†</b> is what vanilla's trainers asked, for a recipe Forever has left where it was; <b>≈</b> is vanilla's level moved by as much as Forever moved the recipe's yellow level<span id="shiftnote"></span>; <b>?</b> is a recipe no item teaches and no vanilla trainer taught, so its level is not in the data.</p>
@@ -225,7 +325,6 @@
       <p>Two things are certain: an orange recipe gives a point every time, and a grey one never does. Blizzard has not published what happens in between. This page uses the straight line players have long used for Classic: certain up to the yellow level, then falling evenly to nothing at grey,</p>
       <p class="f">chance = (grey − skill) ÷ (grey − yellow)</p>
       <p>which is 100% on the first yellow point, 50% as the recipe turns green and 0% as it turns grey, and averages 75% across the yellow band and 25% across the green one. Forever may not use exactly this curve, so read every percentage here as an estimate, good for comparing recipes and planning materials rather than for counting on the last craft.</p>
-      <p class="note">“Crafts per point” is one divided by the chance; the totals in an opened recipe add that up point by point from your skill to where the recipe turns grey (or to the cap of 300). A recipe that gives no skill at all shows a dash.</p>
 
       <h3 id="about-talent">Working Overtime</h3>
       <p id="talentText"></p>
@@ -248,7 +347,10 @@
 // on its own (npm run check:professions). A recipe here is { y, g, u } — the
 // skill at which it turns yellow, the skill at which it turns grey, and the
 // points one success gives (1 unless stated); a recipe that never gives a
-// point has no g.
+// point has no g. For the route it also has r (what it takes: [item, count]
+// pairs), p (what it makes: [item, count]), ct (the seconds one craft takes),
+// cd (a cooldown, if it has one) and from (the skill from which the player
+// has it).
 const CATALOGUE = (() => {
   // green starts halfway from yellow to grey
   const green = (r) => Math.floor((r.y + r.g) / 2);
@@ -283,7 +385,191 @@ const CATALOGUE = (() => {
     }
     return n;
   }
-  return { green, colour, baseChance, chance, crafts };
+  // The crafts that are enough in a share `q` of runs: the luck of each point
+  // is its own, so the spread is worked out exactly, craft by craft, as the
+  // odds of standing at each skill along the way.
+  function craftsQuantile(r, from, to, bonus = 0, mode = "x", q = 0.9) {
+    const step = r.u || 1, ps = [];
+    for (let s = from; s < to; s += step) {
+      const p = chance(r, s, bonus, mode);
+      if (p <= 0) return Infinity;
+      ps.push(p);
+    }
+    const n = ps.length;
+    if (!n) return 0;
+    const at = new Float64Array(n + 1);
+    at[0] = 1;
+    for (let made = 1; made <= 200000; made++) {
+      for (let k = n - 1; k >= 0; k--) { const up = at[k] * ps[k]; at[k] -= up; at[k + 1] += up; }
+      if (at[n] >= q - 1e-12) return made;
+    }
+    return Infinity;
+  }
+
+  // ---- money: copper, written the way the game writes it -------------------
+  function money(c) {
+    if (c == null || !isFinite(c)) return "?";
+    c = Math.round(c);
+    const sign = c < 0 ? "−" : "";
+    c = Math.abs(c);
+    const g = Math.floor(c / 10000), s = Math.floor((c % 10000) / 100), k = c % 100;
+    if (g >= 100) return `${sign}${g.toLocaleString("en")}g`;
+    const out = [];
+    if (g) out.push(g + "g");
+    if (s) out.push(s + "s");
+    if (k && !g) out.push(k + "c");
+    return sign + (out.join(" ") || "0c");
+  }
+  // "1g 20s 5c", "35s", "80c", "1.5g"; a bare number is silver. null if it is not a price.
+  function parseMoney(text) {
+    const t = String(text == null ? "" : text).trim().toLowerCase().replace(/,/g, ".");
+    if (!t) return null;
+    if (/^\d+(\.\d+)?$/.test(t)) return Math.round(parseFloat(t) * 100);
+    let c = 0, rest = t;
+    for (const [unit, worth] of [["g", 10000], ["s", 100], ["c", 1]]) {
+      const m = rest.match(new RegExp(`^\\s*(\\d+(?:\\.\\d+)?)\\s*${unit}`));
+      if (m) { c += parseFloat(m[1]) * worth; rest = rest.slice(m[0].length); }
+    }
+    return rest.trim() ? null : Math.round(c);
+  }
+
+  // ---- the route -----------------------------------------------------------
+  // Which of the player's recipes makes each item, so that a reagent they can
+  // make is made, not bought. A recipe on a cooldown is no way to make stock.
+  function makersOf(pool) {
+    const makers = new Map();
+    for (const r of pool) {
+      if (!r.p || r.cd) continue;
+      const m = makers.get(r.p[0]);
+      if (!m || r.from < m.from) makers.set(r.p[0], r);
+    }
+    return makers;
+  }
+  // What `n` crafts of r cost to supply at skill s: from stock first, then by
+  // making what the player can make, then by buying. Infinity if something it
+  // needs has no price. `used` is what this quote has taken from stock so far;
+  // `held` is an item whose stock is not to be touched (see the route).
+  function quote(r, n, s, stock, makers, price, used = new Map(), held = null, depth = 0) {
+    let cost = 0;
+    for (const [id, count] of r.r || []) {
+      let need = count * n;
+      const have = id === held ? 0 : (stock.get(id) || 0) - (used.get(id) || 0);
+      if (have > 0) { const take = Math.min(have, need); used.set(id, (used.get(id) || 0) + take); need -= take; }
+      if (need <= 1e-9) continue;
+      const m = makers.get(id);
+      if (m && m !== r && m.from <= s && depth < 3) cost += quote(m, need / m.p[1], s, stock, makers, price, used, held, depth + 1);
+      else { const each = price(id); if (each == null) return Infinity; cost += need * each; }
+    }
+    return cost;
+  }
+  // The same walk, done for real: stock is drawn down, and what is bought and
+  // what is made on the side are written to the ledger.
+  function supply(r, n, s, stock, makers, price, led, depth = 0) {
+    for (const [id, count] of r.r || []) {
+      let need = count * n;
+      const have = stock.get(id) || 0;
+      if (have > 0) { const take = Math.min(have, need); stock.set(id, have - take); need -= take; }
+      if (need <= 1e-9) continue;
+      const m = makers.get(id);
+      if (m && m !== r && m.from <= s && depth < 3) {
+        led.side.set(m, (led.side.get(m) || 0) + need / m.p[1]);
+        supply(m, need / m.p[1], s, stock, makers, price, led, depth + 1);
+      } else {
+        const each = price(id);
+        if (each == null) led.unpriced.add(id); else led.cost += need * each;
+        led.buys.set(id, (led.buys.get(id) || 0) + need);
+      }
+    }
+  }
+  const newLedger = () => ({ buys: new Map(), side: new Map(), unpriced: new Set(), cost: 0, made: 0 });
+  // how long one craft takes; a recipe with no cast time is still a click and a wait
+  const seconds = (r) => r.ct || 3;
+  // What a run of steps takes, with each step's crafts multiplied by scale(step).
+  function bill(steps, scale, { bonus = 0, mode = "x", makers, price }) {
+    const stock = new Map(), total = newLedger(), per = [];
+    for (const st of steps) {
+      const led = newLedger();
+      if (st.r) {
+        const k = scale(st);
+        for (let s = st.from; s < st.to; s += st.r.u || 1) {
+          const n = k / chance(st.r, s, bonus, mode);
+          supply(st.r, n, s, stock, makers, price, led);
+          if (st.r.p) { stock.set(st.r.p[0], (stock.get(st.r.p[0]) || 0) + st.r.p[1] * n); led.made += st.r.p[1] * n; }
+        }
+        for (const [id, n] of led.buys) total.buys.set(id, (total.buys.get(id) || 0) + n);
+        for (const [m, n] of led.side) total.side.set(m, (total.side.get(m) || 0) + n);
+        for (const id of led.unpriced) total.unpriced.add(id);
+        total.cost += led.cost;
+      }
+      per.push(led);
+    }
+    return { per, total, left: stock };
+  }
+  // The route from skill a to skill b. At every skill the player makes
+  // whatever gives the next point for the least — the least money (goal
+  // "cost") or the least time at the anvil (goal "time": a sharpening stone
+  // takes three seconds, a breastplate a minute) — out of the recipes in
+  // `pool` they have by then, counting what they have already made on the way
+  // as theirs to use. A batch is finished before it is spent: while they are
+  // on a recipe, what it makes is not yet stock in hand for the others, or
+  // powder and the shot made from it would take turns a point at a time.
+  // They stay on a recipe while it is within `stick` of the
+  // best, so the route is not a recipe a point, and they leave one once its
+  // chance has fallen under `least` if anything better than that is to hand
+  // (nobody grinds a recipe at one point in twenty because the stones are
+  // cheap). Where nothing in the pool gives a point there is a gap: a step
+  // with no recipe.
+  function route({ pool, a, b, bonus = 0, mode = "x", goal = "cost", price, stick = 0.05, least = 0, safe = 0.9 }) {
+    const makers = makersOf(pool), ctx = { bonus, mode, makers, price };
+    const stock = new Map(), scratch = newLedger(), used = new Map(), steps = [];
+    let cur = null;
+    // v is what is being kept low, t breaks ties; anything priced beats anything that is not
+    const better = (v, t, bv, bt) => (isFinite(v) !== isFinite(bv) ? isFinite(v) : v < bv - 1e-9 || (v <= bv + 1e-9 && t < bt - 1e-9));
+    for (let s = a; s < b;) {
+      let best = null, bv = Infinity, bt = Infinity, cv = Infinity, ct = Infinity, any = false, top = 0;
+      for (const r of pool) if (r.from <= s) top = Math.max(top, chance(r, s, bonus, mode));
+      const floor = top >= least ? least : 0;
+      for (const r of pool) {
+        if (r.from > s) continue;
+        const p = chance(r, s, bonus, mode);
+        if (p <= 0 || p < floor - 1e-12) continue;
+        used.clear();
+        const c = quote(r, 1 / p, s, stock, makers, price, used, cur && cur !== r && cur.p ? cur.p[0] : null);
+        const v = goal === "time" ? seconds(r) / p : c, t = goal === "time" ? c : 1 / p;
+        if (r === cur) { cv = v; ct = t; }
+        if (!any || better(v, t, bv, bt)) { best = r; bv = v; bt = t; any = true; }
+      }
+      if (!best) {
+        const last = steps[steps.length - 1];
+        if (last && !last.r) last.to = s + 1; else steps.push({ from: s, to: s + 1, r: null });
+        cur = null; s++;
+        continue;
+      }
+      if (cur && cur !== best && isFinite(cv) === isFinite(bv) && (isFinite(cv) ? cv <= bv * (1 + stick) + 1e-9 : true) && (goal === "cost" || ct <= bt * (1 + stick) + 1e-9)) best = cur;
+      const p = chance(best, s, bonus, mode), up = Math.min(best.u || 1, b - s);
+      supply(best, 1 / p, s, stock, makers, price, scratch);
+      if (best.p) stock.set(best.p[0], (stock.get(best.p[0]) || 0) + best.p[1] / p);
+      const last = steps[steps.length - 1];
+      if (last && last.r === best) last.to = s + up; else steps.push({ from: s, to: s + up, r: best });
+      cur = best; s += up;
+    }
+    let made = 0, madeSafe = 0, points = 0;
+    for (const st of steps) {
+      if (!st.r) continue;
+      st.crafts = crafts(st.r, st.from, st.to, bonus, mode);
+      st.craftsSafe = craftsQuantile(st.r, st.from, st.to, bonus, mode, safe);
+      st.p0 = chance(st.r, st.from, bonus, mode);
+      st.p1 = chance(st.r, st.to - (st.r.u || 1), bonus, mode);
+      made += st.crafts; madeSafe += st.craftsSafe; points += st.to - st.from;
+    }
+    // (nine times in ten can be a hair under the average when a step is all but certain; to be safe is never to buy less)
+    const typical = bill(steps, () => 1, ctx), cautious = bill(steps, (st) => Math.max(1, st.craftsSafe / st.crafts), ctx);
+    // the time it all takes: the steps' own crafts and what is made on the side for them
+    const timeOf = (led, pick) => { let t = 0; for (const st of steps) if (st.r) t += pick(st) * seconds(st.r); for (const [m, n] of led.total.side) t += n * seconds(m); return t; };
+    typical.seconds = timeOf(typical, (st) => st.crafts); cautious.seconds = timeOf(cautious, (st) => Math.max(st.crafts, st.craftsSafe));
+    return { a, b, steps, points, crafts: made, craftsSafe: madeSafe, gaps: steps.filter((st) => !st.r), typical, cautious, makers };
+  }
+  return { green, colour, baseChance, chance, crafts, craftsQuantile, money, parseMoney, makersOf, quote, bill, route };
 })();
 if (typeof module !== "undefined") module.exports = CATALOGUE;
 </script>
@@ -297,32 +583,49 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const M = CATALOGUE;
 const MAX_ROWS = 600;
-// the table drops its last column, then its bar, as the window narrows (the same widths as the stylesheet)
+const EMPTY = new Map();
+// the table drops its last two columns, then its bar, as the window narrows (the same widths as the stylesheet)
 const NARROW = window.matchMedia("(max-width:1100px)"), PHONE = window.matchMedia("(max-width:760px)");
-const span = () => (PHONE.matches ? 6 : NARROW.matches ? 7 : 8);
+const span = () => (PHONE.matches ? 6 : NARROW.matches ? 7 : 9);
 
 let D = null;                 // the dataset
-const state = { prof: null, skill: 1, wo: 0, mode: "x", onlyPts: false, sort: "game", sod: false, q: "", open: new Set(), more: false };
-let saved = { skills: {} };   // what this browser remembers: a skill per profession, the talent, the options
+let R = null;                 // the route on show, if there is one
+const state = { prof: null, skill: 1, goal: 300, wo: 0, mode: "x", objective: "cost", least: 0.25, safe: false, onlyPts: false, sort: "game", sod: false, q: "", open: new Set(), more: false };
+// what this browser remembers: a skill and a goal per profession, which recipes are yours, your prices, the options
+let saved = { skills: {}, goals: {}, use: {}, prices: {} };
+let showKey = null;           // a recipe to scroll to once the list is drawn
 
 // ---- data ------------------------------------------------------------------
 const itemName = (id) => (D.items[id] && D.items[id][0]) || null;
 const itemQ = (id) => { const q = D.items[id] && D.items[id][1]; return q == null ? 1 : Math.min(5, q); };
 const itemHtml = (id, fallback) => `<span class="q${itemQ(id)}">${esc(itemName(id) || fallback || "an item the client has no name for")}</span>`;
+// yours if you have typed one, else what a vendor charges; null if the game's data has no price for it
+const price = (id) => { const mine = saved.prices[id]; if (mine != null) return mine; const v = D.items[id] && D.items[id][2]; return v > 0 ? v : null; };
 const bonus = () => (state.wo ? D.talent.ranks[state.wo - 1] : 0);
 const pct = (p) => (p >= 0.995 ? "100%" : p <= 0 ? "0%" : p < 0.01 ? "<1%" : Math.round(p * 100) + "%");
 const fmtCrafts = (n) => (!isFinite(n) ? "—" : n < 10 ? n.toFixed(1) : String(Math.round(n)));
+const qty = (n) => Math.ceil(n - 1e-6).toLocaleString("en");
+const mats = (list) => (list || []).map(([id, n]) => `${n} ${esc(itemName(id) || "?")}`).join(", ");
 function fmtTime(sec) {
   if (sec >= 86400) { const d = sec / 86400; return (Number.isInteger(d) ? d : d.toFixed(1)) + (d === 1 ? " day" : " days"); }
   if (sec >= 3600) { const h = sec / 3600; return (Number.isInteger(h) ? h : h.toFixed(1)) + (h === 1 ? " hour" : " hours"); }
   return Math.round(sec / 60) + " min";
 }
+function fmtDur(sec) {
+  const m = Math.max(1, Math.round(sec / 60));
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}`;
+}
 function prepare() {
   for (const p of D.professions) {
     p.slug = slug(p.name);
     p.live = p.recipes.filter((r) => !r.x).length;
+    p.byId = new Map(p.recipes.map((r) => [r.i, r]));
+    p.takes = new Set();
+    const places = new Map();
     for (const r of p.recipes) {
       r.prof = p;
+      for (const [id] of r.r || []) p.takes.add(id);
+      if (r.f) places.set(r.f, (places.get(r.f) || 0) + 1);
       const words = [r.n, p.categories[r.c], r.e || ""];
       if (r.p) words.push(itemName(r.p[0]) || "");
       for (const [id] of r.r || []) words.push(itemName(id) || "");
@@ -330,38 +633,235 @@ function prepare() {
       if (r.f) words.push(r.f);
       r.words = words.join(" · ").toLowerCase();
     }
+    p.usualPlace = [...places].sort((x, y) => y[1] - x[1])[0]?.[0] || null;   // the anvil, the forge: not worth saying on every step
   }
 }
 
+// ---- which recipes are yours ---------------------------------------------------
+// Out of the box: what a trainer teaches and what you start with. "Every
+// recipe" adds whatever a plan teaches. A tick or an untick of your own
+// overrides either; a recipe on a cooldown is only ever used if you tick it.
+const cfg = (pid) => saved.use[pid] || (saved.use[pid] = { all: 0, over: {} });
+const usualUse = (r) => !r.x && !r.cd && r.g != null && ("ate".includes(r.s) || (!!cfg(r.prof.id).all && r.s === "i"));
+function usable(r) { const o = cfg(r.prof.id).over[r.i]; return o != null ? !!o : usualUse(r); }
+function setUse(r, on) { const c = cfg(r.prof.id); if (on === usualUse(r)) delete c.over[r.i]; else c.over[r.i] = on ? 1 : 0; }
+
 // ---- state: the address, and what the browser remembers ----------------------
 function load() {
-  try { saved = Object.assign({ skills: {} }, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) { /* private mode */ }
+  try { saved = Object.assign({ skills: {}, goals: {}, use: {}, prices: {} }, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) { /* private mode */ }
+  for (const k of ["skills", "goals", "use", "prices"]) if (!saved[k] || typeof saved[k] !== "object") saved[k] = {};
   if (saved.wo != null) state.wo = saved.wo;
   if (saved.mode) state.mode = saved.mode;
   if (saved.sort) state.sort = saved.sort;
-  state.onlyPts = !!saved.onlyPts; state.sod = !!saved.sod;
+  if (saved.objective === "time" || saved.objective === "cost") state.objective = saved.objective;
+  if (saved.least != null) state.least = saved.least;
+  state.safe = !!saved.safe; state.onlyPts = !!saved.onlyPts; state.sod = !!saved.sod;
   const h = new URLSearchParams(location.hash.slice(1));
   const p = D.professions.find((p) => p.slug === h.get("p")) || D.professions.find((p) => p.id === saved.prof) || D.professions[0];
   state.prof = p.id;
   state.skill = clampSkill(h.has("s") ? h.get("s") : saved.skills[p.id] || 1);
+  state.goal = clampGoal(h.has("g") ? h.get("g") : saved.goals[p.id] || D.skillCap);
   if (h.has("wo")) state.wo = Math.max(0, Math.min(D.talent.ranks.length, parseInt(h.get("wo"), 10) || 0));
   if (h.get("m") === "mul") state.mode = "x"; else if (h.get("m") === "add") state.mode = "+";
+  if (h.get("o") === "time") state.objective = "time"; else if (h.get("o") === "cost") state.objective = "cost";
   state.q = h.get("q") || "";
   if (h.get("sod") === "1") state.sod = true;
 }
 function save() {
-  saved.prof = state.prof; saved.skills[state.prof] = state.skill;
-  Object.assign(saved, { wo: state.wo, mode: state.mode, sort: state.sort, onlyPts: state.onlyPts, sod: state.sod });
+  saved.prof = state.prof; saved.skills[state.prof] = state.skill; saved.goals[state.prof] = state.goal;
+  Object.assign(saved, { wo: state.wo, mode: state.mode, sort: state.sort, objective: state.objective, least: state.least, safe: state.safe, onlyPts: state.onlyPts, sod: state.sod });
   try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { /* private mode */ }
   const h = new URLSearchParams();
   h.set("p", profOf(state.prof).slug); h.set("s", state.skill);
+  if (state.goal !== D.skillCap) h.set("g", state.goal);
   if (state.wo) { h.set("wo", state.wo); h.set("m", state.mode === "+" ? "add" : "mul"); }
+  if (state.objective === "time") h.set("o", "time");
   if (state.sod) h.set("sod", "1");
   if (state.q.trim()) h.set("q", state.q.trim());
   history.replaceState(null, "", "#" + h.toString());
 }
 const clampSkill = (v) => Math.max(1, Math.min(D.skillCap, parseInt(v, 10) || 1));
+const clampGoal = (v) => Math.max(2, Math.min(D.skillCap, parseInt(v, 10) || D.skillCap));
 const profOf = (id) => D.professions.find((p) => p.id === id);
+
+// ---- what a point costs ----------------------------------------------------------
+// With no stock in hand: the price of the materials for one point at your
+// skill, making what your own recipes can make. Worked once per recipe per draw.
+let makersBy = new Map(), costBy = new Map();
+function makersFor(p) { if (!makersBy.has(p)) makersBy.set(p, M.makersOf(p.recipes.filter(usable))); return makersBy.get(p); }
+const craftCost = (r) => M.quote(r, 1, Math.max(state.skill, r.from || 1), EMPTY, makersFor(r.prof), price);
+function pointCost(r) {
+  if (!costBy.has(r)) {
+    const p = learnable(r) ? M.chance(r, state.skill, bonus(), state.mode) : 0;
+    costBy.set(r, p > 0 ? M.quote(r, 1 / p, state.skill, EMPTY, makersFor(r.prof), price) : null);
+  }
+  return costBy.get(r);
+}
+const dearer = (x, y) => (x == null ? Infinity : x) - (y == null ? Infinity : y) || 0;
+
+// ---- the route --------------------------------------------------------------------
+function rankNote(cur, st) {
+  for (let k = 0; k + 1 < (cur.ranks || []).length; k++) {
+    const cap = cur.ranks[k].cap, next = cur.ranks[k + 1];
+    if (st.from <= cap && cap < st.to) return `you need <b>${esc(next.n)}</b> to pass ${cap}${next.l ? ` (vanilla's trainers taught it from ${next.l}†)` : ""}`;
+  }
+  return null;
+}
+function learnNote(r) {
+  if (r.s === "i") return `needs ${itemHtml(r.ri)}${r.l > state.skill ? `, which asks for ${r.l}` : ""}`;
+  if (r.s === "u") return "you ticked this one; how it is learned is not in the data";
+  if (r.l > state.skill) return r.s === "a" ? `comes by itself at ${r.l}` : `learn it from a trainer at ${r.s === "e" ? "≈" : ""}${r.l}${r.s === "t" ? "†" : ""}`;
+  return null;
+}
+function gapLeg(cur, st, id) {
+  // the cheapest things you have not ticked that would give a point somewhere in the gap
+  const found = [];
+  for (const r of cur.recipes) {
+    if (usable(r) || r.cd || r.g == null || r.l == null || (r.x && !state.sod)) continue;
+    const s = Math.max(st.from, r.l);
+    if (s >= st.to) continue;
+    const p = M.chance(r, s, bonus(), state.mode);
+    if (p > 0) found.push({ r, s, cost: M.quote(r, 1 / p, s, EMPTY, R.makers, price) });
+  }
+  found.sort((x, y) => x.cost - y.cost || x.s - y.s);
+  const list = found.slice(0, 3).map(({ r, s, cost }) => `<button class="lnk q${r.p ? itemQ(r.p[0]) : 1}" data-use="${r.i}" title="Tick it: use it in the route">${esc(r.n)}</button> <small>(${r.s === "i" ? esc(itemName(r.ri) || "a plan") : "you unticked it"}${s > st.from ? `, from ${s}` : ""}${isFinite(cost) ? `, about ${M.money(cost)} a point` : ""})</small>`).join(" · ");
+  const pts = st.to - st.from;
+  return `<li class="leg gap" id="${id}"><div class="rng">${st.from}<i>→</i>${st.to}<small>${pts} point${pts === 1 ? "" : "s"}</small></div>
+<div class="what"><div class="nm">Nothing you have gives a point here</div>
+<div class="note">${cur.gather ? `${esc(cur.name)} is raised mostly by gathering. ` : ""}${list ? `The cheapest that would: ${list}` : "No recipe in the data would, either."}</div></div><div></div><div></div><div></div><div></div></li>`;
+}
+function legHtml(cur, st, i, led, first) {
+  const id = `leg-${i}`;
+  if (!st.r) return gapLeg(cur, st, id);
+  const r = st.r, pts = st.to - st.from, q = r.p ? itemQ(r.p[0]) : 1;
+  const made = state.safe ? st.craftsSafe : st.crafts, certain = st.p0 >= 0.995 && st.p1 >= 0.995;
+  const notes = [], warns = [];
+  const how = learnNote(r);
+  if (how) notes.push(how);
+  for (const [m, n] of led.side) notes.push(`make <b>${qty(n * m.p[1])} ${esc(itemName(m.p[0]) || m.n)}</b> first (${mats(m.r) || "nothing listed"} ${m.p[1] > 1 ? `for ${m.p[1]}` : "each"})`);
+  for (const [item, n] of r.r || []) {
+    const m = R.makers.get(item), sideMade = m && led.side.has(m) ? led.side.get(m) * m.p[1] : 0;
+    const drawn = n * made - (led.buys.get(item) || 0) - sideMade;
+    if (drawn > 0.5) notes.push(`uses <b>${Math.round(drawn).toLocaleString("en")} ${esc(itemName(item) || "?")}</b> you made earlier`);
+  }
+  if (led.buys.size) notes.push(`to buy: <b>${[...led.buys].map(([item, n]) => `${qty(n)} ${esc(itemName(item) || "?")}`).join(", ")}</b>`);
+  if (!(r.r || []).length) notes.push("its cost is not in the recipe: it uses up what you cast it on");
+  if (r.f && r.f !== cur.usualPlace) notes.push(`at: ${esc(r.f)}`);
+  if (r.cd) notes.push(`cooldown ${fmtTime(r.cd)}: this many crafts will take days`);
+  const rank = rankNote(cur, st);
+  if (rank) notes.push(rank);
+  if (st.p1 < 0.25 - 1e-9) warns.push(`nothing better among your recipes, so the last points come at about 1 in ${fmtCrafts(1 / st.p1)}`);
+  if (led.unpriced.size) warns.push(`no price for ${[...led.unpriced].map((item) => esc(itemName(item) || "?")).join(", ")}`);
+  const big = certain ? `${pts}` : state.safe ? `${st.craftsSafe}` : `about ${fmtCrafts(st.crafts)}`;
+  const small = certain || st.craftsSafe <= Math.round(st.crafts) ? "" : state.safe ? `about ${fmtCrafts(st.crafts)} on average` : `${st.craftsSafe} to be safe`;
+  return `<li class="leg${first ? " now" : ""}" id="${id}">
+<div class="rng">${st.from}<i>→</i>${st.to}<small>${pts} point${pts === 1 ? "" : "s"}</small></div>
+<div class="what"><div class="nm"><button class="lnk q${q}" data-show="${r.i}" title="Show it in the list below">${esc(r.n)}</button></div>
+<div class="per">${mats(r.r) ? `${mats(r.r)} a craft` : "takes nothing the recipe lists"}${r.p && r.p[1] > 1 ? ` · makes ${r.p[1]}` : ""}</div>
+${notes.map((n) => `<div class="note">${n}</div>`).join("")}${warns.map((n) => `<div class="note warn">${n}</div>`).join("")}
+${first ? `<button class="btn got" data-got title="One point more (the + key does the same)">+1 · I got a point</button>` : ""}</div>
+<div class="num"><b>${big}</b> craft${certain && pts === 1 ? "" : "s"}${small ? `<small>${small}</small>` : ""}</div>
+<div class="num odds">${st.p0 - st.p1 < 0.005 ? pct(st.p0) : `${pct(st.p0)} → ${pct(st.p1)}`}<small>a point</small></div>
+<div class="num cost">${led.unpriced.size && !led.cost ? "?" : M.money(led.cost)}</div>
+<button class="drop" data-drop="${r.i}" title="Don’t use this recipe" aria-label="Don’t use ${esc(r.n)}">✕</button></li>`;
+}
+function shopHtml(cur, led) {
+  const rows = [...led.total.buys].map(([id, n]) => ({ id, n, each: price(id), mine: saved.prices[id] != null }));
+  rows.sort((x, y) => (y.each == null) - (x.each == null) || y.n * (y.each || 0) - x.n * (x.each || 0) || y.n - x.n);
+  // a material you priced out of the route stays in sight, so the price can be changed back
+  for (const id of Object.keys(saved.prices)) if (cur.takes.has(Number(id)) && !led.total.buys.has(Number(id))) rows.push({ id: Number(id), n: 0, each: saved.prices[id], mine: true });
+  const mine = Object.keys(saved.prices).length;
+  let html = `<h3>Shopping list <span class="seg" id="safeSeg" role="group" aria-label="How many crafts to buy for">
+<button data-safe="0" class="${state.safe ? "" : "on"}" title="What it takes on average">on average</button><button data-safe="1" class="${state.safe ? "on" : ""}" title="Enough for each step nine times out of ten">to be safe</button></span></h3>`;
+  if (!rows.length) return html + `<p>Nothing to buy: these recipes list no materials.</p>`;
+  html += `<table class="shop"><tbody><tr class="hd"><td></td><td></td><td>each</td><td>in all</td></tr>${rows.map((x) => `<tr${x.n ? "" : ` class="unused" title="Not in the route at this price"`}><td class="qty">${x.n ? qty(x.n) : "none"}</td><td>${itemHtml(x.id)}</td>
+<td class="pr"><input type="text" data-item="${x.id}" value="${x.each == null ? "" : M.money(x.each)}" placeholder="price?" class="${x.mine ? "mine" : ""}" aria-label="Price of one ${esc(itemName(x.id) || "")}" title="${x.mine ? "Your price" : x.each == null ? "The game’s data has no price for this" : "What a vendor charges"}: type your own, like 2g 50s, 35s or 80c"></td>
+<td class="tot">${!x.n ? "—" : x.each == null ? "?" : M.money(x.n * x.each)}</td></tr>`).join("")}
+<tr class="sum"><td></td><td>materials${led.total.unpriced.size ? ", without the unpriced" : ""}</td><td></td><td class="tot">${M.money(led.total.cost)}</td></tr></tbody></table>`;
+  html += `<p>A price is what a vendor charges for the thing in the game’s data: right for what vendors sell, a stand-in for the rest. Type your realm’s over it (2g 50s, 35s, 80c — or 0 for what you already have)${mine ? `. <button class="lnk" id="resetPrices">Forget my ${mine === 1 ? "price" : `${mine} prices`}</button>` : ""}.</p>`;
+  // what is left in the bags at the end
+  let kinds = 0, worth = 0; const names = [];
+  for (const [id, n] of led.left) { if (n < 0.5) continue; kinds++; worth += Math.round(n) * ((D.items[id] && D.items[id][3]) || 0); if (names.length < 3) names.push(`${Math.round(n).toLocaleString("en")} ${esc(itemName(id) || "?")}`); }
+  if (kinds) html += `<p>You will be left with what you made and did not use: ${names.join(", ")}${kinds > names.length ? ` and ${kinds - names.length} more kinds` : ""}${worth ? `. A vendor pays about <b style="color:var(--parch)">${M.money(worth)}</b> for the lot` : ""}.</p>`;
+  return html;
+}
+// Which plans would be worth getting: each recipe the best possible route
+// uses and you do not have, tried on its own against your route.
+function findsHtml(cur) {
+  const over = cfg(cur.id).over;
+  const extra = cur.recipes.filter((r) => r.s === "i" && over[r.i] == null && !usable(r) && !r.x && !r.cd && r.g != null);
+  if (!extra.length) return "";
+  const ideal = M.route(Object.assign({}, R.opts, { pool: R.pool.concat(extra) }));
+  const wanted = [...new Set(ideal.steps.map((st) => st.r).filter((r) => r && extra.includes(r)))].slice(0, 14);
+  const base = R.typical.total.cost, out = [];
+  for (const x of wanted) {
+    const alt = M.route(Object.assign({}, R.opts, { pool: R.pool.concat([x]) }));
+    const more = alt.points - R.points, saving = base - alt.typical.total.cost;
+    if (more > 0 || (more === 0 && saving > Math.max(base * 0.01, 100))) out.push({ x, more, saving });
+  }
+  out.sort((p, q) => q.more - p.more || q.saving - p.saving);
+  // nothing to name and nothing much to gain: say nothing
+  const better = ideal.points > R.points || ideal.typical.total.cost < base * 0.9;
+  if (!out.length && !better) return "";
+  return `<h3>Plans worth finding <small>each tried on its own against the route above</small></h3>
+${out.length ? `<ul>${out.slice(0, 6).map(({ x, more, saving }) => `<li><button class="btn" data-use="${x.i}" title="Tick it: use it in the route">I have it</button><span class="it">${itemHtml(x.ri)} <small>asks for ${x.l}</small></span><span class="gain">${more > 0 ? `covers ${more} more point${more === 1 ? "" : "s"}` : `saves about ${M.money(saving)}`}</span></li>`).join("")}</ul>` : ""}
+<p>With every recipe in the game this route would come to about <b style="color:var(--parch)">${M.money(ideal.typical.total.cost)}</b>${ideal.points > R.points ? ` and cover ${ideal.points === R.opts.b - R.opts.a ? "every point" : `${ideal.points} points`}` : ""}, against ${M.money(base)} now. <button class="lnk" data-allrecipes>Show that route</button></p>`;
+}
+let findsTimer = 0;
+function drawPlan(cur) {
+  const plan = $("plan"), a = state.skill, b = state.goal;
+  clearTimeout(findsTimer);
+  R = null;
+  if (state.q.trim()) { plan.hidden = true; return; }
+  plan.hidden = false;
+  const c = cfg(cur.id), ticks = Object.keys(c.over).length;
+  $("planTitle").textContent = `${cur.name} from ${a}`;
+  if (document.activeElement !== $("goal")) $("goal").value = b;
+  for (const el of document.querySelectorAll("#objective button")) el.classList.toggle("on", el.dataset.goal === state.objective);
+  for (const el of document.querySelectorAll("#poolMode button")) el.classList.toggle("on", Number(el.dataset.all) === (c.all ? 1 : 0));
+  $("least").value = String(state.least);
+  $("resetUse").hidden = !ticks; $("resetUse").textContent = `Undo my ${ticks === 1 ? "tick" : `${ticks} ticks`}`;
+  const body = $("planBody"), none = $("planEmpty");
+  if (b <= a) {
+    body.hidden = true; none.hidden = false;
+    none.textContent = a >= D.skillCap ? `You are at the cap of ${D.skillCap}: there is nothing left to level.` : `You are at ${a}, and your goal is ${b}. Raise the goal to plan further.`;
+    return;
+  }
+  body.hidden = false; none.hidden = true;
+  const pool = cur.recipes.filter(usable);
+  const opts = { a, b, bonus: bonus(), mode: state.mode, goal: state.objective, price, least: state.least };
+  R = M.route(Object.assign({ pool }, opts));
+  R.opts = opts; R.pool = pool;
+  R.where = new Map();
+  for (const st of R.steps) if (st.r && !R.where.has(st.r)) R.where.set(st.r, st);
+  const led = state.safe ? R.cautious : R.typical;
+
+  // the sum of it
+  const short = b - a - R.points, time = led.seconds;
+  const bits = [];
+  if (R.points) {
+    bits.push(`<b>${R.points}</b> point${R.points === 1 ? "" : "s"}`);
+    bits.push(R.craftsSafe > Math.ceil(R.crafts) ? `about <b>${fmtCrafts(R.crafts)}</b> crafts, <b>${R.craftsSafe.toLocaleString("en")}</b> to be safe` : `<b>${fmtCrafts(R.crafts)}</b> crafts`);
+    if (time > 0) bits.push(`${fmtDur(time)} of crafting`);
+    bits.push(`about <b>${M.money(led.total.cost)}</b> in materials${state.safe ? " to be safe" : ""}${led.total.unpriced.size ? `, and ${led.total.unpriced.size} thing${led.total.unpriced.size === 1 ? "" : "s"} with no price` : ""}`);
+  }
+  if (short > 0) bits.push(`<span style="color:var(--warn)">nothing you have covers ${R.points ? `${short} of the ${b - a} points` : `any of the ${b - a} points`}</span>`);
+  $("planSum").innerHTML = bits.join(" · ");
+
+  // the ladder: the way ahead, a block a step
+  const xs = (s) => ((s - a) / (b - a)) * 100;
+  let n = 0;
+  const wide = $("ladder").clientWidth || 900;
+  $("ladder").innerHTML = R.steps.map((st, i) => { const w = xs(st.to) - xs(st.from); return `<a href="#leg-${i}" class="${st.r ? "a" + (n++ % 2) : "gap"}" style="left:${xs(st.from).toFixed(3)}%;width:${w.toFixed(3)}%" title="${st.from} → ${st.to}: ${esc(st.r ? st.r.n : "nothing you have")}">${(w / 100) * wide < 44 ? "" : esc(st.r ? st.r.n : "nothing")}</a>`; }).join("");
+  $("legsHow").textContent = state.objective === "time" ? "each step is the quickest way to the next point with what you have by then" : "each step is the cheapest way to the next point with what you have by then";
+  $("ticks").innerHTML = `<span class="l" style="left:0">${a}</span>` + (cur.ranks || []).filter((k) => xs(k.cap) > 9 && xs(k.cap) < 91).map((k) => `<span class="cap" style="left:${xs(k.cap).toFixed(2)}%" title="${esc(k.n)} ends at ${k.cap}">${k.cap}</span>`).join("") + `<span class="r" style="left:100%">${b}</span>`;
+
+  // the first step is the one to be making now, unless nothing you have gives a point at your skill
+  $("legs").innerHTML = R.steps.map((st, i) => legHtml(cur, st, i, led.per[i], i === 0 && !!st.r)).join("");
+  $("shop").innerHTML = R.points ? shopHtml(cur, led) : "";
+  $("finds").innerHTML = "";
+  if (!c.all) findsTimer = setTimeout(() => { if (R) $("finds").innerHTML = findsHtml(cur); }, 160);
+}
 
 // ---- the recipes to show -----------------------------------------------------
 function learnable(r) { return r.l == null || r.l <= state.skill; }
@@ -379,6 +879,7 @@ function selection() {
   const b = bonus();
   for (const g of groups) {
     if (state.sort === "chance") g.list = g.list.slice().sort((x, y) => reach(x) - reach(y) || (reach(x) === 2 ? x.l - y.l : M.chance(y, state.skill, b, state.mode) - M.chance(x, state.skill, b, state.mode)) || (y.y ?? -1) - (x.y ?? -1) || x.n.localeCompare(y.n));
+    else if (state.sort === "cheap") g.list = g.list.slice().sort((x, y) => reach(x) - reach(y) || (reach(x) === 2 ? x.l - y.l : dearer(pointCost(x), pointCost(y))) || M.chance(y, state.skill, b, state.mode) - M.chance(x, state.skill, b, state.mode) || x.n.localeCompare(y.n));
     else if (state.sort === "level") g.list = g.list.slice().sort((x, y) => (x.y ?? 9999) - (y.y ?? 9999) || (x.g ?? 9999) - (y.g ?? 9999) || x.n.localeCompare(y.n));
     else if (state.sort === "name") g.list = g.list.slice().sort((x, y) => x.n.localeCompare(y.n) || x.i - y.i);
   }
@@ -421,23 +922,28 @@ function rowHtml(r, key, b) {
     const was = b && p - p0 >= 0.005 ? ` <small class="was" title="Without ${esc(D.talent.name)}">was ${pct(p0)}</small>` : "";
     chance = `<div class="pct ${st}">${pct(p)}${was}</div><div class="chsub">${sub}</div>`;
   }
-  const tags = (r.fa ? `<span class="tag ${r.fa}" title="${r.fa === "A" ? "Alliance" : "Horde"} only">${r.fa}</span>` : "") + (r.x ? `<span class="tag sod" title="Filed by the client under “Season of Discovery”: a leftover, probably not obtainable in Forever">SoD</span>` : "");
+  const pc = pointCost(r);
+  const cost = pc == null ? `<span style="color:var(--faint)">—</span>` : !isFinite(pc) ? `<span style="color:var(--faint)" title="Something it takes has no price: give it one in the shopping list, or here once it is in your route">no price</span>` : `${M.money(pc)}<small>${M.money(pc * p)} a craft</small>`;
+  const step = R && r.prof.id === state.prof ? R.where.get(r) : null;
+  const mine = usable(r);
+  const tags = (step ? `<span class="tag inroute" title="In your route from ${step.from} to ${step.to}">${step.from}–${step.to}</span>` : "") + (r.fa ? `<span class="tag ${r.fa}" title="${r.fa === "A" ? "Alliance" : "Horde"} only">${r.fa}</span>` : "") + (r.x ? `<span class="tag sod" title="Filed by the client under “Season of Discovery”: a leftover, probably not obtainable in Forever">SoD</span>` : "");
   const lv = r.g == null ? `<td class="n none" colspan="3">no skill-ups</td>` : `<td class="n y">${r.y}</td><td class="n g">${M.green(r)}</td><td class="n t">${r.g}</td>`;
   return `<tr class="r st-${later ? "later" : st}${later ? " later" : ""}${state.open.has(key) ? " open" : ""}" data-key="${key}" tabindex="0" aria-expanded="${state.open.has(key)}">
-<td><div class="nm q${q}">${esc(r.n)}${tags}</div>${mk ? `<div class="mk">${mk}</div>` : ""}</td>
+<td><div class="rw"><input type="checkbox" class="use"${mine ? " checked" : ""}${r.g == null ? " disabled" : ""} title="${r.g == null ? "It gives no skill, so the route has no use for it" : mine ? "The route may use this recipe. Untick it if you cannot get it" : "Tick it once you have it, and the route will use it"}" aria-label="Use ${esc(r.n)} in my route"><div><div class="nm q${q}">${esc(r.n)}${tags}</div>${mk ? `<div class="mk">${mk}</div>` : ""}</div></div></td>
 ${learnCell(r)}${lv}
 <td class="bandc">${bandHtml(r)}</td>
 <td class="ch">${chance}</td>
+<td class="costc">${cost}</td>
 <td class="needsc"><div class="needs">${needsHtml(r)}</div></td></tr>` + (state.open.has(key) ? detailRow(r, st, b) : "");
 }
 
 // ---- an opened recipe --------------------------------------------------------
 function curveSvg(r, b) {
-  const W = 340, H = 132, L = 34, R = 10, T = 8, B = 30, cap = D.skillCap;
+  const W = 340, H = 132, L = 34, R_ = 10, T = 8, B = 30, cap = D.skillCap;
   const start = r.l == null ? r.y : Math.min(r.l, r.y);
   let a = Math.max(1, start - Math.max(6, Math.round((r.g - start) * 0.15))), z = Math.min(cap, r.g + Math.max(6, Math.round((r.g - start) * 0.15)));
   if (z - a < 12) { a = Math.max(1, z - 12); z = Math.min(cap, a + 12); }
-  const x = (s) => L + ((s - a) / (z - a)) * (W - L - R), y = (p) => T + (1 - p) * (H - T - B);
+  const x = (s) => L + ((s - a) / (z - a)) * (W - L - R_), y = (p) => T + (1 - p) * (H - T - B);
   const path = (fn) => { let d = ""; for (let s = a; s <= z; s++) d += `${s === a ? "M" : "L"}${x(s).toFixed(1)},${y(fn(s)).toFixed(1)}`; return d; };
   const gr = M.green(r), base = H - B;
   const strip = (cls, s0, s1) => { const x0 = x(Math.max(a, s0)), x1 = x(Math.min(z, s1)); return x1 > x0 ? `<rect x="${x0.toFixed(1)}" y="${base + 2}" width="${(x1 - x0).toFixed(1)}" height="5" fill="var(--${cls})"/>` : ""; };
@@ -448,7 +954,7 @@ function curveSvg(r, b) {
   for (const [s, cls] of [[r.y, "yellow"], [gr, "green"], [r.g, "grey"]]) if (s >= a && s <= z && x(s) - last > 24) { ticks.push(tick(s, cls)); last = x(s); }
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Chance of a skill point from ${esc(r.n)} by skill">
 <g font-size="10.5" fill="#a89b7c" font-family="Segoe UI,system-ui,sans-serif">
-${[0, 0.5, 1].map((p) => `<line x1="${L}" y1="${y(p)}" x2="${W - R}" y2="${y(p)}" stroke="#2a2113"/><text x="${L - 6}" y="${y(p) + 3.5}" text-anchor="end">${p * 100}%</text>`).join("")}
+${[0, 0.5, 1].map((p) => `<line x1="${L}" y1="${y(p)}" x2="${W - R_}" y2="${y(p)}" stroke="#2a2113"/><text x="${L - 6}" y="${y(p) + 3.5}" text-anchor="end">${p * 100}%</text>`).join("")}
 ${strip("orange", a, r.y)}${strip("yellow", r.y, gr)}${strip("green", gr, r.g)}${strip("grey", r.g, z)}
 ${b ? `<path d="${path((s) => M.baseChance(r, s))}" fill="none" stroke="#a89b7c" stroke-width="1.5" stroke-dasharray="4 3"/>` : ""}
 <path d="${path((s) => M.chance(r, s, b, state.mode))}" fill="none" stroke="#e0b95a" stroke-width="2"/>
@@ -460,9 +966,10 @@ function projection(r, st, b) {
   if (st === "grey") return `<p class="dim">Grey at ${s}: no more points from this.</p>`;
   const from = r.l != null && r.l > s ? r.l : s;
   if (from >= end) return `<p class="dim">Learned at ${r.l}, when it is already grey.</p>`;
-  const n = M.crafts(r, from, end, b, state.mode), n0 = M.crafts(r, from, end, 0, state.mode);
+  const n = M.crafts(r, from, end, b, state.mode), n0 = M.crafts(r, from, end, 0, state.mode), safe = M.craftsQuantile(r, from, end, b, state.mode);
   const where = r.g > cap ? `the cap of ${cap}` : `grey at ${r.g}`;
   let out = `<p class="proj">From <b>${from}</b> to ${where}: <b>${end - from}</b> point${end - from === 1 ? "" : "s"} in about <b>${fmtCrafts(n)}</b> craft${n >= 1.05 || n < 0.95 ? "s" : ""}`;
+  if (safe > Math.ceil(n)) out += ` (${safe} to be safe)`;
   if (b && n0 - n >= 0.05) out += `, against ${fmtCrafts(n0)} without ${esc(D.talent.name)}`;
   out += ".</p>";
   if (s < r.y && from < r.y) out += `<p class="dim">The first ${Math.min(r.y, end) - from} of those are certain: it stays orange until ${r.y}.</p>`;
@@ -492,10 +999,14 @@ function detailRow(r, st, b) {
   if (r.cd) facts.push(`Cooldown: ${fmtTime(r.cd)}`);
   if (r.fa) facts.push(r.fa === "A" ? "Alliance only" : "Horde only");
   const levels = r.g == null ? "" : `<p><b class="lv o">${r.s === "u" ? "?" : (r.s === "e" ? "≈" : "") + r.l}</b> orange · <b class="lv y">${r.y}</b> yellow · <b class="lv g">${M.green(r)}</b> green · <b class="lv t">${r.g}</b> grey</p>`;
+  const one = (r.r || []).length ? craftCost(r) : null, pc = pointCost(r);
+  const money = one == null ? "" : `<p class="dim">${isFinite(one) ? `A craft takes about ${M.money(one)} in materials at the shopping list's prices${pc != null && isFinite(pc) ? `, so a point costs about ${M.money(pc)} at your skill` : ""}.` : "Something it takes has no price in the game's data."}</p>`;
+  const step = R && p.id === state.prof ? R.where.get(r) : null;
+  const inRoute = step ? `<p class="dim">In your route from ${step.from} to ${step.to}.</p>` : r.cd && !usable(r) ? `<p class="dim">Left out of the route for its cooldown; tick it to use it anyway.</p>` : "";
   return `<tr class="d st-${learnable(r) ? st : "later"}"><td colspan="${span()}"><div class="det">
-<div>${makes ? `<h4>Makes</h4><p>${makes}</p>` : ""}${takes ? `<h4>Takes</h4><ul>${takes}</ul>` : ""}${facts.length ? `<h4>Needs</h4><p class="dim">${facts.join(" · ")}</p>` : ""}</div>
+<div>${makes ? `<h4>Makes</h4><p>${makes}</p>` : ""}${takes ? `<h4>Takes</h4><ul>${takes}</ul>` : ""}${facts.length ? `<h4>Needs</h4><p class="dim">${facts.join(" · ")}</p>` : ""}${money}</div>
 <div><h4>Learned from</h4><p>${learnedHtml(r, p)}</p>${r.x ? `<p class="dim">The client files this under “Season of Discovery”: a leftover from that game, and probably not something Forever hands out.</p>` : ""}
-<h4>Skill points</h4>${levels}${projection(r, st, b)}<p class="dim">${esc(p.name)} · ${esc(p.categories[r.c])} · spell ${r.i}</p></div>
+<h4>Skill points</h4>${levels}${projection(r, st, b)}${inRoute}<p class="dim">${esc(p.name)} · ${esc(p.categories[r.c])} · spell ${r.i}</p></div>
 <div class="curve">${r.g == null ? "" : `<h4>Chance by skill${b ? ` <span class="dim">— gold with ${esc(D.talent.name)} ${state.wo}/${D.talent.ranks.length}, dashed without</span>` : ""}</h4>${curveSvg(r, b)}`}</div>
 </div></td></tr>`;
 }
@@ -504,14 +1015,18 @@ function detailRow(r, st, b) {
 let queued = false;
 function render() { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; draw(); }); }
 function draw() {
-  const groups = selection(), b = bonus(), q = state.q.trim();
+  const q = state.q.trim(), b = bonus(), cur = profOf(state.prof);
+  // every recipe on show is yours from the skill it is learned at; one whose level nobody knows, from now
+  for (const p of q ? D.professions : [cur]) for (const r of p.recipes) r.from = r.l != null ? r.l : state.skill;
+  makersBy = new Map(); costBy = new Map();
+  drawPlan(cur);
+  const groups = selection();
   const total = groups.reduce((n, g) => n + g.list.length, 0);
-  const cur = profOf(state.prof);
   $("list").style.setProperty("--sx", X(state.skill).toFixed(2) + "%");
 
   // the heading and the colour counts
   if (q) $("summary").innerHTML = `<h2>“${esc(q)}”</h2><span class="about">${total} recipe${total === 1 ? "" : "s"} in ${groups.length} profession${groups.length === 1 ? "" : "s"}, read at a skill of ${state.skill} in each. <button class="btn" id="clearQ">Clear the search</button></span>`;
-  else $("summary").innerHTML = `<h2>${esc(cur.name)}${cur.class ? ` <span style="font-size:14px;color:var(--dim)">${esc(cur.class)} only</span>` : ""}</h2><span class="about">${esc(cur.about)}</span>`;
+  else $("summary").innerHTML = `<h2>Every ${esc(cur.name)} recipe${cur.class ? ` <span style="font-size:14px;color:var(--dim)">${esc(cur.class)} only</span>` : ""}</h2><span class="about">${esc(cur.about)}</span>`;
   const c = { orange: 0, yellow: 0, green: 0, grey: 0, none: 0, later: 0 };
   for (const g of groups) for (const r of g.list) { if (!learnable(r)) c.later++; else c[M.colour(r, state.skill)]++; }
   const hidden = q ? D.professions.reduce((n, p) => n + p.recipes.length - p.live, 0) : cur.recipes.length - cur.live;
@@ -519,12 +1034,13 @@ function draw() {
 <span><i class="dot" style="background:var(--orange)"></i><b>${c.orange}</b> orange</span><span><i class="dot" style="background:var(--yellow)"></i><b>${c.yellow}</b> yellow</span>
 <span><i class="dot" style="background:var(--green)"></i><b>${c.green}</b> green</span><span><i class="dot" style="background:#4a4a4a"></i><b>${c.grey}</b> grey</span>
 ${c.later ? `<span><b>${c.later}</b> not yet learnable</span>` : ""}${c.none ? `<span><b>${c.none}</b> that give no skill</span>` : ""}
-`;
+<span>· a tick means the route may use it</span>`;
   $("sodWrap").hidden = !hidden; $("sodLabel").textContent = `Season of Discovery leftovers (${hidden})`; $("sod").checked = state.sod;
 
   // the rows
   let html = "", shown = 0;
   const limit = state.more ? Infinity : MAX_ROWS;
+  const runs = state.sort === "chance" || state.sort === "cheap";
   outer: for (const g of groups) {
     if (q) html += `<tr class="cat"><th colspan="${span()}">${esc(g.p.name)}<small>${g.list.length}</small></th></tr>`;
     let lastCat = -1, lastReach = 0;
@@ -534,7 +1050,7 @@ ${c.later ? `<span><b>${c.later}</b> not yet learnable</span>` : ""}${c.none ? `
         lastCat = r.c;
         html += `<tr class="cat"><th colspan="${span()}">${esc(g.p.categories[r.c])}<small>${g.list.filter((o) => o.c === r.c).length}</small></th></tr>`;
       }
-      if (state.sort === "chance" && reach(r) !== lastReach) {
+      if (runs && reach(r) !== lastReach) {
         lastReach = reach(r);
         html += `<tr class="cat sub"><th colspan="${span()}">${lastReach === 1 ? "If you have them" : `Not yet learnable at ${state.skill}`}<small>${lastReach === 1 ? "the level these are learned at is not in the data" : "by the level they are learned at"}</small></th></tr>`;
       }
@@ -560,10 +1076,12 @@ ${c.later ? `<span><b>${c.later}</b> not yet learnable</span>` : ""}${c.none ? `
   $("onlyPts").checked = state.onlyPts; $("sort").value = state.sort;
   if (document.activeElement !== $("q")) $("q").value = state.q;
   save();
+  if (showKey) { const tr = document.querySelector(`tr.r[data-key="${showKey}"]`); showKey = null; if (tr) tr.scrollIntoView({ block: "center" }); }
 }
 
 // ---- wiring ------------------------------------------------------------------
 function setSkill(v) { state.skill = clampSkill(v); render(); }
+function recipeOf(key) { const [pid, rid] = key.split(":").map(Number); return profOf(pid).byId.get(rid); }
 function build() {
   const kinds = [["primary", "Primary"], ["secondary", "Secondary"], ["class", "Class skills"]];
   $("profs").innerHTML = kinds.map(([k, label]) => {
@@ -572,26 +1090,31 @@ function build() {
   }).join("");
   $("woName").textContent = D.talent.name;
   $("woRanks").innerHTML = [0, ...D.talent.ranks.map((_, i) => i + 1)].map((r) => `<button data-rank="${r}" title="${r ? `Rank ${r}: +${D.talent.ranks[r - 1]}%` : "Not taken"}">${r}</button>`).join("");
-  $("skillN").max = $("skillR").max = D.skillCap;
+  $("skillN").max = $("skillR").max = $("goal").max = D.skillCap;
 
   const top = D.talent.ranks[D.talent.ranks.length - 1], n = D.talent.ranks.length;
-  $("talentText").innerHTML = `A legacy talent with ${n} ranks. The client's talent data sets it at ${D.talent.ranks.map((r) => `+${r}%`).join(", ")}; at ${n} ranks its tooltip reads: “${esc(D.talent.text.replace("$s1", top))}” It covers every profession on this page, the Rogue's and the Mage's own included.`;
+  $("talentText").innerHTML = `A legacy talent with ${n} ranks. The client's talent data sets it at ${D.talent.ranks.map((r) => `+${r}%`).join(", ")}; at ${n} ranks its tooltip reads: “${esc(D.talent.text.replace("$s1", top))}” It covers every profession on this page, the Rogue's and the Mage's own included, and the route counts it in.`;
   const ex = { y: 100, g: 140 };
   $("talentTable").innerHTML = `<tr><th>A recipe yellow at 100, grey at 140</th>${[100, 110, 120, 130, 139, 140].map((s) => `<th>at ${s}</th>`).join("")}</tr>
 <tr><td>without the talent</td>${[100, 110, 120, 130, 139, 140].map((s) => `<td>${pct(M.chance(ex, s))}</td>`).join("")}</tr>
 <tr><td>${n} ranks, ×</td>${[100, 110, 120, 130, 139, 140].map((s) => `<td>${pct(M.chance(ex, s, top, "x"))}</td>`).join("")}</tr>
 <tr><td>${n} ranks, +</td>${[100, 110, 120, 130, 139, 140].map((s) => `<td>${pct(M.chance(ex, s, top, "+"))}</td>`).join("")}</tr>`;
   const S = D.stats, live = S.recipes - S.leftovers, L = { a: 0, i: 0, t: 0, e: 0, u: 0 };
+  let reagents = 0, priced = 0;
   for (const p of D.professions) for (const r of p.recipes) if (!r.x) L[r.s]++;
+  const seen = new Set();
+  for (const p of D.professions) for (const r of p.recipes) for (const [id] of r.r || []) if (!seen.has(id)) { seen.add(id); reagents++; if (D.items[id][2] > 0) priced++; }
+  $("priceNote").textContent = `The only price the game's data has for a material is what a vendor charges for it. That is the real price of flux, vials and thread; for ore, bars, herbs, cloth and leather it is just a number that rises with the material's tier. So the route starts out roughly right, and becomes yours as you type your realm's prices into the shopping list (they are kept in this browser). ${reagents - priced} of the ${reagents} materials have no vendor price at all; a recipe that takes one is left out of the cheapest route until you price it.`;
   $("shiftnote").textContent = ` (of the ${S.shiftCheck.total} recipe items whose level is known in both games, ${S.shiftCheck.match} moved exactly in step with their recipe)`;
   $("scopeText").innerHTML = `${live.toLocaleString("en")} recipes across ${D.professions.length} professions, from build ${esc(D.build)} of the Forever client: everything the trade-skill window lists, plus Disenchant and the Mage's scroll reading, which colour up the same way. Gathering professions have only their new camping recipes and, for Mining, smelting; what a node or a corpse needs is not a recipe and is not here. The recipes Forever retired are left out. The client also still carries ${S.leftovers} recipes filed under “Season of Discovery”; they are hidden until you tick the box above the table. Of the ${live.toLocaleString("en")}, ${(L.i + L.a).toLocaleString("en")} have an exact learn level, ${L.t} carry vanilla's trainer level (†), ${L.e} an estimate (≈) and ${L.u} none (?). The skill cap is ${D.skillCap}; a recipe whose yellow level is above that stays orange for good.`;
-  $("creditText").innerHTML = `Recipes, their yellow and grey levels, categories, products, reagents, tools and cooldowns, the items that teach them and the ${esc(D.talent.name)} talent are the Forever client's own data (product ${esc(D.product)}, build ${esc(D.build)}), read through the table exports of <a href="https://wago.tools" target="_blank" rel="noopener">wago.tools</a>, as are the vanilla yellow levels of a Classic Era client (${esc(D.eraProduct)}, build ${esc(D.eraBuild)}) used to see what Forever moved. Vanilla trainer levels are from the trainer tables of the <a href="https://github.com/cmangos/classic-db" target="_blank" rel="noopener">CMaNGOS classic-db</a> (GPLv3). The chance formula is the community's long-standing estimate, not Blizzard's published figure; the <a href="https://warcraft.wiki.gg/wiki/Skillup" target="_blank" rel="noopener">Warcraft Wiki</a> records only the two certain ends, orange and grey. No recipe database website was read to build this page.`;
+  $("creditText").innerHTML = `Recipes, their yellow and grey levels, categories, products, reagents, tools and cooldowns, the items that teach them, what a vendor charges and pays, the ranks and their ceilings and the ${esc(D.talent.name)} talent are the Forever client's own data (product ${esc(D.product)}, build ${esc(D.build)}), read through the table exports of <a href="https://wago.tools" target="_blank" rel="noopener">wago.tools</a>, as are the vanilla yellow levels of a Classic Era client (${esc(D.eraProduct)}, build ${esc(D.eraBuild)}) used to see what Forever moved. Vanilla trainer levels, for recipes and for ranks, are from the trainer tables of the <a href="https://github.com/cmangos/classic-db" target="_blank" rel="noopener">CMaNGOS classic-db</a> (GPLv3). The chance formula is the community's long-standing estimate, not Blizzard's published figure; the <a href="https://warcraft.wiki.gg/wiki/Skillup" target="_blank" rel="noopener">Warcraft Wiki</a> records only the two certain ends, orange and grey. The route is worked out on this page from those; no guide, calculator or recipe database website was read to build it.`;
 
   $("profs").addEventListener("click", (e) => {
     const el = e.target.closest(".chip"); if (!el) return;
-    saved.skills[state.prof] = state.skill;
+    saved.skills[state.prof] = state.skill; saved.goals[state.prof] = state.goal;
     state.prof = Number(el.dataset.prof); state.q = ""; state.more = false;
     state.skill = clampSkill(saved.skills[state.prof] || 1);
+    state.goal = clampGoal(saved.goals[state.prof] || D.skillCap);
     $("q").value = ""; render();
   });
   $("skillN").addEventListener("input", (e) => { if (e.target.value !== "") setSkill(e.target.value); });
@@ -604,8 +1127,47 @@ function build() {
   $("onlyPts").addEventListener("change", (e) => { state.onlyPts = e.target.checked; render(); });
   $("sort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
   $("q").addEventListener("input", (e) => { state.q = e.target.value; state.more = false; render(); });
+
+  // the route's own controls
+  $("goal").addEventListener("input", (e) => { if (e.target.value !== "") { state.goal = clampGoal(e.target.value); render(); } });
+  $("goal").addEventListener("blur", (e) => { e.target.value = state.goal; });
+  $("objective").addEventListener("click", (e) => { const el = e.target.closest("button"); if (el) { state.objective = el.dataset.goal; render(); } });
+  $("poolMode").addEventListener("click", (e) => { const el = e.target.closest("button"); if (el) { cfg(state.prof).all = Number(el.dataset.all); render(); } });
+  $("least").addEventListener("change", (e) => { state.least = Number(e.target.value); render(); });
+  $("resetUse").addEventListener("click", () => { cfg(state.prof).over = {}; render(); });
+  $("plan").addEventListener("click", (e) => {
+    const cur = profOf(state.prof);
+    const el = e.target.closest("[data-drop],[data-use],[data-got],[data-show],[data-safe],[data-allrecipes],#resetPrices");
+    if (el) {
+      if (el.dataset.drop) setUse(cur.byId.get(Number(el.dataset.drop)), false);
+      else if (el.dataset.use) setUse(cur.byId.get(Number(el.dataset.use)), true);
+      else if (el.dataset.got != null) state.skill = clampSkill(state.skill + 1);
+      else if (el.dataset.show) { showKey = `${cur.id}:${el.dataset.show}`; state.open.add(showKey); state.more = true; }
+      else if (el.dataset.safe) state.safe = el.dataset.safe === "1";
+      else if (el.dataset.allrecipes != null) cfg(cur.id).all = 1;
+      else if (el.id === "resetPrices") saved.prices = {};
+      render();
+      return;
+    }
+    // a block of the ladder takes you to its step
+    const a = e.target.closest("#ladder a");
+    if (a) { e.preventDefault(); const leg = document.querySelector(a.getAttribute("href")); if (leg) leg.scrollIntoView({ block: "center", behavior: "smooth" }); }
+  });
+  $("plan").addEventListener("change", (e) => {
+    const el = e.target.closest("input[data-item]"); if (!el) return;
+    const id = el.dataset.item, typed = M.parseMoney(el.value), vendor = D.items[id] && D.items[id][2] > 0 ? D.items[id][2] : null;
+    if (typed == null || typed === vendor) delete saved.prices[id]; else saved.prices[id] = typed;
+    render();
+  });
+  $("plan").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("input[data-item]")) e.target.blur(); });
+
   const toggle = (tr) => { const k = tr.dataset.key; if (state.open.has(k)) state.open.delete(k); else state.open.add(k); render(); };
-  $("rows").addEventListener("click", (e) => { if (e.target.closest("a")) return; const tr = e.target.closest("tr.r"); if (tr) toggle(tr); });
+  $("rows").addEventListener("click", (e) => {
+    if (e.target.closest("a")) return;
+    const tr = e.target.closest("tr.r"); if (!tr) return;
+    if (e.target.matches("input.use")) { setUse(recipeOf(tr.dataset.key), e.target.checked); render(); return; }
+    toggle(tr);
+  });
   $("rows").addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr.r")) { e.preventDefault(); const k = e.target.dataset.key; toggle(e.target); requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector(`tr.r[data-key="${k}"]`)?.focus())); } });
   document.addEventListener("click", (e) => {
     if (e.target.id === "clearQ") { state.q = ""; $("q").value = ""; render(); }
@@ -614,6 +1176,14 @@ function build() {
       const done = () => { e.target.textContent = "Link copied"; setTimeout(() => { if (e.target.isConnected) e.target.textContent = "Copy a link to this view"; }, 1500); };
       if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(done, () => prompt("Copy this link", location.href)); else prompt("Copy this link", location.href);
     }
+  });
+  // at the anvil: + when a point comes, − if you overshot
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (e.key === "+" || e.key === "=") { e.preventDefault(); setSkill(state.skill + 1); }
+    else if (e.key === "-" || e.key === "_") { e.preventDefault(); setSkill(state.skill - 1); }
   });
   $("sod").addEventListener("change", (e) => { state.sod = e.target.checked; render(); });
   window.addEventListener("hashchange", () => { load(); render(); });

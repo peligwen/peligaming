@@ -135,15 +135,50 @@ else is added. Rebuild with `npm run data:wow-forever`.
 
 ## 📜 Profession Catalogue (WoW Forever)
 
-Every recipe of every Forever profession, from the game's own data: the
-skill at which it turns orange, yellow, green and grey, and the estimated
-chance that one craft gives a skill point at your skill, with the Working
-Overtime legacy talent counted in or left out.
+A levelling companion for Forever's professions, worked out from the game's
+own data: tell it your skill and where you are going, and it lays out what
+to make over which stretch of skill, how many crafts that should take, and
+what to buy for the whole way. Underneath is the catalogue it is worked out
+from: every recipe with the skill at which it turns orange, yellow, green
+and grey and the estimated chance of a point, with the Working Overtime
+legacy talent counted in or left out.
 
 **Try it: [peligaming.com/tools/wow-forever/profession-catalogue](https://peligaming.com/tools/wow-forever/profession-catalogue)**
 
 ![Profession Catalogue](docs/profession-catalogue.jpg)
 
+- **A route from your skill.** At every skill on the way it makes whatever
+  gives the next point for the least in materials, out of the recipes you
+  have by then: rough sharpening stones to 36, rough grinding stones to 76,
+  copper chain belts, runed copper bracers that use up the grinding stones,
+  and so on up. Each step says what a craft takes, how many crafts to
+  expect and how many are enough nine times out of ten, how the chance
+  falls across the step, what to buy for it, and what to make first if one
+  of your own recipes supplies a reagent. A ladder draws the whole way as a
+  block a step, with the rank ceilings marked. Ask for **Quickest** instead
+  and it keeps the time at the anvil low rather than the cost: this build's
+  crafts run from three seconds for a sharpening stone to a minute for a
+  breastplate, and the cheapest way to 300 can be six hours of casting.
+- **At the anvil.** The first step is the one to be making now. A button on
+  it, or the + key, takes a point when you get one, and the route, the
+  shopping list and the catalogue all move with you.
+- **A shopping list.** Everything the route buys, added up, with what you
+  make along the way taken off. It can be for the average run or to be safe.
+  The only price in the game's data is what a vendor charges, which is right
+  for flux and thread and only a stand-in for ore and bars, so every price
+  is a box to type your realm's into (or 0 for what you already have); the
+  route is worked out again at your prices, and they are remembered. It ends
+  with what you will be left holding and what a vendor pays for it.
+- **The recipes you have.** Out of the box the route uses what a trainer
+  teaches and what you start with. Tick a plan, pattern or formula in the
+  catalogue once you own it, or untick a recipe you cannot get, and the
+  route follows. **Plans worth finding** tries each recipe the best possible
+  route would use against yours, one at a time, and says what it would save
+  or how many more points it would cover. In Blacksmithing the trainer's
+  recipes run dry at 285 and are ruinous long before that: at vendor prices
+  the way from 1 to 285 comes to some 2,800 gold, and the best route with
+  every recipe reaches 300 for a little over 200. "Every recipe" shows that
+  best route outright, with the plans it takes.
 - **Fourteen professions, 2,236 recipes.** Alchemy, Blacksmithing,
   Enchanting, Engineering, Leatherworking and Tailoring; Mining's smelting;
   the camping recipes Forever gives Herbalism, Skinning and Fishing;
@@ -156,23 +191,23 @@ Overtime legacy talent counted in or left out.
   orange, yellow, green and grey, in those colours, and a bar of the same
   four on a scale of 1 to 300 with a line at your skill, so a category reads
   as a ladder: what is worth making now, and what takes over next.
-- **Chance now.** Set your skill (it is remembered per profession) and every
-  row shows the estimated chance of a point from one craft and how many
-  crafts a point should take. Order the list by best chance, or keep only
-  what can give a point right now.
+- **Chance and cost now.** Every row shows the estimated chance of a point
+  from one craft at your skill, and what the materials for a point come to.
+  Order the list by cheapest point or best chance, or keep only what can
+  give a point right now.
 - **Working Overtime.** The legacy talent's five ranks are a row of buttons;
   the client's talent data sets them at +4% each, +20% at five. The tooltip
   does not say how the bonus is applied, so both readings are offered: ×
   multiplies the chance (50% becomes 60%), + adds to it (50% becomes 70%).
-  Rows show the chance with the talent and what it was without.
-- **A recipe opened.** What it makes and how many, what it takes, the tools
-  and the forge or anvil, the cooldown, how it is learned, the chance drawn
-  against skill with and without the talent, and the crafts it should take
-  to ride the recipe from your skill to grey.
+  The route and every row count it in.
+- **A recipe opened.** What it makes and how many, what it takes and costs,
+  the tools and the forge or anvil, the cooldown, how it is learned, the
+  chance drawn against skill with and without the talent, and the crafts it
+  should take to ride the recipe from your skill to grey.
 - **Search** runs across every profession at once: a recipe, what it makes,
   a reagent ("linen cloth" finds everything in four professions that eats
-  it). The address carries the profession, skill and talent, so a view can
-  be shared.
+  it). The address carries the profession, skill, goal and talent, so a view
+  can be shared; your ticks and prices stay in your browser.
 
 ### How it's built
 
@@ -186,9 +221,12 @@ Overtime legacy talent counted in or left out.
   the reagents, the tools, the forge or anvil and the cooldown; the items
   that teach a recipe give the skill needed to learn it; and the trait
   tables give Working Overtime, whose real value per rank is a curve the
-  talent points at (the spell's own "10" is a placeholder). Pass a build
-  number to target a newer build; downloads are cached in
-  `.wow-forever-cache/`.
+  talent points at (the spell's own "10" is a placeholder). For the route
+  it also carries what a vendor charges for each reagent and pays for each
+  product, and the profession's ranks: each rank spell sets the skill's
+  ceiling to 75 times its step, which gives Apprentice 75, Journeyman 150,
+  Expert 225 and Artisan 300. Pass a build number to target a newer build;
+  downloads are cached in `.wow-forever-cache/`.
 - **Learn levels.** For 1,708 of the 2,236 the level is exact: an item
   teaches the recipe and states the skill it asks for, or the game hands the
   recipe out by itself. What a *trainer* asks is decided on the server and
@@ -210,13 +248,30 @@ Overtime legacy talent counted in or left out.
   abilities whose spell is gone, and the gathering skills' own rank spells.
   The client still carries 286 recipes filed under a category named "SEASON
   OF DISCOVERY"; they are in the data, flagged, and hidden until asked for.
+- **The route.** At each skill it takes the recipe with the lowest expected
+  cost of the next point (materials for a craft, over the chance), or the
+  lowest expected time. Three things keep that from being a recipe a point.
+  It stays on a recipe while that is within a twentieth of the best. It
+  leaves one whose chance has dropped under a mark you set (one in four by
+  default) when something better is to hand: nobody grinds a recipe at one
+  point in twenty because the stones are cheap. And it finishes a batch
+  before spending it: while it is on a recipe, what that recipe makes is not
+  yet stock in hand for the others, or blasting powder and the shot made
+  from it take turns a point at a time (Engineering came out at 73 steps
+  that way, and 33 without). What has been made is used before anything is
+  bought, and a reagent one of your recipes makes is made, not bought. The
+  crafts that are enough nine times in ten are not an approximation: the
+  odds of standing at each skill are carried forward craft by craft.
 - The page (`public/tools/wow-forever/profession-catalogue.html`) is one
   file of vanilla JS. Its `<script id="catalogue-model">` block is the
   arithmetic and nothing else, and `npm run check:professions` runs it in
   Node: the colour bands and the chance at their edges, the talent's two
-  readings, expected crafts against sums worked by hand, then the same
-  properties over every recipe in the data at every skill from 1 to 300, and
-  the data file's own shape.
+  readings, expected and nine-in-ten crafts against sums worked by hand,
+  money read and written, the route against hand calculations on small
+  made-up recipe books (which recipe wins, where the switch comes, stock used
+  before anything is bought), then every recipe at every skill from 1 to
+  300, 56 routes over the real professions checked for being unbroken and
+  for bills that add up, and the data file's own shape.
 
 ### What the percentages are
 
@@ -231,6 +286,14 @@ curve, and whether Working Overtime multiplies the chance or adds to it, are
 both decided on the server; the first is assumed and the second is left as a
 switch.
 
+The route inherits all of that and adds two estimates of its own. Its
+prices are the vendor's until you type yours, so out of the box it ranks
+materials by tier rather than by what your auction house charges. And "my
+recipes" means what vanilla's trainers taught and no item in Forever's
+client teaches; whether Forever's trainers still teach each of them is not
+in the data. The route is worked out on the page from the client's numbers;
+no guide or calculator was read to build it.
+
 ### Sources and their terms
 
 - **wago.tools**: as for the map above — only the CSV exports and the API
@@ -239,9 +302,9 @@ switch.
   the page (`wowf` 1.60.1.70888 for Forever, `wow_classic_era` 1.15.9.70576
   for the vanilla yellow levels). The build identifies itself as
   `peligaming-professions-build/1.0`, with a link here.
-- **CMaNGOS classic-db** is GPLv3. The trainer levels derived from it are
-  marked in the data and on the page, credited there and here, and listed
-  in `LICENSE`.
+- **CMaNGOS classic-db** is GPLv3. The trainer levels derived from it, for
+  recipes and for the ranks, are marked in the data and on the page,
+  credited there and here, and listed in `LICENSE`.
 - **Wowhead** and the other recipe sites are not read: their databases are
   theirs, and Wowhead's terms bar both automated access and derivative
   works. Nothing on the page is copied from a guide or a calculator.
@@ -1011,7 +1074,7 @@ export and import, and this is an unofficial editor for that save.
 | --- | --- | --- |
 | Azeroth Survivors | Save Editor | Unseal an exported save, edit heroes, talents, zones and heroic tiers, the gear collection and its stars, perks, statistics and achievements, and seal it again for import — all in the browser |
 | WoW Forever | World Map | Azeroth at every scale from the game's own art: biomes for the zone-bound item effects, flight masters with times and a planner, boats and zeppelins with timetables, banks and auctioneers |
-| WoW Forever | Profession Catalogue | Every recipe of every profession with the skill at which it turns orange, yellow, green and grey, the estimated chance of a skill point at your skill, and the Working Overtime talent counted in or out |
+| WoW Forever | Profession Catalogue | A levelling route from your skill with the recipes you have: what to make over which stretch, how many crafts, a shopping list at your prices and the plans worth finding; under it every recipe with the skill at which it turns orange, yellow, green and grey and the chance of a point, Working Overtime counted in or out |
 | RuneScape | Sand Table | Boss & raid rehearsals: the briefing, the kit, and the fight rebuilt tile by tile in 3D with a drill mode |
 | RuneScape | Sand Table | Boss and raid rehearsals: the briefing checked against your hiscores, the kit slot by slot, and the fight rebuilt tile by tile in 3D with a tick clock — then a drill that grades your prayers and footwork |
 | RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer |

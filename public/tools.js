@@ -37,7 +37,7 @@ window.PELIGAMING = {
         },
         {
           name: "Profession Catalogue",
-          description: "Every recipe of every profession from the game's own data — Alchemy to Tailoring, Mining's smelting, Cooking and First Aid, the new camping recipes, the Rogue's Poisons — with the skill at which each turns orange, yellow, green and grey, the four drawn as a bar from 1 to 300, and the estimated chance of a skill point at your skill. Tick ranks of the Working Overtime legacy talent to see what it adds. Open a recipe for what it makes and takes, how it is learned, and how many crafts it should take to ride it to grey. Search across every profession; share links.",
+          description: "Level a profession with a route worked out from the game's own data: set your skill and your goal, and it says what to make over which stretch of skill, how many crafts to expect and how many to be safe, and what to buy for the whole way, cheapest or quickest. Type your realm's prices over the vendor's, tick the plans you own, and see which ones would be worth finding. Underneath, every recipe of all fourteen professions with the skill at which it turns orange, yellow, green and grey and the estimated chance of a point, with the Working Overtime legacy talent counted in or out.",
           path: "tools/wow-forever/profession-catalogue.html",
         },
       ],
