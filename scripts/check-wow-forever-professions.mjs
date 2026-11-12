@@ -15,13 +15,15 @@
 //   - the route picks what a hand calculation picks on small made-up recipe
 //     books (the cheaper recipe per point, the switch at the right skill, what
 //     was made earlier used before anything is bought, what a later step
-//     needs made ahead while making it still gives points), and on every real
-//     profession it is a route: unbroken, only recipes the player has by
-//     then, only while they can give a point, a bill that adds up, and never
-//     the worse for what it makes ahead.
+//     needs made ahead while making it still gives points, a tool got once
+//     by the first step to need it, a trainer's fee paid once and a recipe
+//     or a tool not worth its cost left out), and on every real profession it
+//     is a route: unbroken, only recipes the player has by then, only while
+//     they can give a point, never without the tool, a bill that adds up, and
+//     never the worse for what it makes ahead or leaves out.
 // The data is checked for shape: every recipe in a category, levels in
 // order, every item it names present, every learn level carrying its source,
-// prices and ranks where they should be.
+// prices, ranks, tools, fees and kinds of trainer where they should be.
 //
 //   node scripts/check-wow-forever-professions.mjs      (npm run check:professions)
 
@@ -179,6 +181,55 @@ console.log("route, on made-up recipe books");
   check("the talent shortens the route's crafts", M.route({ pool: [A, B], a: 1, b: 30, price, bonus: 20 }).crafts < M.route({ pool: [A, B], a: 1, b: 30, price }).crafts);
 }
 
+// ------------------------------------------------------- tools, fees and thrift
+console.log("route: tools and what a trainer charges, on made-up recipe books");
+{
+  const prices = { 1: 10, 2: 30, 3: 3, 50: 40 };
+  const price = (id) => (id in prices ? prices[id] : null);
+  const names = (R) => R.steps.map((st) => `${st.r ? st.r.n : "gap"} ${st.from}-${st.to}`).join(", ");
+  // X is made with tool 50: 10 a point from 1 to 10, and the tool once.
+  const X = { n: "X", y: 50, g: 60, r: [[1, 1]], from: 1, tools: [[50]] };
+  let R = M.route({ pool: [X], a: 1, b: 10, price, sold: new Set([50]) });
+  check("a tool a vendor sells is bought once, by the first step to need it", names(R) === "X 1-10" && R.steps[0].tools.length === 1 && R.steps[0].tools[0].item === 50 && near(R.typical.total.cost, 130) && R.typical.total.buys.get(50) === 1 && near(R.cautious.total.cost, 130), M.money(R.typical.total.cost));
+  R = M.route({ pool: [X], a: 1, b: 10, price, sold: new Set([50]), owned: new Set([50]) });
+  check("a tool the player has costs nothing", !R.steps[0].tools && near(R.typical.total.cost, 90) && !R.got.length);
+  R = M.route({ pool: [Object.assign({}, X, { tools: [[50, 51]] })], a: 1, b: 10, price, owned: new Set([51]) });
+  check("and a better one does the work of the plain one", names(R) === "X 1-10" && !R.steps[0].tools && near(R.typical.total.cost, 90));
+  R = M.route({ pool: [X], a: 1, b: 10, price });
+  check("with no way to the tool the recipe is no use", names(R) === "gap 1-10" && R.points === 0);
+  // TM makes the tool from three of item 1, and is orange to 5. Wanted at 1, the one craft is certain
+  // to give a point: it is a step, 30, and X does the other eight: 110, where a rod made on the side
+  // would have left X all nine, 120.
+  const TM = { n: "TM", y: 5, g: 10, r: [[1, 3]], p: [50, 1], from: 1 };
+  R = M.route({ pool: [TM, X], a: 1, b: 10, price });
+  check("a tool the player can make is made: as a step of its own where that is certain to give a point", names(R) === "TM 1-2, X 2-10" && R.steps[0].tool === 50 && R.steps[0].craftsSafe === 1 && near(R.typical.total.cost, 110) && !R.typical.left.has(50) && R.points === 9, `${names(R)}: ${M.money(R.typical.total.cost)}`);
+  // from 7 the tool's recipe is at six in ten: one is made all the same, for the step, and no point is counted on
+  R = M.route({ pool: [TM, X], a: 7, b: 10, price });
+  check("and before the step that needs it where it is not", names(R) === "X 7-10" && R.steps[0].tools[0].m === TM && near(R.typical.total.side.get(TM), 1) && near(R.typical.total.cost, 60) && near(R.cautious.total.side.get(TM), 1), `${names(R)}: ${M.money(R.typical.total.cost)}`);
+  // K2 is a copper a point cheaper than K1 (9 against 10) and costs 500 to learn: nine points save 9.
+  const K1 = { n: "K1", y: 50, g: 60, r: [[1, 1]], from: 1 }, K2 = { n: "K2", y: 50, g: 60, r: [[3, 3]], from: 1 };
+  const fees = (f) => (r) => (r === K2 ? f : 0);
+  R = M.route({ pool: [K1, K2], a: 1, b: 10, price, fee: fees(500), thrift: false });
+  check("a fee is paid once, for each recipe the route uses", names(R) === "K2 1-10" && R.fee === 500 && R.learn.get(K2) === 1 && !R.learn.has(K1) && near(M.outlay(R), 581));
+  R = M.route({ pool: [K1, K2], a: 1, b: 10, price, fee: fees(500) });
+  check("a recipe that saves less than it costs to learn is left out", names(R) === "K1 1-10" && R.spared.length === 1 && R.spared[0] === K2 && near(M.outlay(R), 90) && near(R.full.cost, 81) && R.full.fee === 500, `${names(R)}: ${M.money(M.outlay(R))} against ${M.money(581)}`);
+  R = M.route({ pool: [K1, K2], a: 1, b: 10, price, fee: fees(5) });
+  check("and one that saves more is learned", names(R) === "K2 1-10" && !R.spared && near(M.outlay(R), 86));
+  R = M.route({ pool: [K1, K2], a: 1, b: 10, price, fee: fees(500), goal: "time" });
+  check("the quickest route is the quickest whatever the fees, and says what they are", names(R) === "K2 1-10" && !R.spared && R.fee === 500);
+  // S makes what T is made from (the book above). Bought, an X would be a copper; S costs 100 gold to learn.
+  // It is learned all the same: what the player can make is made, and doing without S would mean buying.
+  const S = { n: "S", y: 5, g: 10, r: [[1, 2]], p: [9, 1], from: 1 }, T = { n: "T", y: 20, g: 30, r: [[9, 1], [1, 1]], from: 1 };
+  R = M.route({ pool: [S, T], a: 1, b: 12, price: (id) => (id === 9 ? 1 : price(id)), fee: (r) => (r === S ? 1000000 : 0) });
+  check("a recipe other recipes are made from is never left out to buy its product instead", names(R) === "S 1-7, T 7-12" && !R.spared && R.fee === 1000000 && !R.typical.total.buys.has(9));
+  // A tool that costs 1000 to make, for a recipe 3 a point cheaper than the one that needs none: left unmade.
+  const dear = { n: "TM", y: 1, g: 1, r: [[1, 100]], p: [50, 1], from: 1 }, cheap = Object.assign({}, dear, { r: [[1, 2]] }), Y = { n: "Y", y: 50, g: 60, r: [[1, 1], [3, 1]], from: 1 };
+  R = M.route({ pool: [dear, X, Y], a: 1, b: 10, price });
+  check("a tool that costs more to make than it saves is not made", names(R) === "Y 1-10" && R.spared[0] === 50 && near(M.outlay(R), 117) && near(R.full.cost, 1090), `${names(R)}: ${M.money(M.outlay(R))} against ${M.money(R.full.cost)}`);
+  R = M.route({ pool: [cheap, X, Y], a: 1, b: 10, price });
+  check("and one that saves more is", names(R) === "X 1-10" && !R.spared && near(M.outlay(R), 110));
+}
+
 // --------------------------------------------- the model over every real recipe
 console.log("model, over every recipe in the data");
 {
@@ -211,47 +262,80 @@ console.log("model, over every recipe in the data");
 console.log("route, over every profession: what a trainer teaches, then every recipe");
 {
   const price = (id) => (D.items[id] && D.items[id][2] > 0 ? D.items[id][2] : null);
-  const cap = D.skillCap, faults = [], lines = [], saved = [];
-  let routes = 0, ahead = 0;
+  const cap = D.skillCap, faults = [], lines = [], saved = [], lean = [];
+  const fee = (r) => ((r.s === "t" || r.s === "e") && r.m) || 0;
+  let routes = 0, ahead = 0, spared = 0, tooled = 0, tools = 0;
   for (const p of D.professions) for (const all of [false, true]) for (const goal of ["cost", "time"]) {
     for (const r of p.recipes) r.from = r.l != null ? r.l : 1;
     const pool = p.recipes.filter((r) => !r.x && !r.cd && r.g != null && ("ate".includes(r.s) || (all && r.s === "i")));
-    const opts = { pool, a: 1, b: cap, price, goal, least: 0.25 };
+    // from nothing: no tool owned, every trainer's fee to pay
+    const opts = { pool, a: 1, b: cap, price, goal, least: 0.25, fee, sold: M.tooling(p), owned: new Set() };
     const R = M.route(opts), who = `${p.name} (${all ? "every recipe" : "trainer"}, ${goal})`;
     routes++;
+    // leaving out what is not worth its fee: never fewer points, never dearer with the fees counted
+    const full = M.route(Object.assign({}, opts, { thrift: false }));
+    if (R.points < full.points || (R.points === full.points && R.typical.total.unpriced.size === full.typical.total.unpriced.size && goal === "cost" && M.outlay(R) > M.outlay(full) * (1 + 1e-9))) faults.push(`${who}: the worse for what it leaves out`);
+    if (R.spared) {
+      spared++;
+      if (goal !== "cost") faults.push(`${who}: leaves something out of the quickest route`);
+      if (!near(R.full.cost + R.full.fee, M.outlay(full), 1e-6 * Math.max(1, M.outlay(full)))) faults.push(`${who}: the full route it reports is not the full route`);
+      for (const x of R.spared) if (typeof x === "object" ? !pool.includes(x) || R.learn.has(x) || !(fee(x) > 0) : R.got.some((t) => t.item === x)) faults.push(`${who}: says it left out ${x.n || x} and did not`);
+      lean.push(1 - M.outlay(R) / M.outlay(full));
+    }
+    let owed = 0;
+    for (const r of R.learn.keys()) owed += fee(r);
+    if (!near(owed, R.fee, 1e-6)) faults.push(`${who}: its fees are ${R.fee}, its recipes' come to ${owed}`);
     // making ahead: never fewer points, never dearer (or slower), and only of things the player makes
     const plain = M.route(Object.assign({}, opts, { ahead: false })), measure = (X) => (goal === "time" ? X.typical.seconds : X.typical.total.cost);
-    if (R.points < plain.points || (R.points === plain.points && R.typical.total.unpriced.size === plain.typical.total.unpriced.size && measure(R) > measure(plain) * (1 + 1e-9))) faults.push(`${who}: the worse for making ahead`);
-    if (R.ahead) {
+    if (full.points < plain.points || (full.points === plain.points && full.typical.total.unpriced.size === plain.typical.total.unpriced.size && measure(full) > measure(plain) * (1 + 1e-9))) faults.push(`${who}: the worse for making ahead`);
+    if (full.ahead) {
       ahead++;
-      if (!near(R.plain.cost, plain.typical.total.cost, 1e-6 * Math.max(1, plain.typical.total.cost))) faults.push(`${who}: the plain route it reports is not the plain route`);
+      if (!near(full.plain.cost, plain.typical.total.cost, 1e-6 * Math.max(1, plain.typical.total.cost))) faults.push(`${who}: the plain route it reports is not the plain route`);
+      if (goal === "cost") saved.push(1 - full.typical.total.cost / plain.typical.total.cost);
+    }
+    if (R.ahead) {
       for (const [m, n] of R.ahead) if (!(n > 0) || !m.p || !pool.includes(m)) faults.push(`${who}: makes ${m.n} ahead`);
       if (!R.steps.some((st) => st.pre)) faults.push(`${who}: something to make ahead and no step that does`);
-      if (goal === "cost") saved.push(1 - R.typical.total.cost / plain.typical.total.cost);
     }
     for (const st of R.steps) if (st.pre && !(R.ahead && R.ahead.has(st.r) && st.pre > st.from && st.pre <= st.to)) faults.push(`${who}: ${st.r.n} marked as made ahead at ${st.from}`);
+    // tools: none to start with, each got once, and no craft without its tool
+    const have = new Set(), everHad = new Set(R.got.map((t) => t.item));
+    const equipped = (r) => (r.tools || []).every((any) => any.some((id) => have.has(id)));
+    if (R.got.length) { tooled++; tools += R.got.length; }
+    if (new Set(R.got.map((t) => t.item)).size !== R.got.length) faults.push(`${who}: a tool got twice`);
     let at = 1, last = null, paid = 0;
-    for (const st of R.steps) {
+    R.steps.forEach((st, i) => {
       if (st.from !== at || st.to <= st.from) faults.push(`${who}: broken at ${st.from}`);
       at = st.to;
-      if (st.r && st.r === last) faults.push(`${who}: ${st.r.n} twice running at ${st.from}`);
+      if (st.r && st.r === last && !st.tools) faults.push(`${who}: ${st.r.n} twice running at ${st.from}`);
       last = st.r;
+      for (const t of st.tools || []) {
+        if (t.m ? !pool.includes(t.m) || t.m.p[0] !== t.item || t.m.from > st.from || !equipped(t.m) || !(R.typical.per[i].side.get(t.m) >= 1 - 1e-9) : !opts.sold.has(t.item) || !(R.typical.per[i].buys.get(t.item) >= 1)) faults.push(`${who}: no way to the tool it gets at ${st.from}`);
+        have.add(t.item);
+      }
+      if (st.r && !equipped(st.r)) faults.push(`${who}: ${st.r.n} at ${st.from} without its tool`);
+      if (st.r) for (const m of R.typical.per[i].side.keys()) if (!equipped(m)) faults.push(`${who}: ${m.n} made at ${st.from} without its tool`);
+      if (st.tool && !(st.r.p[0] === st.tool && st.to - st.from === (st.r.u || 1) && M.chance(st.r, st.from) === 1 && near(st.crafts, 1))) faults.push(`${who}: the tool step at ${st.from} is not one certain craft`);
+      if (st.r && st.r.p && pool.some((r) => (r.tools || []).some((any) => any.includes(st.r.p[0])))) have.add(st.r.p[0]);
       for (let s = st.from; s < st.to; s++) {
         if (st.r) { if (st.r.from > s || M.chance(st.r, s) <= 0 || !pool.includes(st.r)) faults.push(`${who}: ${st.r.n} cannot give a point at ${s}`); }
-        else if (pool.some((r) => r.from <= s && M.chance(r, s) > 0)) faults.push(`${who}: a gap at ${s} with a recipe to hand`);
+        // (a gap stands only where nothing gives a point, or nothing whose tools the route ever had or left out on purpose)
+        else if (pool.some((r) => r.from <= s && M.chance(r, s) > 0 && !(R.spared || []).includes(r) && (r.tools || []).every((any) => any.some((id) => everHad.has(id))))) faults.push(`${who}: a gap at ${s} with a recipe to hand`);
       }
       if (st.r && !(st.crafts >= st.to - st.from - 1e-9 && st.craftsSafe >= Math.floor(st.crafts) && st.craftsSafe >= st.to - st.from)) faults.push(`${who}: crafts out of order at ${st.from}`);
-    }
+    });
     if (at !== cap) faults.push(`${who}: ends at ${at}`);
     for (const [id, n] of R.typical.total.buys) { if (!(n > 0)) faults.push(`${who}: buys ${n} of ${id}`); paid += n * (price(id) || 0); }
     if (!near(paid, R.typical.total.cost, 1e-6 * Math.max(1, paid))) faults.push(`${who}: the bill is ${R.typical.total.cost}, its lines come to ${paid}`);
     if (!near(R.typical.per.reduce((n, led) => n + led.cost, 0), R.typical.total.cost, 1e-6 * Math.max(1, paid))) faults.push(`${who}: the steps do not add up to the bill`);
     if (R.cautious.total.cost < R.typical.total.cost - 1e-6) faults.push(`${who}: buying to be safe is cheaper`);
     if (JSON.stringify(M.route(opts).steps.map((st) => [st.from, st.to, st.r && st.r.i])) !== JSON.stringify(R.steps.map((st) => [st.from, st.to, st.r && st.r.i]))) faults.push(`${who}: not the same route twice`);
-    if (goal === "cost") lines.push(`${p.name}, ${all ? "every recipe" : "trainer's"}: ${R.points} of ${cap - 1} points, ${R.steps.filter((st) => st.r).length} steps, ${Math.round(R.crafts)} crafts, ${M.money(R.typical.total.cost)}`);
+    if (goal === "cost") lines.push(`${p.name}, ${all ? "every recipe" : "trainer's"}: ${R.points} of ${cap - 1} points, ${R.steps.filter((st) => st.r).length} steps, ${Math.round(R.crafts)} crafts, ${M.money(R.typical.total.cost)}${R.fee ? ` and ${M.money(R.fee)} in fees for ${[...R.learn.keys()].filter((r) => fee(r)).length} recipes` : ""}${R.got.length ? `, ${R.got.length} tool${R.got.length === 1 ? "" : "s"} got` : ""}`);
   }
   check("every route is unbroken, uses only what the player has by then and only while it gives a point", !faults.length, faults.length ? `${faults.length}, first: ${faults[0]}` : `${routes} routes`);
   check("and none is the worse for what it makes ahead", !faults.length && ahead > 0, `${ahead} of ${routes} make something ahead; of the cheapest routes, by up to ${(Math.max(0, ...saved) * 100).toFixed(1)}% cheaper for it`);
+  check("no craft is made without its tool, and each tool is got once, by a recipe or from a vendor", !faults.length && tooled > 0, `${tools} tools got on ${tooled} routes`);
+  check("and none is the worse for what it leaves unlearned and unmade", !faults.length && spared > 0, `${spared} of ${routes / 2} cheapest routes leave something out; by up to ${(Math.max(0, ...lean) * 100).toFixed(1)}% cheaper for it, fees counted`);
   for (const l of lines) console.log(`      ${l}`);
 }
 
@@ -293,18 +377,63 @@ console.log("data");
   const sc = D.stats.shiftCheck;
   check("recipe items moved with their recipes often enough to lean on", sc.total >= 100 && sc.match / sc.total >= 0.9, `${sc.match} of ${sc.total} (${((100 * sc.match) / sc.total).toFixed(1)}%)`);
   // prices and ranks, for the route
-  const reagents = new Set(), products = new Set();
-  for (const p of D.professions) for (const r of p.recipes) { for (const [id] of r.r || []) reagents.add(id); if (r.p) products.add(r.p[0]); }
+  const reagents = new Set(), products = new Set(), toolIds = new Set(), books = new Set();
+  for (const p of D.professions) {
+    for (const r of p.recipes) { for (const [id] of r.r || []) reagents.add(id); if (r.p) products.add(r.p[0]); }
+    for (const t of p.tools || []) for (const id of t.it) toolIds.add(id);
+    for (const k of p.ranks) if (k.ri != null) books.add(k.ri);
+  }
   let priced = 0, badPrice = 0;
   for (const [id, it] of Object.entries(D.items)) {
     if (it[2] != null && !(Number.isInteger(it[2]) && it[2] >= 0)) badPrice++;
     if (it[3] != null && !(Number.isInteger(it[3]) && it[3] > 0 && products.has(Number(id)))) badPrice++;
-    if (it[2] > 0 && !reagents.has(Number(id))) badPrice++;
-    if (it[2] > 0) priced++;
+    if (it[2] > 0 && !reagents.has(Number(id)) && !toolIds.has(Number(id)) && !books.has(Number(id))) badPrice++;
+    if (it[2] > 0 && reagents.has(Number(id))) priced++;
   }
-  check("vendor prices are whole copper, on reagents and products only", !badPrice && priced > 0, `${priced} of ${reagents.size} reagents priced; ${Object.values(D.items).filter((it) => it[3] > 0).length} products with a vendor value`);
+  check("vendor prices are whole copper, on reagents, tools, rank books and products only", !badPrice && priced > 0, `${priced} of ${reagents.size} reagents priced; ${Object.values(D.items).filter((it) => it[3] > 0).length} products with a vendor value`);
   const badRanks = D.professions.filter((p) => !Array.isArray(p.ranks) || p.ranks.some((k, i) => !k.n || k.cap !== 75 * (i + 1) || (k.l != null && !(k.l > 0 && k.l < k.cap))) || (p.ranks.length && p.ranks[p.ranks.length - 1].cap !== D.skillCap));
   check("ranks rise by 75 to the cap, each trainable before the one below runs out", !badRanks.length, badRanks.length ? badRanks.map((p) => p.name).join(", ") : `${D.professions.filter((p) => p.ranks.length).length} professions with ranks; raised by gathering: ${D.professions.filter((p) => p.gather).map((p) => p.name).join(", ")}`);
+
+  // tools: each one a recipe asks for is in its profession's list, with the items that will do
+  const badTools = [];
+  let asks = 0;
+  for (const p of D.professions) {
+    for (const t of p.tools || []) if (!t.n || !t.it.length || t.it.some((id) => !item(id) || !item(id)[0]) || new Set(t.it).size !== t.it.length || (t.v || []).some((id) => !t.it.includes(id) || !(item(id)[2] > 0))) badTools.push(`${p.name} / ${t.n}`);
+    for (const r of p.recipes) for (const k of r.t || []) { asks++; if (!Number.isInteger(k) || !(p.tools || [])[k]) badTools.push(`${p.name} / ${r.n}`); }
+  }
+  check("every tool a recipe asks for is listed with the items that serve as it", !badTools.length && asks > 0, badTools.length ? `${badTools.length}, first ${badTools[0]}` : `${asks} recipes ask for one of ${D.professions.reduce((n, p) => n + (p.tools || []).length, 0)} tools`);
+  // an enchanter's rods: any better rod will do for a lesser one, and none is sold; a smith's hammer is bought
+  const ench = D.professions.find((p) => p.id === 333), smith = D.professions.find((p) => p.id === 164);
+  const rods = (ench.tools || []).filter((t) => /^Runed .* Rod$/.test(t.n)).sort((x, y) => y.it.length - x.it.length);
+  check("a better rod serves for a lesser one, and no vendor sells a rod", rods.length === 5 && rods.every((t, i) => t.it.length === 5 - i && !t.v && item(t.it[0])[0] === t.n && (i === 0 || rods[i - 1].it.slice(1).join() === t.it.join())) && rods.every((t) => ench.recipes.some((r) => r.p && r.p[0] === t.it[0])), rods.map((t) => t.n.replace(/^Runed | Rod$/g, "")).join(" < "));
+  const hammer = (smith.tools || []).find((t) => t.n === "Blacksmith Hammer");
+  check("a blacksmith's hammer is a vendor's", !!hammer && hammer.v && hammer.v[0] === hammer.it[0] && item(hammer.it[0])[2] > 0, hammer ? M.money(item(hammer.it[0])[2]) : "");
+
+  // vanilla's trainers: a fee and a kind of trainer for every recipe one taught
+  const badFees = [], noFee = [];
+  let fees = 0;
+  for (const p of D.professions) {
+    const kinds = (p.trainers || []).length;
+    if (p.trainers && (!(p.ladder >= 0 && p.ladder <= kinds) || new Set(p.trainers).size !== kinds || kinds > 30)) badFees.push(p.name);
+    for (const r of p.recipes) {
+      const taught = r.s === "t" || r.s === "e";
+      if (!taught) { if (r.m != null || r.w != null) badFees.push(`${p.name} / ${r.n}`); continue; }
+      if (!(r.m > 0 && r.w > 0)) { noFee.push(r.n); continue; }
+      fees++;
+      if (!Number.isInteger(r.m) || !Number.isInteger(r.w) || r.w >= 2 ** kinds || (r.lv != null && !(r.lv > 0 && r.lv <= 60))) badFees.push(`${p.name} / ${r.n}`);
+    }
+    for (const k of p.ranks) {
+      if ((k.m != null && !(Number.isInteger(k.m) && k.m > 0)) || (k.w != null && !(k.w > 0 && k.w < 2 ** kinds)) || (k.ri != null && !(item(k.ri) && item(k.ri)[0] && item(k.ri)[2] > 0 && k.l > 0)) || (k.lv != null && !(k.lv > 0 && k.lv <= 60))) badFees.push(`${p.name} / ${k.n}`);
+    }
+  }
+  check("every recipe a vanilla trainer taught carries the fee and the kinds of trainer, bar the odd one out", !badFees.length && noFee.length <= 2 && fees > 400, badFees.length ? `${badFees.length}, first ${badFees[0]}` : `${fees} recipes${noFee.length ? `; without: ${noFee.join(", ")}` : ""}`);
+  // the anchor: what a player reported from Forever is what vanilla's tables say
+  const tailor = D.professions.find((p) => p.id === 197), headband = tailor.recipes.find((r) => r.n === "Silk Headband");
+  const whoOf = (p, mask) => p.trainers.filter((t, i) => (mask >> i) & 1);
+  check("Silk Headband is taught from the Artisan tailor up, as a player found it in Forever", !!headband && whoOf(tailor, headband.w).join() === "Artisan Tailor,Master Tailor" && tailor.trainers.slice(0, tailor.ladder).join() === "Journeyman Tailor,Expert Tailor,Artisan Tailor,Master Tailor", headband ? `${whoOf(tailor, headband.w).join(", ")}; ${M.money(headband.m)}` : "");
+  const crafting = D.professions.filter((p) => p.kind === "primary" && !p.gather);
+  const stepUp = crafting.length > 0 && crafting.every((p) => p.ranks.length === 4 && p.ranks[1].m > 0 && p.ranks[1].m < p.ranks[2].m && p.ranks[2].m < p.ranks[3].m && p.ranks.slice(1).every((k) => k.w > 0));
+  check("each rank of a crafting profession costs more than the one before", stepUp, tailor.ranks.slice(1).map((k) => `${k.n} ${M.money(k.m)}`).join(", "));
   const unnamed = D.professions.flatMap((p) => p.recipes).filter((r) => !r.x && r.p && !item(r.p[0])[0]).length;
   console.log(`    (${unnamed} live recipes make an item the client has no record of; the page names those by the recipe)`);
 }
