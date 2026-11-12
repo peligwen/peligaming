@@ -159,6 +159,16 @@ legacy talent counted in or left out.
   and it keeps the time at the anvil low rather than the cost: this build's
   crafts run from three seconds for a sharpening stone to a minute for a
   breastplate, and the cheapest way to 300 can be six hours of casting.
+- **Reagents made while they still give points.** A bolt of cloth takes
+  the same cloth whenever it is made, but made while bolts are orange it
+  brings a point with it, and made when a later step calls for it, long
+  after bolts have gone grey, it brings nothing. So where a step needs
+  something one of your recipes makes, the route makes it as soon as that
+  recipe can be cast and for as long as a craft can still give a point,
+  marks the step *made ahead*, names the steps it is for, and says what the
+  route saves by it. A tailor going from 50 to 150 at vendor prices makes
+  wool bolts from 55 to 85 and silk bolts from 100, and the way comes to
+  14g 75s and 36 minutes at the loom where it was 16g 94s and 49.
 - **At the anvil.** The first step is the one to be making now. A button on
   it, or the + key, takes a point when you get one, and the route, the
   shopping list and the catalogue all move with you.
@@ -167,8 +177,11 @@ legacy talent counted in or left out.
   The only price in the game's data is what a vendor charges, which is right
   for flux and thread and only a stand-in for ore and bars, so every price
   is a box to type your realm's into (or 0 for what you already have); the
-  route is worked out again at your prices, and they are remembered. It ends
-  with what you will be left holding and what a vendor pays for it.
+  route is worked out again at your prices, and they are remembered. A
+  material the route does not use can be priced as well, since it may be
+  only the vendor's figure that keeps it out: wool at three times the price
+  of linen is a different route from wool at seven times. It ends with what
+  you will be left holding and what a vendor pays for it.
 - **The recipes you have.** Out of the box the route uses what a trainer
   teaches and what you start with. Tick a plan, pattern or formula in the
   catalogue once you own it, or untick a recipe you cannot get, and the
@@ -250,7 +263,8 @@ legacy talent counted in or left out.
   OF DISCOVERY"; they are in the data, flagged, and hidden until asked for.
 - **The route.** At each skill it takes the recipe with the lowest expected
   cost of the next point (materials for a craft, over the chance), or the
-  lowest expected time. Three things keep that from being a recipe a point.
+  lowest expected time (the craft's own and that of whatever has to be made
+  on the side for it). Three things keep that from being a recipe a point.
   It stays on a recipe while that is within a twentieth of the best. It
   leaves one whose chance has dropped under a mark you set (one in four by
   default) when something better is to hand: nobody grinds a recipe at one
@@ -262,6 +276,22 @@ legacy talent counted in or left out.
   bought, and a reagent one of your recipes makes is made, not bought. The
   crafts that are enough nine times in ten are not an approximation: the
   odds of standing at each skill are carried forward craft by craft.
+- **Making ahead.** That pass makes a reagent on the side at the moment a
+  step wants it, which is often long after its own recipe has gone grey. So
+  the route is gone over again with those crafts made ahead instead: from
+  the first skill at which the recipe can be cast, for as long as a craft
+  can still give a point, and each point they give is one the route does
+  not have to find elsewhere. How much to make is whatever the route then
+  goes on to use, which is found by going round a few times, since a route
+  with thirty points fewer to find needs fewer shirts and so fewer bolts.
+  What is made ahead is kept for the steps that wanted it, not offered to
+  every recipe as stock for the taking, or a recipe that eats three bolts
+  would be chosen over one that eats one because the bolts were lying
+  about. Where the plain route takes the recipe up for its own sake a
+  little later, the crafts go on the front of that step and do not split
+  an earlier one. And the result is kept only if it is better than the
+  plain route: of the 56 routes the checks run, 20 make something ahead,
+  and none is the worse for it.
 - The page (`public/tools/wow-forever/profession-catalogue.html`) is one
   file of vanilla JS. Its `<script id="catalogue-model">` block is the
   arithmetic and nothing else, and `npm run check:professions` runs it in
@@ -269,9 +299,11 @@ legacy talent counted in or left out.
   readings, expected and nine-in-ten crafts against sums worked by hand,
   money read and written, the route against hand calculations on small
   made-up recipe books (which recipe wins, where the switch comes, stock used
-  before anything is bought), then every recipe at every skill from 1 to
-  300, 56 routes over the real professions checked for being unbroken and
-  for bills that add up, and the data file's own shape.
+  before anything is bought, what a later step needs made ahead and kept for
+  it), then every recipe at every skill from 1 to 300, 56 routes over the
+  real professions checked for being unbroken, for bills that add up and
+  for being no worse for what they make ahead, and the data file's own
+  shape.
 
 ### What the percentages are
 
