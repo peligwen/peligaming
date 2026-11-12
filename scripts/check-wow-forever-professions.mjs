@@ -9,9 +9,17 @@
 //     slope, green the worse),
 //   - the talent never lowers a chance, never lifts it past certain, and
 //     never gives a grey recipe a point, in either of its two readings,
-//   - the expected crafts match the sums worked by hand.
+//   - the expected crafts match the sums worked by hand, and the crafts
+//     that are enough nine times in ten match the odds worked by hand,
+//   - money reads and writes the way the game writes it,
+//   - the route picks what a hand calculation picks on small made-up recipe
+//     books (the cheaper recipe per point, the switch at the right skill, what
+//     was made earlier used before anything is bought), and on every real
+//     profession it is a route: unbroken, only recipes the player has by
+//     then, only while they can give a point, and a bill that adds up.
 // The data is checked for shape: every recipe in a category, levels in
-// order, every item it names present, every learn level carrying its source.
+// order, every item it names present, every learn level carrying its source,
+// prices and ranks where they should be.
 //
 //   node scripts/check-wow-forever-professions.mjs      (npm run check:professions)
 
@@ -63,6 +71,80 @@ console.log("model");
   let byHand = 2; for (let s = 12; s < 20; s++) byHand += 10 / (1.2 * (20 - s));
   check("the multiplied talent, by hand", near(M.crafts(t, 10, 20, 20, "x"), byHand), `${M.crafts(t, 10, 20, 20, "x").toFixed(4)} vs ${byHand.toFixed(4)}`);
   check("a recipe that gives two points a success takes half the crafts", near(M.crafts({ y: 50, g: 60, u: 2 }, 40, 50), 5));
+
+  // the crafts that are enough nine times in ten
+  check("certain points need no margin", M.craftsQuantile(t, 3, 10) === 7 && M.craftsQuantile(t, 5, 5) === 0);
+  // one point at a half: enough in n crafts with odds 1 − ½ⁿ, so four; at one in five, eleven
+  check("one point at 50% is safe in four crafts, at 20% in eleven", M.craftsQuantile(t, 15, 16) === 4 && M.craftsQuantile(t, 18, 19) === 11);
+  // two certain points then one at a half: two crafts more than the single point at a half
+  check("two certain points and a 50% one are safe in six", M.craftsQuantile({ y: 15, g: 17 }, 14, 16) === 2 && M.craftsQuantile({ y: 15, g: 17 }, 14, 17) === 6);
+  check("more caution never means fewer crafts, and never fewer than the points", M.craftsQuantile(t, 10, 20, 0, "x", 0.5) <= M.craftsQuantile(t, 10, 20) && M.craftsQuantile(t, 10, 20) <= M.craftsQuantile(t, 10, 20, 0, "x", 0.99) && M.craftsQuantile(t, 10, 20, 0, "x", 0.5) >= 10,
+    `half the time ${M.craftsQuantile(t, 10, 20, 0, "x", 0.5)}, nine in ten ${M.craftsQuantile(t, 10, 20)}, ninety-nine in a hundred ${M.craftsQuantile(t, 10, 20, 0, "x", 0.99)}, on average ${M.crafts(t, 10, 20).toFixed(1)}`);
+  check("past grey there is no safe number either", M.craftsQuantile(t, 15, 21) === Infinity);
+}
+
+// ---------------------------------------------------------------------- money
+console.log("money");
+{
+  check("written as the game writes it", M.money(0) === "0c" && M.money(5) === "5c" && M.money(120) === "1s 20c" && M.money(2000) === "20s" && M.money(12345) === "1g 23s" && M.money(2000000) === "200g" && M.money(12345678) === "1,234g" && M.money(null) === "?" && M.money(Infinity) === "?");
+  check("read back", M.parseMoney("1g 20s 5c") === 12005 && M.parseMoney("2g50s") === 25000 && M.parseMoney("35s") === 3500 && M.parseMoney("80c") === 80 && M.parseMoney("1.5g") === 15000 && M.parseMoney(" 0 ") === 0);
+  check("a bare number is silver", M.parseMoney("12") === 1200 && M.parseMoney("2.5") === 250);
+  check("what is not a price is not one", M.parseMoney("") === null && M.parseMoney("cheap") === null && M.parseMoney("1g x") === null && M.parseMoney("s") === null);
+  let round = true;
+  for (const c of [0, 1, 99, 100, 101, 2550, 9999]) if (M.parseMoney(M.money(c)) !== c) round = false;
+  check("under a gold, what is written reads back to the copper", round);
+}
+
+// ------------------------------------------------------------------ the route
+console.log("route, on made-up recipe books");
+{
+  const prices = { 1: 10, 2: 30 };
+  const price = (id) => (id in prices ? prices[id] : null);
+  const names = (R) => R.steps.map((st) => `${st.r ? st.r.n : "gap"} ${st.from}-${st.to}`).join(", ");
+  // A is cheap and goes grey at 20, B is three times the price and lasts to 30.
+  // A point from A costs 100 ÷ (20 − s) past 10; from B 30 until 15, then 450 ÷ (30 − s).
+  // A stays the cheaper through 17 (33.3 against 34.6) and loses at 18 (50 against 37.5).
+  const A = { n: "A", y: 10, g: 20, r: [[1, 1]], from: 1 }, B = { n: "B", y: 15, g: 30, r: [[2, 1]], from: 1 };
+  let R = M.route({ pool: [A, B], a: 1, b: 30, price, stick: 0 });
+  check("the cheaper point wins, and the switch comes where the sums say", names(R) === "A 1-18, B 18-30", names(R));
+  check("its crafts are the recipes' own", near(R.crafts, M.crafts(A, 1, 18) + M.crafts(B, 18, 30)) && R.points === 29 && R.craftsSafe === R.steps[0].craftsSafe + R.steps[1].craftsSafe);
+  check("its bill is its crafts at their prices", near(R.typical.total.cost, 10 * M.crafts(A, 1, 18) + 30 * M.crafts(B, 18, 30)) && near(R.typical.total.buys.get(1), M.crafts(A, 1, 18)), M.money(R.typical.total.cost));
+  check("buying to be safe costs more, by each step's margin", R.cautious.total.cost > R.typical.total.cost && near(R.cautious.total.cost, 10 * R.steps[0].craftsSafe + 30 * R.steps[1].craftsSafe));
+  // B is learned at 22: A is ridden to its last point, and 20 and 21 are a gap
+  R = M.route({ pool: [A, Object.assign({}, B, { from: 22 })], a: 1, b: 30, price });
+  check("where nothing gives a point there is a gap, and the route goes on after it", names(R) === "A 1-20, gap 20-22, B 22-30" && R.points === 27 && R.gaps.length === 1, names(R));
+  // leave a recipe under one in two: A is at 50% on 15 and 40% on 16, where B is still above nine in ten
+  R = M.route({ pool: [A, B], a: 1, b: 30, price, stick: 0, least: 0.5 });
+  check("a recipe is left once it drops under the mark, if something better is to hand", names(R) === "A 1-16, B 16-30", names(R));
+  R = M.route({ pool: [A], a: 1, b: 20, price, least: 0.5 });
+  check("and ridden to the end if nothing is", names(R) === "A 1-20");
+  // staying put: within a twentieth of the best is not worth a change
+  const C = { n: "C", y: 50, g: 60, r: [[1, 1]], from: 1 }, Cx = { n: "C′", y: 50, g: 60, r: [[1, 1]], from: 5 };
+  R = M.route({ pool: [C, Cx], a: 1, b: 20, price });
+  check("no change of recipe for nothing", names(R) === "C 1-20", names(R));
+  // quickest: the three-second craft over the minute-long one, whatever it costs
+  const slow = { n: "slow", y: 50, g: 60, r: [[1, 1]], ct: 60, from: 1 }, fast = { n: "fast", y: 50, g: 60, r: [[2, 5]], ct: 3, from: 1 };
+  check("cheapest and quickest are different routes", names(M.route({ pool: [slow, fast], a: 1, b: 10, price })) === "slow 1-10" && names(M.route({ pool: [slow, fast], a: 1, b: 10, price, goal: "time" })) === "fast 1-10");
+  check("and the time is the crafts at their cast times", near(M.route({ pool: [slow], a: 1, b: 10, price }).typical.seconds, 540) && near(M.route({ pool: [fast], a: 1, b: 10, price }).typical.seconds, 27));
+  // What you made earlier is yours. S makes an X from two of item 1 (20 a craft, yellow at 5, grey at 10);
+  // T takes an X and one of item 1 — 30 a point if the X has to be made for it.
+  // S is the cheaper point through 6 (20, 20, 20, 20, 20, 25) and dearer at 7 (33.3): six points, 6.25 X.
+  // T then spends them, 10 a point, from 7 to 11, and 1.25 X are left.
+  const S = { n: "S", y: 5, g: 10, r: [[1, 2]], p: [9, 1], from: 1 }, T = { n: "T", y: 20, g: 30, r: [[9, 1], [1, 1]], from: 1 };
+  R = M.route({ pool: [S, T], a: 1, b: 12, price });
+  check("a batch is finished before it is spent: no taking turns a point at a time", names(R) === "S 1-7, T 7-12", names(R));
+  check("what was made on the way is used before anything is bought", near(R.typical.total.cost, 175) && near(R.typical.total.buys.get(1), 17.5) && near(R.typical.per[1].cost, 50) && !R.typical.total.side.size && near(R.typical.left.get(9), 1.25), M.money(R.typical.total.cost));
+  // on to 16: the last X goes at 12, a quarter of one is left for 13, and 2.75 are made on the side
+  R = M.route({ pool: [S, T], a: 1, b: 16, price });
+  check("and what runs out is made, not bought, by a recipe the player has", names(R) === "S 1-7, T 7-16" && near(R.typical.total.side.get(S), 2.75) && !R.typical.total.buys.has(9) && near(R.typical.total.cost, 270) && near(R.typical.left.get(9) || 0, 0), `${names(R)}: ${M.money(R.typical.total.cost)}`);
+  check("a recipe not yet learned makes nothing", (() => { const late = Object.assign({}, S, { from: 99 }); const r2 = M.route({ pool: [late, T], a: 1, b: 4, price: (id) => (id === 9 ? 500 : price(id)) }); return near(r2.typical.total.buys.get(9), 3) && near(r2.typical.total.cost, 1530); })());
+  // no price: left alone while something priced will do, used and flagged when nothing else will
+  const U = { n: "U", y: 50, g: 60, r: [[7, 1]], from: 1 };
+  check("a recipe with an unpriced material waits for a price", names(M.route({ pool: [U, B], a: 1, b: 10, price })) === "B 1-10");
+  R = M.route({ pool: [U], a: 1, b: 10, price });
+  check("unless it is all there is, and then the bill says what has no price", names(R) === "U 1-10" && R.typical.total.unpriced.has(7) && R.typical.total.cost === 0);
+  check("a cooldown recipe is nobody's way of making stock", M.makersOf([Object.assign({}, S, { cd: 3600 })]).size === 0 && M.makersOf([S]).get(9) === S);
+  check("the talent shortens the route's crafts", M.route({ pool: [A, B], a: 1, b: 30, price, bonus: 20 }).crafts < M.route({ pool: [A, B], a: 1, b: 30, price }).crafts);
 }
 
 // --------------------------------------------- the model over every real recipe
@@ -91,6 +173,42 @@ console.log("model, over every recipe in the data");
   check("yellow is above a half, green at or below it", !bad.colour.length, first(bad.colour));
   check("the talent never lowers a chance, and adding gives at least as much as multiplying", !bad.talent.length, first(bad.talent));
   void points;
+}
+
+// ------------------------------------------------- the route, on the real data
+console.log("route, over every profession: what a trainer teaches, then every recipe");
+{
+  const price = (id) => (D.items[id] && D.items[id][2] > 0 ? D.items[id][2] : null);
+  const cap = D.skillCap, faults = [], lines = [];
+  let routes = 0;
+  for (const p of D.professions) for (const all of [false, true]) for (const goal of ["cost", "time"]) {
+    for (const r of p.recipes) r.from = r.l != null ? r.l : 1;
+    const pool = p.recipes.filter((r) => !r.x && !r.cd && r.g != null && ("ate".includes(r.s) || (all && r.s === "i")));
+    const opts = { pool, a: 1, b: cap, price, goal, least: 0.25 };
+    const R = M.route(opts), who = `${p.name} (${all ? "every recipe" : "trainer"}, ${goal})`;
+    routes++;
+    let at = 1, last = null, paid = 0;
+    for (const st of R.steps) {
+      if (st.from !== at || st.to <= st.from) faults.push(`${who}: broken at ${st.from}`);
+      at = st.to;
+      if (st.r && st.r === last) faults.push(`${who}: ${st.r.n} twice running at ${st.from}`);
+      last = st.r;
+      for (let s = st.from; s < st.to; s++) {
+        if (st.r) { if (st.r.from > s || M.chance(st.r, s) <= 0 || !pool.includes(st.r)) faults.push(`${who}: ${st.r.n} cannot give a point at ${s}`); }
+        else if (pool.some((r) => r.from <= s && M.chance(r, s) > 0)) faults.push(`${who}: a gap at ${s} with a recipe to hand`);
+      }
+      if (st.r && !(st.crafts >= st.to - st.from - 1e-9 && st.craftsSafe >= Math.floor(st.crafts) && st.craftsSafe >= st.to - st.from)) faults.push(`${who}: crafts out of order at ${st.from}`);
+    }
+    if (at !== cap) faults.push(`${who}: ends at ${at}`);
+    for (const [id, n] of R.typical.total.buys) { if (!(n > 0)) faults.push(`${who}: buys ${n} of ${id}`); paid += n * (price(id) || 0); }
+    if (!near(paid, R.typical.total.cost, 1e-6 * Math.max(1, paid))) faults.push(`${who}: the bill is ${R.typical.total.cost}, its lines come to ${paid}`);
+    if (!near(R.typical.per.reduce((n, led) => n + led.cost, 0), R.typical.total.cost, 1e-6 * Math.max(1, paid))) faults.push(`${who}: the steps do not add up to the bill`);
+    if (R.cautious.total.cost < R.typical.total.cost - 1e-6) faults.push(`${who}: buying to be safe is cheaper`);
+    if (JSON.stringify(M.route(opts).steps.map((st) => [st.from, st.to, st.r && st.r.i])) !== JSON.stringify(R.steps.map((st) => [st.from, st.to, st.r && st.r.i]))) faults.push(`${who}: not the same route twice`);
+    if (goal === "cost") lines.push(`${p.name}, ${all ? "every recipe" : "trainer's"}: ${R.points} of ${cap - 1} points, ${R.steps.filter((st) => st.r).length} steps, ${Math.round(R.crafts)} crafts, ${M.money(R.typical.total.cost)}`);
+  }
+  check("every route is unbroken, uses only what the player has by then and only while it gives a point", !faults.length, faults.length ? `${faults.length}, first: ${faults[0]}` : `${routes} routes`);
+  for (const l of lines) console.log(`      ${l}`);
 }
 
 // ------------------------------------------------------------------- the data
@@ -130,6 +248,19 @@ console.log("data");
   check("the stated totals are the counted ones", D.stats.recipes === counts.recipes && D.stats.leftovers === counts.leftovers && L.auto === counts.a && L.item === counts.i && L.trainer === counts.t && L.estimate === counts.e && L.unknown === counts.u);
   const sc = D.stats.shiftCheck;
   check("recipe items moved with their recipes often enough to lean on", sc.total >= 100 && sc.match / sc.total >= 0.9, `${sc.match} of ${sc.total} (${((100 * sc.match) / sc.total).toFixed(1)}%)`);
+  // prices and ranks, for the route
+  const reagents = new Set(), products = new Set();
+  for (const p of D.professions) for (const r of p.recipes) { for (const [id] of r.r || []) reagents.add(id); if (r.p) products.add(r.p[0]); }
+  let priced = 0, badPrice = 0;
+  for (const [id, it] of Object.entries(D.items)) {
+    if (it[2] != null && !(Number.isInteger(it[2]) && it[2] >= 0)) badPrice++;
+    if (it[3] != null && !(Number.isInteger(it[3]) && it[3] > 0 && products.has(Number(id)))) badPrice++;
+    if (it[2] > 0 && !reagents.has(Number(id))) badPrice++;
+    if (it[2] > 0) priced++;
+  }
+  check("vendor prices are whole copper, on reagents and products only", !badPrice && priced > 0, `${priced} of ${reagents.size} reagents priced; ${Object.values(D.items).filter((it) => it[3] > 0).length} products with a vendor value`);
+  const badRanks = D.professions.filter((p) => !Array.isArray(p.ranks) || p.ranks.some((k, i) => !k.n || k.cap !== 75 * (i + 1) || (k.l != null && !(k.l > 0 && k.l < k.cap))) || (p.ranks.length && p.ranks[p.ranks.length - 1].cap !== D.skillCap));
+  check("ranks rise by 75 to the cap, each trainable before the one below runs out", !badRanks.length, badRanks.length ? badRanks.map((p) => p.name).join(", ") : `${D.professions.filter((p) => p.ranks.length).length} professions with ranks; raised by gathering: ${D.professions.filter((p) => p.gather).map((p) => p.name).join(", ")}`);
   const unnamed = D.professions.flatMap((p) => p.recipes).filter((r) => !r.x && r.p && !item(r.p[0])[0]).length;
   console.log(`    (${unnamed} live recipes make an item the client has no record of; the page names those by the recipe)`);
 }

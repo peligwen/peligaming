@@ -11,7 +11,11 @@
 //     from the start; the spell tables carry the product, the reagents, the
 //     tools, the forge or anvil and the cooldown; the items that teach a
 //     recipe carry the skill needed to learn it; the trait tables carry the
-//     Working Overtime talent and what each rank is worth.
+//     Working Overtime talent and what each rank is worth. For the route
+//     the page plans, three more things: what a vendor charges for each
+//     reagent (the only price the client has: exact for what vendors sell,
+//     a stand-in for everything else), the profession's ranks and the skill
+//     each one caps at, and which professions are raised by gathering.
 //   * wago.tools again, for one Classic Era build's SkillLineAbility: the
 //     vanilla yellow level of each recipe, to see how far Forever moved it.
 //   * CMaNGOS classic-db (GPLv3) — the vanilla 1.12 trainer tables. What a
@@ -64,7 +68,7 @@ const PRODUCT = await wago.product(BUILD), ERA_PRODUCT = await wago.product(ERA_
 if (!PRODUCT || !ERA_PRODUCT) throw new Error(`wago.tools does not list build ${PRODUCT ? ERA_BUILD : BUILD}`);
 log(`build ${BUILD} (${PRODUCT}); Classic Era baseline ${ERA_BUILD} (${ERA_PRODUCT})`);
 const T = {};
-for (const name of ["SkillLine", "SkillLineAbility", "SkillRaceClassInfo", "TradeSkillCategory", "ChrClasses",
+for (const name of ["SkillLine", "SkillLineAbility", "SkillRaceClassInfo", "TradeSkillCategory", "ChrClasses", "Profession",
   "SpellName", "Spell", "SpellEffect", "SpellReagents", "SpellTotems", "TotemCategory", "SpellCastingRequirements", "SpellFocusObject",
   "SpellCooldowns", "SpellMisc", "SpellCastTimes", "SpellItemEnchantment", "ItemSparse", "ItemEffect", "ItemXItemEffect",
   "TraitDefinition", "TraitNodeEntry", "TraitNodeXTraitNodeEntry", "TraitDefinitionEffectPoints", "CurvePoint"]) {
@@ -162,7 +166,11 @@ log(`  ${talent.name}: ${talent.ranks.map((r) => `+${r}%`).join(" / ")}`);
 // ---------------------------------------------------------------------------
 // 4. The recipes
 // ---------------------------------------------------------------------------
-const items = {};       // id -> [name, quality], every item the recipes mention
+// id -> [name, quality], every item the recipes mention. A reagent gets a
+// third value, what a vendor charges for it, and a product a fourth, what a
+// vendor pays for it; both in copper, both the client's own.
+const items = {};
+const reagentIds = new Set(), productIds = new Set();
 const useItem = (id) => {
   const s = itemSparse.get(String(id));
   if (!items[id]) items[id] = s ? [s.Display_lang, num(s.OverallQualityID)] : [null, null];
@@ -193,6 +201,23 @@ for (const id of PROFESSIONS) {
     if (!cats.has(key)) { cats.set(key, catList.length); catList.push(c ? { name: c.Name_lang, order: num(c.OrderIndex) } : { name: "Other skills", order: 99990 }); }
     return cats.get(key);
   };
+  // The ranks: each "Apprentice", "Journeyman" … spell of the profession sets
+  // the skill's ceiling to 75 times its step (effect 118, the skill effect).
+  // When a trainer will teach the next one is the server's, so it is
+  // vanilla's level here too.
+  const ranks = [];
+  for (const a of T.SkillLineAbility) {
+    if (a.SkillLine !== String(id) || spellName.get(a.Spell) !== line.DisplayName_lang) continue;
+    const step = (effects.get(a.Spell) || []).find((e) => e.Effect === "118" && e.EffectMiscValue_0 === String(id));
+    const title = (spellText.get(a.Spell)?.NameSubtext_lang || "").trim();
+    if (!step || !title || ranks.some((k) => k.n === title)) continue;
+    const rank = { n: title, cap: 75 * num(step.EffectBasePointsF) };
+    const at = vanillaTrainer.get(`${id}:${a.Spell}`);
+    if (at != null && at > 0) rank.l = at;
+    ranks.push(rank);
+  }
+  ranks.sort((x, y) => x.cap - y.cap);
+  const gathers = T.Profession.some((x) => x.SkillLineID === String(id) && x.ActionTypeEnumValue === "1");
   const recipes = [];
   const skipped = { unnamed: 0, retired: 0, rank: 0 };
   const listed = new Set();
@@ -248,13 +273,13 @@ for (const id of PROFESSIONS) {
 
     // --- what it makes
     // (a product the client has no item record for keeps its id; the page falls back to the recipe's name)
-    if (create) { r.p = [useItem(create.EffectItemType), Math.max(1, Math.round(num(create.EffectBasePointsF)))]; if (!items[r.p[0]][0]) stats.unnamedProducts++; }
+    if (create) { r.p = [useItem(create.EffectItemType), Math.max(1, Math.round(num(create.EffectBasePointsF)))]; productIds.add(create.EffectItemType); if (!items[r.p[0]][0]) stats.unnamedProducts++; }
     else if (enchant) r.e = enchantment.get(enchant.EffectMiscValue_0);
     else { const d = (spellText.get(a.Spell)?.Description_lang || "").replace(/\s+/g, " ").trim(); if (d && !/[$|]/.test(d)) r.d = d; }
 
     // --- what it takes
     const rg = reagents.get(a.Spell);
-    if (rg) { const list = []; for (let k = 0; k < 8; k++) if (rg[`Reagent_${k}`] !== "0" && num(rg[`ReagentCount_${k}`]) > 0) list.push([useItem(rg[`Reagent_${k}`]), num(rg[`ReagentCount_${k}`])]); if (list.length) r.r = list; }
+    if (rg) { const list = []; for (let k = 0; k < 8; k++) if (rg[`Reagent_${k}`] !== "0" && num(rg[`ReagentCount_${k}`]) > 0) { reagentIds.add(rg[`Reagent_${k}`]); list.push([useItem(rg[`Reagent_${k}`]), num(rg[`ReagentCount_${k}`])]); } if (list.length) r.r = list; }
     const tt = totems.get(a.Spell);
     if (tt) {
       const tools = [];
@@ -279,10 +304,11 @@ for (const id of PROFESSIONS) {
   for (const r of recipes) r.c = rank.get(r.c);
   recipes.sort((x, y) => x.c - y.c || (x.y ?? 9999) - (y.y ?? 9999) || (x.g ?? 9999) - (y.g ?? 9999) || x.n.localeCompare(y.n) || x.i - y.i);
   stats.recipes += recipes.length;
-  professions.push({ id, name: line.DisplayName_lang, kind, ...(cls ? { class: cls } : {}), about: line.Description_lang.replace(/\s+/g, " ").trim(),
-    categories: order.map((i) => catList[i].name), recipes });
+  professions.push({ id, name: line.DisplayName_lang, kind, ...(cls ? { class: cls } : {}), ...(gathers ? { gather: 1 } : {}),
+    about: line.Description_lang.replace(/\s+/g, " ").trim(), ranks, categories: order.map((i) => catList[i].name), recipes });
   log(`  ${line.DisplayName_lang}${cls ? ` (${cls})` : ""}: ${recipes.length} recipes in ${catList.length} categories` +
-    ` — left out ${skipped.retired} retired, ${skipped.unnamed} unnamed, ${skipped.rank} rank or gathering spells`);
+    ` — left out ${skipped.retired} retired, ${skipped.unnamed} unnamed, ${skipped.rank} rank or gathering spells` +
+    `; ranks ${ranks.map((k) => `${k.n} ${k.cap}${k.l ? ` (from ${k.l})` : ""}`).join(", ") || "none"}${gathers ? "; raised by gathering" : ""}`);
 }
 
 // the vanilla skill a recipe item asked for, read lazily from classic-db
@@ -297,10 +323,27 @@ function vanillaRecipeItem(itemId) {
   return vanillaRecipeItem.map.get(String(itemId));
 }
 
+// What a vendor charges for each reagent (ItemSparse.BuyPrice, in copper).
+// It is the real price of what vendors sell — flux, vials, thread — and for
+// ore, bars, herbs and cloth only a stand-in that rises with the material's
+// tier; the page says so and lets the player type their realm's prices.
+let priced = 0;
+for (const id of reagentIds) {
+  const buy = num(itemSparse.get(id)?.BuyPrice || 0);
+  if (buy > 0) { items[id][2] = buy; priced++; }
+}
+// ...and what a vendor pays for each thing the recipes make: what a leveller
+// gets back for the pile of bracers at the end.
+for (const id of productIds) {
+  const sell = num(itemSparse.get(id)?.SellPrice || 0);
+  if (sell > 0) { if (items[id][2] === undefined) items[id][2] = 0; items[id][3] = sell; }
+}
+
 // ---------------------------------------------------------------------------
 // 5. Checks, then write
 // ---------------------------------------------------------------------------
 const L = stats.learn;
+log(`  ${priced} of ${reagentIds.size} reagents carry a vendor price`);
 log(`  ${stats.recipes} recipes (${stats.leftovers} of them Season of Discovery leftovers)`);
 log(`  learnable at: known from the start ${L.auto}, the recipe item's own requirement ${L.item},` +
   ` a vanilla trainer's level ${L.trainer}, a vanilla trainer's level moved with the recipe ${L.estimate}, not known ${L.unknown}`);
