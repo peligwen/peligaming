@@ -137,8 +137,9 @@ else is added. Rebuild with `npm run data:wow-forever`.
 
 A levelling companion for Forever's professions, worked out from the game's
 own data: tell it your skill and where you are going, and it lays out what
-to make over which stretch of skill, how many crafts that should take, and
-what to buy for the whole way. Underneath is the catalogue it is worked out
+to make over which stretch of skill, how many crafts that should take, what
+to buy for the whole way, which tools to make and what to learn from which
+trainer. Underneath is the catalogue it is worked out
 from: every recipe with the skill at which it turns orange, yellow, green
 and grey and the estimated chance of a point, with the Working Overtime
 legacy talent counted in or left out.
@@ -169,6 +170,27 @@ legacy talent counted in or left out.
   route saves by it. A tailor going from 50 to 150 at vendor prices makes
   wool bolts from 55 to 85 and silk bolts from 100, and the way comes to
   14g 75s and 36 minutes at the loom where it was 16g 94s and 49.
+- **Tools.** Where a recipe is made with a tool, the first step that needs
+  one gets it, and its materials are on the shopping list: an enchanter's
+  rod is made, a blacksmith's hammer bought. Made while its own recipe is
+  still orange a rod is a step of its own, one craft and a point with it
+  (an enchanter going from 100 to 200 makes the Runed Silver Rod at 125);
+  later than that it is made on the side before the step that needs it. A
+  better tool does the work of a lesser one, as in the game, so only the
+  rods the route cannot do without are made. A row of ticks says which
+  tools you already have.
+- **At the trainer.** What a trainer charges is counted, for the recipes the
+  route uses and no others, and for each rank on the way, and listed by the
+  skill each is wanted at with the kind of trainer that teaches it: a
+  Journeyman Tailor's list stops long before an Artisan's. The tailor's way
+  from 50 to 150 is eight recipes and the Journeyman rank, 37s 35c on top
+  of 14g 75s of materials, and its last two recipes need an Artisan Tailor. If
+  the cheapest route is wanted, a recipe is only learned where the route
+  comes to less for it: one taken up for a point or two that saves less
+  than its fee is left out, and so is a rod that costs more to make than
+  the enchantments it opens save. Say *know it* for what you have already
+  learned and it costs nothing. Fees, levels and who teaches what are
+  vanilla's, and marked so.
 - **At the anvil.** The first step is the one to be making now. A button on
   it, or the + key, takes a point when you get one, and the route, the
   shopping list and the catalogue all move with you.
@@ -214,12 +236,15 @@ legacy talent counted in or left out.
   multiplies the chance (50% becomes 60%), + adds to it (50% becomes 70%).
   The route and every row count it in.
 - **A recipe opened.** What it makes and how many, what it takes and costs,
-  the tools and the forge or anvil, the cooldown, how it is learned, the
-  chance drawn against skill with and without the talent, and the crafts it
-  should take to ride the recipe from your skill to grey.
+  the tools (and what else will do for each) and the forge or anvil, the
+  cooldown, how it is learned and, where a trainer teaches it, which of
+  vanilla's trainers did and for how much, the chance drawn against skill
+  with and without the talent, and the crafts it should take to ride the
+  recipe from your skill to grey.
 - **Search** runs across every profession at once: a recipe, what it makes,
   a reagent ("linen cloth" finds everything in four professions that eats
-  it). The address carries the profession, skill, goal and talent, so a view
+  it), a tool, or a trainer ("artisan tailor" lists what that trainer is the
+  first to teach). The address carries the profession, skill, goal and talent, so a view
   can be shared; your ticks and prices stay in your browser.
 
 ### How it's built
@@ -240,6 +265,15 @@ legacy talent counted in or left out.
   ceiling to 75 times its step, which gives Apprentice 75, Journeyman 150,
   Expert 225 and Artisan 300. Pass a build number to target a newer build;
   downloads are cached in `.wow-forever-cache/`.
+- **Tools.** A recipe asks either for an item outright (Flint and Tinder)
+  or for a kind of tool, a totem category, and then any item whose own
+  category is of the same type and covers the wanted bits will do: the
+  Runed Golden Rod's category carries the bits of the copper and the silver
+  rod, so it serves for both. The script lists, for each tool a recipe asks
+  for, the items that serve as it, the plainest first. Whether a tool is
+  bought or has to be made is not in the client; vanilla's vendor tables
+  (the same CMaNGOS database as below) say a blacksmith's hammer and flint
+  and tinder were sold and no rod was.
 - **Learn levels.** For 1,708 of the 2,236 the level is exact: an item
   teaches the recipe and states the skill it asks for, or the game hands the
   recipe out by itself. What a *trainer* asks is decided on the server and
@@ -257,6 +291,17 @@ legacy talent counted in or left out.
   `MinSkillLineRank` is not used for this: outside the recipes the game
   hands out, it is a relic that matches neither vanilla's trainers nor
   Forever's levels.
+- **Fees and trainers.** The same vanilla tables say what a trainer charged
+  for each recipe and each rank and what character level was asked, and,
+  read with the title each trainer placed in the world carries, which kinds
+  of trainer taught it. 422 recipes carry a fee and their trainers; the
+  ranks cost about 5 silver, 50 silver and 5 gold; where vanilla taught a
+  rank from a book (the Expert Cookbook) the client still has the book and
+  its price. This is vanilla's, like the levels, and the page marks it †.
+  One thing it was checked against: a player found that Forever's Silk
+  Headband needs an Artisan tailor, and that is what vanilla's tables say
+  (Artisan and Master tailors only), though Forever has moved the recipe's
+  levels by 35 points.
 - **What is left out.** Recipes Forever retired (the client flags them),
   abilities whose spell is gone, and the gathering skills' own rank spells.
   The client still carries 286 recipes filed under a category named "SEASON
@@ -292,6 +337,18 @@ legacy talent counted in or left out.
   an earlier one. And the result is kept only if it is better than the
   plain route: of the 56 routes the checks run, 20 make something ahead,
   and none is the worse for it.
+- **Tools and fees.** A tool plays no part in choosing the next craft: the
+  first step to want one gets it, as a step of its own if making it is
+  certain to give a point and before the step otherwise. Fees are added up
+  for the recipes the route ends up using. Then, for the cheapest route,
+  each of those is tried without: every tool, and every recipe whose fee is
+  more than its points would have cost extra from the next best thing at
+  the time. Whatever leaves the whole cheaper, fees counted, with no point
+  lost, is left out, and the rest gone over again; the route that comes out
+  is kept only if it comes to less. Only a recipe nothing else is made from
+  is tried, because to do without the recipe for bolts would be to buy the
+  bolts at a stand-in price, and what you can make is made. Of the 28
+  cheapest routes the checks run from 1 to 300, 12 leave something out.
 - The page (`public/tools/wow-forever/profession-catalogue.html`) is one
   file of vanilla JS. Its `<script id="catalogue-model">` block is the
   arithmetic and nothing else, and `npm run check:professions` runs it in
@@ -300,10 +357,12 @@ legacy talent counted in or left out.
   money read and written, the route against hand calculations on small
   made-up recipe books (which recipe wins, where the switch comes, stock used
   before anything is bought, what a later step needs made ahead and kept for
-  it), then every recipe at every skill from 1 to 300, 56 routes over the
-  real professions checked for being unbroken, for bills that add up and
-  for being no worse for what they make ahead, and the data file's own
-  shape.
+  it, a tool bought or made once by the first step to need it, a fee paid
+  once, and a recipe or a tool not worth its cost left out), then every
+  recipe at every skill from 1 to 300, 56 routes over the real professions
+  checked for being unbroken, for no craft made without its tool, for bills
+  that add up and for being no worse for what they make ahead or leave out,
+  and the data file's own shape: 93 checks.
 
 ### What the percentages are
 
@@ -1106,7 +1165,7 @@ export and import, and this is an unofficial editor for that save.
 | --- | --- | --- |
 | Azeroth Survivors | Save Editor | Unseal an exported save, edit heroes, talents, zones and heroic tiers, the gear collection and its stars, perks, statistics and achievements, and seal it again for import — all in the browser |
 | WoW Forever | World Map | Azeroth at every scale from the game's own art: biomes for the zone-bound item effects, flight masters with times and a planner, boats and zeppelins with timetables, banks and auctioneers |
-| WoW Forever | Profession Catalogue | A levelling route from your skill with the recipes you have: what to make over which stretch, how many crafts, a shopping list at your prices and the plans worth finding; under it every recipe with the skill at which it turns orange, yellow, green and grey and the chance of a point, Working Overtime counted in or out |
+| WoW Forever | Profession Catalogue | A levelling route from your skill with the recipes you have: what to make over which stretch, how many crafts, a shopping list at your prices, the tools to make, what to learn from which trainer and the plans worth finding; under it every recipe with the skill at which it turns orange, yellow, green and grey and the chance of a point, Working Overtime counted in or out |
 | RuneScape | Sand Table | Boss & raid rehearsals: the briefing, the kit, and the fight rebuilt tile by tile in 3D with a drill mode |
 | RuneScape | Sand Table | Boss and raid rehearsals: the briefing checked against your hiscores, the kit slot by slot, and the fight rebuilt tile by tile in 3D with a tick clock — then a drill that grades your prayers and footwork |
 | RuneScape | Job Board | Skilling work priced by the Grand Exchange: a notice board of jobs that pay right now (or the cheapest xp in a skill), each lifting into a contract to buy, work and sell; plus a Market Board of weekly going rates with standing orders priced to fill within a day, a Commodities grid of the goods everyone trades with a GEB (Grand Exchange Basket) on every family, and an econ primer |
@@ -1323,8 +1382,9 @@ Several kinds of things live here under different terms — see
   © 2015 Olaf Frohn, **BSD-3-Clause** (the notice travels inside the file),
   plus NOAA's public-domain WMM2025 coefficients.
 - **Vanilla server values** in the WoW Forever data (the positions of
-  vanilla NPCs on the World Map, the vanilla trainer levels in the
-  Profession Catalogue) are derived from the
+  vanilla NPCs on the World Map; in the Profession Catalogue the vanilla
+  trainers' levels, fees and titles and which tools vendors sold) are
+  derived from the
   [CMaNGOS classic-db](https://github.com/cmangos/classic-db), **GPLv3**,
   and stay under it.
 

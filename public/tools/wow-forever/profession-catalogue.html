@@ -76,6 +76,11 @@
   .planhead .push{margin-left:auto;}
   #goal{width:56px;font-size:15px;}
   #planSum{margin:10px 0 0;font-size:14px;color:var(--parch);} #planSum b{color:var(--gold);font-variant-numeric:tabular-nums;} #planSum .dim{color:var(--dim);}
+  #kit{margin:7px 0 0;font-size:13px;color:var(--parch);display:flex;flex-wrap:wrap;gap:3px 14px;align-items:center;} #kit .lab{color:var(--dim);} #kit small{color:var(--faint);font-size:12px;}
+  .lnk.mini{font-size:12px;color:var(--dim);margin-left:4px;white-space:nowrap;} .lnk.mini:hover{color:var(--gold);}
+  #shop h3:not(:first-child){margin-top:16px;}
+  table.train td small{display:block;color:var(--dim);font-size:12px;} table.train td.got{width:1%;white-space:nowrap;padding-right:0;} table.train b.rank{color:var(--gold);font-weight:600;}
+  table.train tr.hd td:first-child{text-align:right;} table.train tr.sum.all td{padding-top:1px;font-weight:400;color:var(--dim);} table.train tr.sum.all td.tot{color:var(--parch);font-size:13px;}
   #ladder{position:relative;height:28px;border-radius:4px;background:#120e07;box-shadow:inset 0 0 0 1px var(--edge-hi);overflow:hidden;margin-top:10px;}
   #ladder a{position:absolute;top:0;bottom:0;display:block;padding:0 5px;font-size:11.5px;line-height:28px;color:#1a1408;font-weight:600;white-space:nowrap;overflow:hidden;text-decoration:none;border-left:1px solid #0b0906;}
   #ladder a.a0{background:#e0b95a;} #ladder a.a1{background:#b5924a;} #ladder a:hover{filter:brightness(1.15);color:#000;}
@@ -264,6 +269,7 @@
       </div>
       <div id="planBody">
         <p id="planSum"></p>
+        <p id="kit" hidden></p>
         <div id="ladder"></div>
         <div id="ticks"></div>
         <div id="finds"></div>
@@ -315,13 +321,15 @@
       <h3 id="about-route">The route</h3>
       <p>Set your skill and where you are going. At every skill on the way the route makes whatever gives the next point for the least in materials (or, if you ask for the quickest, in the least time at the anvil, counting what has to be made on the side: this build's crafts run from three seconds for a sharpening stone to a minute for a breastplate), out of the recipes you have by then. It counts what you have already made as yours to use, so the grinding stones from one step feed the bracers of the next, and anything one of your recipes can make is made rather than bought. It stays on a recipe while that is within a twentieth of the best, and leaves one whose chance has dropped under the mark you set if something better is to hand.</p>
       <p>What you make to use is made early. A bolt of cloth takes the same cloth whenever it is made, but made while bolts are still orange it brings a point with it, and made when a later step calls for it, long after bolts have gone grey, it brings nothing. So where a step needs something one of your recipes makes, the route makes it as soon as that recipe can be cast (or on the front of the step where the route takes that recipe up anyway) and for as long as a craft can still give a point, and marks the step <i>made ahead</i>. It makes ahead only what the route goes on to use, and keeps the result only if the whole route comes out cheaper (or quicker) for it; the line above the steps says by how much.</p>
+      <p>Tools are part of it. Where a recipe is made with a tool, the first step that needs one gets it: an enchanter's rod is made, a blacksmith's hammer bought, and its materials are on the shopping list. Made while its own recipe is still orange, a rod is a step of its own, one craft and a point with it; later than that it is made on the side before the step that needs it. A better tool does the work of a lesser one, as in the game (a Runed Golden Rod will do wherever a copper or a silver one is asked for), so only the rods the route cannot do without are made. The ticks under the sum say which tools you already have. To start with you are taken to have the ones you could have made or bought before your skill; untick any you lack.</p>
+      <p>What a trainer charges is counted too, for the recipes the route uses and for no others, and for each rank on the way. <i>At the trainer</i> lists them by the skill each is wanted at, with the kind of trainer that teaches it: a Journeyman Tailor's list stops long before an Artisan's. If you want the cheapest route, a recipe is only learned, and a tool only made, where the route comes to less for it: one taken up for a point or two that saves less than its fee is left out, and the line above the steps says which. Say <i>know it</i> or <i>have it</i> for what you have already paid for, and it costs nothing. All of this is vanilla's: fees, levels and who teaches what are the server's business and no client carries them, so they are marked † and Forever's may differ.</p>
       <p>“My recipes” are the ones a trainer teaches and the ones you start with; tick a plan, pattern or formula in the list once you own it and the route will use it, or untick anything you cannot get. “Every recipe” shows the best route the game allows and the plans it would take. Recipes on a cooldown are left out unless you tick them. Where nothing you have gives a point, the route says so and names the cheapest thing that would.</p>
       <p>Crafts are given twice: what it takes on average, and what is enough nine times out of ten, worked out exactly from the chance at each point. The shopping list can be switched to the second; it then buys for every step as if that step went badly, which is more than a whole run of bad luck would need.</p>
       <p class="note" id="priceNote"></p>
 
       <h3>Reading the table</h3>
       <p>The four numbers are the skill at which a recipe turns <b class="lv o">orange</b>, <b class="lv y">yellow</b>, <b class="lv g">green</b> and <b class="lv t">grey</b>. Yellow and grey are the client's own numbers for the recipe; green is the point halfway between them; orange starts where the recipe can be learned, and whatever your skill, a recipe below its yellow level is orange. The bar draws the same four on a scale of 1 to 300, with a white line at your skill.</p>
-      <p id="about-learn">Where a recipe is learned from an item, the first number is the skill that item asks for, and it is exact. What a trainer asks is decided on the server and no client carries it, so those levels are marked: <b>†</b> is what vanilla's trainers asked, for a recipe Forever has left where it was; <b>≈</b> is vanilla's level moved by as much as Forever moved the recipe's yellow level<span id="shiftnote"></span>; <b>?</b> is a recipe no item teaches and no vanilla trainer taught, so its level is not in the data.</p>
+      <p id="about-learn">Where a recipe is learned from an item, the first number is the skill that item asks for, and it is exact. What a trainer asks is decided on the server and no client carries it, so those levels are marked: <b>†</b> is what vanilla's trainers asked, for a recipe Forever has left where it was; <b>≈</b> is vanilla's level moved by as much as Forever moved the recipe's yellow level<span id="shiftnote"></span>; <b>?</b> is a recipe no item teaches and no vanilla trainer taught, so its level is not in the data. Open a recipe a trainer teaches and it says which of vanilla's trainers taught it and for how much; searching for a trainer's title (“artisan tailor”) lists what that trainer is the first to teach.</p>
 
       <h3 id="about-chance">How the chance is estimated</h3>
       <p>Two things are certain: an orange recipe gives a point every time, and a grey one never does. Blizzard has not published what happens in between. This page uses the straight line players have long used for Classic: certain up to the yellow level, then falling evenly to nothing at grey,</p>
@@ -351,8 +359,9 @@
 // points one success gives (1 unless stated); a recipe that never gives a
 // point has no g. For the route it also has r (what it takes: [item, count]
 // pairs), p (what it makes: [item, count]), ct (the seconds one craft takes),
-// cd (a cooldown, if it has one) and from (the skill from which the player
-// has it).
+// cd (a cooldown, if it has one), from (the skill from which the player has
+// it) and tools (for each tool it is made with, the items that will do, the
+// plainest first).
 const CATALOGUE = (() => {
   // green starts halfway from yellow to grey
   const green = (r) => Math.floor((r.y + r.g) / 2);
@@ -495,17 +504,27 @@ const CATALOGUE = (() => {
     }
   }
   const newLedger = () => ({ buys: new Map(), side: new Map(), unpriced: new Set(), cost: 0, made: 0 });
+  const NONE = [];
   // What a run of steps takes, with each step's crafts multiplied by scale(step).
+  // A tool a step has the player get first (st.tools) is got once, whatever
+  // the luck: made, like anything made on the side, or bought. A step that
+  // is itself the making of a tool (st.tool) leaves nothing in the bags.
   function bill(steps, scale, { bonus = 0, mode = "x", makers, price }) {
     const stock = new Map(), total = newLedger(), per = [];
     for (const st of steps) {
       const led = newLedger();
       if (st.r) {
-        const k = scale(st);
+        for (const t of st.tools || []) {
+          if (t.m) { led.side.set(t.m, (led.side.get(t.m) || 0) + 1); supply(t.m, 1, st.from, stock, makers, price, led); continue; }
+          const each = price(t.item);
+          if (each == null) led.unpriced.add(t.item); else led.cost += each;
+          led.buys.set(t.item, (led.buys.get(t.item) || 0) + 1);
+        }
+        const k = st.tool ? 1 : scale(st);
         for (let s = st.from; s < st.to; s += st.r.u || 1) {
           const n = k / chance(st.r, s, bonus, mode);
           supply(st.r, n, s, stock, makers, price, led);
-          if (st.r.p) { stock.set(st.r.p[0], (stock.get(st.r.p[0]) || 0) + st.r.p[1] * n); led.made += st.r.p[1] * n; }
+          if (st.r.p && !st.tool) { stock.set(st.r.p[0], (stock.get(st.r.p[0]) || 0) + st.r.p[1] * n); led.made += st.r.p[1] * n; }
         }
         for (const [id, n] of led.buys) total.buys.set(id, (total.buys.get(id) || 0) + n);
         for (const [m, n] of led.side) total.side.set(m, (total.side.get(m) || 0) + n);
@@ -539,25 +558,100 @@ const CATALOGUE = (() => {
   // it on the side: to the others it is not stock to be had for nothing.
   // `st.pre` is the skill such a step is made ahead up to. `brief` leaves out
   // what only the finished route needs.
-  function walk({ pool, a, b, bonus = 0, mode = "x", goal = "cost", price, stick = 0.05, least = 0, safe = 0.9 }, ahead = null, brief = false, start = null) {
+  //
+  // Tools. A recipe that is made with a tool can be used once the player has
+  // one of the items that will do: one they own (`owned`), one a recipe in
+  // the pool makes, or one a vendor sells (`sold`, bought at its price). The
+  // first step to want a tool gets it: `st.tools` lists what is made or
+  // bought before that step, each { item, m } with m the recipe that makes
+  // it. Where making the tool is itself certain to give a point it is a
+  // step of its own, `st.tool`. What a tool costs plays no part in choosing
+  // the next craft; whether it was worth getting is settled afterwards (see
+  // the route). `ban` is a set of recipes not to use and tools not to get.
+  //
+  // `fee(r)` is what it costs to learn r, once. The walk only adds it up:
+  // `learn` is every recipe the route uses with the skill it is first wanted
+  // at, `fee` the sum for them; `gain` is, for each recipe, how much dearer
+  // its points would have been from the next best thing at the time.
+  function walk({ pool, a, b, bonus = 0, mode = "x", goal = "cost", price, stick = 0.05, least = 0, safe = 0.9, fee = null, owned = null, sold = null, ban = null }, ahead = null, brief = false, start = null) {
+    if (ban && ban.size) pool = pool.filter((r) => !ban.has(r));
     const makers = makersOf(pool), ctx = { bonus, mode, makers, price };
     const stock = new Map(), scratch = newLedger(), steps = [], due = new Map(ahead || []), kept = new Map(), early = new Map();
     const w = { used: new Map(), held: null, kept, secs: 0 };
     const feeds = (x, y) => (y.r || []).some(([id]) => id === x.p[0]);
-    let cur = null;
+    // ---- tools
+    const have = new Set(owned || []), toolMaker = new Map(), got = [], gain = new Map();
+    {
+      const wanted = new Set();
+      for (const r of pool) for (const any of r.tools || []) for (const id of any) wanted.add(id);
+      if (wanted.size) for (const r of pool) {
+        if (!r.p || r.cd || !wanted.has(r.p[0])) continue;
+        const m = toolMaker.get(r.p[0]);
+        if (!m || r.from < m.from) toolMaker.set(r.p[0], r);
+      }
+    }
+    // what r lacks in tools at skill s, in the order to get it: [] if nothing, null if it cannot be had yet
+    const lack = (r, s, depth = 0) => {
+      if (!r.tools) return NONE;
+      let out = NONE;
+      for (const any of r.tools) {
+        if (any.some((id) => have.has(id) || out.some((t) => t.item === id))) continue;
+        let get = null;
+        for (const id of any) {
+          if (ban && ban.has(id)) continue;
+          const m = toolMaker.get(id);
+          if (m && m !== r && m.from <= s && depth < 2) {
+            const first = lack(m, s, depth + 1);
+            if (first) { get = first.concat([{ item: id, m }]); break; }
+          } else if (!m && sold && sold.has(id) && price(id) != null) { get = [{ item: id, m: null }]; break; }
+        }
+        if (!get) return null;
+        out = out.concat(get.filter((t) => !out.some((o) => o.item === t.item)));
+      }
+      return out;
+    };
+    // Get them. True if one was made as a step of its own, taking the skill on: then the choice is made afresh.
+    let pending = [];
+    const equip = (need) => {
+      for (const t of need) {
+        if (have.has(t.item)) continue;
+        have.add(t.item); got.push({ item: t.item, m: t.m, at: s });
+        if (t.m && chance(t.m, s, bonus, mode) >= 1 - 1e-9) {
+          const up = Math.min(t.m.u || 1, b - s);
+          supply(t.m, 1, s, stock, makers, price, scratch, kept);
+          const st = { from: s, to: s + up, r: t.m, tool: t.item };
+          if (pending.length) { st.tools = pending; pending = []; }
+          steps.push(st);
+          cur = t.m; s += up;
+          return true;
+        }
+        pending.push(t);
+      }
+      return false;
+    };
+    const step = (r, to, pre) => {
+      const st = { from: s, to, r };
+      if (pre) st.pre = to;
+      if (pending.length) { st.tools = pending; pending = []; }
+      steps.push(st);
+    };
+    let cur = null, s = a;
     // v is what is being kept low, t breaks ties; anything priced beats anything that is not
     const better = (v, t, bv, bt) => (isFinite(v) !== isFinite(bv) ? isFinite(v) : v < bv - 1e-9 || (v <= bv + 1e-9 && t < bt - 1e-9));
-    for (let s = a; s < b;) {
+    while (s < b) {
       // first, anything due to be made ahead; what goes into another of them before that one
-      let pre = null, pp = 0;
+      let pre = null, pp = 0, pn = NONE;
       for (const [m, n] of due) {
         if (m.from > s || (start && start.get(m) > s)) continue;
         const p = chance(m, s, bonus, mode);
         // (a point that would take more than is wanted, by over half a craft, is left)
         if (p <= 0 || m.p[1] / p - n > m.p[1] / 2) continue;
-        if (!pre || feeds(m, pre) || (!feeds(pre, m) && p > pp)) { pre = m; pp = p; }
+        const need = lack(m, s);
+        if (!need) continue;
+        if (!pre || feeds(m, pre) || (!feeds(pre, m) && p > pp)) { pre = m; pp = p; pn = need; }
       }
       if (pre) {
+        if (pn.length && equip(pn)) continue;
         const up = Math.min(pre.u || 1, b - s), out = pre.p[1] / pp;
         supply(pre, 1 / pp, s, stock, makers, price, scratch, kept);
         stock.set(pre.p[0], (stock.get(pre.p[0]) || 0) + out);
@@ -565,22 +659,32 @@ const CATALOGUE = (() => {
         early.set(pre, (early.get(pre) || 0) + out);
         due.set(pre, due.get(pre) - out);
         const last = steps[steps.length - 1];
-        if (last && last.r === pre && last.pre === s) last.to = last.pre = s + up; else steps.push({ from: s, to: s + up, r: pre, pre: s + up });
+        if (last && last.r === pre && last.pre === s && !pending.length) last.to = last.pre = s + up; else step(pre, s + up, true);
         cur = pre; s += up;
         continue;
       }
-      let best = null, bv = Infinity, bt = Infinity, cv = Infinity, ct = Infinity, any = false, top = 0;
-      for (const r of pool) if (r.from <= s) top = Math.max(top, chance(r, s, bonus, mode));
-      const floor = top >= least ? least : 0;
+      // (what cannot be had for want of a tool is out of it, for the best chance to hand as for the choice)
+      let best = null, bv = Infinity, bt = Infinity, bn = NONE, cv = Infinity, ct = Infinity, any = false, top = 0, next = Infinity;
+      const can = [];
       for (const r of pool) {
         if (r.from > s) continue;
         const p = chance(r, s, bonus, mode);
-        if (p <= 0 || p < floor - 1e-12) continue;
+        if (p <= 0) continue;
+        const need = lack(r, s);
+        if (!need) continue;
+        can.push(r, p, need);
+        if (p > top) top = p;
+      }
+      const floor = top >= least ? least : 0;
+      for (let k = 0; k < can.length; k += 3) {
+        const r = can[k], p = can[k + 1];
+        if (p < floor - 1e-12) continue;
         w.used.clear(); w.held = cur && cur !== r && cur.p ? cur.p[0] : null;
         const c = quote(r, 1 / p, s, stock, makers, price, w);
         const v = goal === "time" ? seconds(r) / p + w.secs : c, t = goal === "time" ? c : 1 / p;
         if (r === cur) { cv = v; ct = t; }
-        if (!any || better(v, t, bv, bt)) { best = r; bv = v; bt = t; any = true; }
+        if (!any || better(v, t, bv, bt)) { if (any) next = bv; best = r; bv = v; bt = t; bn = can[k + 2]; any = true; }
+        else if (v < next) next = v;
       }
       if (!best) {
         const last = steps[steps.length - 1];
@@ -588,12 +692,15 @@ const CATALOGUE = (() => {
         cur = null; s++;
         continue;
       }
-      if (cur && cur !== best && isFinite(cv) === isFinite(bv) && (isFinite(cv) ? cv <= bv * (1 + stick) + 1e-9 : true) && (goal === "cost" || ct <= bt * (1 + stick) + 1e-9)) best = cur;
+      if (cur && cur !== best && isFinite(cv) === isFinite(bv) && (isFinite(cv) ? cv <= bv * (1 + stick) + 1e-9 : true) && (goal === "cost" || ct <= bt * (1 + stick) + 1e-9)) { next = bv; bv = cv; best = cur; bn = NONE; }
+      if (bn.length && equip(bn)) continue;
+      // what the next best thing would have cost over this one: all there is to lose by doing without it
+      gain.set(best, (gain.get(best) || 0) + (isFinite(bv) ? Math.max(0, next - bv) : 0));
       const p = chance(best, s, bonus, mode), up = Math.min(best.u || 1, b - s);
       supply(best, 1 / p, s, stock, makers, price, scratch, kept);
-      if (best.p) stock.set(best.p[0], (stock.get(best.p[0]) || 0) + best.p[1] / p);
+      if (best.p) { stock.set(best.p[0], (stock.get(best.p[0]) || 0) + best.p[1] / p); if (toolMaker.get(best.p[0]) === best) have.add(best.p[0]); }
       const last = steps[steps.length - 1];
-      if (last && last.r === best) last.to = s + up; else steps.push({ from: s, to: s + up, r: best });
+      if (last && last.r === best && !pending.length) last.to = s + up; else step(best, s + up, false);
       cur = best; s += up;
     }
     let made = 0, madeSafe = 0, points = 0;
@@ -612,34 +719,41 @@ const CATALOGUE = (() => {
     typical.seconds = timeOf(typical, (st) => st.crafts);
     let side = 0;
     for (const n of typical.total.side.values()) side += n;
-    const R = { a, b, steps, points, crafts: made, side, gaps: steps.filter((st) => !st.r), typical, makers, kept, early };
+    // every recipe it has the player use, with the skill it is first wanted at, and what learning them comes to
+    const learn = new Map();
+    let fees = 0;
+    steps.forEach((st, i) => {
+      if (!st.r) return;
+      for (const r of [st.r, ...typical.per[i].side.keys()]) if (!learn.has(r)) { learn.set(r, st.from); if (fee) fees += fee(r) || 0; }
+    });
+    const R = { a, b, steps, points, crafts: made, side, gaps: steps.filter((st) => !st.r), typical, makers, kept, early, learn, fee: fees, got, gain };
     if (brief) return R;
     // (nine times in ten can be a hair under the average when a step is all but certain; to be safe is never to buy less)
     const cautious = bill(steps, (st) => Math.max(1, st.craftsSafe / st.crafts), ctx);
     cautious.seconds = timeOf(cautious, (st) => Math.max(st.crafts, st.craftsSafe));
     return Object.assign(R, { craftsSafe: madeSafe, cautious });
   }
-  // The route from skill a to skill b: the pass above, and then the same pass
-  // with what it made on the side made ahead instead. A reagent the player
-  // makes themselves costs the same whenever it is made, but made while its
-  // own recipe still gives points it brings those points with it, so the bolts
-  // a later step wants are made when bolts are orange, not when the step
-  // comes round and they have long been grey. How much is made ahead is what
-  // the route then goes on to use, found by going round a few times; the
-  // route that comes out is kept only if it is better than the plain one.
-  // Where the plain route takes up the recipe for its own sake a little
-  // later, while it is still orange, the crafts go on the front of that step
-  // and do not make a step of their own. `ahead: false` gives the plain one.
-  function route(o) {
-    const plain = walk(o);
+  // What a route comes to: its materials, and what it has the player pay a trainer.
+  const outlay = (R) => R.typical.total.cost + R.fee;
+  const score = (R, goal) => [-R.points, R.typical.total.unpriced.size, goal === "time" ? R.typical.seconds : outlay(R), goal === "time" ? outlay(R) : R.crafts + R.side];
+  const beats = (x, y) => { for (let i = 0; i < x.length; i++) { const tol = 1e-7 * Math.max(1, Math.abs(y[i])); if (x[i] < y[i] - tol) return true; if (x[i] > y[i] + tol) return false; } return false; };
+  // The pass above, and then the same pass with what it made on the side
+  // made ahead instead. A reagent the player makes themselves costs the same
+  // whenever it is made, but made while its own recipe still gives points it
+  // brings those points with it, so the bolts a later step wants are made
+  // when bolts are orange, not when the step comes round and they have long
+  // been grey. How much is made ahead is what the route then goes on to use,
+  // found by going round a few times; the route that comes out is kept only
+  // if it is better than the plain one. Where the plain route takes up the
+  // recipe for its own sake a little later, while it is still orange, the
+  // crafts go on the front of that step and do not make a step of their own.
+  function settle(o, plain) {
     if (o.ahead === false || !plain.points) return plain;
     const { pool, a, b, bonus = 0, mode = "x", goal = "cost" } = o;
     const eaten = new Set();
     for (const r of pool) for (const [id] of r.r || []) eaten.add(id);
     const able = [...plain.makers.values()].filter((m) => eaten.has(m.p[0]) && Math.max(a, m.from) < b && chance(m, Math.max(a, m.from), bonus, mode) > 0);
     if (!able.length) return plain;
-    const score = (R) => [-R.points, R.typical.total.unpriced.size, goal === "time" ? R.typical.seconds : R.typical.total.cost, goal === "time" ? R.typical.total.cost : R.crafts + R.side];
-    const beats = (x, y) => { for (let i = 0; i < x.length; i++) { const tol = 1e-7 * Math.max(1, Math.abs(y[i])); if (x[i] < y[i] - tol) return true; if (x[i] > y[i] + tol) return false; } return false; };
     const onSide = (R, m) => { let n = 0; for (const led of R.typical.per) n += led.side.get(m) || 0; return n * m.p[1]; };
     const own = new Map();
     for (const st of plain.steps) if (st.r && !own.has(st.r)) own.set(st.r, st.from);
@@ -647,7 +761,7 @@ const CATALOGUE = (() => {
       const lo = Math.max(a, m.from), at = own.get(m);
       return at > lo && at <= m.y ? Math.max(lo, at - Math.round(n / m.p[1])) : lo;
     };
-    let best = null, bs = score(plain), plan = new Map(), start = new Map(), R = plain;
+    let best = null, bs = score(plain, goal), plan = new Map(), start = new Map(), R = plain;
     for (let round = 0; round < 5; round++) {
       // all the route uses of it: what it made ahead and what it still made on the side, less what was kept and never used
       let moved = false;
@@ -659,18 +773,84 @@ const CATALOGUE = (() => {
       }
       if (!moved) break;
       R = walk(o, plan, true, start);
-      const sc = score(R);
+      const sc = score(R, goal);
       if (beats(sc, bs)) { best = [new Map(plan), new Map(start)]; bs = sc; }
     }
     if (!best) return plain;
     // (and if putting the crafts on a later step of their own came out dearer than making them at once, they are made at once)
-    if ([...best[0].keys()].some((m) => best[1].get(m) > Math.max(a, m.from)) && beats(score(walk(o, best[0], true)), bs)) best[1] = null;
+    if ([...best[0].keys()].some((m) => best[1].get(m) > Math.max(a, m.from)) && beats(score(walk(o, best[0], true), goal), bs)) best[1] = null;
     const out = walk(o, best[0], false, best[1]);
     out.ahead = best[0];
     out.plain = { cost: plain.typical.total.cost, seconds: plain.typical.seconds, crafts: plain.crafts, side: plain.side };
     return out;
   }
-  return { green, colour, baseChance, chance, crafts, craftsQuantile, money, parseMoney, makersOf, quote, bill, walk, route };
+  // What a route has the player learn and get for it is only known once it
+  // is worked out: a fee for each recipe a trainer teaches, the makings of
+  // each tool. A recipe taken up for a point or two can cost more to learn
+  // than it saves, and a rod more to make than the enchantments it opens
+  // save over the ones the old rod still gives points from. So each is tried
+  // without: the recipes whose fee is more than the walk reckoned their
+  // points would have cost extra from the next best thing, and every tool.
+  // Whatever leaves the whole cheaper, fees counted, with no point lost, is
+  // left out, and the rest gone over again. Only a recipe nothing else is
+  // made from is tried: to do without the recipe for bolts would be to buy
+  // the bolts, and what the player can make is made. Returns what to leave
+  // out.
+  function thrift(o, plain, limit = 12) {
+    const goal = o.goal || "cost", eaten = new Set();
+    for (const r of o.pool) for (const [id] of r.r || []) eaten.add(id);
+    let cur = plain, ban = new Set(o.ban || []), tries = 0;
+    const spared = [];
+    for (let again = true; again;) {
+      again = false;
+      const units = [];
+      if (o.fee) for (const r of cur.learn.keys()) {
+        const f = o.fee(r) || 0, lose = cur.gain.get(r) || 0;
+        if (f > 0 && f > lose && !(r.p && eaten.has(r.p[0]))) units.push([r, f - lose]);
+      }
+      units.sort((x, y) => y[1] - x[1]);
+      for (const t of cur.got) units.unshift([t.item, 0]);
+      for (const [what] of units) {
+        if (tries++ >= limit) return spared;
+        const without = walk(Object.assign({}, o, { ban: new Set([...ban, what]) }), null, true);
+        if (!beats(score(without, goal), score(cur, goal))) continue;
+        ban.add(what); spared.push(what); cur = without; again = true;
+        break;
+      }
+    }
+    return spared;
+  }
+  // The route from skill a to skill b: the pass, what it makes on the side
+  // made ahead, and then, if it is the cheapest that is wanted, the same
+  // again without whatever was not worth learning or getting. That second
+  // route is kept only if it comes to less, so the route is never the worse
+  // for it; `spared` is what it left out, `full` what the route came to with
+  // them. `ahead: false` gives the plain pass, `thrift: false` leaves the
+  // second route out.
+  function route(o) {
+    const plain = walk(o);
+    if (o.ahead === false) return plain;
+    const out = settle(o, plain), goal = o.goal || "cost";
+    if (o.thrift === false || goal !== "cost" || !plain.points || !(plain.fee > 0 || plain.got.length)) return out;
+    const spared = thrift(o, plain, o.limit || 12);
+    if (!spared.length) return out;
+    const lean = Object.assign({}, o, { ban: new Set([...(o.ban || []), ...spared]) });
+    const alt = settle(lean, walk(lean));
+    if (!beats(score(alt, goal), score(out, goal))) return out;
+    alt.spared = spared;
+    alt.full = { cost: out.typical.total.cost, fee: out.fee };
+    return alt;
+  }
+  // A profession's tools, read for the route: each recipe that is made with
+  // tools gets `tools` (for each, the items that will do, the plainest
+  // first). What comes back is which of those items a vendor sells.
+  function tooling(prof) {
+    const sold = new Set();
+    for (const t of prof.tools || []) for (const id of t.v || []) sold.add(id);
+    for (const r of prof.recipes) if (r.t) r.tools = r.t.map((k) => prof.tools[k].it);
+    return sold;
+  }
+  return { green, colour, baseChance, chance, crafts, craftsQuantile, money, parseMoney, makersOf, quote, bill, walk, route, outlay, tooling };
 })();
 if (typeof module !== "undefined") module.exports = CATALOGUE;
 </script>
@@ -722,6 +902,9 @@ function prepare() {
     p.live = p.recipes.filter((r) => !r.x).length;
     p.byId = new Map(p.recipes.map((r) => [r.i, r]));
     p.takes = new Set();
+    p.sold = M.tooling(p);      // the tools a vendor sells; each recipe gets the items that will do for its tools
+    p.toolMaker = new Map();    // the recipe of this profession that makes a tool, by the tool
+    for (const r of p.recipes) if (r.p && !r.x && !p.toolMaker.has(r.p[0]) && (p.tools || []).some((t) => t.it.includes(r.p[0]))) p.toolMaker.set(r.p[0], r);
     const places = new Map();
     for (const r of p.recipes) {
       r.prof = p;
@@ -730,12 +913,55 @@ function prepare() {
       const words = [r.n, p.categories[r.c], r.e || ""];
       if (r.p) words.push(itemName(r.p[0]) || "");
       for (const [id] of r.r || []) words.push(itemName(id) || "");
-      for (const t of r.t || []) words.push(t);
+      for (const t of toolNames(r)) words.push(t);
       if (r.f) words.push(r.f);
+      if (r.w) words.push(whoText(p, r.w));
       r.words = words.join(" · ").toLowerCase();
     }
     p.usualPlace = [...places].sort((x, y) => y[1] - x[1])[0]?.[0] || null;   // the anvil, the forge: not worth saying on every step
   }
+}
+
+// ---- tools, trainers and fees ----------------------------------------------------
+const toolNames = (r) => (r.t || []).map((k) => r.prof.tools[k].n);
+const an = (t) => (/^(<[^>]+>)*[AEIOU]/.test(t) ? "an " : "a ") + t;   // (t may be wrapped in a tag)
+// Which of vanilla's trainers taught it. Where the ladder from one title up
+// all did, "Expert Tailor or higher"; else the titles themselves.
+function whoText(p, mask) {
+  if (!mask || !p.trainers) return "";
+  const got = p.trainers.map((t, i) => i).filter((i) => (mask >> i) & 1), rungs = got.filter((i) => i < p.ladder);
+  if (rungs.length > 1 && rungs.length === p.ladder - rungs[0]) return `${p.trainers[rungs[0]]} or higher`;
+  const names = got.slice(0, 3).map((i) => p.trainers[i]), more = got.length - names.length;
+  if (more) return `${names.join(", ")} or ${more} other${more === 1 ? "" : "s"}`;
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}` : names[0];
+}
+// What a trainer charges for a recipe: vanilla's fee, unless you have said you know it already.
+const taughtByTrainer = (r) => r.s === "t" || r.s === "e";
+const known = (r) => !!(cfg(r.prof.id).known || {})[r.i];
+const fee = (r) => (taughtByTrainer(r) && r.m && !known(r) ? r.m : 0);
+// The tools you are taken to have: the ones you could have made or bought
+// before your skill. A tick or an untick of your own overrides that.
+function usualTool(p, id) { const m = p.toolMaker.get(id); return m ? m.l != null && m.l < state.skill && usable(m) : state.skill > 1; }
+function hasTool(p, id) { const o = (cfg(p.id).tools || {})[id]; return o != null ? !!o : usualTool(p, id); }
+function setTool(p, id, on) { const c = cfg(p.id); if (!c.tools) c.tools = {}; if (on === usualTool(p, id)) delete c.tools[id]; else c.tools[id] = on ? 1 : 0; }
+const ownedTools = (p) => new Set((p.tools || []).map((t) => t.it[0]).filter((id) => hasTool(p, id)));
+// The ranks the stretch from a to b passes through: each one that has to be trained to go on.
+function ranksDue(p, a, b) {
+  const out = [], have = cfg(p.id).ranks || {};
+  for (let k = 0; k + 1 < (p.ranks || []).length; k++) {
+    const cap = p.ranks[k].cap, next = p.ranks[k + 1];
+    if (cap >= a && cap < b && !have[cap]) out.push({ cap, rank: next, fee: next.m || (next.ri != null ? price(next.ri) || 0 : 0) });
+  }
+  return out;
+}
+function rankHow(p, k) {
+  if (k.ri != null) return `in vanilla it came from a book, ${itemHtml(k.ri)}${price(k.ri) ? `, ${M.money(price(k.ri))} at a vendor` : ""}, read at ${k.l}${k.lv ? ` and level ${k.lv}` : ""}†`;
+  const who = whoText(p, k.w);
+  if (!who && !k.l) return "";
+  let out = who ? `${an(esc(who))} taught it in vanilla` : "vanilla's trainers taught it";
+  if (k.l) out += ` from skill ${k.l}${k.lv ? ` and level ${k.lv}` : ""}`;
+  if (k.m) out += `, for ${M.money(k.m)}`;
+  return out + "†";
 }
 
 // ---- which recipes are yours ---------------------------------------------------
@@ -804,21 +1030,24 @@ const dearer = (x, y) => (x == null ? Infinity : x) - (y == null ? Infinity : y)
 function rankNote(cur, st) {
   for (let k = 0; k + 1 < (cur.ranks || []).length; k++) {
     const cap = cur.ranks[k].cap, next = cur.ranks[k + 1];
-    if (st.from <= cap && cap < st.to) return `you need <b>${esc(next.n)}</b> to pass ${cap}${next.l ? ` (vanilla's trainers taught it from ${next.l}†)` : ""}`;
+    if (st.from <= cap && cap < st.to && !(cfg(cur.id).ranks || {})[cap]) { const how = rankHow(cur, next); return `you need <b>${esc(next.n)}</b> to pass ${cap}${how ? `: ${how}` : ""}`; }
   }
   return null;
 }
 function learnNote(r) {
   if (r.s === "i") return `needs ${itemHtml(r.ri)}${r.l > state.skill ? `, which asks for ${r.l}` : ""}`;
   if (r.s === "u") return "you ticked this one; how it is learned is not in the data";
-  if (r.l > state.skill) return r.s === "a" ? `comes by itself at ${r.l}` : `learn it from a trainer at ${r.s === "e" ? "≈" : ""}${r.l}${r.s === "t" ? "†" : ""}`;
-  return null;
+  if (r.s === "a") return r.l > state.skill ? `comes by itself at ${r.l}` : null;
+  if (known(r)) return null;
+  const who = whoText(r.prof, r.w), f = fee(r);
+  return `learn it from ${who ? an(esc(who)) : "a trainer"}${r.l > state.skill || r.lv ? ` (${[r.l > state.skill ? `skill ${r.s === "e" ? "≈" : ""}${r.l}` : "", r.lv ? `level ${r.lv}` : ""].filter(Boolean).join(", ")})` : ""}${f ? `: ${M.money(f)}` : ""}†`;
 }
 function gapLeg(cur, st, id) {
-  // the cheapest things you have not ticked that would give a point somewhere in the gap
-  const found = [];
+  // the cheapest things you have not ticked that would give a point somewhere in the gap, with the tools you have
+  const found = [], mine = new Set([...R.opts.owned, ...R.got.map((t) => t.item)]);
+  const tooled = (r) => (r.tools || []).every((any) => any.some((item) => mine.has(item)));
   for (const r of cur.recipes) {
-    if (usable(r) || r.cd || r.g == null || r.l == null || (r.x && !state.sod)) continue;
+    if (usable(r) || r.cd || r.g == null || r.l == null || (r.x && !state.sod) || !tooled(r)) continue;
     const s = Math.max(st.from, r.l);
     if (s >= st.to) continue;
     const p = M.chance(r, s, bonus(), state.mode);
@@ -827,9 +1056,17 @@ function gapLeg(cur, st, id) {
   found.sort((x, y) => x.cost - y.cost || x.s - y.s);
   const list = found.slice(0, 3).map(({ r, s, cost }) => `<button class="lnk q${r.p ? itemQ(r.p[0]) : 1}" data-use="${r.i}" title="Tick it: use it in the route">${esc(r.n)}</button> <small>(${r.s === "i" ? esc(itemName(r.ri) || "a plan") : "you unticked it"}${s > st.from ? `, from ${s}` : ""}${isFinite(cost) ? `, about ${M.money(cost)} a point` : ""})</small>`).join(" · ");
   const pts = st.to - st.from;
+  // recipes of yours that would, but for a tool there is no way to get
+  const held = new Map();
+  for (const r of R.pool) {
+    if (!r.tools || Math.max(st.from, r.from) >= st.to || M.chance(r, Math.max(st.from, r.from), bonus(), state.mode) <= 0) continue;
+    r.tools.forEach((any, k) => { if (!any.some((item) => mine.has(item))) held.set(r.prof.tools[r.t[k]].n, (held.get(r.prof.tools[r.t[k]].n) || 0) + 1); });
+  }
+  const tools = [...held].map(([n, k]) => `${k} of your recipes would with ${an(`<b>${esc(n)}</b>`)}`).join("; ");
   return `<li class="leg gap" id="${id}"><div class="rng">${st.from}<i>→</i>${st.to}<small>${pts} point${pts === 1 ? "" : "s"}</small></div>
 <div class="what"><div class="nm">Nothing you have gives a point here</div>
-<div class="note">${cur.gather ? `${esc(cur.name)} is raised mostly by gathering. ` : ""}${list ? `The cheapest that would: ${list}` : "No recipe in the data would, either."}</div></div><div></div><div></div><div></div><div></div></li>`;
+<div class="note">${cur.gather ? `${esc(cur.name)} is raised mostly by gathering. ` : ""}${list ? `The cheapest that would: ${list}` : tools ? "" : "No recipe in the data would, either."}</div>
+${tools ? `<div class="note">${tools}: tick the tool above if you have one, or the recipe that makes it in the list below.</div>` : ""}</div><div></div><div></div><div></div><div></div></li>`;
 }
 function legHtml(cur, st, i, all, first) {
   const id = `leg-${i}`, led = all[i];
@@ -839,6 +1076,30 @@ function legHtml(cur, st, i, all, first) {
   const notes = [], warns = [];
   const how = learnNote(r);
   if (how) notes.push(how);
+  // a tool: what is got before this step, or what this step is
+  const toolSide = new Map();
+  for (const t of st.tools || []) {
+    const nm = `<b>${esc(itemName(t.item) || "the tool")}</b>`;
+    if (t.m) {
+      toolSide.set(t.m, (toolSide.get(t.m) || 0) + 1);
+      const p = M.chance(t.m, st.from, bonus(), state.mode);
+      notes.push(`<span class="ahead">a tool</span> first make ${an(nm)} for this (${mats(t.m.r) || "nothing listed"})${p > 0 ? ", which may give a point too" : ""}`);
+    } else notes.push(`<span class="ahead">a tool</span> first buy ${an(nm)} for this${price(t.item) != null ? `, ${M.money(price(t.item))} at a vendor` : ""}`);
+  }
+  // a made tool you are taken to have: said once, at the first step that is made with it, in case you have none
+  if (!st.tool) for (const any of r.tools || []) {
+    const mine = any.find((item) => R.opts.owned.has(item));
+    if (mine == null || !cur.toolMaker.has(mine) || R.said.has(mine)) continue;
+    R.said.add(mine);
+    notes.push(`made with your <b>${esc(itemName(mine) || "tool")}</b>: untick it above if you have none, and the route will make one`);
+  }
+  if (st.tool) {
+    const needs = (x) => (x.tools || []).some((any) => any.includes(st.tool)), users = [];
+    for (let j = i + 1; j < R.steps.length; j++) { const u = R.steps[j].r; if (u && u !== r && !users.includes(u) && needs(u)) users.push(u); }
+    const named = users.slice(0, 2).map((u) => `<b>${esc(u.n)}</b>`), rest = users.length - named.length;
+    const whom = !users.length ? "the steps after it" : named.join(rest ? ", " : " and ") + (rest ? ` and ${rest} more step${rest === 1 ? "" : "s"}` : "");
+    notes.push(`<span class="ahead">a tool</span> for ${whom}: one is all the route needs, and made now it gives a point too`);
+  }
   if (st.pre) {
     // made before it is wanted: say what will use it, so a dear-looking step explains itself
     const item = r.p[0], takes = (x) => (x.r || []).some(([id]) => id === item), users = [];
@@ -855,7 +1116,7 @@ function legHtml(cur, st, i, all, first) {
     const need = later >= 1 ? `the route needs ${qty(mine + later)} in all` : "the route needs them anyway";
     notes.push(`<span class="ahead">made ahead</span> ${part}for ${whom}: ${need}, and made now they give points${st.pre >= st.to && st.p1 < 0.25 - 1e-9 ? ", if rarely by the end" : ""}`);
   }
-  for (const [m, n] of led.side) notes.push(`make <b>${qty(n * m.p[1])} ${esc(itemName(m.p[0]) || m.n)}</b> first (${mats(m.r) || "nothing listed"} ${m.p[1] > 1 ? `for ${m.p[1]}` : "each"})`);
+  for (const [m, all] of led.side) { const n = all - (toolSide.get(m) || 0); if (n > 1e-6) notes.push(`make <b>${qty(n * m.p[1])} ${esc(itemName(m.p[0]) || m.n)}</b> first (${mats(m.r) || "nothing listed"} ${m.p[1] > 1 ? `for ${m.p[1]}` : "each"})`); }
   for (const [item, n] of r.r || []) {
     const m = R.makers.get(item), sideMade = m && led.side.has(m) ? led.side.get(m) * m.p[1] : 0;
     const drawn = n * made - (led.buys.get(item) || 0) - sideMade;
@@ -907,6 +1168,32 @@ function shopHtml(cur, led) {
   if (kinds) html += `<p>You will be left with what you made and did not use: ${names.join(", ")}${kinds > names.length ? ` and ${kinds - names.length} more kinds` : ""}${worth ? `. A vendor pays about <b style="color:var(--parch)">${M.money(worth)}</b> for the lot` : ""}.</p>`;
   return html;
 }
+// What the route has you pay a trainer for, and nothing else: the recipes it
+// uses that a trainer teaches, by the skill each is first wanted at, and the
+// ranks on the way.
+function trainRows(cur) {
+  const rows = [];
+  for (const [r, at] of R.learn) if (taughtByTrainer(r) && !known(r)) rows.push({ at, r, fee: r.m || 0 });
+  for (const d of ranksDue(cur, R.opts.a, R.opts.b)) rows.push({ at: d.cap, rank: d.rank, fee: d.fee });
+  return rows.sort((x, y) => x.at - y.at || !!y.rank - !!x.rank || x.fee - y.fee);
+}
+const trainFee = (rows) => rows.reduce((n, x) => n + x.fee, 0);
+function trainHtml(cur, rows, led) {
+  const c = cfg(cur.id), said = Object.keys(c.known || {}).length + Object.keys(c.ranks || {}).length;
+  const undo = said ? ` You have said you know ${said === 1 ? "one thing" : `${said} things`} already. <button class="lnk" id="resetKnown">Forget that</button>.` : "";
+  if (!rows.length) return said ? `<h3>At the trainer</h3><p>Nothing to pay for on this route.${undo}</p>` : "";
+  const total = trainFee(rows);
+  return `<h3>At the trainer <small>only what this route uses</small></h3>
+<table class="shop train"><tbody><tr class="hd"><td>by</td><td></td><td>fee†</td><td></td></tr>${rows.map((x) => {
+    const who = x.rank ? (x.rank.ri != null ? `a book in vanilla: ${esc(itemName(x.rank.ri) || "")}` : whoText(cur, x.rank.w)) : whoText(cur, x.r.w);
+    const more = x.rank ? [x.rank.l ? `from skill ${x.rank.l}` : "", x.rank.lv ? `level ${x.rank.lv}` : ""].filter(Boolean).join(", ") : x.r.lv ? `level ${x.r.lv}` : "";
+    return `<tr><td class="qty">${x.at}</td><td>${x.rank ? `<b class="rank">${esc(x.rank.n)}</b>, the next rank` : `<button class="lnk q${x.r.p ? itemQ(x.r.p[0]) : 1}" data-show="${x.r.i}" title="Show it in the list below">${esc(x.r.n)}</button>`}<small>${esc(who || (x.rank ? "how it is come by is not in the data" : "a trainer"))}${more ? ` · ${more}` : ""}</small></td>
+<td class="tot">${x.fee ? M.money(x.fee) : "?"}</td><td class="got"><button class="lnk mini" ${x.rank ? `data-rank="${x.at}"` : `data-known="${x.r.i}"`} title="Leave it out: you ${x.rank ? "have this rank" : "know this recipe"} already">${x.rank ? "have it" : "know it"}</button></td></tr>`;
+  }).join("")}
+<tr class="sum"><td></td><td>training</td><td class="tot">${M.money(total)}</td><td></td></tr>
+<tr class="sum all"><td></td><td>with the materials${led.total.unpriced.size ? ", without the unpriced" : ""}</td><td class="tot">${M.money(total + led.total.cost)}</td><td></td></tr></tbody></table>
+<p>† Fees, levels and who teaches what are vanilla's: the server sets them and no client carries them, so Forever's may differ. A recipe the route could do without for less than its fee is left out of it.${undo}</p>`;
+}
 // Which plans would be worth getting: each recipe the best possible route
 // uses and you do not have, tried on its own against your route.
 // A route apiece, so it is done a route at a time with the page left free in
@@ -920,21 +1207,24 @@ async function findsHtml(cur) {
   if (!extra.length) return "";
   const ideal = M.route(Object.assign({}, R.opts, { pool: R.pool.concat(extra) }));
   const wanted = [...new Set(ideal.steps.map((st) => st.r).filter((r) => r && extra.includes(r)))].slice(0, 14);
-  const base = R.typical.total.cost, out = [];
+  // (each plan is tried on a route worked out the quick way, without the second look at fees, and set against yours worked out the same way)
+  const quick = { thrift: false }, mine0 = wanted.length ? M.route(Object.assign({}, R.opts, quick, { pool: R.pool })) : R;
+  const base = M.outlay(R), base0 = M.outlay(mine0), out = [];
   for (const x of wanted) {
     await breathe();
     if (stale()) return null;
-    const alt = M.route(Object.assign({}, R.opts, { pool: R.pool.concat([x]) }));
-    const more = alt.points - R.points, saving = base - alt.typical.total.cost;
-    if (more > 0 || (more === 0 && saving > Math.max(base * 0.01, 100))) out.push({ x, more, saving });
+    const alt = M.route(Object.assign({}, R.opts, quick, { pool: R.pool.concat([x]) }));
+    const more = alt.points - mine0.points, saving = base0 - M.outlay(alt);
+    if (more > 0 || (more === 0 && saving > Math.max(base0 * 0.01, 100))) out.push({ x, more, saving });
   }
   out.sort((p, q) => q.more - p.more || q.saving - p.saving);
   // nothing to name and nothing much to gain: say nothing
-  const better = ideal.points > R.points || ideal.typical.total.cost < base * 0.9;
+  const better = ideal.points > R.points || M.outlay(ideal) < base * 0.9;
   if (!out.length && !better) return "";
+  const ranks = trainFee(ranksDue(cur, R.opts.a, R.opts.b));   // the same on any route, and in the sum the page shows
   return `<h3>Plans worth finding <small>each tried on its own against the route above</small></h3>
 ${out.length ? `<ul>${out.slice(0, 6).map(({ x, more, saving }) => `<li><button class="btn" data-use="${x.i}" title="Tick it: use it in the route">I have it</button><span class="it">${itemHtml(x.ri)} <small>asks for ${x.l}</small></span><span class="gain">${more > 0 ? `covers ${more} more point${more === 1 ? "" : "s"}` : `saves about ${M.money(saving)}`}</span></li>`).join("")}</ul>` : ""}
-<p>With every recipe in the game this route would come to about <b style="color:var(--parch)">${M.money(ideal.typical.total.cost)}</b>${ideal.points > R.points ? ` and cover ${ideal.points === R.opts.b - R.opts.a ? "every point" : `${ideal.points} points`}` : ""}, against ${M.money(base)} now. <button class="lnk" data-allrecipes>Show that route</button></p>`;
+<p>With every recipe in the game this route would come to about <b style="color:var(--parch)">${M.money(M.outlay(ideal) + ranks)}</b>${ideal.points > R.points ? ` and cover ${ideal.points === R.opts.b - R.opts.a ? "every point" : `${ideal.points} points`}` : ""}, against ${M.money(base + ranks)} now. <button class="lnk" data-allrecipes>Show that route</button></p>`;
 }
 let findsTimer = 0, wantBox = null;
 function drawPlan(cur) {
@@ -958,10 +1248,10 @@ function drawPlan(cur) {
   }
   body.hidden = false; none.hidden = true;
   const pool = cur.recipes.filter(usable);
-  const opts = { a, b, bonus: bonus(), mode: state.mode, goal: state.objective, price, least: state.least };
+  const opts = { a, b, bonus: bonus(), mode: state.mode, goal: state.objective, price, least: state.least, fee, owned: ownedTools(cur), sold: cur.sold };
   R = M.route(Object.assign({ pool }, opts));
   R.opts = opts; R.pool = pool;
-  R.where = new Map();
+  R.where = new Map(); R.said = new Set();
   for (const st of R.steps) if (st.r && !R.where.has(st.r)) R.where.set(st.r, st);
   const led = state.safe ? R.cautious : R.typical;
 
@@ -977,8 +1267,14 @@ function drawPlan(cur) {
     if (time > 0) bits.push(`${fmtDur(time)} of crafting`);
     bits.push(`about <b>${M.money(led.total.cost)}</b> in materials${state.safe ? " to be safe" : ""}${led.total.unpriced.size ? `, and ${led.total.unpriced.size} thing${led.total.unpriced.size === 1 ? "" : "s"} with no price` : ""}`);
   }
+  const training = R.points ? trainRows(cur) : [];
+  if (trainFee(training)) bits.push(`<b>${M.money(trainFee(training))}</b> at the trainer`);
   if (short > 0) bits.push(`<span style="color:var(--warn)">nothing you have covers ${R.points ? `${short} of the ${b - a} points` : `any of the ${b - a} points`}</span>`);
   $("planSum").innerHTML = bits.join(" · ");
+  // the tools the recipes on this stretch are made with: which of them you have
+  const kit = (cur.tools || []).filter((t, k) => pool.some((r) => r.t && r.t.includes(k) && r.from < b && r.g > a));
+  $("kit").hidden = !kit.length;
+  $("kit").innerHTML = !kit.length ? "" : `<span class="lab">Tools you have</span>${kit.map((t) => `<label class="chk" title="${t.it.length > 1 ? `Or anything that does its work: ${esc(t.it.slice(1).map((id) => itemName(id) || "?").join(", "))}. ` : ""}${cur.toolMaker.has(t.it[0]) ? "Unticked, the route makes one when a step first needs it" : "Unticked, the route buys one when a step first needs it"}"><input type="checkbox" data-kit="${t.it[0]}"${hasTool(cur, t.it[0]) ? " checked" : ""}> ${esc(t.n)}</label>`).join("")}<small>the route gets the ones you lack as it needs them</small>`;
 
   // the ladder: the way ahead, a block a step
   const xs = (s) => ((s - a) / (b - a)) * 100;
@@ -989,12 +1285,15 @@ function drawPlan(cur) {
   const gain = !R.ahead ? "" : state.objective === "time"
     ? (R.plain.seconds - R.typical.seconds >= 30 ? `; making reagents ahead saves about ${fmtDur(R.plain.seconds - R.typical.seconds)}` : "")
     : (R.plain.cost - R.typical.total.cost >= 1 ? `; making reagents ahead saves about ${M.money(R.plain.cost - R.typical.total.cost)}` : "");
-  $("legsHow").textContent = (state.objective === "time" ? "each step is the quickest way to the next point with what you have by then" : "each step is the cheapest way to the next point with what you have by then") + gain;
+  // what it left unlearned and unmade as not worth the fee or the making
+  const sparedNames = (R.spared || []).map((x) => (typeof x === "object" ? x.n : itemName(x) || "a tool"));
+  const lean = !sparedNames.length ? "" : `; left out as not worth ${R.spared.every((x) => typeof x === "object") ? "the fee" : R.spared.some((x) => typeof x === "object") ? "the fee or the making" : "the making"}: ${sparedNames.slice(0, 3).join(", ")}${sparedNames.length > 3 ? ` and ${sparedNames.length - 3} more` : ""} (${M.money(R.full.cost + R.full.fee - M.outlay(R))} saved)`;
+  $("legsHow").textContent = (state.objective === "time" ? "each step is the quickest way to the next point with what you have by then" : "each step is the cheapest way to the next point with what you have by then") + gain + lean;
   $("ticks").innerHTML = `<span class="l" style="left:0">${a}</span>` + (cur.ranks || []).filter((k) => xs(k.cap) > 9 && xs(k.cap) < 91).map((k) => `<span class="cap" style="left:${xs(k.cap).toFixed(2)}%" title="${esc(k.n)} ends at ${k.cap}">${k.cap}</span>`).join("") + `<span class="r" style="left:100%">${b}</span>`;
 
   // the first step is the one to be making now, unless nothing you have gives a point at your skill
   $("legs").innerHTML = R.steps.map((st, i) => legHtml(cur, st, i, led.per, i === 0 && !!st.r)).join("");
-  $("shop").innerHTML = R.points ? shopHtml(cur, led) : "";
+  $("shop").innerHTML = R.points ? shopHtml(cur, led) + trainHtml(cur, training, led) : "";
   if (wantBox != null) { const box = $("shop").querySelector(`input[data-item="${wantBox}"]`); wantBox = null; if (box) { box.focus(); box.select(); } }
   $("finds").innerHTML = "";
   findsRun++;
@@ -1035,7 +1334,8 @@ function bandHtml(r) {
 function learnCell(r) {
   if (r.s === "u") return `<td class="n o" title="No item teaches this and no vanilla trainer taught it: the level it is learned at is not in the data"><span class="q">?</span></td>`;
   const mark = r.s === "t" ? "†" : "", pre = r.s === "e" ? "≈" : "";
-  const why = { a: r.l > 1 ? `Learned by itself at ${r.l}` : "Known as soon as you take the profession", i: "The skill its recipe item asks for", t: "What vanilla's trainers asked; Forever has not moved this recipe", e: `Vanilla's trainers asked ${r.v}; moved by ${r.dy > 0 ? "+" : "−"}${Math.abs(r.dy)}, as Forever moved this recipe's yellow level` }[r.s];
+  const from = taughtByTrainer(r) && (r.w || r.m) ? ` In vanilla: ${whoText(r.prof, r.w) || "a trainer"}${r.m ? `, ${M.money(r.m)}` : ""}` : "";
+  const why = { a: r.l > 1 ? `Learned by itself at ${r.l}` : "Known as soon as you take the profession", i: "The skill its recipe item asks for", t: "What vanilla's trainers asked; Forever has not moved this recipe." + from, e: `Vanilla's trainers asked ${r.v}; moved by ${r.dy > 0 ? "+" : "−"}${Math.abs(r.dy)}, as Forever moved this recipe's yellow level.` + from }[r.s];
   return `<td class="n o" title="${esc(why)}"><span class="q">${pre}</span>${r.l}<span class="q">${mark}</span></td>`;
 }
 function makesText(r) {
@@ -1044,7 +1344,7 @@ function makesText(r) {
 }
 function needsHtml(r) {
   const parts = (r.r || []).map(([id, n]) => `${n} <b>${esc(itemName(id) || "?")}</b>`);
-  const extra = [...(r.t || []), ...(r.f ? [r.f] : [])];
+  const extra = [...toolNames(r), ...(r.f ? [r.f] : [])];
   return parts.join(", ") + (extra.length ? `${parts.length ? " · " : ""}${esc(extra.join(", "))}` : "");
 }
 function rowHtml(r, key, b) {
@@ -1119,8 +1419,9 @@ function learnedHtml(r, p) {
   const prof = esc(p.name);
   if (r.s === "a") return r.l > 1 ? `Learned by itself when your ${prof} reaches <b class="lv o">${r.l}</b>.` : `Known as soon as you take ${prof}.`;
   if (r.s === "i") return `${itemHtml(r.ri)}, which asks for ${prof} <b class="lv o">${r.l}</b>.`;
-  if (r.s === "t") return `A trainer. Vanilla's asked for ${prof} <b class="lv o">${r.l}</b>, and Forever has left this recipe's levels where they were, so that is probably still the level. <span class="dim">†</span>`;
-  if (r.s === "e") return `A trainer. Vanilla's asked for ${prof} ${r.v}; Forever moved this recipe's yellow level by ${r.dy > 0 ? "+" : "−"}${Math.abs(r.dy)}, so the trainer's level is estimated at <b class="lv o">${r.l}</b>. <span class="dim">≈</span>`;
+  const who = whoText(p, r.w), from = who || r.m ? ` In vanilla ${who ? `${an(`<b>${esc(who)}</b>`)} taught it` : "a trainer taught it"}${r.m ? `, for <b>${M.money(r.m)}</b>` : ""}${r.lv ? `, from level ${r.lv}` : ""}. <span class="dim">†</span>` : "";
+  if (r.s === "t") return `A trainer. Vanilla's asked for ${prof} <b class="lv o">${r.l}</b>, and Forever has left this recipe's levels where they were, so that is probably still the level. <span class="dim">†</span>${from}`;
+  if (r.s === "e") return `A trainer. Vanilla's asked for ${prof} ${r.v}; Forever moved this recipe's yellow level by ${r.dy > 0 ? "+" : "−"}${Math.abs(r.dy)}, so the trainer's level is estimated at <b class="lv o">${r.l}</b>. <span class="dim">≈</span>${from}`;
   return `Not in the data: no item in the client teaches it and no vanilla trainer did. A Forever trainer, a quest or a discovery, most likely.`;
 }
 function detailRow(r, st, b) {
@@ -1131,7 +1432,7 @@ function detailRow(r, st, b) {
   else if (r.d) makes = esc(r.d);
   const takes = (r.r || []).map(([id, n]) => `<li><span class="num">${n} ×</span> ${itemHtml(id)}</li>`).join("");
   const facts = [];
-  if (r.t) facts.push(`Tool${r.t.length > 1 ? "s" : ""}: ${esc(r.t.join(", "))}`);
+  if (r.t) facts.push(`Tool${r.t.length > 1 ? "s" : ""}: ${r.t.map((k) => { const t = p.tools[k], also = t.it.slice(1).map((id) => itemName(id)).filter(Boolean); return esc(t.n) + (also.length ? ` (or ${esc(also.slice(0, 2).join(", "))}${also.length > 2 ? ` and ${also.length - 2} more` : ""})` : ""); }).join(", ")}`);
   if (r.f) facts.push(`At: ${esc(r.f)}`);
   if (r.ct) facts.push(`${r.ct} sec to make`);
   if (r.cd) facts.push(`Cooldown: ${fmtTime(r.cd)}`);
@@ -1245,7 +1546,7 @@ function build() {
   $("priceNote").textContent = `The only price the game's data has for a material is what a vendor charges for it. That is the real price of flux, vials and thread; for ore, bars, herbs, cloth and leather it is just a number that rises with the material's tier. So the route starts out roughly right, and becomes yours as you type your realm's prices into the shopping list (they are kept in this browser); a material the route leaves out can be priced there too, in case it is only the vendor's figure that keeps it out. ${reagents - priced} of the ${reagents} materials have no vendor price at all; a recipe that takes one is left out of the cheapest route until you price it.`;
   $("shiftnote").textContent = ` (of the ${S.shiftCheck.total} recipe items whose level is known in both games, ${S.shiftCheck.match} moved exactly in step with their recipe)`;
   $("scopeText").innerHTML = `${live.toLocaleString("en")} recipes across ${D.professions.length} professions, from build ${esc(D.build)} of the Forever client: everything the trade-skill window lists, plus Disenchant and the Mage's scroll reading, which colour up the same way. Gathering professions have only their new camping recipes and, for Mining, smelting; what a node or a corpse needs is not a recipe and is not here. The recipes Forever retired are left out. The client also still carries ${S.leftovers} recipes filed under “Season of Discovery”; they are hidden until you tick the box above the table. Of the ${live.toLocaleString("en")}, ${(L.i + L.a).toLocaleString("en")} have an exact learn level, ${L.t} carry vanilla's trainer level (†), ${L.e} an estimate (≈) and ${L.u} none (?). The skill cap is ${D.skillCap}; a recipe whose yellow level is above that stays orange for good.`;
-  $("creditText").innerHTML = `Recipes, their yellow and grey levels, categories, products, reagents, tools and cooldowns, the items that teach them, what a vendor charges and pays, the ranks and their ceilings and the ${esc(D.talent.name)} talent are the Forever client's own data (product ${esc(D.product)}, build ${esc(D.build)}), read through the table exports of <a href="https://wago.tools" target="_blank" rel="noopener">wago.tools</a>, as are the vanilla yellow levels of a Classic Era client (${esc(D.eraProduct)}, build ${esc(D.eraBuild)}) used to see what Forever moved. Vanilla trainer levels, for recipes and for ranks, are from the trainer tables of the <a href="https://github.com/cmangos/classic-db" target="_blank" rel="noopener">CMaNGOS classic-db</a> (GPLv3). The chance formula is the community's long-standing estimate, not Blizzard's published figure; the <a href="https://warcraft.wiki.gg/wiki/Skillup" target="_blank" rel="noopener">Warcraft Wiki</a> records only the two certain ends, orange and grey. The route is worked out on this page from those; no guide, calculator or recipe database website was read to build it.`;
+  $("creditText").innerHTML = `Recipes, their yellow and grey levels, categories, products, reagents, tools (and the items that serve as each) and cooldowns, the items that teach them, what a vendor charges and pays, the ranks and their ceilings and the ${esc(D.talent.name)} talent are the Forever client's own data (product ${esc(D.product)}, build ${esc(D.build)}), read through the table exports of <a href="https://wago.tools" target="_blank" rel="noopener">wago.tools</a>, as are the vanilla yellow levels of a Classic Era client (${esc(D.eraProduct)}, build ${esc(D.eraBuild)}) used to see what Forever moved. Vanilla's trainers — the skill they asked, what they charged for recipes and for ranks, and which of them taught what, read from the title each trainer in the world carries — and which tools its vendors sold are from the trainer, creature and vendor tables of the <a href="https://github.com/cmangos/classic-db" target="_blank" rel="noopener">CMaNGOS classic-db</a> (GPLv3). The chance formula is the community's long-standing estimate, not Blizzard's published figure; the <a href="https://warcraft.wiki.gg/wiki/Skillup" target="_blank" rel="noopener">Warcraft Wiki</a> records only the two certain ends, orange and grey. The route is worked out on this page from those; no guide, calculator or recipe database website was read to build it.`;
 
   $("profs").addEventListener("click", (e) => {
     const el = e.target.closest(".chip"); if (!el) return;
@@ -1275,9 +1576,14 @@ function build() {
   $("resetUse").addEventListener("click", () => { cfg(state.prof).over = {}; render(); });
   $("plan").addEventListener("click", (e) => {
     const cur = profOf(state.prof);
-    const el = e.target.closest("[data-drop],[data-use],[data-got],[data-show],[data-safe],[data-allrecipes],#resetPrices");
+    const el = e.target.closest("[data-drop],[data-use],[data-got],[data-show],[data-safe],[data-allrecipes],[data-known],[data-rank],[data-tool],#resetPrices,#resetKnown");
     if (el) {
-      if (el.dataset.drop) setUse(cur.byId.get(Number(el.dataset.drop)), false);
+      const c = cfg(cur.id);
+      if (el.dataset.known) (c.known || (c.known = {}))[el.dataset.known] = 1;
+      else if (el.dataset.rank) (c.ranks || (c.ranks = {}))[el.dataset.rank] = 1;
+      else if (el.dataset.tool) setTool(cur, Number(el.dataset.tool), true);
+      else if (el.id === "resetKnown") { delete c.known; delete c.ranks; }
+      else if (el.dataset.drop) setUse(cur.byId.get(Number(el.dataset.drop)), false);
       else if (el.dataset.use) setUse(cur.byId.get(Number(el.dataset.use)), true);
       else if (el.dataset.got != null) state.skill = clampSkill(state.skill + 1);
       else if (el.dataset.show) { showKey = `${cur.id}:${el.dataset.show}`; state.open.add(showKey); state.more = true; }
@@ -1292,6 +1598,7 @@ function build() {
     if (a) { e.preventDefault(); const leg = document.querySelector(a.getAttribute("href")); if (leg) leg.scrollIntoView({ block: "center", behavior: "smooth" }); }
   });
   $("plan").addEventListener("change", (e) => {
+    if (e.target.dataset.kit) { setTool(profOf(state.prof), Number(e.target.dataset.kit), e.target.checked); render(); return; }
     if (e.target.id === "priceOther") {
       const id = Number(e.target.value); if (!id) return;
       state.asked.add(id); wantBox = id; render();
