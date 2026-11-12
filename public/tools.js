@@ -37,7 +37,7 @@ window.PELIGAMING = {
         },
         {
           name: "Profession Catalogue",
-          description: "Level a profession with a route worked out from the game's own data: set your skill and your goal, and it says what to make over which stretch of skill, how many crafts to expect and how many to be safe, and what to buy for the whole way, cheapest or quickest. Type your realm's prices over the vendor's, tick the plans you own, and see which ones would be worth finding. Underneath, every recipe of all fourteen professions with the skill at which it turns orange, yellow, green and grey and the estimated chance of a point, with the Working Overtime legacy talent counted in or out.",
+          description: "Level a profession with a route worked out from the game's own data: set your skill and your goal, and it says what to make over which stretch of skill, how many crafts to expect and how many to be safe, and what to buy for the whole way, cheapest or quickest. The bolts, bars and stones a later step needs are made while making them still gives points. Type your realm's prices over the vendor's, tick the plans you own, and see which ones would be worth finding. Underneath, every recipe of all fourteen professions with the skill at which it turns orange, yellow, green and grey and the estimated chance of a point, with the Working Overtime legacy talent counted in or out.",
           path: "tools/wow-forever/profession-catalogue.html",
         },
       ],

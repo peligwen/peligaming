@@ -93,7 +93,7 @@
   .leg .rng small{display:block;font-weight:400;font-size:11.5px;color:var(--dim);}
   .leg .what{min-width:0;}
   .leg .nm{white-space:normal;font-size:14.5px;}
-  .leg .per{font-size:12.5px;color:var(--parch);} .leg .note{font-size:12.5px;color:var(--dim);} .leg .note b{color:var(--parch);font-weight:400;} .leg .note.warn{color:var(--warn);}
+  .leg .per{font-size:12.5px;color:var(--parch);} .leg .note{font-size:12.5px;color:var(--dim);} .leg .note b{color:var(--parch);font-weight:400;} .leg .note.warn{color:var(--warn);} .leg .note .ahead{color:var(--gold);}
   .leg .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;} .leg .num b{font-size:15px;} .leg .num small{display:block;font-size:11.5px;color:var(--dim);}
   .leg .drop{font:inherit;font-size:13px;line-height:1;color:var(--faint);background:none;border:0;cursor:pointer;padding:3px 2px;} .leg .drop:hover{color:var(--warn);}
   .leg .got{margin-top:6px;border-color:var(--gold-dim);color:var(--gold);font-weight:600;}
@@ -107,6 +107,7 @@
   table.shop tr.hd td{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.5px;text-align:right;padding-top:5px;}
   table.shop input{width:78px;font:inherit;font-size:12.5px;text-align:right;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:3px;padding:2px 5px;outline:none;}
   table.shop input:focus{border-color:var(--gold);} table.shop input.mine{color:var(--gold);border-color:var(--gold);}
+  table.shop select{max-width:100%;font:inherit;font-size:12.5px;color:var(--dim);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:3px;padding:2px 4px;outline:none;} table.shop select:focus{border-color:var(--gold);}
   table.shop tr.unused td.qty,table.shop tr.unused td.tot{color:var(--faint);font-weight:400;} table.shop tr.unused td span{opacity:.6;}
   table.shop tr.sum td{border-bottom:0;font-weight:600;padding-top:6px;} table.shop tr.sum td.tot{color:var(--gold);font-size:14px;}
   #shop p,#finds p{font-size:12.5px;color:var(--dim);margin:6px 0 0;}
@@ -312,7 +313,8 @@
 
     <section id="aboutbox" class="panel">
       <h3 id="about-route">The route</h3>
-      <p>Set your skill and where you are going. At every skill on the way the route makes whatever gives the next point for the least in materials (or, if you ask for the quickest, in the least time at the anvil: this build's crafts run from three seconds for a sharpening stone to a minute for a breastplate), out of the recipes you have by then. It counts what you have already made as yours to use, so the grinding stones from one step feed the bracers of the next, and anything one of your recipes can make is made rather than bought. It stays on a recipe while that is within a twentieth of the best, and leaves one whose chance has dropped under the mark you set if something better is to hand.</p>
+      <p>Set your skill and where you are going. At every skill on the way the route makes whatever gives the next point for the least in materials (or, if you ask for the quickest, in the least time at the anvil, counting what has to be made on the side: this build's crafts run from three seconds for a sharpening stone to a minute for a breastplate), out of the recipes you have by then. It counts what you have already made as yours to use, so the grinding stones from one step feed the bracers of the next, and anything one of your recipes can make is made rather than bought. It stays on a recipe while that is within a twentieth of the best, and leaves one whose chance has dropped under the mark you set if something better is to hand.</p>
+      <p>What you make to use is made early. A bolt of cloth takes the same cloth whenever it is made, but made while bolts are still orange it brings a point with it, and made when a later step calls for it, long after bolts have gone grey, it brings nothing. So where a step needs something one of your recipes makes, the route makes it as soon as that recipe can be cast (or on the front of the step where the route takes that recipe up anyway) and for as long as a craft can still give a point, and marks the step <i>made ahead</i>. It makes ahead only what the route goes on to use, and keeps the result only if the whole route comes out cheaper (or quicker) for it; the line above the steps says by how much.</p>
       <p>“My recipes” are the ones a trainer teaches and the ones you start with; tick a plan, pattern or formula in the list once you own it and the route will use it, or untick anything you cannot get. “Every recipe” shows the best route the game allows and the plans it would take. Recipes on a cooldown are left out unless you tick them. Where nothing you have gives a point, the route says so and names the cheapest thing that would.</p>
       <p>Crafts are given twice: what it takes on average, and what is enough nine times out of ten, worked out exactly from the chance at each point. The shopping list can be switched to the second; it then buys for every step as if that step went badly, which is more than a whole run of bad luck would need.</p>
       <p class="note" id="priceNote"></p>
@@ -445,35 +447,46 @@ const CATALOGUE = (() => {
     }
     return makers;
   }
+  // how long one craft takes; a recipe with no cast time is still a click and a wait
+  const seconds = (r) => r.ct || 3;
   // What `n` crafts of r cost to supply at skill s: from stock first, then by
   // making what the player can make, then by buying. Infinity if something it
-  // needs has no price. `used` is what this quote has taken from stock so far;
-  // `held` is an item whose stock is not to be touched (see the route).
-  function quote(r, n, s, stock, makers, price, used = new Map(), held = null, depth = 0) {
+  // needs has no price. `w` is the working of one quote: `used` is what it
+  // has taken from stock so far, `held` an item whose stock is not to be
+  // touched and `kept` how much of each item's stock is spoken for (see the
+  // route); `secs` comes back as the time the crafts on the side would take.
+  function quote(r, n, s, stock, makers, price, w = {}, depth = 0) {
+    if (!w.used) w.used = new Map();
+    if (!depth) w.secs = 0;
     let cost = 0;
     for (const [id, count] of r.r || []) {
       let need = count * n;
-      const have = id === held ? 0 : (stock.get(id) || 0) - (used.get(id) || 0);
-      if (have > 0) { const take = Math.min(have, need); used.set(id, (used.get(id) || 0) + take); need -= take; }
+      const have = id === w.held ? 0 : (stock.get(id) || 0) - (w.used.get(id) || 0) - ((w.kept && w.kept.get(id)) || 0);
+      if (have > 0) { const take = Math.min(have, need); w.used.set(id, (w.used.get(id) || 0) + take); need -= take; }
       if (need <= 1e-9) continue;
       const m = makers.get(id);
-      if (m && m !== r && m.from <= s && depth < 3) cost += quote(m, need / m.p[1], s, stock, makers, price, used, held, depth + 1);
-      else { const each = price(id); if (each == null) return Infinity; cost += need * each; }
+      if (m && m !== r && m.from <= s && depth < 3) { w.secs += (need / m.p[1]) * seconds(m); cost += quote(m, need / m.p[1], s, stock, makers, price, w, depth + 1); }
+      else { const each = price(id); cost += each == null ? Infinity : need * each; }
     }
     return cost;
   }
   // The same walk, done for real: stock is drawn down, and what is bought and
-  // what is made on the side are written to the ledger.
-  function supply(r, n, s, stock, makers, price, led, depth = 0) {
+  // what is made on the side are written to the ledger. Of stock that is
+  // partly spoken for (`kept`), what is not goes first.
+  function supply(r, n, s, stock, makers, price, led, kept = null, depth = 0) {
     for (const [id, count] of r.r || []) {
       let need = count * n;
       const have = stock.get(id) || 0;
-      if (have > 0) { const take = Math.min(have, need); stock.set(id, have - take); need -= take; }
+      if (have > 0) {
+        const take = Math.min(have, need); stock.set(id, have - take); need -= take;
+        const k = kept && kept.get(id);
+        if (k) kept.set(id, Math.max(0, k - Math.max(0, take - Math.max(0, have - k))));
+      }
       if (need <= 1e-9) continue;
       const m = makers.get(id);
       if (m && m !== r && m.from <= s && depth < 3) {
         led.side.set(m, (led.side.get(m) || 0) + need / m.p[1]);
-        supply(m, need / m.p[1], s, stock, makers, price, led, depth + 1);
+        supply(m, need / m.p[1], s, stock, makers, price, led, kept, depth + 1);
       } else {
         const each = price(id);
         if (each == null) led.unpriced.add(id); else led.cost += need * each;
@@ -482,8 +495,6 @@ const CATALOGUE = (() => {
     }
   }
   const newLedger = () => ({ buys: new Map(), side: new Map(), unpriced: new Set(), cost: 0, made: 0 });
-  // how long one craft takes; a recipe with no cast time is still a click and a wait
-  const seconds = (r) => r.ct || 3;
   // What a run of steps takes, with each step's crafts multiplied by scale(step).
   function bill(steps, scale, { bonus = 0, mode = "x", makers, price }) {
     const stock = new Map(), total = newLedger(), per = [];
@@ -505,10 +516,11 @@ const CATALOGUE = (() => {
     }
     return { per, total, left: stock };
   }
-  // The route from skill a to skill b. At every skill the player makes
+  // One pass from skill a to skill b. At every skill the player makes
   // whatever gives the next point for the least — the least money (goal
   // "cost") or the least time at the anvil (goal "time": a sharpening stone
-  // takes three seconds, a breastplate a minute) — out of the recipes in
+  // takes three seconds, a breastplate a minute, and what has to be made on
+  // the side for a craft takes its own time too) — out of the recipes in
   // `pool` they have by then, counting what they have already made on the way
   // as theirs to use. A batch is finished before it is spent: while they are
   // on a recipe, what it makes is not yet stock in hand for the others, or
@@ -519,13 +531,44 @@ const CATALOGUE = (() => {
   // (nobody grinds a recipe at one point in twenty because the stones are
   // cheap). Where nothing in the pool gives a point there is a gap: a step
   // with no recipe.
-  function route({ pool, a, b, bonus = 0, mode = "x", goal = "cost", price, stick = 0.05, least = 0, safe = 0.9 }) {
+  //
+  // `ahead` is what to make before it is wanted: for a recipe, how much of
+  // what it makes. It is made from the first skill at which the recipe can be
+  // cast (or from the skill `start` gives for it), for as long as a craft can
+  // still give a point, and it is kept for the steps that were going to make
+  // it on the side: to the others it is not stock to be had for nothing.
+  // `st.pre` is the skill such a step is made ahead up to. `brief` leaves out
+  // what only the finished route needs.
+  function walk({ pool, a, b, bonus = 0, mode = "x", goal = "cost", price, stick = 0.05, least = 0, safe = 0.9 }, ahead = null, brief = false, start = null) {
     const makers = makersOf(pool), ctx = { bonus, mode, makers, price };
-    const stock = new Map(), scratch = newLedger(), used = new Map(), steps = [];
+    const stock = new Map(), scratch = newLedger(), steps = [], due = new Map(ahead || []), kept = new Map(), early = new Map();
+    const w = { used: new Map(), held: null, kept, secs: 0 };
+    const feeds = (x, y) => (y.r || []).some(([id]) => id === x.p[0]);
     let cur = null;
     // v is what is being kept low, t breaks ties; anything priced beats anything that is not
     const better = (v, t, bv, bt) => (isFinite(v) !== isFinite(bv) ? isFinite(v) : v < bv - 1e-9 || (v <= bv + 1e-9 && t < bt - 1e-9));
     for (let s = a; s < b;) {
+      // first, anything due to be made ahead; what goes into another of them before that one
+      let pre = null, pp = 0;
+      for (const [m, n] of due) {
+        if (m.from > s || (start && start.get(m) > s)) continue;
+        const p = chance(m, s, bonus, mode);
+        // (a point that would take more than is wanted, by over half a craft, is left)
+        if (p <= 0 || m.p[1] / p - n > m.p[1] / 2) continue;
+        if (!pre || feeds(m, pre) || (!feeds(pre, m) && p > pp)) { pre = m; pp = p; }
+      }
+      if (pre) {
+        const up = Math.min(pre.u || 1, b - s), out = pre.p[1] / pp;
+        supply(pre, 1 / pp, s, stock, makers, price, scratch, kept);
+        stock.set(pre.p[0], (stock.get(pre.p[0]) || 0) + out);
+        kept.set(pre.p[0], (kept.get(pre.p[0]) || 0) + out);
+        early.set(pre, (early.get(pre) || 0) + out);
+        due.set(pre, due.get(pre) - out);
+        const last = steps[steps.length - 1];
+        if (last && last.r === pre && last.pre === s) last.to = last.pre = s + up; else steps.push({ from: s, to: s + up, r: pre, pre: s + up });
+        cur = pre; s += up;
+        continue;
+      }
       let best = null, bv = Infinity, bt = Infinity, cv = Infinity, ct = Infinity, any = false, top = 0;
       for (const r of pool) if (r.from <= s) top = Math.max(top, chance(r, s, bonus, mode));
       const floor = top >= least ? least : 0;
@@ -533,9 +576,9 @@ const CATALOGUE = (() => {
         if (r.from > s) continue;
         const p = chance(r, s, bonus, mode);
         if (p <= 0 || p < floor - 1e-12) continue;
-        used.clear();
-        const c = quote(r, 1 / p, s, stock, makers, price, used, cur && cur !== r && cur.p ? cur.p[0] : null);
-        const v = goal === "time" ? seconds(r) / p : c, t = goal === "time" ? c : 1 / p;
+        w.used.clear(); w.held = cur && cur !== r && cur.p ? cur.p[0] : null;
+        const c = quote(r, 1 / p, s, stock, makers, price, w);
+        const v = goal === "time" ? seconds(r) / p + w.secs : c, t = goal === "time" ? c : 1 / p;
         if (r === cur) { cv = v; ct = t; }
         if (!any || better(v, t, bv, bt)) { best = r; bv = v; bt = t; any = true; }
       }
@@ -547,7 +590,7 @@ const CATALOGUE = (() => {
       }
       if (cur && cur !== best && isFinite(cv) === isFinite(bv) && (isFinite(cv) ? cv <= bv * (1 + stick) + 1e-9 : true) && (goal === "cost" || ct <= bt * (1 + stick) + 1e-9)) best = cur;
       const p = chance(best, s, bonus, mode), up = Math.min(best.u || 1, b - s);
-      supply(best, 1 / p, s, stock, makers, price, scratch);
+      supply(best, 1 / p, s, stock, makers, price, scratch, kept);
       if (best.p) stock.set(best.p[0], (stock.get(best.p[0]) || 0) + best.p[1] / p);
       const last = steps[steps.length - 1];
       if (last && last.r === best) last.to = s + up; else steps.push({ from: s, to: s + up, r: best });
@@ -557,19 +600,77 @@ const CATALOGUE = (() => {
     for (const st of steps) {
       if (!st.r) continue;
       st.crafts = crafts(st.r, st.from, st.to, bonus, mode);
-      st.craftsSafe = craftsQuantile(st.r, st.from, st.to, bonus, mode, safe);
+      // what is made ahead is a number of crafts, not a climb to a skill: it is made once, however the points fall
+      if (!brief) st.craftsSafe = st.pre ? Math.ceil(crafts(st.r, st.from, st.pre, bonus, mode) - 1e-9) + craftsQuantile(st.r, st.pre, st.to, bonus, mode, safe) : craftsQuantile(st.r, st.from, st.to, bonus, mode, safe);
       st.p0 = chance(st.r, st.from, bonus, mode);
       st.p1 = chance(st.r, st.to - (st.r.u || 1), bonus, mode);
       made += st.crafts; madeSafe += st.craftsSafe; points += st.to - st.from;
     }
-    // (nine times in ten can be a hair under the average when a step is all but certain; to be safe is never to buy less)
-    const typical = bill(steps, () => 1, ctx), cautious = bill(steps, (st) => Math.max(1, st.craftsSafe / st.crafts), ctx);
     // the time it all takes: the steps' own crafts and what is made on the side for them
     const timeOf = (led, pick) => { let t = 0; for (const st of steps) if (st.r) t += pick(st) * seconds(st.r); for (const [m, n] of led.total.side) t += n * seconds(m); return t; };
-    typical.seconds = timeOf(typical, (st) => st.crafts); cautious.seconds = timeOf(cautious, (st) => Math.max(st.crafts, st.craftsSafe));
-    return { a, b, steps, points, crafts: made, craftsSafe: madeSafe, gaps: steps.filter((st) => !st.r), typical, cautious, makers };
+    const typical = bill(steps, () => 1, ctx);
+    typical.seconds = timeOf(typical, (st) => st.crafts);
+    let side = 0;
+    for (const n of typical.total.side.values()) side += n;
+    const R = { a, b, steps, points, crafts: made, side, gaps: steps.filter((st) => !st.r), typical, makers, kept, early };
+    if (brief) return R;
+    // (nine times in ten can be a hair under the average when a step is all but certain; to be safe is never to buy less)
+    const cautious = bill(steps, (st) => Math.max(1, st.craftsSafe / st.crafts), ctx);
+    cautious.seconds = timeOf(cautious, (st) => Math.max(st.crafts, st.craftsSafe));
+    return Object.assign(R, { craftsSafe: madeSafe, cautious });
   }
-  return { green, colour, baseChance, chance, crafts, craftsQuantile, money, parseMoney, makersOf, quote, bill, route };
+  // The route from skill a to skill b: the pass above, and then the same pass
+  // with what it made on the side made ahead instead. A reagent the player
+  // makes themselves costs the same whenever it is made, but made while its
+  // own recipe still gives points it brings those points with it, so the bolts
+  // a later step wants are made when bolts are orange, not when the step
+  // comes round and they have long been grey. How much is made ahead is what
+  // the route then goes on to use, found by going round a few times; the
+  // route that comes out is kept only if it is better than the plain one.
+  // Where the plain route takes up the recipe for its own sake a little
+  // later, while it is still orange, the crafts go on the front of that step
+  // and do not make a step of their own. `ahead: false` gives the plain one.
+  function route(o) {
+    const plain = walk(o);
+    if (o.ahead === false || !plain.points) return plain;
+    const { pool, a, b, bonus = 0, mode = "x", goal = "cost" } = o;
+    const eaten = new Set();
+    for (const r of pool) for (const [id] of r.r || []) eaten.add(id);
+    const able = [...plain.makers.values()].filter((m) => eaten.has(m.p[0]) && Math.max(a, m.from) < b && chance(m, Math.max(a, m.from), bonus, mode) > 0);
+    if (!able.length) return plain;
+    const score = (R) => [-R.points, R.typical.total.unpriced.size, goal === "time" ? R.typical.seconds : R.typical.total.cost, goal === "time" ? R.typical.total.cost : R.crafts + R.side];
+    const beats = (x, y) => { for (let i = 0; i < x.length; i++) { const tol = 1e-7 * Math.max(1, Math.abs(y[i])); if (x[i] < y[i] - tol) return true; if (x[i] > y[i] + tol) return false; } return false; };
+    const onSide = (R, m) => { let n = 0; for (const led of R.typical.per) n += led.side.get(m) || 0; return n * m.p[1]; };
+    const own = new Map();
+    for (const st of plain.steps) if (st.r && !own.has(st.r)) own.set(st.r, st.from);
+    const startOf = (m, n) => {
+      const lo = Math.max(a, m.from), at = own.get(m);
+      return at > lo && at <= m.y ? Math.max(lo, at - Math.round(n / m.p[1])) : lo;
+    };
+    let best = null, bs = score(plain), plan = new Map(), start = new Map(), R = plain;
+    for (let round = 0; round < 5; round++) {
+      // all the route uses of it: what it made ahead and what it still made on the side, less what was kept and never used
+      let moved = false;
+      for (const m of able) {
+        const n = plan.get(m) || 0, next = Math.max(0, (R.early.get(m) || 0) + onSide(R, m) - (R.kept.get(m.p[0]) || 0));
+        if (Math.abs(next - n) <= m.p[1] / 20) continue;
+        moved = true;
+        if (next > m.p[1] / 4) { plan.set(m, next); start.set(m, startOf(m, next)); } else plan.delete(m);
+      }
+      if (!moved) break;
+      R = walk(o, plan, true, start);
+      const sc = score(R);
+      if (beats(sc, bs)) { best = [new Map(plan), new Map(start)]; bs = sc; }
+    }
+    if (!best) return plain;
+    // (and if putting the crafts on a later step of their own came out dearer than making them at once, they are made at once)
+    if ([...best[0].keys()].some((m) => best[1].get(m) > Math.max(a, m.from)) && beats(score(walk(o, best[0], true)), bs)) best[1] = null;
+    const out = walk(o, best[0], false, best[1]);
+    out.ahead = best[0];
+    out.plain = { cost: plain.typical.total.cost, seconds: plain.typical.seconds, crafts: plain.crafts, side: plain.side };
+    return out;
+  }
+  return { green, colour, baseChance, chance, crafts, craftsQuantile, money, parseMoney, makersOf, quote, bill, walk, route };
 })();
 if (typeof module !== "undefined") module.exports = CATALOGUE;
 </script>
@@ -590,7 +691,7 @@ const span = () => (PHONE.matches ? 6 : NARROW.matches ? 7 : 9);
 
 let D = null;                 // the dataset
 let R = null;                 // the route on show, if there is one
-const state = { prof: null, skill: 1, goal: 300, wo: 0, mode: "x", objective: "cost", least: 0.25, safe: false, onlyPts: false, sort: "game", sod: false, q: "", open: new Set(), more: false };
+const state = { prof: null, skill: 1, goal: 300, wo: 0, mode: "x", objective: "cost", least: 0.25, safe: false, onlyPts: false, sort: "game", sod: false, q: "", open: new Set(), more: false, asked: new Set() };
 // what this browser remembers: a skill and a goal per profession, which recipes are yours, your prices, the options
 let saved = { skills: {}, goals: {}, use: {}, prices: {} };
 let showKey = null;           // a recipe to scroll to once the list is drawn
@@ -730,14 +831,30 @@ function gapLeg(cur, st, id) {
 <div class="what"><div class="nm">Nothing you have gives a point here</div>
 <div class="note">${cur.gather ? `${esc(cur.name)} is raised mostly by gathering. ` : ""}${list ? `The cheapest that would: ${list}` : "No recipe in the data would, either."}</div></div><div></div><div></div><div></div><div></div></li>`;
 }
-function legHtml(cur, st, i, led, first) {
-  const id = `leg-${i}`;
+function legHtml(cur, st, i, all, first) {
+  const id = `leg-${i}`, led = all[i];
   if (!st.r) return gapLeg(cur, st, id);
   const r = st.r, pts = st.to - st.from, q = r.p ? itemQ(r.p[0]) : 1;
   const made = state.safe ? st.craftsSafe : st.crafts, certain = st.p0 >= 0.995 && st.p1 >= 0.995;
   const notes = [], warns = [];
   const how = learnNote(r);
   if (how) notes.push(how);
+  if (st.pre) {
+    // made before it is wanted: say what will use it, so a dear-looking step explains itself
+    const item = r.p[0], takes = (x) => (x.r || []).some(([id]) => id === item), users = [];
+    for (let j = i + 1; j < R.steps.length; j++) {
+      const u = R.steps[j].r;
+      if (u && u !== r && !users.includes(u) && (takes(u) || [...all[j].side.keys()].some(takes))) users.push(u);
+    }
+    const named = users.slice(0, 2).map((u) => `<b>${esc(u.n)}</b>`), rest = users.length - named.length;
+    const whom = !users.length ? "later steps" : named.join(rest ? ", " : " and ") + (rest ? ` and ${rest} more step${rest === 1 ? "" : "s"}` : "");
+    const mine = M.crafts(r, st.from, st.pre, bonus(), state.mode) * r.p[1];
+    let later = 0;
+    for (let j = i + 1; j < all.length; j++) later += (all[j].side.get(r) || 0) * r.p[1];
+    const part = st.pre < st.to ? `the first ${qty(mine)} are ` : "";
+    const need = later >= 1 ? `the route needs ${qty(mine + later)} in all` : "the route needs them anyway";
+    notes.push(`<span class="ahead">made ahead</span> ${part}for ${whom}: ${need}, and made now they give points${st.pre >= st.to && st.p1 < 0.25 - 1e-9 ? ", if rarely by the end" : ""}`);
+  }
   for (const [m, n] of led.side) notes.push(`make <b>${qty(n * m.p[1])} ${esc(itemName(m.p[0]) || m.n)}</b> first (${mats(m.r) || "nothing listed"} ${m.p[1] > 1 ? `for ${m.p[1]}` : "each"})`);
   for (const [item, n] of r.r || []) {
     const m = R.makers.get(item), sideMade = m && led.side.has(m) ? led.side.get(m) * m.p[1] : 0;
@@ -750,7 +867,7 @@ function legHtml(cur, st, i, led, first) {
   if (r.cd) notes.push(`cooldown ${fmtTime(r.cd)}: this many crafts will take days`);
   const rank = rankNote(cur, st);
   if (rank) notes.push(rank);
-  if (st.p1 < 0.25 - 1e-9) warns.push(`nothing better among your recipes, so the last points come at about 1 in ${fmtCrafts(1 / st.p1)}`);
+  if (st.p1 < 0.25 - 1e-9 && !(st.pre >= st.to)) warns.push(`nothing better among your recipes, so the last points come at about 1 in ${fmtCrafts(1 / st.p1)}`);
   if (led.unpriced.size) warns.push(`no price for ${[...led.unpriced].map((item) => esc(itemName(item) || "?")).join(", ")}`);
   const big = certain ? `${pts}` : state.safe ? `${st.craftsSafe}` : `about ${fmtCrafts(st.crafts)}`;
   const small = certain || st.craftsSafe <= Math.round(st.crafts) ? "" : state.safe ? `about ${fmtCrafts(st.crafts)} on average` : `${st.craftsSafe} to be safe`;
@@ -770,13 +887,18 @@ function shopHtml(cur, led) {
   rows.sort((x, y) => (y.each == null) - (x.each == null) || y.n * (y.each || 0) - x.n * (x.each || 0) || y.n - x.n);
   // a material you priced out of the route stays in sight, so the price can be changed back
   for (const id of Object.keys(saved.prices)) if (cur.takes.has(Number(id)) && !led.total.buys.has(Number(id))) rows.push({ id: Number(id), n: 0, each: saved.prices[id], mine: true });
+  // and so does one you asked to price: the route may be leaving it out only because of the vendor's figure
+  for (const id of state.asked) if (!rows.some((x) => x.id === id)) rows.push({ id, n: 0, each: price(id), mine: false });
+  const others = new Map();
+  for (const r of R.pool) if (r.from < R.opts.b && r.g > R.opts.a) for (const [id] of r.r || []) if (!R.makers.has(id) && itemName(id) && !rows.some((x) => x.id === id)) others.set(id, itemName(id));
+  const pick = !others.size ? "" : `<tr class="other"><td></td><td colspan="3"><select id="priceOther" aria-label="Price a material the route does not use" title="A material your recipes could use on this stretch and the route does not: price it, and the route is worked out again"><option value="">price another material…</option>${[...others].sort((x, y) => x[1].localeCompare(y[1])).map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join("")}</select></td></tr>`;
   const mine = Object.keys(saved.prices).length;
   let html = `<h3>Shopping list <span class="seg" id="safeSeg" role="group" aria-label="How many crafts to buy for">
 <button data-safe="0" class="${state.safe ? "" : "on"}" title="What it takes on average">on average</button><button data-safe="1" class="${state.safe ? "on" : ""}" title="Enough for each step nine times out of ten">to be safe</button></span></h3>`;
   if (!rows.length) return html + `<p>Nothing to buy: these recipes list no materials.</p>`;
   html += `<table class="shop"><tbody><tr class="hd"><td></td><td></td><td>each</td><td>in all</td></tr>${rows.map((x) => `<tr${x.n ? "" : ` class="unused" title="Not in the route at this price"`}><td class="qty">${x.n ? qty(x.n) : "none"}</td><td>${itemHtml(x.id)}</td>
 <td class="pr"><input type="text" data-item="${x.id}" value="${x.each == null ? "" : M.money(x.each)}" placeholder="price?" class="${x.mine ? "mine" : ""}" aria-label="Price of one ${esc(itemName(x.id) || "")}" title="${x.mine ? "Your price" : x.each == null ? "The game’s data has no price for this" : "What a vendor charges"}: type your own, like 2g 50s, 35s or 80c"></td>
-<td class="tot">${!x.n ? "—" : x.each == null ? "?" : M.money(x.n * x.each)}</td></tr>`).join("")}
+<td class="tot">${!x.n ? "—" : x.each == null ? "?" : M.money(x.n * x.each)}</td></tr>`).join("")}${pick}
 <tr class="sum"><td></td><td>materials${led.total.unpriced.size ? ", without the unpriced" : ""}</td><td></td><td class="tot">${M.money(led.total.cost)}</td></tr></tbody></table>`;
   html += `<p>A price is what a vendor charges for the thing in the game’s data: right for what vendors sell, a stand-in for the rest. Type your realm’s over it (2g 50s, 35s, 80c — or 0 for what you already have)${mine ? `. <button class="lnk" id="resetPrices">Forget my ${mine === 1 ? "price" : `${mine} prices`}</button>` : ""}.</p>`;
   // what is left in the bags at the end
@@ -787,7 +909,12 @@ function shopHtml(cur, led) {
 }
 // Which plans would be worth getting: each recipe the best possible route
 // uses and you do not have, tried on its own against your route.
-function findsHtml(cur) {
+// A route apiece, so it is done a route at a time with the page left free in
+// between, and dropped if the plan has been drawn again meanwhile.
+let findsRun = 0;
+const breathe = () => new Promise((done) => setTimeout(done, 0));
+async function findsHtml(cur) {
+  const run = ++findsRun, mine = R, stale = () => run !== findsRun || R !== mine;
   const over = cfg(cur.id).over;
   const extra = cur.recipes.filter((r) => r.s === "i" && over[r.i] == null && !usable(r) && !r.x && !r.cd && r.g != null);
   if (!extra.length) return "";
@@ -795,6 +922,8 @@ function findsHtml(cur) {
   const wanted = [...new Set(ideal.steps.map((st) => st.r).filter((r) => r && extra.includes(r)))].slice(0, 14);
   const base = R.typical.total.cost, out = [];
   for (const x of wanted) {
+    await breathe();
+    if (stale()) return null;
     const alt = M.route(Object.assign({}, R.opts, { pool: R.pool.concat([x]) }));
     const more = alt.points - R.points, saving = base - alt.typical.total.cost;
     if (more > 0 || (more === 0 && saving > Math.max(base * 0.01, 100))) out.push({ x, more, saving });
@@ -807,7 +936,7 @@ function findsHtml(cur) {
 ${out.length ? `<ul>${out.slice(0, 6).map(({ x, more, saving }) => `<li><button class="btn" data-use="${x.i}" title="Tick it: use it in the route">I have it</button><span class="it">${itemHtml(x.ri)} <small>asks for ${x.l}</small></span><span class="gain">${more > 0 ? `covers ${more} more point${more === 1 ? "" : "s"}` : `saves about ${M.money(saving)}`}</span></li>`).join("")}</ul>` : ""}
 <p>With every recipe in the game this route would come to about <b style="color:var(--parch)">${M.money(ideal.typical.total.cost)}</b>${ideal.points > R.points ? ` and cover ${ideal.points === R.opts.b - R.opts.a ? "every point" : `${ideal.points} points`}` : ""}, against ${M.money(base)} now. <button class="lnk" data-allrecipes>Show that route</button></p>`;
 }
-let findsTimer = 0;
+let findsTimer = 0, wantBox = null;
 function drawPlan(cur) {
   const plan = $("plan"), a = state.skill, b = state.goal;
   clearTimeout(findsTimer);
@@ -842,6 +971,9 @@ function drawPlan(cur) {
   if (R.points) {
     bits.push(`<b>${R.points}</b> point${R.points === 1 ? "" : "s"}`);
     bits.push(R.craftsSafe > Math.ceil(R.crafts) ? `about <b>${fmtCrafts(R.crafts)}</b> crafts, <b>${R.craftsSafe.toLocaleString("en")}</b> to be safe` : `<b>${fmtCrafts(R.crafts)}</b> crafts`);
+    let side = 0;
+    for (const n of led.total.side.values()) side += n;
+    if (side >= 0.5) bits.push(`<b>${fmtCrafts(side)}</b> more to make their reagents`);
     if (time > 0) bits.push(`${fmtDur(time)} of crafting`);
     bits.push(`about <b>${M.money(led.total.cost)}</b> in materials${state.safe ? " to be safe" : ""}${led.total.unpriced.size ? `, and ${led.total.unpriced.size} thing${led.total.unpriced.size === 1 ? "" : "s"} with no price` : ""}`);
   }
@@ -853,14 +985,20 @@ function drawPlan(cur) {
   let n = 0;
   const wide = $("ladder").clientWidth || 900;
   $("ladder").innerHTML = R.steps.map((st, i) => { const w = xs(st.to) - xs(st.from); return `<a href="#leg-${i}" class="${st.r ? "a" + (n++ % 2) : "gap"}" style="left:${xs(st.from).toFixed(3)}%;width:${w.toFixed(3)}%" title="${st.from} → ${st.to}: ${esc(st.r ? st.r.n : "nothing you have")}">${(w / 100) * wide < 44 ? "" : esc(st.r ? st.r.n : "nothing")}</a>`; }).join("");
-  $("legsHow").textContent = state.objective === "time" ? "each step is the quickest way to the next point with what you have by then" : "each step is the cheapest way to the next point with what you have by then";
+  // what making reagents ahead is worth here, against the same route without it
+  const gain = !R.ahead ? "" : state.objective === "time"
+    ? (R.plain.seconds - R.typical.seconds >= 30 ? `; making reagents ahead saves about ${fmtDur(R.plain.seconds - R.typical.seconds)}` : "")
+    : (R.plain.cost - R.typical.total.cost >= 1 ? `; making reagents ahead saves about ${M.money(R.plain.cost - R.typical.total.cost)}` : "");
+  $("legsHow").textContent = (state.objective === "time" ? "each step is the quickest way to the next point with what you have by then" : "each step is the cheapest way to the next point with what you have by then") + gain;
   $("ticks").innerHTML = `<span class="l" style="left:0">${a}</span>` + (cur.ranks || []).filter((k) => xs(k.cap) > 9 && xs(k.cap) < 91).map((k) => `<span class="cap" style="left:${xs(k.cap).toFixed(2)}%" title="${esc(k.n)} ends at ${k.cap}">${k.cap}</span>`).join("") + `<span class="r" style="left:100%">${b}</span>`;
 
   // the first step is the one to be making now, unless nothing you have gives a point at your skill
-  $("legs").innerHTML = R.steps.map((st, i) => legHtml(cur, st, i, led.per[i], i === 0 && !!st.r)).join("");
+  $("legs").innerHTML = R.steps.map((st, i) => legHtml(cur, st, i, led.per, i === 0 && !!st.r)).join("");
   $("shop").innerHTML = R.points ? shopHtml(cur, led) : "";
+  if (wantBox != null) { const box = $("shop").querySelector(`input[data-item="${wantBox}"]`); wantBox = null; if (box) { box.focus(); box.select(); } }
   $("finds").innerHTML = "";
-  if (!c.all) findsTimer = setTimeout(() => { if (R) $("finds").innerHTML = findsHtml(cur); }, 160);
+  findsRun++;
+  if (!c.all) findsTimer = setTimeout(() => { if (R) findsHtml(cur).then((html) => { if (html != null) $("finds").innerHTML = html; }); }, 160);
 }
 
 // ---- the recipes to show -----------------------------------------------------
@@ -1104,7 +1242,7 @@ function build() {
   for (const p of D.professions) for (const r of p.recipes) if (!r.x) L[r.s]++;
   const seen = new Set();
   for (const p of D.professions) for (const r of p.recipes) for (const [id] of r.r || []) if (!seen.has(id)) { seen.add(id); reagents++; if (D.items[id][2] > 0) priced++; }
-  $("priceNote").textContent = `The only price the game's data has for a material is what a vendor charges for it. That is the real price of flux, vials and thread; for ore, bars, herbs, cloth and leather it is just a number that rises with the material's tier. So the route starts out roughly right, and becomes yours as you type your realm's prices into the shopping list (they are kept in this browser). ${reagents - priced} of the ${reagents} materials have no vendor price at all; a recipe that takes one is left out of the cheapest route until you price it.`;
+  $("priceNote").textContent = `The only price the game's data has for a material is what a vendor charges for it. That is the real price of flux, vials and thread; for ore, bars, herbs, cloth and leather it is just a number that rises with the material's tier. So the route starts out roughly right, and becomes yours as you type your realm's prices into the shopping list (they are kept in this browser); a material the route leaves out can be priced there too, in case it is only the vendor's figure that keeps it out. ${reagents - priced} of the ${reagents} materials have no vendor price at all; a recipe that takes one is left out of the cheapest route until you price it.`;
   $("shiftnote").textContent = ` (of the ${S.shiftCheck.total} recipe items whose level is known in both games, ${S.shiftCheck.match} moved exactly in step with their recipe)`;
   $("scopeText").innerHTML = `${live.toLocaleString("en")} recipes across ${D.professions.length} professions, from build ${esc(D.build)} of the Forever client: everything the trade-skill window lists, plus Disenchant and the Mage's scroll reading, which colour up the same way. Gathering professions have only their new camping recipes and, for Mining, smelting; what a node or a corpse needs is not a recipe and is not here. The recipes Forever retired are left out. The client also still carries ${S.leftovers} recipes filed under “Season of Discovery”; they are hidden until you tick the box above the table. Of the ${live.toLocaleString("en")}, ${(L.i + L.a).toLocaleString("en")} have an exact learn level, ${L.t} carry vanilla's trainer level (†), ${L.e} an estimate (≈) and ${L.u} none (?). The skill cap is ${D.skillCap}; a recipe whose yellow level is above that stays orange for good.`;
   $("creditText").innerHTML = `Recipes, their yellow and grey levels, categories, products, reagents, tools and cooldowns, the items that teach them, what a vendor charges and pays, the ranks and their ceilings and the ${esc(D.talent.name)} talent are the Forever client's own data (product ${esc(D.product)}, build ${esc(D.build)}), read through the table exports of <a href="https://wago.tools" target="_blank" rel="noopener">wago.tools</a>, as are the vanilla yellow levels of a Classic Era client (${esc(D.eraProduct)}, build ${esc(D.eraBuild)}) used to see what Forever moved. Vanilla trainer levels, for recipes and for ranks, are from the trainer tables of the <a href="https://github.com/cmangos/classic-db" target="_blank" rel="noopener">CMaNGOS classic-db</a> (GPLv3). The chance formula is the community's long-standing estimate, not Blizzard's published figure; the <a href="https://warcraft.wiki.gg/wiki/Skillup" target="_blank" rel="noopener">Warcraft Wiki</a> records only the two certain ends, orange and grey. The route is worked out on this page from those; no guide, calculator or recipe database website was read to build it.`;
@@ -1112,7 +1250,7 @@ function build() {
   $("profs").addEventListener("click", (e) => {
     const el = e.target.closest(".chip"); if (!el) return;
     saved.skills[state.prof] = state.skill; saved.goals[state.prof] = state.goal;
-    state.prof = Number(el.dataset.prof); state.q = ""; state.more = false;
+    state.prof = Number(el.dataset.prof); state.q = ""; state.more = false; state.asked.clear();
     state.skill = clampSkill(saved.skills[state.prof] || 1);
     state.goal = clampGoal(saved.goals[state.prof] || D.skillCap);
     $("q").value = ""; render();
@@ -1154,6 +1292,11 @@ function build() {
     if (a) { e.preventDefault(); const leg = document.querySelector(a.getAttribute("href")); if (leg) leg.scrollIntoView({ block: "center", behavior: "smooth" }); }
   });
   $("plan").addEventListener("change", (e) => {
+    if (e.target.id === "priceOther") {
+      const id = Number(e.target.value); if (!id) return;
+      state.asked.add(id); wantBox = id; render();
+      return;
+    }
     const el = e.target.closest("input[data-item]"); if (!el) return;
     const id = el.dataset.item, typed = M.parseMoney(el.value), vendor = D.items[id] && D.items[id][2] > 0 ? D.items[id][2] : null;
     if (typed == null || typed === vendor) delete saved.prices[id]; else saved.prices[id] = typed;
