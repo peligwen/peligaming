@@ -319,8 +319,8 @@
 
     <section id="aboutbox" class="panel">
       <h3 id="about-route">The route</h3>
-      <p>Set your skill and where you are going. At every skill on the way the route makes whatever gives the next point for the least in materials (or, if you ask for the quickest, in the least time at the anvil, counting what has to be made on the side: this build's crafts run from three seconds for a sharpening stone to a minute for a breastplate), out of the recipes you have by then. It counts what you have already made as yours to use, so the grinding stones from one step feed the bracers of the next, and anything one of your recipes can make is made rather than bought. It stays on a recipe while that is within a twentieth of the best, and leaves one whose chance has dropped under the mark you set if something better is to hand.</p>
-      <p>What you make to use is made early. A bolt of cloth takes the same cloth whenever it is made, but made while bolts are still orange it brings a point with it, and made when a later step calls for it, long after bolts have gone grey, it brings nothing. So where a step needs something one of your recipes makes, the route makes it as soon as that recipe can be cast (or on the front of the step where the route takes that recipe up anyway) and for as long as a craft can still give a point, and marks the step <i>made ahead</i>. It makes ahead only what the route goes on to use, and keeps the result only if the whole route comes out cheaper (or quicker) for it; the line above the steps says by how much.</p>
+      <p>Set your skill and where you are going. At every skill on the way the route makes whatever gives the next point for the least in materials (or, if you ask for the quickest, in the least time at the anvil, counting what has to be made on the side: this build's crafts run from three seconds for a sharpening stone to a minute for a breastplate), out of the recipes you have by then. It counts what you have already made as yours to use, so the grinding stones from one step feed the bracers of the next. Anything else one of your recipes can make is made or bought, whichever comes to less at your prices, link by link: a leatherworker makes Heavy Leather from five Medium, Medium from four Light and Light from three Ruined Leather Scraps, sixty scraps a Heavy Leather, and at most prices it is cheaper bought, so it is bought, and the leather made for points along the way is used first. It stays on a recipe while that is within a twentieth of the best, and leaves one whose chance has dropped under the mark you set if something better is to hand.</p>
+      <p>What you make to use is made early. A bolt of cloth takes the same cloth whenever it is made, but made while bolts are still orange it brings a point with it, and made when a later step calls for it, long after bolts have gone grey, it brings nothing. So where a step needs something one of your recipes makes, the route makes it as soon as that recipe can be cast (or on the front of the step where the route takes that recipe up anyway) and for as long as a craft can still give a point, and marks the step <i>made ahead</i>. That goes for a reagent the route would buy, too: a bolt of wool is a few coppers cheaper from a vendor than in cloth, and made while it gives points it is the cheapest point there is. It makes ahead only what the route goes on to use, and keeps the result only if the whole route comes out cheaper (or quicker) for it; the line above the steps says by how much.</p>
       <p>Tools are part of it. Where a recipe is made with a tool, the first step that needs one gets it: an enchanter's rod is made, a blacksmith's hammer bought, and its materials are on the shopping list. Made while its own recipe is still orange, a rod is a step of its own, one craft and a point with it; later than that it is made on the side before the step that needs it. A better tool does the work of a lesser one, as in the game (a Runed Golden Rod will do wherever a copper or a silver one is asked for), so only the rods the route cannot do without are made. The ticks under the sum say which tools you already have. To start with you are taken to have the ones you could have made or bought before your skill; untick any you lack.</p>
       <p>What a trainer charges is counted too, for the recipes the route uses and for no others, and for each rank on the way. <i>At the trainer</i> lists them by the skill each is wanted at, with the kind of trainer that teaches it: a Journeyman Tailor's list stops long before an Artisan's. If you want the cheapest route, a recipe is only learned, and a tool only made, where the route comes to less for it: one taken up for a point or two that saves less than its fee is left out, and the line above the steps says which. Say <i>know it</i> or <i>have it</i> for what you have already paid for, and it costs nothing. All of this is vanilla's: fees, levels and who teaches what are the server's business and no client carries them, so they are marked † and Forever's may differ.</p>
       <p>“My recipes” are the ones a trainer teaches and the ones you start with; tick a plan, pattern or formula in the list once you own it and the route will use it, or untick anything you cannot get. “Every recipe” shows the best route the game allows and the plans it would take. Recipes on a cooldown are left out unless you tick them. Where nothing you have gives a point, the route says so and names the cheapest thing that would.</p>
@@ -458,12 +458,19 @@ const CATALOGUE = (() => {
   }
   // how long one craft takes; a recipe with no cast time is still a click and a wait
   const seconds = (r) => r.ct || 3;
-  // What `n` crafts of r cost to supply at skill s: from stock first, then by
-  // making what the player can make, then by buying. Infinity if something it
-  // needs has no price. `w` is the working of one quote: `used` is what it
-  // has taken from stock so far, `held` an item whose stock is not to be
-  // touched and `kept` how much of each item's stock is spoken for (see the
-  // route); `secs` comes back as the time the crafts on the side would take.
+  // What `n` crafts of r cost to supply at skill s: from stock first, then
+  // whichever is cheaper of making it, where one of the player's recipes
+  // can, and buying it. A leatherworker makes Light Leather from three
+  // scraps and Heavy Leather from five Medium, which takes four Light each;
+  // made all the way down, a Heavy Leather is sixty scraps, and at most
+  // prices it is cheaper bought. The making is costed at each link, so what
+  // is in the bags is used and what is cheaper bought is bought. (Making
+  // wins a tie, and anything without a price is made.) Infinity if
+  // something it needs has no price either way. `w` is the working of one
+  // quote: `used` is what it has taken from stock so far, `held` an item
+  // whose stock is not to be touched and `kept` how much of each item's
+  // stock is spoken for (see the route); `secs` comes back as the time the
+  // crafts on the side would take.
   function quote(r, n, s, stock, makers, price, w = {}, depth = 0) {
     if (!w.used) w.used = new Map();
     if (!depth) w.secs = 0;
@@ -473,11 +480,22 @@ const CATALOGUE = (() => {
       const have = id === w.held ? 0 : (stock.get(id) || 0) - (w.used.get(id) || 0) - ((w.kept && w.kept.get(id)) || 0);
       if (have > 0) { const take = Math.min(have, need); w.used.set(id, (w.used.get(id) || 0) + take); need -= take; }
       if (need <= 1e-9) continue;
-      const m = makers.get(id);
-      if (m && m !== r && m.from <= s && depth < 3) { w.secs += (need / m.p[1]) * seconds(m); cost += quote(m, need / m.p[1], s, stock, makers, price, w, depth + 1); }
-      else { const each = price(id); cost += each == null ? Infinity : need * each; }
+      const m = makers.get(id), each = price(id), buy = each == null ? Infinity : need * each;
+      if (m && m !== r && m.from <= s && depth < 3) {
+        // (made on trial: if it is cheaper bought, what the making took from stock goes back)
+        const used = new Map(w.used), secs = w.secs;
+        const make = quote(m, need / m.p[1], s, stock, makers, price, w, depth + 1);
+        if (buy < make - 1e-9) { w.used = used; w.secs = secs; cost += buy; }
+        else { w.secs += (need / m.p[1]) * seconds(m); cost += make; }
+      } else cost += buy;
     }
     return cost;
+  }
+  // Whether to make `need` of item `id` with m at skill s rather than buy it:
+  // what quote above decides, for the stock as it stands.
+  function makes(m, id, need, s, stock, makers, price, depth) {
+    const each = price(id);
+    return each == null || need * each >= quote(m, need / m.p[1], s, stock, makers, price, { secs: 0 }, depth + 1) - 1e-9;
   }
   // The same walk, done for real: stock is drawn down, and what is bought and
   // what is made on the side are written to the ledger. Of stock that is
@@ -493,7 +511,7 @@ const CATALOGUE = (() => {
       }
       if (need <= 1e-9) continue;
       const m = makers.get(id);
-      if (m && m !== r && m.from <= s && depth < 3) {
+      if (m && m !== r && m.from <= s && depth < 3 && makes(m, id, need, s, stock, makers, price, depth)) {
         led.side.set(m, (led.side.get(m) || 0) + need / m.p[1]);
         supply(m, need / m.p[1], s, stock, makers, price, led, kept, depth + 1);
       } else {
@@ -761,20 +779,29 @@ const CATALOGUE = (() => {
       const lo = Math.max(a, m.from), at = own.get(m);
       return at > lo && at <= m.y ? Math.max(lo, at - Math.round(n / m.p[1])) : lo;
     };
-    let best = null, bs = score(plain, goal), plan = new Map(), start = new Map(), R = plain;
-    for (let round = 0; round < 5; round++) {
-      // all the route uses of it: what it made ahead and what it still made on the side, less what was kept and never used
-      let moved = false;
-      for (const m of able) {
-        const n = plan.get(m) || 0, next = Math.max(0, (R.early.get(m) || 0) + onSide(R, m) - (R.kept.get(m.p[0]) || 0));
-        if (Math.abs(next - n) <= m.p[1] / 20) continue;
-        moved = true;
-        if (next > m.p[1] / 4) { plan.set(m, next); start.set(m, startOf(m, next)); } else plan.delete(m);
+    // What the route goes on to use of each, made ahead: what it made ahead
+    // and what it still made on the side, less what was kept and never used.
+    // That is gone over twice: once as it stands, and once with what the
+    // route bought of it counted in, for a reagent that is a little cheaper
+    // bought than made (a bolt of wool, at vendor prices) may be cheaper
+    // still made while making it gives points. Whichever comes out better.
+    let best = null, bs = score(plain, goal);
+    const bought = (R, m) => R.typical.total.buys.get(m.p[0]) || 0;
+    for (const buys of able.some((m) => bought(plain, m) > 0) ? [false, true] : [false]) {
+      let plan = new Map(), start = new Map(), R = plain;
+      for (let round = 0; round < 5; round++) {
+        let moved = false;
+        for (const m of able) {
+          const n = plan.get(m) || 0, next = Math.max(0, (R.early.get(m) || 0) + onSide(R, m) + (buys ? bought(R, m) : 0) - (R.kept.get(m.p[0]) || 0));
+          if (Math.abs(next - n) <= m.p[1] / 20) continue;
+          moved = true;
+          if (next > m.p[1] / 4) { plan.set(m, next); start.set(m, startOf(m, next)); } else plan.delete(m);
+        }
+        if (!moved) break;
+        R = walk(o, plan, true, start);
+        const sc = score(R, goal);
+        if (beats(sc, bs)) { best = [new Map(plan), new Map(start)]; bs = sc; }
       }
-      if (!moved) break;
-      R = walk(o, plan, true, start);
-      const sc = score(R, goal);
-      if (beats(sc, bs)) { best = [new Map(plan), new Map(start)]; bs = sc; }
     }
     if (!best) return plain;
     // (and if putting the crafts on a later step of their own came out dearer than making them at once, they are made at once)
@@ -793,8 +820,9 @@ const CATALOGUE = (() => {
   // points would have cost extra from the next best thing, and every tool.
   // Whatever leaves the whole cheaper, fees counted, with no point lost, is
   // left out, and the rest gone over again. Only a recipe nothing else is
-  // made from is tried: to do without the recipe for bolts would be to buy
-  // the bolts, and what the player can make is made. Returns what to leave
+  // made from is tried: one whose product is cheaper bought is left
+  // unlearned by the walk already, which buys instead, and trying the rest
+  // as well came out dearer about as often as cheaper. Returns what to leave
   // out.
   function thrift(o, plain, limit = 12) {
     const goal = o.goal || "cost", eaten = new Set();
@@ -1013,7 +1041,8 @@ const profOf = (id) => D.professions.find((p) => p.id === id);
 
 // ---- what a point costs ----------------------------------------------------------
 // With no stock in hand: the price of the materials for one point at your
-// skill, making what your own recipes can make. Worked once per recipe per draw.
+// skill, making what your own recipes make for less than it costs to buy.
+// Worked once per recipe per draw.
 let makersBy = new Map(), costBy = new Map();
 function makersFor(p) { if (!makersBy.has(p)) makersBy.set(p, M.makersOf(p.recipes.filter(usable))); return makersBy.get(p); }
 const craftCost = (r) => M.quote(r, 1, Math.max(state.skill, r.from || 1), EMPTY, makersFor(r.prof), price);
@@ -1123,6 +1152,9 @@ function legHtml(cur, st, i, all, first) {
     if (drawn > 0.5) notes.push(`uses <b>${Math.round(drawn).toLocaleString("en")} ${esc(itemName(item) || "?")}</b> you made earlier`);
   }
   if (led.buys.size) notes.push(`to buy: <b>${[...led.buys].map(([item, n]) => `${qty(n)} ${esc(itemName(item) || "?")}`).join(", ")}</b>`);
+  // what you could make all through the step and the route buys: at these prices it is cheaper bought
+  const could = [...led.buys.keys()].filter((item) => { const m = R.makers.get(item); return m && m !== r && m.from <= st.from; });
+  if (could.length) notes.push(`${could.map((item) => esc(itemName(item) || "?")).join(", ")}: you can make ${could.length === 1 ? "it" : "them"}, but at these prices ${could.length === 1 ? "it is" : "they are"} cheaper bought`);
   if (!(r.r || []).length) notes.push("its cost is not in the recipe: it uses up what you cast it on");
   if (r.f && r.f !== cur.usualPlace) notes.push(`at: ${esc(r.f)}`);
   if (r.cd) notes.push(`cooldown ${fmtTime(r.cd)}: this many crafts will take days`);
@@ -1151,7 +1183,8 @@ function shopHtml(cur, led) {
   // and so does one you asked to price: the route may be leaving it out only because of the vendor's figure
   for (const id of state.asked) if (!rows.some((x) => x.id === id)) rows.push({ id, n: 0, each: price(id), mine: false });
   const others = new Map();
-  for (const r of R.pool) if (r.from < R.opts.b && r.g > R.opts.a) for (const [id] of r.r || []) if (!R.makers.has(id) && itemName(id) && !rows.some((x) => x.id === id)) others.set(id, itemName(id));
+  // (one you can make as well: what it costs bought is what decides whether it is made)
+  for (const r of R.pool) if (r.from < R.opts.b && r.g > R.opts.a) for (const [id] of r.r || []) if (itemName(id) && !rows.some((x) => x.id === id)) others.set(id, itemName(id));
   const pick = !others.size ? "" : `<tr class="other"><td></td><td colspan="3"><select id="priceOther" aria-label="Price a material the route does not use" title="A material your recipes could use on this stretch and the route does not: price it, and the route is worked out again"><option value="">price another material…</option>${[...others].sort((x, y) => x[1].localeCompare(y[1])).map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join("")}</select></td></tr>`;
   const mine = Object.keys(saved.prices).length;
   let html = `<h3>Shopping list <span class="seg" id="safeSeg" role="group" aria-label="How many crafts to buy for">
@@ -1162,6 +1195,9 @@ function shopHtml(cur, led) {
 <td class="tot">${!x.n ? "—" : x.each == null ? "?" : M.money(x.n * x.each)}</td></tr>`).join("")}${pick}
 <tr class="sum"><td></td><td>materials${led.total.unpriced.size ? ", without the unpriced" : ""}</td><td></td><td class="tot">${M.money(led.total.cost)}</td></tr></tbody></table>`;
   html += `<p>A price is what a vendor charges for the thing in the game’s data: right for what vendors sell, a stand-in for the rest. Type your realm’s over it (2g 50s, 35s, 80c — or 0 for what you already have)${mine ? `. <button class="lnk" id="resetPrices">Forget my ${mine === 1 ? "price" : `${mine} prices`}</button>` : ""}.</p>`;
+  // what you can make and the route buys, since a price of your own may turn it the other way
+  const makeable = rows.filter((x) => x.n && R.makers.has(x.id)).map((x) => itemHtml(x.id));
+  if (makeable.length) html += `<p>You can make ${makeable.length === 1 ? makeable[0] : `${makeable.slice(0, 3).join(", ")}${makeable.length > 3 ? ` and ${makeable.length - 3} more` : ""}`} yourself. The route buys ${makeable.length === 1 ? "it" : "them"} where that comes to less than the making, at these prices, so a price of your own can change which.</p>`;
   // what is left in the bags at the end
   let kinds = 0, worth = 0; const names = [];
   for (const [id, n] of led.left) { if (n < 0.5) continue; kinds++; worth += Math.round(n) * ((D.items[id] && D.items[id][3]) || 0); if (names.length < 3) names.push(`${Math.round(n).toLocaleString("en")} ${esc(itemName(id) || "?")}`); }
