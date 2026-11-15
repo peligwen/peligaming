@@ -14,8 +14,10 @@
 //   - money reads and writes the way the game writes it,
 //   - the route picks what a hand calculation picks on small made-up recipe
 //     books (the cheaper recipe per point, the switch at the right skill, what
-//     was made earlier used before anything is bought, what a later step
-//     needs made ahead while making it still gives points, a tool got once
+//     was made earlier used before anything is bought, a reagent made or
+//     bought at each link of a chain, whichever is cheaper, what a later step
+//     needs made ahead while making it still gives points (and what it would
+//     buy, where making it brings points for less), a tool got once
 //     by the first step to need it, a trainer's fee paid once and a recipe
 //     or a tool not worth its cost left out), and on every real profession it
 //     is a route: unbroken, only recipes the player has by then, only while
@@ -172,6 +174,35 @@ console.log("route, on made-up recipe books");
   R = M.route({ pool: [P, F], a: 1, b: 20, price });
   check("nothing is made ahead that nothing uses", names(R) === "F 1-20" && !R.ahead && !R.plain);
   check("a recipe not yet learned makes nothing", (() => { const late = Object.assign({}, S, { from: 99 }); const r2 = M.route({ pool: [late, T], a: 1, b: 4, price: (id) => (id === 9 ? 500 : price(id)) }); return near(r2.typical.total.buys.get(9), 3) && near(r2.typical.total.cost, 1530); })());
+  // Made or bought, whichever is cheaper, link by link. A leatherworker's chain: Light from three scraps,
+  // Medium from four Light, Heavy from five Medium; none of them gives a point any more. U takes a
+  // Heavy a craft and gives nine points from 1. Scraps at 30, Light 60, Medium 200, Heavy 600: made all
+  // the way down a Heavy is sixty scraps, 1800, so it is bought, 5400 for the nine.
+  const Lt = { n: "Light", y: 1, g: 1, r: [[20, 3]], p: [21, 1], from: 1 }, Md = { n: "Medium", y: 1, g: 1, r: [[21, 4]], p: [22, 1], from: 1 };
+  const Hv = { n: "Heavy", y: 1, g: 1, r: [[22, 5]], p: [23, 1], from: 1 }, Us = { n: "U", y: 50, g: 60, r: [[23, 1]], from: 1 };
+  const hide = (over) => (id) => (id in over ? over[id] : { 20: 30, 21: 60, 22: 200, 23: 600 }[id] ?? price(id));
+  R = M.route({ pool: [Lt, Md, Hv, Us], a: 1, b: 10, price: hide({}) });
+  check("a reagent cheaper bought than made is bought, however many links down it could be made", names(R) === "U 1-10" && near(R.typical.total.cost, 5400) && near(R.typical.total.buys.get(23), 9) && !R.typical.total.side.size && !R.typical.total.buys.has(20) && !R.learn.has(Hv), `${M.money(R.typical.total.cost)}, ${[...R.typical.total.buys.keys()].join(", ")} bought`);
+  // scraps at 5: a Light is 15 made against 60, a Medium 60 against 200, a Heavy 300 against 600: all made
+  R = M.route({ pool: [Lt, Md, Hv, Us], a: 1, b: 10, price: hide({ 20: 5 }) });
+  check("and made where making is cheaper, all the way down", near(R.typical.total.cost, 2700) && near(R.typical.total.buys.get(20), 540) && R.typical.total.buys.size === 1 && near(R.typical.total.side.get(Hv), 9) && near(R.typical.total.side.get(Md), 45) && near(R.typical.total.side.get(Lt), 180), M.money(R.typical.total.cost));
+  // Light at 10, under three scraps' 15: the Light is bought, and Medium (40) and Heavy (200) made from it
+  R = M.route({ pool: [Lt, Md, Hv, Us], a: 1, b: 10, price: hide({ 20: 5, 21: 10 }) });
+  check("each link is decided on its own", near(R.typical.total.cost, 1800) && near(R.typical.total.buys.get(21), 180) && !R.typical.total.buys.has(20) && !R.typical.total.side.has(Lt) && near(R.typical.total.side.get(Md), 45), M.money(R.typical.total.cost));
+  // (and a Heavy with no price is made, of five Medium bought: 1000, where four Light would be 240 a Medium)
+  const chain = M.makersOf([Lt, Md, Hv]), q = (over) => M.quote(Us, 1, 1, new Map(), chain, hide(over));
+  check("and a recipe's cost of a point is the cheaper way at each link", near(q({}), 600) && near(q({ 20: 5 }), 300) && near(q({ 23: null }), 1000), `${q({})}, ${q({ 20: 5 })}, ${q({ 23: null })}`);
+  // What is in the bags is used first, however cheap it is to buy. S2 makes T's X from two of item 3 and is
+  // the cheaper point through 7 (6 a point to 10, against T's 11 with an X bought at 1): 7.92 X. T then
+  // spends them from 8 to 12, at 10 a point, and buys none.
+  const S2 = Object.assign({}, S, { n: "S2", r: [[3, 2]] });
+  R = M.route({ pool: [S2, T], a: 1, b: 12, price: (id) => (id === 9 ? 1 : price(id)) });
+  check("what was made for its points is used before anything is bought, however cheap", names(R) === "S2 1-8, T 8-12" && !R.typical.total.buys.has(9) && near(R.typical.per[1].cost, 40), `${names(R)}: ${M.money(R.typical.total.cost)}`);
+  // P's X from the book above, now 9 to buy against 10 to make. Plain: F to 20 and C buying twenty X, 286.25.
+  // Made ahead while P gives points they are 257.5 as before, less a copper on the 0.04 X P leaves to be
+  // bought: a point for a copper over buying.
+  R = M.route({ pool: [P, F, Cn], a: 1, b: 30, price: (id) => (id === 9 ? 9 : price(id)) });
+  check("a reagent a little cheaper bought is still made ahead, where making it brings points for less", names(R) === "P 1-17, F 17-20, C 20-30" && near(R.typical.total.cost, 257.5 - (20 - R.early.get(P)), 1e-6) && R.early.get(P) > 19.9 && near(R.plain.cost, 286.25) && R.ahead.has(P), `${names(R)}: ${M.money(R.typical.total.cost)} against ${M.money(R.plain ? R.plain.cost : NaN)}`);
   // no price: left alone while something priced will do, used and flagged when nothing else will
   const U = { n: "U", y: 50, g: 60, r: [[7, 1]], from: 1 };
   check("a recipe with an unpriced material waits for a price", names(M.route({ pool: [U, B], a: 1, b: 10, price })) === "B 1-10");
@@ -217,11 +248,15 @@ console.log("route: tools and what a trainer charges, on made-up recipe books");
   check("and one that saves more is learned", names(R) === "K2 1-10" && !R.spared && near(M.outlay(R), 86));
   R = M.route({ pool: [K1, K2], a: 1, b: 10, price, fee: fees(500), goal: "time" });
   check("the quickest route is the quickest whatever the fees, and says what they are", names(R) === "K2 1-10" && !R.spared && R.fee === 500);
-  // S makes what T is made from (the book above). Bought, an X would be a copper; S costs 100 gold to learn.
-  // It is learned all the same: what the player can make is made, and doing without S would mean buying.
+  // S makes what T is made from (the book above), and costs 100 gold to learn. Bought, an X is a copper:
+  // T is then 11 a point against S's 20, the X are bought, and S is never learned, so its fee is never paid.
   const S = { n: "S", y: 5, g: 10, r: [[1, 2]], p: [9, 1], from: 1 }, T = { n: "T", y: 20, g: 30, r: [[9, 1], [1, 1]], from: 1 };
-  R = M.route({ pool: [S, T], a: 1, b: 12, price: (id) => (id === 9 ? 1 : price(id)), fee: (r) => (r === S ? 1000000 : 0) });
-  check("a recipe other recipes are made from is never left out to buy its product instead", names(R) === "S 1-7, T 7-12" && !R.spared && R.fee === 1000000 && !R.typical.total.buys.has(9));
+  const dearS = (r) => (r === S ? 1000000 : 0);
+  R = M.route({ pool: [S, T], a: 1, b: 12, price: (id) => (id === 9 ? 1 : price(id)), fee: dearS });
+  check("a reagent cheaper bought is bought, and the recipe that makes it is not learned for it", names(R) === "T 1-12" && R.fee === 0 && !R.learn.has(S) && near(R.typical.total.buys.get(9), 11) && near(R.typical.total.cost, 121), `${names(R)}: ${M.money(R.typical.total.cost)}`);
+  // An X at 30 is dearer bought than made: S is learned, fee and all, and not left out to buy them instead
+  R = M.route({ pool: [S, T], a: 1, b: 12, price: (id) => (id === 9 ? 30 : price(id)), fee: dearS });
+  check("one cheaper made is made, and the recipe for it is never left out to buy its product instead", names(R) === "S 1-7, T 7-12" && !R.spared && R.fee === 1000000 && !R.typical.total.buys.has(9));
   // A tool that costs 1000 to make, for a recipe 3 a point cheaper than the one that needs none: left unmade.
   const dear = { n: "TM", y: 1, g: 1, r: [[1, 100]], p: [50, 1], from: 1 }, cheap = Object.assign({}, dear, { r: [[1, 2]] }), Y = { n: "Y", y: 50, g: 60, r: [[1, 1], [3, 1]], from: 1 };
   R = M.route({ pool: [dear, X, Y], a: 1, b: 10, price });

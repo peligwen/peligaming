@@ -154,8 +154,9 @@ legacy talent counted in or left out.
   copper chain belts, runed copper bracers that use up the grinding stones,
   and so on up. Each step says what a craft takes, how many crafts to
   expect and how many are enough nine times out of ten, how the chance
-  falls across the step, what to buy for it, and what to make first if one
-  of your own recipes supplies a reagent. A ladder draws the whole way as a
+  falls across the step, what to buy for it, and what to make first where
+  one of your own recipes supplies a reagent for less than it costs to buy.
+  A ladder draws the whole way as a
   block a step, with the rank ceilings marked. Ask for **Quickest** instead
   and it keeps the time at the anvil low rather than the cost: this build's
   crafts run from three seconds for a sharpening stone to a minute for a
@@ -167,9 +168,27 @@ legacy talent counted in or left out.
   something one of your recipes makes, the route makes it as soon as that
   recipe can be cast and for as long as a craft can still give a point,
   marks the step *made ahead*, names the steps it is for, and says what the
-  route saves by it. A tailor going from 50 to 150 at vendor prices makes
-  wool bolts from 55 to 85 and silk bolts from 100, and the way comes to
-  14g 75s and 36 minutes at the loom where it was 16g 94s and 49.
+  route saves by it. That goes for a reagent the route would otherwise buy,
+  too: a bolt of wool is 4s from a vendor and 4s 5c in cloth, and made
+  while it still gives points it is the cheapest point going. A tailor
+  going from 50 to 150 at vendor prices makes wool bolts from 55 to 85 and
+  silk bolts from 100, and the way comes to 14g 69s and 26 minutes at the
+  loom where it was 16g 84s and 31.
+- **Made or bought, whichever is cheaper.** Past the points it brings, a
+  reagent your own recipes can make is made where that comes to less than
+  buying it, and bought where it does not, decided at each link of the
+  chain. A leatherworker makes Light Leather from three Ruined Leather
+  Scraps, Medium from four Light, Heavy from five Medium and Thick from six
+  Heavy, so a Thick Leather is 360 scraps. Made all the way down every time,
+  the trainer's way from 1 to 300 at vendor prices came to some 5,500 gold
+  and over a hundred thousand crafts of leather on the side, 235 hours of
+  them. Now it makes Light Leather from scraps while that gives points, a
+  Heavy and a few Thick for theirs, and buys the rest: 880 gold and three
+  hours. Price scraps at 5c and the route goes back to making Light, Medium
+  and Heavy from them, and still buys the Thick and the Rugged; that is
+  21,000 scraps and seventeen hours on the side to save 13 gold, which is
+  what the cheapest route weighs and Quickest does not. Each step says which
+  of what it buys you could have made.
 - **Tools.** Where a recipe is made with a tool, the first step that needs
   one gets it, and its materials are on the shopping list: an enchanter's
   rod is made, a blacksmith's hammer bought. Made while its own recipe is
@@ -202,7 +221,9 @@ legacy talent counted in or left out.
   route is worked out again at your prices, and they are remembered. A
   material the route does not use can be priced as well, since it may be
   only the vendor's figure that keeps it out: wool at three times the price
-  of linen is a different route from wool at seven times. It ends with what
+  of linen is a different route from wool at seven times. So can one you
+  can make, since its price is what decides whether it is made or bought:
+  cheap Heavy Leather on your realm and the route buys it. It ends with what
   you will be left holding and what a vendor pays for it.
 - **The recipes you have.** Out of the box the route uses what a trainer
   teaches and what you start with. Tick a plan, pattern or formula in the
@@ -211,8 +232,8 @@ legacy talent counted in or left out.
   route would use against yours, one at a time, and says what it would save
   or how many more points it would cover. In Blacksmithing the trainer's
   recipes run dry at 285 and are ruinous long before that: at vendor prices
-  the way from 1 to 285 comes to some 2,800 gold, and the best route with
-  every recipe reaches 300 for a little over 200. "Every recipe" shows that
+  the way from 1 to 285 comes to some 2,750 gold, and the best route with
+  every recipe reaches 300 for about 200. "Every recipe" shows that
   best route outright, with the plans it takes.
 - **Fourteen professions, 2,236 recipes.** Alchemy, Blacksmithing,
   Enchanting, Engineering, Leatherworking and Tailoring; Mining's smelting;
@@ -318,7 +339,10 @@ legacy talent counted in or left out.
   yet stock in hand for the others, or blasting powder and the shot made
   from it take turns a point at a time (Engineering came out at 73 steps
   that way, and 33 without). What has been made is used before anything is
-  bought, and a reagent one of your recipes makes is made, not bought. The
+  bought. A reagent one of your recipes makes is then made or bought,
+  whichever costs less at the prices given, link by link: the making is
+  costed through the chain below it (at most three links), what it takes
+  from stock counts for nothing, and making wins a tie. The
   crafts that are enough nine times in ten are not an approximation: the
   odds of standing at each skill are carried forward craft by craft.
 - **Making ahead.** That pass makes a reagent on the side at the moment a
@@ -335,8 +359,11 @@ legacy talent counted in or left out.
   about. Where the plain route takes the recipe up for its own sake a
   little later, the crafts go on the front of that step and do not split
   an earlier one. And the result is kept only if it is better than the
-  plain route: of the 56 routes the checks run, 20 make something ahead,
-  and none is the worse for it.
+  plain route: of the 56 routes the checks run, 15 make something ahead,
+  and none is the worse for it. It is gone over twice, once with what the
+  route bought of a reagent counted in with what it made, since a reagent a
+  little cheaper bought can be cheaper still made for its points; the
+  better of the two is kept.
 - **Tools and fees.** A tool plays no part in choosing the next craft: the
   first step to want one gets it, as a step of its own if making it is
   certain to give a point and before the step otherwise. Fees are added up
@@ -346,9 +373,10 @@ legacy talent counted in or left out.
   the time. Whatever leaves the whole cheaper, fees counted, with no point
   lost, is left out, and the rest gone over again; the route that comes out
   is kept only if it comes to less. Only a recipe nothing else is made from
-  is tried, because to do without the recipe for bolts would be to buy the
-  bolts at a stand-in price, and what you can make is made. Of the 28
-  cheapest routes the checks run from 1 to 300, 12 leave something out.
+  is tried: one whose product is cheaper bought is never learned by the
+  route in the first place, and trying the others as well came out dearer
+  about as often as cheaper. Of the 28 cheapest routes the checks run from
+  1 to 300, 11 leave something out.
 - The page (`public/tools/wow-forever/profession-catalogue.html`) is one
   file of vanilla JS. Its `<script id="catalogue-model">` block is the
   arithmetic and nothing else, and `npm run check:professions` runs it in
