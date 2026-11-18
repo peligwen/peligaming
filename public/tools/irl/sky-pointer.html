@@ -47,6 +47,8 @@
       cursor: grab;
     }
     #sky.dragging { cursor: grabbing; }
+    /* the constellation pictures, drawn with WebGL under the sky canvas (which is then transparent) */
+    #art { position: fixed; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; }
 
     a { color: var(--brand); }
     button, input, select {
@@ -274,12 +276,16 @@
     .hidden { display: none !important; }
 
     @media (max-width: 480px) {
+      .layers .wide-only { display: none; } /* in Settings instead, to keep the bar to two rows */
+      .layers { gap: 5px; }
+      .layers button { padding: 5px 8px; font-size: 12px; }
       .card { right: 8px; left: 8px; width: auto; top: auto; bottom: calc(150px + var(--safe-bottom)); }
       .pointing { top: calc(92px + var(--safe-top)); font-size: 12px; }
     }
   </style>
 </head>
 <body>
+  <canvas id="art"></canvas>
   <canvas id="sky"></canvas>
 
   <header class="top">
@@ -314,6 +320,8 @@
     <div class="layers" id="layers">
       <button data-layer="stars">✦ stars</button>
       <button data-layer="lines">⟋ lines</button>
+      <button data-layer="art">🏺 art</button>
+      <button data-layer="bounds" class="wide-only">⬚ bounds</button>
       <button data-layer="names">Aa names</button>
       <button data-layer="planets">♃ planets</button>
       <button data-layer="dsos">◌ deep sky</button>
@@ -362,6 +370,10 @@
     <h3>View</h3>
     <label>Field of view <span id="fovNote"></span></label>
     <input type="range" id="fovRange" min="15" max="130" step="1">
+    <label>Constellation art <span id="artNote"></span></label>
+    <input type="range" id="artRange" min="10" max="100" step="5">
+    <label><input type="checkbox" id="boundsCheck"> Show the constellation boundaries</label>
+    <p>The pictures sit faintly behind the stars. The constellation in the middle of the screen is drawn brighter and named in the readout up top, and with the boundaries showing it is outlined; tap empty sky to see which constellation it belongs to.</p>
     <div class="line">
       <span id="viewNote"></span>
       <button id="shareBtn">🔗 Copy share link</button>
@@ -373,7 +385,7 @@
     </div>
     <p>The brightest satellites (CelesTrak's "visual" list) plus the space stations, propagated with SGP4 from the latest two-line elements. Bright markers are sunlit satellites in a dark sky, the ones you can actually see; dim ones are in the Earth's shadow or up in daylight.</p>
     <h3>About</h3>
-    <p>Stars to magnitude 6 with their colours, constellation figures and the Messier objects from <a href="https://github.com/ofrohn/d3-celestial" target="_blank" rel="noopener">d3-celestial</a> (Hipparcos data, BSD-3); the Sun, Moon and planets from low-precision elements (about an arcminute); satellites from <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>; magnetic declination from NOAA's WMM2025. Positions include precession to today's equinox but not refraction, so objects right on the horizon sit a little higher than drawn.</p>
+    <p>Stars to magnitude 6 with their colours, constellation figures and the Messier objects from <a href="https://github.com/ofrohn/d3-celestial" target="_blank" rel="noopener">d3-celestial</a> (Hipparcos data, BSD-3); the constellation pictures from <a href="https://stellarium.org" target="_blank" rel="noopener">Stellarium</a>'s modern sky culture (<a href="https://artlibre.org/licence/lal/en/" target="_blank" rel="noopener">Free Art License</a>), pinned to the sky by three stars each; the IAU boundaries as Delporte drew them on the 1875 equator, carried to today's; the Sun, Moon and planets from low-precision elements (about an arcminute); satellites from <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>; magnetic declination from NOAA's WMM2025. Positions include precession to today's equinox but not refraction, so objects right on the horizon sit a little higher than drawn.</p>
   </section>
 
   <div class="start" id="start" role="dialog" aria-labelledby="startTitle">
@@ -446,6 +458,13 @@ const SKY = (() => {
     M[3] * v[0] + M[4] * v[1] + M[5] * v[2],
     M[6] * v[0] + M[7] * v[1] + M[8] * v[2],
   ];
+  const transpose = (M) => [M[0], M[3], M[6], M[1], M[4], M[7], M[2], M[5], M[8]];
+  function inv3(M) {
+    const [a, b, c, d, e, f, g, h, i] = M;
+    const A = e * i - f * h, B = f * g - d * i, C = d * h - e * g;
+    const det = a * A + b * B + c * C;
+    return [A / det, (c * h - b * i) / det, (b * f - c * e) / det, B / det, (a * i - c * g) / det, (c * d - a * f) / det, C / det, (b * g - a * h) / det, (a * e - b * d) / det];
+  }
   // right-handed rotations by deg about an axis: Rz turns x toward y
   const rotX = (deg) => { const c = cos(deg * D2R), s = sin(deg * D2R); return [1, 0, 0, 0, c, -s, 0, s, c]; };
   const rotY = (deg) => { const c = cos(deg * D2R), s = sin(deg * D2R); return [c, 0, s, 0, 1, 0, -s, 0, c]; };
@@ -938,6 +957,61 @@ const SKY = (() => {
     return { kind: 'line', p0: px(P0), along: [d[0], -d[1]], into: [g[0], -g[1]] };
   }
 
+  // ------------------------------------------------------------ constellation illustrations
+  // An illustration is pinned to the sky by three stars: the pixel each sits
+  // on (x right, y down from the top left) and its J2000 position. As in
+  // Stellarium, the picture is treated as a flat drawing of the sky, a tangent
+  // plane: a pixel's direction is a fixed linear map of (x, y, 1), normalised,
+  // and three pixel/star pairs fix that map. M takes a pixel to a direction;
+  // Minv takes a direction back to its pixel (in front of the picture only).
+  function artFrame(anchors) {
+    const T = [anchors[0][0], anchors[1][0], anchors[2][0], anchors[0][1], anchors[1][1], anchors[2][1], 1, 1, 1];
+    const s = anchors.map(([, , ra, dec]) => vec(ra, dec));
+    const V = [s[0][0], s[1][0], s[2][0], s[0][1], s[1][1], s[2][1], s[0][2], s[1][2], s[2][2]];
+    return { M: mul(V, inv3(T)), Minv: mul(T, inv3(V)) };
+  }
+  const artDir = (frame, x, y) => norm(apply(frame.M, [x, y, 1]));
+  function artPixel(frame, v) {
+    const w = apply(frame.Minv, v);
+    return w[2] > 1e-9 ? [w[0] / w[2], w[1] / w[2]] : null;
+  }
+
+  // ------------------------------------------------------------ constellation boundaries
+  // The IAU boundaries (Delporte, 1930) run along meridians and parallels of
+  // the B1875 equator. An edge is [type, ra1, dec1, ra2, dec2, a, b] in B1875
+  // degrees: 'M' runs north along a meridian with a to its east, 'P' runs east
+  // along a parallel with a to its south. Which constellation holds a
+  // direction is then a walk north from it (Roman, 1987): the first parallel
+  // edge above it, at its right ascension, has its constellation to the south.
+  // Nothing above it means it is in Ursa Minor, round the pole.
+  const B1875 = 2405889.258550475;
+  const toB1875 = precessionMatrix(B1875), fromB1875 = transpose(toB1875);
+  function boundaryIndex(edges) {
+    return edges.filter((e) => e[0] === 'P')
+      .map(([, ra1, dec, ra2, , south]) => ({ ra1, span: norm360(ra2 - ra1) || 360, dec, south }))
+      .sort((a, b) => a.dec - b.dec);
+  }
+  function constellationAt(index, vJ2000) {
+    const { lon: ra, lat: dec } = sph(apply(toB1875, vJ2000));
+    for (const e of index) if (e.dec > dec && norm360(ra - e.ra1) < e.span) return e.south;
+    return 'UMi';
+  }
+  // An edge as J2000 directions no further than stepDeg apart along it, so
+  // that straight lines between them follow it on the screen.
+  function boundaryPath(edge, stepDeg = 1.5) {
+    const [type, ra1, dec1, ra2, dec2] = edge;
+    const pts = [];
+    if (type === 'M') {
+      const n = Math.max(1, Math.ceil((dec2 - dec1) / stepDeg));
+      for (let i = 0; i <= n; i++) pts.push(vec(ra1, dec1 + (dec2 - dec1) * i / n));
+    } else {
+      const span = norm360(ra2 - ra1) || 360;
+      const n = Math.max(1, Math.ceil(span * cos(dec1 * D2R) / stepDeg), Math.ceil(span / 15));
+      for (let i = 0; i <= n; i++) pts.push(vec(ra1 + span * i / n, dec1));
+    }
+    return pts.map((v) => apply(fromB1875, v));
+  }
+
   // ------------------------------------------------------------ colour of a star from B−V
   function bvColor(bv) {
     if (bv == null) return [255, 255, 255];
@@ -949,11 +1023,12 @@ const SKY = (() => {
 
   return {
     D2R, R2D, norm360, clamp, J2000, jdFromDate, dateFromJd, gmst, lst, decimalYear,
-    vec, sph, dot, cross, norm, sub, add, scale, angle, mul, apply, rotX, rotY, rotZ, I3,
+    vec, sph, dot, cross, norm, sub, add, scale, angle, mul, apply, transpose, inv3, rotX, rotY, rotZ, I3,
     precessionMatrix, horizonMatrix, altaz, enuFromAltAz, observerVector,
     sunPosition, moonPosition, planetPositions, illumination, AU_KM,
     parseTle, sgp4Init, sgp4, inShadow, magneticField,
     cameraFromAzAlt, cameraFromOrientation, compassOffsetSample, compassTracker, yawCamera, cameraAzAlt, cameraRoll, scaleForFov, project, unproject, horizonOnScreen, bvColor,
+    artFrame, artDir, artPixel, B1875, boundaryIndex, constellationAt, boundaryPath,
   };
 })();
   </script>
@@ -963,7 +1038,7 @@ const SKY = (() => {
     const $ = (s) => document.querySelector(s);
     const { D2R, R2D, norm360, clamp } = SKY;
     const canvas = $('#sky'), ctx = canvas.getContext('2d');
-    const DATA_URL = 'data/sky-pointer/sky.json';
+    const DATA_DIR = 'data/sky-pointer/', DATA_URL = `${DATA_DIR}sky.json`;
     const TLE_GROUPS = ['visual', 'stations'];
     const LS = 'sky-pointer';
 
@@ -972,7 +1047,8 @@ const SKY = (() => {
       lat: 51.48, lon: 0, hKm: 0, locSource: 'default',
       fov: 70, az: 180, alt: 35,
       azOffset: 0, useDecl: true,
-      layers: { stars: true, lines: true, names: true, planets: true, dsos: true, sats: true, grid: false },
+      layers: { stars: true, lines: true, art: true, bounds: false, names: true, planets: true, dsos: true, sats: true, grid: false },
+      artLevel: 0.6,             // constellation art brightness, 0.1–1
       night: false,
       start: 'ask',              // on a phone: 'ask' for location and sensors up front, or 'manual' if they said no
     };
@@ -984,6 +1060,9 @@ const SKY = (() => {
     let data = null;               // sky.json
     let stars = null;              // { v: Float64Array(3n), mag, bv, hip, n }
     let consLines = [];            // [{ id, segs: [Float64Array(3k)] }]
+    let artItems = [];             // [{ id, a, frame, centre, radius, covers, glow }] — one per picture
+    const artOf = {};              // constellation → the picture it is drawn in (Pup, Vel → Car; Ser → Oph)
+    let bounds = null;             // { index, paths: [{ a, b, pts: Float64Array(3k), centre, radius }] }
     let dsoVecs = [];              // Float64Array per dso
     let sats = [];                 // [{ rec, tle, name }]
     let satStatus = 'idle';
@@ -1015,6 +1094,23 @@ const SKY = (() => {
         id, name: c.name, labels: c.labels,
         segs: c.lines.map((seg) => { const a = new Float64Array(3 * seg.length); seg.forEach(([ra, dec], k) => { const v = SKY.vec(ra, dec); a[3 * k] = v[0]; a[3 * k + 1] = v[1]; a[3 * k + 2] = v[2]; }); return a; }),
       }));
+      // each picture's frame, and a cap on the sphere around it for culling: its centre and how far its corners reach
+      artItems = Object.entries(d.art).map(([id, a]) => {
+        const frame = SKY.artFrame(a.a), centre = SKY.artDir(frame, a.w / 2, a.h / 2);
+        const rim = [[0, 0], [a.w / 2, 0], [a.w, 0], [a.w, a.h / 2], [a.w, a.h], [a.w / 2, a.h], [0, a.h], [0, a.h / 2]];
+        const radius = Math.max(...rim.map(([x, y]) => SKY.angle(centre, SKY.artDir(frame, x, y))));
+        artOf[id] = id;
+        for (const c of a.covers || []) artOf[c] = id;
+        return { id, a, frame, centre, radius, glow: 0 };
+      });
+      const flat = (pts) => { const a = new Float64Array(3 * pts.length); pts.forEach((v, k) => a.set(v, 3 * k)); return a; };
+      bounds = {
+        index: SKY.boundaryIndex(d.bounds.edges),
+        paths: d.bounds.edges.map((e) => {
+          const pts = SKY.boundaryPath(e), centre = SKY.norm(pts.reduce(SKY.add, [0, 0, 0]));
+          return { a: e[5], b: e[6], pts: flat(pts), centre, radius: Math.max(...pts.map((v) => SKY.angle(centre, v))) };
+        }),
+      };
       dsoVecs = d.dsos.map((o) => SKY.vec(o.ra, o.dec));
       updateDeclination();
       dirty = true;
@@ -1098,20 +1194,155 @@ const SKY = (() => {
     window.addEventListener('resize', resize);
     resize();
 
+    // ------------------------------------------------------------ constellation art (WebGL)
+    // The pictures are light drawings on black, so like Stellarium they are added onto the sky
+    // rather than painted over it. A 2-D canvas can only map a picture affinely, and these span
+    // tens of degrees of a curved projection, so each becomes a mesh of cells a few degrees across
+    // whose J2000 directions are fixed when it loads; a vertex shader puts them through the same
+    // stereographic camera as everything else. The WebGL canvas sits under the sky canvas and paints
+    // the sky's colour with the pictures added onto it; the sky canvas is then left transparent, and
+    // the browser stacks the two, so no frame is ever copied back from the GPU. Pictures load as they
+    // come into view, and the least recently seen are let go past a few dozen.
+    const artGL = (() => {
+      const VS = `
+        attribute vec3 aDir;
+        attribute vec2 aUv;
+        uniform mat3 uCam;      // J2000 → camera right, up, forward
+        uniform vec2 uScale;    // 2S / width, 2S / height
+        varying vec2 vUv;
+        void main() {
+          vec3 c = uCam * aDir;
+          float k = 2.0 / max(1.0 + c.z, 0.05);   // stereographic; near the antipode a vertex is pinned far off screen
+          gl_Position = vec4(c.x * k * uScale.x, c.y * k * uScale.y, 0.0, 1.0);
+          vUv = aUv;
+        }`;
+      const FS = `
+        precision mediump float;
+        uniform sampler2D uTex;
+        uniform vec3 uTint;
+        uniform float uAlpha;
+        varying vec2 vUv;
+        void main() { gl_FragColor = vec4(uTint * (texture2D(uTex, vUv).r * uAlpha), 0.0); }`;
+      const KEEP = 40;
+      let gl = null, glc = null, loc = null, state = 'idle', frame = 0; // state: idle | ok | lost | failed
+      const images = new Map(); // id → null while loading (or failed), the Image once loaded, true once on the GPU
+      const res = new Map();    // id → { tex, buf, ibuf, count, used } on the current context
+      function init() {
+        glc = $('#art');
+        try { gl = glc.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false }); } catch { gl = null; } // opaque: it paints the whole sky
+        if (!gl || !setup()) { state = 'failed'; return false; }
+        glc.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); state = 'lost'; res.clear(); images.clear(); });
+        glc.addEventListener('webglcontextrestored', () => { state = setup() ? 'ok' : 'failed'; dirty = true; });
+        state = 'ok';
+        return true;
+      }
+      function setup() {
+        const shader = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null; };
+        const vs = shader(gl.VERTEX_SHADER, VS), fs = shader(gl.FRAGMENT_SHADER, FS);
+        if (!vs || !fs) return false;
+        const prog = gl.createProgram();
+        gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return false;
+        gl.useProgram(prog);
+        loc = {
+          dir: gl.getAttribLocation(prog, 'aDir'), uv: gl.getAttribLocation(prog, 'aUv'),
+          cam: gl.getUniformLocation(prog, 'uCam'), scale: gl.getUniformLocation(prog, 'uScale'),
+          tex: gl.getUniformLocation(prog, 'uTex'), tint: gl.getUniformLocation(prog, 'uTint'), alpha: gl.getUniformLocation(prog, 'uAlpha'),
+        };
+        gl.enableVertexAttribArray(loc.dir); gl.enableVertexAttribArray(loc.uv);
+        gl.uniform1i(loc.tex, 0);
+        gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); // added onto the opaque sky, and onto each other where they overlap, as light is
+        return true;
+      }
+      function load(item) {
+        images.set(item.id, null);
+        const img = new Image();
+        img.onload = () => { images.set(item.id, img); dirty = true; };
+        img.src = DATA_DIR + item.a.img;
+      }
+      // the picture's texture, and a mesh whose cells are about 3° across
+      function upload(item, img) {
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, gl.LUMINANCE, gl.UNSIGNED_BYTE, img);
+        const pow2 = (n) => (n & (n - 1)) === 0;
+        if (pow2(img.width) && pow2(img.height)) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }
+        else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const n = clamp(Math.ceil(item.radius * 2 / 3), 4, 32), { w, h } = item.a;
+        const verts = new Float32Array((n + 1) * (n + 1) * 5);
+        for (let j = 0, k = 0; j <= n; j++) for (let i = 0; i <= n; i++, k += 5) {
+          const d = SKY.artDir(item.frame, w * i / n, h * j / n);
+          verts.set([d[0], d[1], d[2], i / n, j / n], k);           // texture rows from the top, as the anchors count them
+        }
+        const idx = new Uint16Array(n * n * 6);
+        for (let j = 0, k = 0; j < n; j++) for (let i = 0; i < n; i++, k += 6) {
+          const a = j * (n + 1) + i, c = a + n + 1;
+          idx.set([a, a + 1, c, a + 1, c + 1, c], k);
+        }
+        const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+        const ibuf = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuf); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+        return { tex, buf, ibuf, count: idx.length, used: frame };
+      }
+      function forget(id) {
+        const r = res.get(id);
+        if (r) { gl.deleteTexture(r.tex); gl.deleteBuffer(r.buf); gl.deleteBuffer(r.ibuf); res.delete(id); }
+        images.delete(id);
+      }
+      // Paints the sky colour bg ([r, g, b], 0–255) and adds [{ item, alpha, tint }] onto it for this camera.
+      // Returns false, with the layer hidden, when there is no WebGL to do it with.
+      function render(list, cam, WJ, S, W, H, bg) {
+        if (state === 'idle') init();
+        if (state !== 'ok') { hide(); return false; }
+        frame++;
+        if (glc.width !== canvas.width || glc.height !== canvas.height) { glc.width = canvas.width; glc.height = canvas.height; }
+        glc.style.display = 'block';
+        gl.viewport(0, 0, glc.width, glc.height);
+        gl.clearColor(bg[0] / 255, bg[1] / 255, bg[2] / 255, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+        const m = new Float32Array(9); // column-major: m[j·3 + i] = (camera row i) · (column j of WJ)
+        [cam.r, cam.u, cam.f].forEach((c, i) => { for (let j = 0; j < 3; j++) m[j * 3 + i] = c[0] * WJ[j] + c[1] * WJ[3 + j] + c[2] * WJ[6 + j]; });
+        gl.uniformMatrix3fv(loc.cam, false, m);
+        gl.uniform2f(loc.scale, 2 * S / W, 2 * S / H);
+        for (const { item, alpha, tint } of list) {
+          const img = images.get(item.id);
+          if (img === undefined) { load(item); continue; }
+          if (img === null) continue;
+          let r = res.get(item.id);
+          if (!r) { r = upload(item, img); res.set(item.id, r); images.set(item.id, true); } // the GPU copy is enough
+          r.used = frame;
+          gl.bindTexture(gl.TEXTURE_2D, r.tex);
+          gl.bindBuffer(gl.ARRAY_BUFFER, r.buf);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, r.ibuf);
+          gl.vertexAttribPointer(loc.dir, 3, gl.FLOAT, false, 20, 0);
+          gl.vertexAttribPointer(loc.uv, 2, gl.FLOAT, false, 20, 12);
+          gl.uniform1f(loc.alpha, alpha);
+          gl.uniform3f(loc.tint, tint[0], tint[1], tint[2]);
+          gl.drawElements(gl.TRIANGLES, r.count, gl.UNSIGNED_SHORT, 0);
+        }
+        if (res.size > KEEP) [...res.entries()].sort((a, b) => a[1].used - b[1].used).slice(0, res.size - KEEP).forEach(([id]) => forget(id));
+        return true;
+      }
+      function hide() { if (glc) glc.style.display = 'none'; }
+      return { render, hide, failed: () => state === 'failed' };
+    })();
+
     const SKY_STOPS = [[-18, [5, 7, 13]], [-12, [9, 14, 34]], [-6, [26, 40, 84]], [0, [96, 128, 182]], [12, [110, 160, 222]]];
-    function skyColor(sunAlt) {
+    function skyRgb(sunAlt) {
       const a = clamp(sunAlt, -18, 12);
       for (let i = 0; i < SKY_STOPS.length - 1; i++) {
         const [a0, c0] = SKY_STOPS[i], [a1, c1] = SKY_STOPS[i + 1];
-        if (a <= a1) { const t = (a - a0) / (a1 - a0); return `rgb(${c0.map((c, k) => Math.round(c + (c1[k] - c) * t)).join(',')})`; }
+        if (a <= a1) { const t = (a - a0) / (a1 - a0); return c0.map((c, k) => Math.round(c + (c1[k] - c) * t)); }
       }
-      return 'rgb(110,160,222)';
+      return [110, 160, 222];
     }
     const magLimit = (fov) => clamp(6.6 - 2.1 * (fov - 20) / 100, 4.3, 6.6);
     const PLANET_COLOR = { mercury: '#d9c9b0', venus: '#fff4d6', mars: '#ff8f5e', jupiter: '#f4d9a8', saturn: '#f0dca0', uranus: '#a8e6e6', neptune: '#7aa6ff' };
     const DSO_LIMIT = (fov) => (fov <= 25 ? 11 : fov <= 45 ? 9 : fov <= 80 ? 6.5 : 4.5);
 
     let lastPointing = { az: 0, alt: 0, near: null };
+    let artWarned = false;
     function draw() {
       if (!stars) return;
       const W = canvas.clientWidth, H = canvas.clientHeight, cx = W / 2, cy = H / 2;
@@ -1128,8 +1359,35 @@ const SKY = (() => {
       const dark = e.sunAlt < -6;
       const starAlpha = e.sunAlt < -9 ? 1 : e.sunAlt < 0 ? 0.55 + 0.45 * (-e.sunAlt / 9) : 0.4;
 
-      ctx.fillStyle = skyColor(e.sunAlt);
-      ctx.fillRect(0, 0, W, H);
+      // the constellation the middle of the screen is in, and any being looked at or found: these are drawn up
+      const here = bounds ? SKY.constellationAt(bounds.index, SKY.apply(SKY.transpose(e.WJ), f)) : null;
+      const marked = new Set([here, selected?.kind === 'con' && selected.id, target?.kind === 'con' && target.id].filter(Boolean));
+
+      // ---- the sky, and the constellation art added onto it behind everything else: on the WebGL layer
+      // underneath when there is one (this canvas is then cleared to transparent), or filled here
+      const bg = skyRgb(e.sunAlt);
+      let painted = false;
+      if (st.layers.art && artItems.length && !artGL.failed()) {
+        const fade = e.sunAlt < -9 ? 1 : e.sunAlt < 0 ? 0.4 + 0.6 * (-e.sunAlt / 9) : 0.3;
+        const lit = new Set([...marked].map((c) => artOf[c]));
+        const list = [];
+        let easing = false;
+        for (const it of artItems) {
+          const goal = lit.has(it.id) ? 1 : 0;   // the marked picture brightens and warms over a few frames
+          if (it.glow !== goal) { it.glow = goal > it.glow ? Math.min(goal, it.glow + 0.12) : Math.max(goal, it.glow - 0.08); easing = true; }
+          if (SKY.angle(SKY.apply(e.WJ, it.centre), f) - it.radius > cornerAngle + 2) continue;
+          const k = it.glow;
+          list.push({ item: it, alpha: st.artLevel * fade * (0.45 + 0.55 * k), tint: [0.74 + 0.26 * k, 0.82 + 0.1 * k, 1 - 0.22 * k] });
+        }
+        painted = artGL.render(list, cam, e.WJ, S, W, H, bg);
+        if (easing) dirty = true;
+      } else artGL.hide();
+      if (painted) ctx.clearRect(0, 0, W, H);
+      else { ctx.fillStyle = `rgb(${bg.join(',')})`; ctx.fillRect(0, 0, W, H); }
+      if (st.layers.art && artGL.failed() && !artWarned) {
+        artWarned = true;
+        toast('The constellation pictures need WebGL, which this browser has turned off.', 5000);
+      }
 
       // ---- grid
       if (st.layers.grid) {
@@ -1137,6 +1395,29 @@ const SKY = (() => {
         for (const alt of [30, 60]) polyline(Array.from({ length: 73 }, (_, i) => SKY.enuFromAltAz(i * 5, alt)), P, f);
         for (let az = 0; az < 360; az += 30) polyline(Array.from({ length: 19 }, (_, i) => SKY.enuFromAltAz(az, i * 5)), P, f);
         ctx.setLineDash([]);
+      }
+
+      // ---- IAU boundaries, dashed; the marked constellations' drawn solid
+      if (st.layers.bounds && bounds) {
+        const stroke = (want) => {
+          ctx.beginPath();
+          for (const b of bounds.paths) {
+            if ((marked.has(b.a) || marked.has(b.b)) !== want) continue;
+            if (SKY.angle(SKY.apply(e.WJ, b.centre), f) - b.radius > cornerAngle + 2) continue;
+            let prev = null;
+            for (let k = 0; k < b.pts.length; k += 3) {
+              const v = SKY.apply(e.WJ, [b.pts[k], b.pts[k + 1], b.pts[k + 2]]);
+              const p = SKY.dot(v, f) > -0.2 ? P(v) : null;
+              if (p && prev) { ctx.moveTo(prev[0], prev[1]); ctx.lineTo(p[0], p[1]); }
+              prev = p;
+            }
+          }
+          ctx.stroke();
+        };
+        ctx.lineWidth = 1; ctx.setLineDash([3, 4]); ctx.strokeStyle = dark ? 'rgba(175,150,225,0.4)' : 'rgba(225,215,255,0.38)';
+        stroke(false);
+        ctx.setLineDash([]); ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(242,201,76,0.62)';
+        stroke(true);
       }
 
       // ---- constellation lines and names
@@ -1155,14 +1436,14 @@ const SKY = (() => {
           }
         }
         ctx.stroke();
-        if (st.layers.names) {
-          for (const c of consLines) for (const [ra, dec, name] of c.labels) {
-            const v = SKY.apply(e.WJ, SKY.vec(ra, dec));
-            if (SKY.dot(v, f) < cosCull) continue;
-            const p = P(v);
-            if (on(p, 0)) labels.push({ x: p[0], y: p[1], text: name.toUpperCase(), size: 11.5, color: 'rgba(150,180,240,0.7)', dx: 0, dy: 0, pri: 2, center: true, spaced: true });
-            hits.push({ x: p[0], y: p[1], r: 40, obj: { kind: 'con', id: c.id, name: c.name, ra, dec }, weak: true });
-          }
+      }
+      if (st.layers.names && (st.layers.lines || st.layers.art || st.layers.bounds)) {
+        for (const c of consLines) for (const [ra, dec, name] of c.labels) {
+          const v = SKY.apply(e.WJ, SKY.vec(ra, dec));
+          if (SKY.dot(v, f) < cosCull) continue;
+          const p = P(v), mark = marked.has(c.id);
+          if (on(p, 0)) labels.push({ x: p[0], y: p[1], text: name.toUpperCase(), size: mark ? 12.5 : 11.5, color: mark ? 'rgba(255,226,160,0.95)' : 'rgba(150,180,240,0.7)', dx: 0, dy: 0, pri: mark ? 8 : 2, center: true, spaced: true });
+          hits.push({ x: p[0], y: p[1], r: 40, obj: { kind: 'con', id: c.id, name: c.name, ra, dec }, weak: true });
         }
       }
 
@@ -1349,7 +1630,7 @@ const SKY = (() => {
       let near = null, nearD = Infinity;
       for (const h of hits) { if (h.weak) continue; const d = Math.hypot(h.x - cx, h.y - cy); if (d < nearD) { nearD = d; near = h.obj; } }
       const nearDeg = nearD * 2 * Math.atan(1 / (2 * S)) * R2D; // roughly, at the centre
-      lastPointing = { az, alt, near: nearDeg < Math.max(3, st.fov / 12) ? near : null, nearDeg };
+      lastPointing = { az, alt, near: nearDeg < Math.max(3, st.fov / 12) ? near : null, nearDeg, con: here };
     }
 
     function polyline(points, P, f) {
@@ -1474,7 +1755,8 @@ const SKY = (() => {
     function refreshPointing() {
       const p = lastPointing;
       const near = p.near ? ` · <span class="near">${p.near.name}</span>` : '';
-      $('#pointing').innerHTML = `${mode === 'sensor' ? 'Pointing' : 'Centre'}: <b>${fmtAz(p.az)}</b>, <b>${p.alt >= 0 ? '+' : ''}${Math.round(p.alt)}°</b>${near}`;
+      const con = p.con && data ? ` in <b>${data.cons[p.con].name}</b>` : '';
+      $('#pointing').innerHTML = `${mode === 'sensor' ? 'Pointing' : 'Centre'}: <b>${fmtAz(p.az)}</b>, <b>${p.alt >= 0 ? '+' : ''}${Math.round(p.alt)}°</b>${con}${near}`;
     }
     function refreshUi() {
       const compassNote = sensorKind === 'relative' ? ' (no compass)' : sensorKind === 'ios' && !compass.calibrated() ? ' (tilt flat to calibrate)' : '';
@@ -1496,6 +1778,9 @@ const SKY = (() => {
       $('#alignNote').textContent = `Alignment nudge: ${st.azOffset >= 0 ? '+' : ''}${st.azOffset.toFixed(1)}°`;
       $('#fovRange').value = st.fov;
       $('#fovNote').textContent = `${Math.round(st.fov)}°`;
+      $('#artRange').value = Math.round(st.artLevel * 100);
+      $('#boundsCheck').checked = st.layers.bounds;
+      $('#artNote').textContent = `${Math.round(st.artLevel * 100)}%`;
       $('#viewNote').textContent = `Stars to magnitude ${magLimit(st.fov).toFixed(1)} at this zoom.`;
       $('#satNote').textContent = satStatus === 'loading' ? 'Loading elements…' : satStatus === 'error' ? 'Elements unavailable (offline?).' : sats.length ? `${sats.length} satellites loaded${satEpochNote()}.` : 'Not loaded.';
       const d = now();
@@ -1635,12 +1920,22 @@ const SKY = (() => {
         const d = Math.hypot(h.x - x, h.y - y);
         if (d <= Math.max(h.r, 16) && d - (h.weak ? 0 : 6) < bestD) { bestD = d - (h.weak ? 0 : 6); best = h.obj; }
       }
-      if (best) openCard(best); else closeCard();
+      if (best) { openCard(best); return; }
+      // empty sky: with the pictures or boundaries showing, a tap there is a question about the constellation
+      // it is in; with a card already open, it closes it
+      if (selected || !bounds || !(st.layers.art || st.layers.bounds)) { closeCard(); return; }
+      const W = canvas.clientWidth, H = canvas.clientHeight, e = ephemeris();
+      const v = SKY.unproject(currentCamera(), x, y, SKY.scaleForFov(st.fov, Math.min(W, H)), W / 2, H / 2);
+      if (v[2] < 0) { closeCard(); return; } // not through the ground
+      openCard(conObj(SKY.constellationAt(bounds.index, SKY.apply(SKY.transpose(e.WJ), v))));
     }
+    const conObj = (id) => { const c = data.cons[id]; return { kind: 'con', id, name: c.name, ra: c.labels[0][0], dec: c.labels[0][1] }; };
 
     // ------------------------------------------------------------ object card
     const fmtRa = (ra) => { const h = ra / 15, hh = Math.floor(h), m = (h - hh) * 60, mm = Math.floor(m), s = Math.round((m - mm) * 60); return `${hh}h ${String(mm).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`; };
     const fmtDec = (dec) => { const s = dec < 0 ? '−' : '+', a = Math.abs(dec), d = Math.floor(a), m = Math.round((a - d) * 60); return `${s}${d}° ${String(m).padStart(2, '0')}′`; };
+    const ARGO = 'Argo Navis, the ship: Carina is its keel, Puppis its stern and Vela its sails';
+    const PICTURE_NOTE = { Car: ARGO, Pup: ARGO, Vel: ARGO, Ser: 'Coiled round Ophiuchus, who holds it', Oph: 'The serpent-bearer, holding Serpens' };
     const KIND = { star: 'Star', planet: 'Planet', sun: 'Star — ours', moon: 'Natural satellite', dso: 'Deep-sky object', sat: 'Artificial satellite', con: 'Constellation' };
     function openCard(obj) {
       selected = obj;
@@ -1673,6 +1968,7 @@ const SKY = (() => {
       } else if (obj.kind === 'con') {
         const c = data.cons[obj.id];
         rows.push(['Genitive', c.gen], ['Abbreviation', obj.id]);
+        if (PICTURE_NOTE[obj.id]) rows.push(['Picture', PICTURE_NOTE[obj.id]]);
       }
       if (obj.ra != null && obj.kind !== 'con') rows.push([`RA / Dec${obj.kind === 'star' || obj.kind === 'dso' ? ' (J2000)' : ''}`, `${fmtRa(obj.ra)}, ${fmtDec(obj.dec)}`]);
       $('#cardTitle').textContent = obj.name;
@@ -1718,7 +2014,7 @@ const SKY = (() => {
         items.push({ text: alts[0], alts, sub: `star${con ? ` in ${con.name}` : ''}, mag ${stars.mag[i].toFixed(1)}`, obj });
       }
       data.dsos.forEach((o, i) => items.push({ text: o.name || o.id, alts: [o.id, o.desig, o.name].filter(Boolean), sub: `${o.type}${o.mag != null ? `, mag ${o.mag}` : ''}`, obj: { kind: 'dso', i, id: o.id, name: o.name || o.id, ra: o.ra, dec: o.dec, mag: o.mag, type: o.type, dim: o.dim, desig: o.desig } }));
-      for (const [id, c] of Object.entries(data.cons)) items.push({ text: c.name, alts: [c.name, id, c.gen], sub: 'constellation', obj: { kind: 'con', id, name: c.name, ra: c.labels[0][0], dec: c.labels[0][1] } });
+      for (const [id, c] of Object.entries(data.cons)) items.push({ text: c.name, alts: [c.name, id, c.gen], sub: 'constellation', obj: conObj(id) });
       for (const s of sats) items.push({ text: s.name, alts: [s.name, s.tle.norad], sub: 'satellite', obj: { kind: 'sat', id: s.tle.norad, name: s.name, sat: s } });
       for (const it of items) { it.keys = (it.alts || [it.text]).map((a) => a.toLowerCase()); }
       index = items;
@@ -1870,13 +2166,20 @@ const SKY = (() => {
       const l = b.dataset.layer;
       st.layers[l] = !st.layers[l];
       if (l === 'sats' && st.layers.sats && !sats.length) loadSats();
+      if (l === 'art' && st.layers.art && artGL.failed()) toast('The constellation pictures need WebGL, which this browser has turned off.');
       dirty = true; save(); refreshUi();
     });
     function toggleNight() { st.night = !st.night; save(); refreshUi(); }
     $('#nightBtn').addEventListener('click', toggleNight);
+    $('#boundsCheck').addEventListener('change', () => { st.layers.bounds = $('#boundsCheck').checked; dirty = true; save(); refreshUi(); });
     $('#declCheck').addEventListener('change', () => { st.useDecl = $('#declCheck').checked; dirty = true; save(); });
     $('#alignReset').addEventListener('click', () => { st.azOffset = 0; dirty = true; save(); refreshUi(); });
     $('#fovRange').addEventListener('input', () => setFov(Number($('#fovRange').value)));
+    $('#artRange').addEventListener('input', () => {
+      st.artLevel = clamp(Number($('#artRange').value) / 100, 0.1, 1); $('#artNote').textContent = `${Math.round(st.artLevel * 100)}%`;
+      if (!st.layers.art) { st.layers.art = true; refreshUi(); }
+      dirty = true; save();
+    });
     $('#shareBtn').addEventListener('click', async () => {
       writeHash();
       try { await navigator.clipboard.writeText(location.href); toast('Link copied — it reproduces this place, time and view.'); }

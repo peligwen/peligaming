@@ -3,6 +3,9 @@
 //   - SGP4 against the Spacetrack Report #3 test case (near-earth),
 //   - the magnetic model against NOAA's WMM2025 test table,
 //   - precession against Meeus' worked example 21.b,
+//   - the constellation illustrations' placement (their anchor stars, and the
+//     figures' stars landing on painted pixels) and the IAU boundaries (both
+//     sides of every edge, and the constellations stars are catalogued in),
 //   - the Sun, Moon and planets against JPL Horizons (fetched live; skipped
 //     without network),
 //   - and the camera/projection maths for self-consistency.
@@ -12,6 +15,7 @@
 //   node scripts/check-sky.mjs [--engine file] [--offline]      (npm run check:sky)
 
 import { readFileSync } from 'node:fs';
+import { inflateSync } from 'node:zlib';
 
 const args = process.argv.slice(2);
 const enginePath = args.includes('--engine') ? args[args.indexOf('--engine') + 1] : null;
@@ -248,6 +252,138 @@ console.log('Device orientation through vertical (Euler wrap, iOS compass offset
     if (angDiff(SKY.cameraAzAlt(old).az, SKY.cameraAzAlt(truth).az) > 90) flipped++;
   }
   check('(for the record) pasting the heading into alpha turns the view around past vertical', flipped, 8, 0);
+}
+
+// ------------------------------------------------------------------ constellation art
+// The illustrations are 8-bit greyscale or RGB PNGs; this reads one into a
+// grey value per pixel, enough to ask whether a star lands on the drawing.
+function readPng(file) {
+  const buf = readFileSync(file);
+  let p = 8, w = 0, h = 0, type = 0;
+  const idat = [];
+  while (p < buf.length) {
+    const len = buf.readUInt32BE(p), kind = buf.toString('ascii', p + 4, p + 8), body = buf.subarray(p + 8, p + 8 + len);
+    if (kind === 'IHDR') {
+      w = body.readUInt32BE(0); h = body.readUInt32BE(4); type = body[9];
+      if (body[8] !== 8 || ![0, 2, 4, 6].includes(type) || body[12] !== 0) throw new Error(`${file}: unsupported PNG (depth ${body[8]}, type ${type}, interlace ${body[12]})`);
+    } else if (kind === 'IDAT') idat.push(body);
+    p += 12 + len;
+  }
+  const bpp = { 0: 1, 2: 3, 4: 2, 6: 4 }[type], stride = w * bpp, raw = inflateSync(Buffer.concat(idat));
+  const px = new Uint8Array(stride * h), grey = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)], src = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1)), row = y * stride;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= bpp ? px[row + x - bpp] : 0, b = y ? px[row - stride + x] : 0, c = x >= bpp && y ? px[row - stride + x - bpp] : 0;
+      const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+      const pred = f === 0 ? 0 : f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1 : pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      px[row + x] = (src[x] + pred) & 255;
+    }
+    for (let x = 0; x < w; x++) grey[y * w + x] = px[row + x * bpp];
+  }
+  return { w, h, grey };
+}
+
+console.log('Constellation art — the illustrations pinned by their anchor stars');
+const sky = JSON.parse(readFileSync('public/tools/irl/data/sky-pointer/sky.json', 'utf8'));
+{
+  let worstPx = 0, worstDeg = 0, onArt = 0, figureStars = 0, inFront = 0;
+  const artOf = {};
+  for (const [id, a] of Object.entries(sky.art)) { artOf[id] = id; for (const c of a.covers || []) artOf[c] = id; }
+  check('every constellation has a picture (its own, or Argo\'s or Ophiuchus\')', Object.keys(artOf).length, 88, 0);
+  const frames = Object.fromEntries(Object.entries(sky.art).map(([id, a]) => [id, SKY.artFrame(a.a)]));
+  for (const [id, a] of Object.entries(sky.art)) {
+    for (const [x, y, ra, dec] of a.a) {
+      const v = SKY.vec(ra, dec), px = SKY.artPixel(frames[id], v);
+      worstPx = Math.max(worstPx, Math.hypot(px[0] - x, px[1] - y));
+      worstDeg = Math.max(worstDeg, SKY.angle(SKY.artDir(frames[id], x, y), v));
+    }
+  }
+  check('each anchor star maps to its pixel', worstPx, 0, 1e-6, ' px');
+  check('each anchor pixel maps to its star', worstDeg * 3600, 0, 0.01, '″');
+  const images = Object.fromEntries(Object.entries(sky.art).map(([id, a]) => [id, readPng(`public/tools/irl/data/sky-pointer/${a.img}`)]));
+  check('pictures are the size listed', Object.entries(sky.art).filter(([id, a]) => images[id].w !== a.w || images[id].h !== a.h).length, 0, 0);
+  // the stick figures' stars sit on the drawing, with pixels counted from the top left as the page's
+  // texture coordinates assume (d3-celestial's figures are not quite Stellarium's, so not all of them)
+  for (const [con, c] of Object.entries(sky.cons)) {
+    const id = artOf[con], img = images[id];
+    const seen = new Set();
+    for (const seg of c.lines) for (const [ra, dec] of seg) {
+      const k = `${ra},${dec}`;
+      if (seen.has(k)) continue;
+      seen.add(k); figureStars++;
+      const px = SKY.artPixel(frames[id], SKY.vec(ra, dec));
+      if (!px) continue;
+      inFront++;
+      const x0 = Math.round(px[0]), y0 = Math.round(px[1]);
+      let lit = 0;
+      for (let y = y0 - 2; y <= y0 + 2; y++) for (let x = x0 - 2; x <= x0 + 2; x++) if (x >= 0 && y >= 0 && x < img.w && y < img.h) lit = Math.max(lit, img.grey[y * img.w + x]);
+      if (lit > 20) onArt++;
+    }
+  }
+  check('every figure star is in front of its picture', inFront, figureStars, 0);
+  check(`figure stars that land on the drawing (${onArt} of ${figureStars})`, onArt / figureStars * 100, 100, 25, '%');
+  // read with the rows counted from the bottom, most of the same stars miss
+  let flipped = 0;
+  for (const [con, c] of Object.entries(sky.cons)) {
+    const id = artOf[con], img = images[id];
+    const seen = new Set();
+    for (const seg of c.lines) for (const [ra, dec] of seg) {
+      const k = `${ra},${dec}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const px = SKY.artPixel(frames[id], SKY.vec(ra, dec));
+      const x0 = Math.round(px[0]), y0 = Math.round(img.h - px[1]);
+      let lit = 0;
+      for (let y = y0 - 2; y <= y0 + 2; y++) for (let x = x0 - 2; x <= x0 + 2; x++) if (x >= 0 && y >= 0 && x < img.w && y < img.h) lit = Math.max(lit, img.grey[y * img.w + x]);
+      if (lit > 20) flipped++;
+    }
+  }
+  check(`…and read bottom-up, far fewer would (${flipped} of ${figureStars})`, flipped < onArt * 0.6 ? 1 : 0, 1, 0);
+}
+
+console.log('Constellation boundaries — IAU, B1875');
+{
+  const index = SKY.boundaryIndex(sky.bounds.edges);
+  const fromB1875 = SKY.transpose(SKY.precessionMatrix(SKY.B1875));
+  const J = (ra, dec) => SKY.apply(fromB1875, SKY.vec(ra, dec));
+  // just either side of the middle of every edge is the constellation the edge names on that side
+  let wrong = 0;
+  for (const [t, ra1, dec1, ra2, dec2, a, b] of sky.bounds.edges) {
+    // a lies east of a meridian edge and south of a parallel one; b on the other side
+    let sideA, sideB;
+    if (t === 'M') { const d = (dec1 + dec2) / 2; sideA = J(ra1 + 0.01, d); sideB = J(ra1 - 0.01, d); }
+    else { const r = ra1 + SKY.norm360(ra2 - ra1) / 2; sideA = J(r, dec1 - 0.01); sideB = J(r, dec1 + 0.01); }
+    if (SKY.constellationAt(index, sideA) !== a) wrong++;
+    if (SKY.constellationAt(index, sideB) !== b) wrong++;
+  }
+  check(`both sides of all ${sky.bounds.edges.length} edges are the constellations it names`, wrong, 0, 0);
+  check('the north celestial pole is in Ursa Minor', SKY.constellationAt(index, [0, 0, 1]) === 'UMi' ? 1 : 0, 1, 0);
+  check('the south celestial pole is in Octans', SKY.constellationAt(index, [0, 0, -1]) === 'Oct' ? 1 : 0, 1, 0);
+  // the catalogued constellation of every Bayer/Flamsteed star; the Flamsteed numbers that predate the
+  // boundaries and ended up across them (10 UMa in Lynx, 2 UMi in Cepheus...) are the known exceptions
+  let agree = 0, total = 0;
+  const at = {};
+  for (const [ra, dec, , , hip] of sky.stars) {
+    const nm = sky.names[hip];
+    if (!nm || !nm[3]) continue;
+    const c = SKY.constellationAt(index, SKY.vec(ra, dec));
+    at[nm[0] || `${nm[1] || nm[2]} ${nm[3]}`] = c;
+    total++; if (c === nm[3]) agree++;
+  }
+  check(`stars in the constellation they are catalogued in (${agree} of ${total})`, agree / total * 100, 100, 1.5, '%');
+  for (const [star, con] of [['Betelgeuse', 'Ori'], ['Sirius', 'CMa'], ['Polaris', 'UMi'], ['Rigil Kentaurus', 'Cen'], ['Acrux', 'Cru'], ['Alpheratz', 'And'], ['Antares', 'Sco'], ['10 UMa', 'Lyn'], ['2 UMi', 'Cep'], ['ρ Aql', 'Del']]) {
+    check(`${star} is in ${con}`, at[star] === con ? 1 : 0, 1, 0);
+  }
+  // the drawn paths start and end on the corners, in J2000
+  let worstEnd = 0, worstStep = 0;
+  for (const e of sky.bounds.edges) {
+    const pts = SKY.boundaryPath(e);
+    worstEnd = Math.max(worstEnd, SKY.angle(pts[0], J(e[1], e[2])), SKY.angle(pts.at(-1), J(e[3], e[4])));
+    for (let i = 1; i < pts.length; i++) worstStep = Math.max(worstStep, SKY.angle(pts[i - 1], pts[i]));
+  }
+  check('boundary paths end on their corners', worstEnd * 3600, 0, 0.01, '″');
+  check('boundary paths are drawn in short steps', worstStep, 0, 1.5 + 1e-9, '°');
 }
 
 // ------------------------------------------------------------------ Sun, Moon, planets vs Horizons
