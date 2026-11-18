@@ -754,9 +754,9 @@ drop them.
 ## 🔭 Sky Pointer
 
 Not a game at all: hold your phone up to the night sky and it shows what
-the phone is pointing at — the stars, the constellation figures, the planets,
-the Moon with its phase, the Messier objects, and the satellites passing
-over right now. No sensors, or no dark sky where you are? Set a place and a
+the phone is pointing at — the stars, the constellation figures and the
+pictures they stand for, the planets, the Moon with its phase, the Messier
+objects, and the satellites passing over right now. No sensors, or no dark sky where you are? Set a place and a
 time and pan and zoom the same sky by hand.
 
 **Try it: [peligaming.com/tools/irl/sky-pointer](https://peligaming.com/tools/irl/sky-pointer)**
@@ -789,6 +789,18 @@ time and pan and zoom the same sky by hand.
   a horizon with the ground shaded and the cardinal points; an optional
   altitude grid. The sky brightens through twilight into day, so a planet
   you are hunting at dusk is drawn against the sky it is really in.
+- **Constellation pictures.** Behind the stars, faintly, the 88
+  constellations as drawings: Orion with his club and lion skin, the bull,
+  the twins, the whole ship Argo spread across Carina, Puppis and Vela, the
+  serpent coiled round Ophiuchus. Each is pinned to the sky by three of its
+  own stars, so the drawing stays on the stars it is made of at any zoom and
+  through the curve of a wide view. The constellation in the middle of the
+  screen glows brighter and warmer and is named in the readout ("in
+  Orion"), worked out from the official IAU boundaries rather than the
+  nearest label, so a faint patch between figures goes to the right one; the
+  boundaries can be drawn too, dashed, with that constellation outlined. Tap
+  empty sky to ask which constellation it belongs to; the pictures'
+  brightness is a slider in Settings.
 - **Satellites.** CelesTrak's "visual" list (the hundred-odd brightest) and
   the space stations, propagated with SGP4 from the latest two-line
   elements, each with a short track ahead of it. Bright markers are sunlit
@@ -814,18 +826,45 @@ time and pan and zoom the same sky by hand.
   declination, and a stereographic camera that turns DeviceOrientation
   angles or an azimuth and altitude into a projection where every circle on
   the sky stays a circle on the screen (which is how the horizon is drawn:
-  as the one circle it projects to, filled on the ground side).
+  as the one circle it projects to, filled on the ground side). It also
+  places the constellation pictures — as Stellarium does, each is taken as
+  a flat drawing of the sky, a tangent plane, so a pixel's direction is a
+  linear map of its coordinates that three pixel-and-star pairs fix — and
+  finds which constellation a direction is in by Roman's (1987) walk: carry
+  it back to the 1875 equator the IAU boundaries were drawn on, go north to
+  the first boundary along a parallel, and the constellation is the one on
+  its south side.
+- The pictures are drawn with WebGL, on a layer under the sky canvas: each
+  is a mesh of cells about 3° across whose directions are fixed when it
+  loads, sent through the same stereographic camera in a vertex shader (a
+  2-D canvas can only stretch an image evenly, and these span tens of
+  degrees of a curved projection), and added onto the sky's colour as light
+  is. The sky canvas above is then transparent and the browser stacks the
+  two, so no frame is copied back off the GPU. Pictures load as they come
+  into view.
 - `npm run check:sky` (`scripts/check-sky.mjs`) runs that block under Node
   against reference values: SGP4 against the Spacetrack test case (within
   10 m), the magnetic model against NOAA's WMM2025 test table, precession
   against Meeus's worked example, and the Sun, Moon and planets against JPL
-  Horizons, fetched live (all within 2.5′; `--offline` skips that part).
+  Horizons, fetched live (all within 2.5′; `--offline` skips that part). For
+  the pictures it checks that every anchor star lands on its pixel, and that
+  the stick figures' stars land on the drawn figure (most do; read with the
+  rows upside down, most would not). For the boundaries it checks both sides
+  of every one of the 781 edges, and the constellation of every catalogued
+  Bayer and Flamsteed star: 99% agree, and the rest are the Flamsteed
+  numbers older than the boundaries that ended up across one (10 Ursae
+  Majoris is in Lynx; ρ Aquilae drifted into Delphinus in 1992).
 - `npm run data:sky` (`scripts/fetch-sky-data.mjs`) builds
   `public/tools/irl/data/sky-pointer/sky.json` from
   [d3-celestial](https://github.com/ofrohn/d3-celestial)'s data files (the
   Hipparcos-based star list to magnitude 6, star names, constellation
-  figures and names, the Messier list and the bright deep-sky objects) and
-  NOAA's WMM2025 coefficient file, cached in `.sky-cache/`.
+  figures and names, the Messier list and the bright deep-sky objects),
+  [Stellarium](https://github.com/Stellarium/stellarium)'s "modern" sky
+  culture (the constellation pictures, copied into
+  `public/tools/irl/data/sky-pointer/art/` by IAU abbreviation, with the
+  three stars each is pinned by, and the IAU boundaries as 781 edges on the
+  B1875 equator) and NOAA's WMM2025 coefficient file, cached in
+  `.sky-cache/`.
 - `src/worker.mjs` proxies CelesTrak's element sets under `/api/sky/tle`
   with a six-hour shared edge cache, so the whole site fetches each set a
   few times a day however many phones are pointed at the sky. Elements are
@@ -842,7 +881,10 @@ within 60° of flat, face up (raised, the heading stops tracking the top
 edge, and what it does past vertical is undocumented), so the page samples
 the fix while the phone is flat and holds it for as long as the phone is
 raised; point the phone at the ground for a moment now and then and it
-re-calibrates.
+re-calibrates. The constellation pictures are placed as Stellarium places
+them: exactly on the three stars that pin each one and closely, not exactly,
+on the rest; and they need WebGL, without which the page draws the sky
+without them and says so.
 
 ## 🧶 Cat Sweater Pattern
 
@@ -1204,7 +1246,7 @@ export and import, and this is an unofficial editor for that save.
 | Skyrim | Enchanting Simulator | Max-enchant loadout planner |
 | Skyrim | Alchemy Lab | Best-value potions from your ingredient stock |
 | IRL | Gyro Courier | Fly an ultralight gyrocopter over Chattanooga with a blade-element rotor model, and run deliveries from businesses to houses, landing on the streets |
-| IRL | Sky Pointer | Point your phone at the night sky: the stars, constellations, planets, Moon, deep-sky objects and satellites in that direction, with a finder for anything you search; or set a place and time and pan by hand |
+| IRL | Sky Pointer | Point your phone at the night sky: the stars, constellations and their pictures, planets, Moon, deep-sky objects and satellites in that direction, with a finder for anything you search; or set a place and time and pan by hand |
 
 ### RuneScape data plumbing
 
@@ -1408,7 +1450,13 @@ Several kinds of things live here under different terms — see
 - **Sky data** (`public/tools/irl/data/sky-pointer/sky.json`) is built from
   [d3-celestial](https://github.com/ofrohn/d3-celestial)'s data files,
   © 2015 Olaf Frohn, **BSD-3-Clause** (the notice travels inside the file),
-  plus NOAA's public-domain WMM2025 coefficients.
+  plus NOAA's public-domain WMM2025 coefficients. The constellation pictures
+  (`public/tools/irl/data/sky-pointer/art/`) are
+  [Stellarium](https://stellarium.org)'s, under the
+  [**Free Art License 1.3**](https://artlibre.org/licence/lal/en/) (the
+  notice travels in that folder's `LICENSE.txt`); the stars that pin them and
+  the IAU boundary edges come from Stellarium's sky culture data,
+  **CC BY-SA 4.0**.
 - **Vanilla server values** in the WoW Forever data (the positions of
   vanilla NPCs on the World Map; in the Profession Catalogue the vanilla
   trainers' levels, fees and titles and which tools vendors sold) are
