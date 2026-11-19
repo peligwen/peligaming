@@ -32,7 +32,7 @@ window.PELIGAMING = {
       tools: [
         {
           name: "World Map",
-          description: "Azeroth from the whole world down to a city street, drawn from the game's own map art: every zone's biomes for the new zone-bound item effects (Forest & Grassland, Swamp, Wasteland, Snowy, Mountainous, Haunted, Cavernous, Desert — and which trinkets, seals and runes key off each), every flight master with flight times and fares and a flight planner, the boats, zeppelins and skyships with sailing times and dock waits, and every banker and auctioneer. Searchable, with share links.",
+          description: "Azeroth from the whole world down to a city street, drawn from the game's own map art: every zone's biomes for the new zone-bound item effects (Forest & Grassland, Swamp, Wasteland, Snowy, Mountainous, Haunted, Cavernous, Desert — and which trinkets, seals and runes key off each), a levelling overlay that turns every zone and subzone grey, green, yellow, orange or red against the level you slide or type, with the zones that have the most quests for you and the dungeons at your level, every flight master with flight times and fares and a flight planner, the boats, zeppelins and skyships with sailing times and dock waits, and every banker and auctioneer. Searchable, with share links.",
           path: "tools/wow-forever/world-map.html",
         },
         {
