@@ -53,8 +53,23 @@ the game's own map art, with the layers the game does not draw for you.
   Maelstrom.
 - **Banks and auction houses.** Every banker and auctioneer, coloured by who
   can use them, from zone zoom in.
+- **Levelling.** Turn it on and slide or type your level, and every zone and
+  subzone takes the colour the game would give its level: red five or more
+  above you, orange three or four, yellow within two, green down to the
+  grey level, and grey below that, where the gap widens with level the way
+  the game's does (grey is 13 and under at 20, 51 and under at 60). Each
+  subzone is coloured by the level most of its own mobs are, so the
+  Barrens shows grey around the Crossroads and yellow at Camp Taurajo for
+  the same player; hover one for the spread of its mobs. The panel lists
+  the zones with the most quests for you (the yellow ones, then orange and
+  green), counted for your faction when you pick one, and the dungeons at
+  your level, whose markers take their colour too; a zone's own panel
+  shows its mobs and quests as bars of colour and its places from low to
+  high. The level rides in share links, and `[` `]` step it.
 - Search across zones, subzones, towns, dungeons, flight masters, ships and
   NPCs; a faction filter; share links that reproduce the view and layers.
+
+![World Map, levelling at 23](docs/world-map-levelling.jpg)
 
 ### How it's built
 
@@ -83,6 +98,25 @@ the game's own map art, with the layers the game does not draw for you.
   `scripts/lib/bundle.mjs`, a force-directed edge bundling (Holten & van
   Wijk) that pulls crossings running the same way onto shared cables and
   spreads the members of a cable into lanes.
+- The levelling overlay's levels come from
+  `scripts/fetch-wow-forever-levels.mjs` (`npm run data:wow-forever-levels`,
+  run after the map build, whose zones and subzone shapes it reads), into
+  `levels.json`. Mob levels are the CMaNGOS classic-db spawn table: every
+  creature a player could fight (not townsfolk or guards friendly to either
+  faction, not critters, bosses, creatures that give no experience,
+  world-event spawns, or creatures that wear an invisibility aura, which
+  the client's SpellEffect table names), each placed in the smallest
+  subzone shape that holds it. A subzone's level is the middle 80% of its
+  mobs and the level most of them are; with fewer than eight mobs it takes
+  the level the Forever client's own AreaTable gives it, which is also all
+  there is for Forever's new zones (Riverglades, Zephras Isle), and Mount
+  Hyjal and Shen'dralas, with neither, take their band. Quest levels are
+  the quest log's own zones, for the races that can take them, leaving out
+  class, profession, raid, PvP, world-event, repeatable and unobtainable
+  quests. Where Forever moves a camp or retunes a mob, the map follows
+  vanilla until the data does. `npm run check:levels` checks the colour
+  rule against the game's and the data against places whose levels anyone
+  who played knows.
 - The app (`public/tools/wow-forever/world-map.html`) is vanilla JS on a
   canvas: the art is drawn coarse to fine as you zoom, each zone clipped to
   its own outline so neighbours never fight, and every layer is vector on
@@ -124,8 +158,9 @@ else is added. Rebuild with `npm run data:wow-forever`.
   one file at a time with a gap between requests, back off on rate
   limiting, and cache every download so a rebuild of the same build touches
   the network only for what is missing.
-- **CMaNGOS classic-db** is GPLv3; the spawn coordinates this map derives
-  from it are credited in the map's own panel and here.
+- **CMaNGOS classic-db** is GPLv3; the spawn coordinates and the mob and
+  quest levels this map derives from it are credited in the map's own panel
+  and here.
 - **Wowhead** is not used. Its terms bar reaching the site with anything
   but an ordinary browser and bar derivative works of its content, so the
   earlier Wowhead-sourced NPC positions were dropped and replaced by the
@@ -1234,7 +1269,7 @@ export and import, and this is an unofficial editor for that save.
 | Game | Tool | What it does |
 | --- | --- | --- |
 | Azeroth Survivors | Save Editor | Unseal an exported save, edit heroes, talents, zones and heroic tiers, the gear collection and its stars, perks, statistics and achievements, and seal it again for import — all in the browser |
-| WoW Forever | World Map | Azeroth at every scale from the game's own art: biomes for the zone-bound item effects, flight masters with times and a planner, boats and zeppelins with timetables, banks and auctioneers |
+| WoW Forever | World Map | Azeroth at every scale from the game's own art: biomes for the zone-bound item effects, a levelling overlay that colours every subzone grey to red against your level, flight masters with times and a planner, boats and zeppelins with timetables, banks and auctioneers |
 | WoW Forever | Profession Catalogue | A levelling route from your skill with the recipes you have: what to make over which stretch, how many crafts, a shopping list at your prices, the tools to make, what to learn from which trainer and the plans worth finding; under it every recipe with the skill at which it turns orange, yellow, green and grey and the chance of a point, Working Overtime counted in or out |
 | RuneScape | Sand Table | Boss & raid rehearsals: the briefing, the kit, and the fight rebuilt tile by tile in 3D with a drill mode |
 | RuneScape | Sand Table | Boss and raid rehearsals: the briefing checked against your hiscores, the kit slot by slot, and the fight rebuilt tile by tile in 3D with a tick clock — then a drill that grades your prayers and footwork |
@@ -1458,7 +1493,8 @@ Several kinds of things live here under different terms — see
   the IAU boundary edges come from Stellarium's sky culture data,
   **CC BY-SA 4.0**.
 - **Vanilla server values** in the WoW Forever data (the positions of
-  vanilla NPCs on the World Map; in the Profession Catalogue the vanilla
+  vanilla NPCs and the mob and quest levels on the World Map; in the
+  Profession Catalogue the vanilla
   trainers' levels, fees and titles and which tools vendors sold) are
   derived from the
   [CMaNGOS classic-db](https://github.com/cmangos/classic-db), **GPLv3**,

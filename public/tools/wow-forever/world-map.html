@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>World Map — WoW Forever: biomes, flight paths, boats &amp; zeppelins, banks &amp; auctioneers</title>
-<meta name="description" content="Azeroth from the whole world down to a city street, from the game's own map art: every zone's biomes for the zone-bound item effects, flight masters with flight times and a flight planner, boats, zeppelins and skyships with sailing times, and every banker and auctioneer.">
+<title>World Map — WoW Forever: levelling, biomes, flight paths, boats &amp; zeppelins, banks &amp; auctioneers</title>
+<meta name="description" content="Azeroth from the whole world down to a city street, from the game's own map art: a levelling overlay that colours every zone and subzone grey to red against your level, every zone's biomes for the zone-bound item effects, flight masters with flight times and a flight planner, boats, zeppelins and skyships with sailing times, and every banker and auctioneer.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗺️</text></svg>">
 <style>
   :root{
@@ -82,13 +82,37 @@
   #loading{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--dim);}
   #loading h1{font-family:var(--serif);color:var(--gold);font-weight:600;font-size:28px;}
   #sideToggle{display:none;position:fixed;right:10px;top:60px;z-index:26;font-size:13px;color:var(--parch);background:#1b1509f2;border:1px solid var(--edge-hi);border-radius:4px;padding:5px 10px;cursor:pointer;}
+  /* levelling: the five colours the game gives a level, grey to red */
+  #lvbtn .sw{width:24px;opacity:.55;background:linear-gradient(90deg,#808080 0 20%,#40bf40 20% 40%,#ffff00 40% 60%,#ff8040 60% 80%,#ff1a1a 80%);}
+  #lvbtn.on{color:var(--parch);border-color:var(--gold);} #lvbtn.on .sw{opacity:1;}
+  #lvdock{position:fixed;z-index:24;bottom:34px;left:50px;right:330px;margin:0 auto;max-width:520px;padding:8px 30px 8px 12px;display:none;}
+  #lvdock.on{display:block;}
+  #lvdock .ctl{display:flex;align-items:center;gap:7px;}
+  #lvdock label{font-family:var(--serif);font-weight:600;color:var(--gold);font-size:15px;white-space:nowrap;}
+  #lvdock input[type=range]{flex:1;min-width:60px;accent-color:#e0b95a;height:22px;cursor:pointer;}
+  #lvdock input[type=number]{width:58px;font-size:16px;font-weight:600;text-align:center;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;padding:3px 2px;outline:none;font-variant-numeric:tabular-nums;}
+  #lvdock input[type=number]:focus{border-color:var(--gold);}
+  #lvdock .step{width:26px;height:26px;flex:none;font-size:16px;line-height:1;color:var(--parch);background:#0d0a05;border:1px solid var(--edge-hi);border-radius:4px;cursor:pointer;}
+  #lvdock .step:hover{border-color:var(--gold);color:#fff;}
+  #lvdock .close{position:absolute;top:6px;right:9px;color:var(--dim);cursor:pointer;font-size:18px;line-height:1;} #lvdock .close:hover{color:#fff;}
+  #lvkey{display:flex;gap:4px;margin-top:7px;}
+  #lvkey span{flex:1;min-width:0;font-size:11.5px;text-align:center;border-radius:3px;padding:2px 2px;color:#120d04;font-weight:600;white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums;}
+  #lvkey span.none{opacity:.3;}
+  #lvnote{font-size:12px;color:var(--dim);margin-top:4px;} #lvnote:empty{display:none;}
+  .cbar{display:flex;height:8px;border-radius:2px;overflow:hidden;background:#0d0a05;margin:4px 0 2px;border:1px solid #0008;}
+  .cbar i{display:block;min-width:2px;}
+  .con{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid #0009;flex:none;}
+  .cn{font-weight:600;font-variant-numeric:tabular-nums;}
   @media (max-width:1100px){ #hdr .sub{display:none;} #crumb{max-width:22vw;} }
   @media (max-width:820px){
     #hdr{padding:5px 8px;gap:6px;} #hdr .sub,#crumb{display:none;} .search{min-width:120px;}
     #layerwrap{max-width:100%;} #layers{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
     #side{width:min(300px,calc(100vw - 20px));top:auto;bottom:38px;max-height:46vh;}
     #side.hidden{display:none;} #sideToggle{display:block;top:auto;bottom:8px;right:10px;} #readout{display:none;}
+    #lvdock{top:var(--side-top,60px);bottom:auto;left:8px;right:8px;max-width:none;}
+    #biome{max-width:122px;} #lvbtn{padding:3px 9px;}
   }
+  @media (max-width:560px){ #lvkey b{display:none;} #lvdock label{font-size:14px;} }
 </style>
 </head>
 <body>
@@ -100,6 +124,7 @@
   <div id="crumb"></div>
   <div class="search"><input id="q" type="search" autocomplete="off" placeholder="Search zones, towns, flight masters, banks, boats…"><div id="qdrop" class="drop panel"></div></div>
   <div id="layerwrap"><div id="layers"></div></div>
+  <span id="lvbtn" class="chip" role="button" tabindex="0" title="Colour the map by how its mobs and quests compare with your level"><span class="sw"></span>Levelling</span>
   <select id="biome" title="Light up every zone of one biome"></select>
   <select id="faction" title="Show what one faction can use"><option value="">Both factions</option><option value="A">Alliance</option><option value="H">Horde</option></select>
 </header>
@@ -109,12 +134,77 @@
 <div id="readout"></div>
 <div id="hint"><b>Scroll</b> to zoom · <b>drag</b> to pan · <b>click</b> anything to read about it</div>
 <div id="zoomctl"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button></div>
+<div id="lvdock" class="panel" role="group" aria-label="Your level">
+  <div class="ctl">
+    <label for="lvnum">Your level</label>
+    <button class="step" id="lvdown" title="One level down ( [ )" aria-label="One level down">−</button>
+    <input id="lvrange" type="range" min="1" max="60" step="1" aria-label="Your level">
+    <button class="step" id="lvup" title="One level up ( ] )" aria-label="One level up">+</button>
+    <input id="lvnum" type="number" min="1" max="60" step="1" inputmode="numeric">
+  </div>
+  <div id="lvkey"></div>
+  <div id="lvnote"></div>
+  <span class="close" id="lvclose" title="Leave levelling">×</span>
+</div>
 <div id="loading"><h1>World Map</h1><div id="loadmsg">Unrolling the map…</div></div>
+
+<script id="levelling-model">
+// The colour the game gives a level, for a player of level L: the same rule
+// colours a mob's name and a quest in the log. Kept in its own block so
+// scripts/check-wow-forever-levels.mjs can check it.
+const LEVELLING = (() => {
+  const COLOURS = ["grey", "green", "yellow", "orange", "red"];
+  // the game's own shades of them
+  const HEX = { grey: "#808080", green: "#40bf40", yellow: "#ffff00", orange: "#ff8040", red: "#ff1a1a" };
+  const MAX = 60;
+  // the highest level that is grey to a player of level L, worth no experience; the gap widens with level
+  function greyLevel(L) {
+    if (L <= 5) return 0;
+    if (L <= 39) return L - 5 - Math.floor(L / 10);
+    if (L <= 59) return L - 1 - Math.floor(L / 5);
+    return L - 9;
+  }
+  function colour(level, L) {
+    const d = level - L;
+    if (d >= 5) return "red";
+    if (d >= 3) return "orange";
+    if (d >= -2) return "yellow";
+    if (level > greyLevel(L)) return "green";
+    return "grey";
+  }
+  // the levels each colour spans for a player of level L, as [from, to]; to is null for "and up", and a colour spanning nothing is null
+  function bands(L) {
+    const g = greyLevel(L);
+    return {
+      grey: g >= 1 ? [1, g] : null,
+      green: L - 3 >= g + 1 ? [g + 1, L - 3] : null,
+      yellow: [Math.max(1, L - 2), L + 2],
+      orange: [L + 3, L + 4],
+      red: [L + 5, null],
+    };
+  }
+  // a level histogram, [first level, count, count, …], counted by colour
+  function split(hist, L) {
+    const out = { grey: 0, green: 0, yellow: 0, orange: 0, red: 0, total: 0 };
+    if (!hist) return out;
+    for (let i = 1; i < hist.length; i++) {
+      const n = hist[i];
+      if (n) { out[colour(hist[0] + i - 1, L)] += n; out.total += n; }
+    }
+    return out;
+  }
+  // how much a place's quests are worth doing: the yellow ones in full, orange at half (harder), green at a quarter (less experience)
+  const worth = (s) => s.yellow + 0.5 * s.orange + 0.25 * s.green;
+  return { COLOURS, HEX, MAX, greyLevel, colour, bands, split, worth };
+})();
+</script>
 
 <script>
 (function () {
 "use strict";
 const DATA_URL = "data/world-map/world-map.json";
+const LEVELS_URL = "data/world-map/levels.json";
+const LEVEL_KEY = "wowf-map-level";
 const $ = (id) => document.getElementById(id);
 const canvas = $("map"), ctx = canvas.getContext("2d");
 let W = 0, H = 0, DPR = 1;
@@ -133,6 +223,7 @@ const state = {
   layers: { flights: true, routes: true, transports: true, banks: true, auction: true, places: true },
   faction: "",
   biomeFocus: null,      // a biome key, "all", or null (off)
+  level: null,           // the player's level while the levelling overlay is on, else null
   hover: null, sel: null,
   plan: { from: null, to: null, result: null },
   legacyTransports: false,
@@ -202,11 +293,13 @@ function zoneAt(fx, fy) {
   }
   return best;
 }
+// the most particular subzone under a point: the smallest whose shape holds it, as the levelling overlay paints them
 function subzoneAt(m, fx, fy) {
   if (!m || !m.subzones) return null;
-  for (const s of m.subzones) if (s.poly && s.poly.some((r) => pointInRing(r, fx, fy))) return s;
+  for (let i = m.subzonesBySize.length - 1; i >= 0; i--) { const s = m.subzonesBySize[i]; if (s.poly.some((r) => pointInRing(r, fx, fy))) return s; }
   return null;
 }
+const ringArea = (ring) => { let a = 0; for (let i = 0, n = ring.length; i < n; i++) { const [x1, y1] = ring[i], [x2, y2] = ring[(i + 1) % n]; a += x1 * y2 - x2 * y1; } return Math.abs(a / 2); };
 
 // ---- data ------------------------------------------------------------------
 async function load() {
@@ -217,6 +310,9 @@ async function load() {
     if (m.outline && m.outline.length) m.center = centroid(m.outline[0]);
     else m.center = [(m.rect[0] + m.rect[2]) / 2, (m.rect[1] + m.rect[3]) / 2];
     m.area2 = (m.rect[2] - m.rect[0]) * (m.rect[3] - m.rect[1]);
+    // largest first, so painting in this order leaves the small ones on top
+    m.subzonesBySize = (m.subzones || []).filter((s) => s.poly && s.poly.length)
+      .map((s) => ((s.size = s.poly.reduce((t, r) => t + ringArea(r), 0)), s)).sort((a, b) => b.size - a.size);
   }
   for (const n of D.taxi.nodes) { nodesById.set(n.id, n); routesFrom.set(n.id, []); }
   for (const r of D.taxi.routes) routesFrom.get(r.from)?.push(r);
@@ -226,6 +322,8 @@ async function load() {
   buildLayers();
   buildBiomeSelect();
   readHash();
+  syncLevelUi();
+  if (state.level) ensureLevels();
   syncSideTop();
   if (!state.view.hashed) { state.view.z = fitZoom(); state.view.cx = D.frame.width / 2; state.view.cy = D.frame.height / 2 - topBar() / 2 / state.view.z; }
   showAbout();
@@ -397,9 +495,14 @@ function draw() {
     }
   }
 
+  // levelling: every place in the colour its level shows to the player
+  if (state.level && LV) drawLevels(zones, vis, z);
+
   // zone hover / selection outline
   const hl = state.hover && state.hover.type === "zone" ? state.hover.obj : state.sel && state.sel.type === "zone" ? state.sel.obj : null;
   if (hl && hl.outline) { ctx.beginPath(); for (const ring of hl.outline) path(ring, true); ctx.lineWidth = 2; ctx.strokeStyle = "#ffe9b0"; ctx.stroke(); }
+  const hlSub = state.level && state.hover && state.hover.type === "zone" ? state.hover.sub : null;
+  if (hlSub && hlSub.poly) { ctx.beginPath(); for (const ring of hlSub.poly) path(ring, true); ctx.lineWidth = 1.6; ctx.strokeStyle = "#fff"; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]); }
 
   // 3. transports: solid where the vessel sails, dashed along the shared cables where the game moves it between continents
   if (state.layers.transports) {
@@ -481,9 +584,12 @@ function draw() {
     if (z >= 3) for (const d of D.instances) {
       const [sx, sy] = toScreen(d.at[0], d.at[1]);
       if (sx < -40 || sy < -40 || sx > W + 40 || sy > H + 40) continue;
-      ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2); ctx.fillStyle = d.kind === "raid" ? "#c77dff" : "#8fa3ff"; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = "#1a1408"; ctx.stroke();
-      ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
+      // levelling: the marker takes the colour of the dungeon's mobs, and says how high they are
+      const il = state.level && LV ? LV.instances[d.id] : null, ic = il && il.med ? LEVELLING.HEX[LEVELLING.colour(il.med, state.level)] : null;
+      ctx.beginPath(); ctx.arc(sx, sy, ic ? 5 : 4, 0, Math.PI * 2); ctx.fillStyle = ic || (d.kind === "raid" ? "#c77dff" : "#8fa3ff"); ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = "#1a1408"; ctx.stroke();
+      ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fillStyle = ic ? "#1a1408" : "#fff"; ctx.fill();
       if (z >= 6) label(d.name, sx, sy + 11, 10.5, d.kind === "raid" ? "#e3c5ff" : "#cfd8ff", { serif: false, weight: 500 });
+      if (ic && z >= 4.5) label(levelsText(il.lv), sx, sy + (z >= 6 ? 23 : 12), 10, ic, { serif: false, weight: 600 });
       hits.push({ x: sx, y: sy, r: 7, type: "instance", obj: d });
     }
   }
@@ -498,7 +604,12 @@ function draw() {
   }
   if (z >= 8) for (const m of zones) {
     if (!rectsOverlap(m.rect, vis) || !m.subzones) continue;
-    for (const s of m.subzones) { const [sx, sy] = toScreen(s.at[0], s.at[1]); if (sx < -60 || sy < -30 || sx > W + 60 || sy > H + 30) continue; label(s.name, sx, sy, 11, "#e8dcbd", { weight: 600 }); }
+    for (const s of m.subzones) {
+      const [sx, sy] = toScreen(s.at[0], s.at[1]); if (sx < -60 || sy < -30 || sx > W + 60 || sy > H + 30) continue;
+      label(s.name, sx, sy, 11, "#e8dcbd", { weight: 600 });
+      const e = state.level ? subLevel(m, s) : null;
+      if (e && e.lv) label(levelsText(e.lv), sx, sy + 12, 10, LEVELLING.HEX[LEVELLING.colour(e.med, state.level)], { serif: false, weight: 700 });
+    }
   }
 
   // 7. NPC markers
@@ -556,6 +667,190 @@ function drawGlyph(kind, x, y, r, color) {
     ctx.fillStyle = "#1a1408"; ctx.fillRect(-r * 0.55, -r * 0.14, r * 1.1, r * 0.28);
   }
   ctx.restore();
+}
+
+// ---- levelling ---------------------------------------------------------------
+// levels.json: for every zone the spread of its mobs' levels (the middle 80%),
+// the level most of them are, and its quests' levels for each faction; for
+// every subzone its own spread; for every dungeon its mobs' and quests'.
+const LVL = LEVELLING;
+let LV = null, lvPromise = null;
+const lvCanvas = document.createElement("canvas"), lvCtx = lvCanvas.getContext("2d");
+function ensureLevels() {
+  if (!lvPromise) {
+    $("lvnote").textContent = "Reading the levels…";
+    lvPromise = fetch(LEVELS_URL).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then((j) => { LV = j; $("lvnote").textContent = ""; refreshPanel(); requestDraw(); })
+      .catch((e) => { lvPromise = null; $("lvnote").textContent = "The levels could not be loaded: " + e.message; console.error(e); });
+  }
+  return lvPromise;
+}
+const levelOf = (m) => (LV && m ? LV.zones[m.id] || null : null);
+const subLevel = (m, s) => { const z = levelOf(m); return z && z.subzones && s ? z.subzones[s.area] || null : null; };
+const levelsText = (lv) => (lv[0] === lv[1] ? `${lv[0]}` : `${lv[0]}–${lv[1]}`);
+const bandText = (b) => (b[1] == null ? `${b[0]}+` : b[0] === b[1] ? `${b[0]}` : b[0] === 1 ? `≤${b[1]}` : `${b[0]}–${b[1]}`);
+const conOf = (level) => LVL.colour(level, state.level);
+const conSwatch = (level) => `<span class="con" style="background:${LVL.HEX[conOf(level)]}" title="${conOf(level)} to you"></span>`;
+function barHtml(s) {
+  return `<div class="cbar">${LVL.COLOURS.map((c) => (s[c] ? `<i style="flex:${s[c]};background:${LVL.HEX[c]}" title="${s[c]} ${c}"></i>` : "")).join("")}</div>`;
+}
+function countsHtml(s) {
+  return LVL.COLOURS.filter((c) => s[c]).map((c) => `<span class="cn" style="color:${c === "grey" ? "#a8a8a8" : LVL.HEX[c]}">${s[c]}</span> ${c}`).join(" · ");
+}
+// where a level came from, in a few words
+function sourceText(e) {
+  if (!e.src) return e.n ? `${e.n} mobs, the middle 80%` : "from its places";
+  if (e.src === "mobs") return `${e.n} mob${e.n === 1 ? "" : "s"}${e.n > 4 ? ", the middle 80%" : ""}`;
+  if (e.src === "client") return "the game's own level for it";
+  if (e.src === "near") return `as ${e.near}, next to it`;
+  return "the zone's band";
+}
+// a zone's quests for the faction picked; with both, the side with more worth doing
+function questSplit(entry) {
+  const q = entry && entry.quests;
+  if (!q) return null;
+  if (state.faction) { const s = LVL.split(q[state.faction], state.level); return s.total ? { ...s, side: state.faction } : null; }
+  const a = { ...LVL.split(q.A, state.level), side: "A" }, h = { ...LVL.split(q.H, state.level), side: "H" };
+  const best = LVL.worth(h) > LVL.worth(a) || (LVL.worth(h) === LVL.worth(a) && h.total > a.total) ? h : a;
+  return best.total ? best : null;
+}
+function setLevel(L, from) {
+  state.level = clamp(Math.round(Number(L)) || 1, 1, LVL.MAX);
+  try { localStorage.setItem(LEVEL_KEY, String(state.level)); } catch (e) { /* storage off: the level lasts this visit */ }
+  syncLevelUi(from); refreshPanel(); requestDraw(); writeHash();
+}
+function setLevelling(on) {
+  if (on) {
+    let L = 10;
+    try { L = Number(localStorage.getItem(LEVEL_KEY)) || 10; } catch (e) { /* no storage */ }
+    state.level = clamp(L, 1, LVL.MAX);
+    if (state.biomeFocus) { state.biomeFocus = null; $("biome").value = ""; } // the two overlays paint the same zones: one at a time
+    ensureLevels();
+  } else state.level = null;
+  syncLevelUi(); refreshPanel(); if (!state.sel) side.scrollTop = 0; requestDraw(); writeHash();
+}
+function syncLevelUi(from) {
+  const on = !!state.level;
+  $("lvbtn").classList.toggle("on", on);
+  $("lvdock").classList.toggle("on", on);
+  if (!on) return;
+  if (from !== "range") $("lvrange").value = state.level;
+  if (from !== "num") $("lvnum").value = state.level;
+  const b = LVL.bands(state.level);
+  $("lvkey").innerHTML = LVL.COLOURS.map((c) => `<span class="${b[c] ? "" : "none"}" style="background:${LVL.HEX[c]}" title="${b[c] ? `${c}: level ${bandText(b[c])}` : `nothing is ${c} to you yet`}"><b>${c[0].toUpperCase() + c.slice(1)} </b>${b[c] ? bandText(b[c]) : "–"}</span>`).join("");
+}
+$("lvbtn").onclick = () => setLevelling(!state.level);
+$("lvbtn").onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLevelling(!state.level); } };
+$("lvclose").onclick = () => setLevelling(false);
+$("lvrange").oninput = (e) => setLevel(e.target.value, "range");
+$("lvnum").oninput = (e) => { if (Number(e.target.value) >= 1) setLevel(e.target.value, "num"); };
+$("lvnum").onchange = (e) => setLevel(e.target.value || state.level);
+$("lvdown").onclick = () => setLevel(state.level - 1);
+$("lvup").onclick = () => setLevel(state.level + 1);
+
+// The colours go on a layer of their own, opaque, so a small subzone covers
+// the zone's colour beneath it rather than mixing with it; the layer is then
+// laid over the art at once, half see-through.
+function drawLevels(zones, vis, z) {
+  if (lvCanvas.width !== canvas.width || lvCanvas.height !== canvas.height) { lvCanvas.width = canvas.width; lvCanvas.height = canvas.height; }
+  const g = lvCtx, L = state.level;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, W, H);
+  const trace = (rings) => { g.beginPath(); for (const ring of rings) { ring.forEach(([x, y], i) => { const [sx, sy] = toScreen(x, y); if (i) g.lineTo(sx, sy); else g.moveTo(sx, sy); }); g.closePath(); } };
+  const shown = zones.filter((m) => m.outline && m.outline.length && rectsOverlap(m.rect, vis) && levelOf(m) && !levelOf(m).sanctuary);
+  for (const m of shown) {
+    const zl = levelOf(m);
+    // the zone's own colour first, for the slivers between its subzones' shapes
+    if (zl.med) { trace(m.outline); g.fillStyle = LVL.HEX[LVL.colour(zl.med, L)]; g.fill(); }
+    for (const s of m.subzonesBySize) {
+      const e = zl.subzones && zl.subzones[s.area];
+      if (!e) continue;
+      trace(s.poly);
+      if (e.sanctuary) { g.globalCompositeOperation = "destination-out"; g.fillStyle = "#000"; g.fill(); g.globalCompositeOperation = "source-over"; } // a capital: no colour
+      else { g.fillStyle = LVL.HEX[LVL.colour(e.med, L)]; g.fill(); }
+    }
+  }
+  ctx.globalAlpha = 0.44 * (1 - 0.4 * fade(z, 6, 14));
+  ctx.drawImage(lvCanvas, 0, 0, W, H);
+  ctx.globalAlpha = 1; ctx.lineJoin = "round";
+  if (z >= 2.6) {
+    ctx.lineWidth = 0.7; ctx.strokeStyle = "rgba(20,14,6,.4)";
+    for (const m of shown) for (const s of m.subzonesBySize) { ctx.beginPath(); for (const ring of s.poly) path(ring, true); ctx.stroke(); }
+  }
+  ctx.lineWidth = 1.1; ctx.strokeStyle = "rgba(20,14,6,.75)";
+  for (const m of shown) { ctx.beginPath(); for (const ring of m.outline) path(ring, true); ctx.stroke(); }
+}
+// the hover card's lines for a zone, and the subzone under the pointer
+function levelTip(m, sub) {
+  if (!LV) return `<div class="d">reading the levels…</div>`;
+  const zl = levelOf(m);
+  if (!zl) return "";
+  if (zl.sanctuary) return `<div class="d">${m.kind === "city" ? "A capital" : "A sanctuary"}: nothing to level on</div>`;
+  const e = sub ? subLevel(m, sub) : null;
+  let html = "";
+  if (e && e.sanctuary) html += `<div class="d">${esc(sub.name)}: a capital, nothing to level on</div>`;
+  else if (e && e.lv) html += `<div>${conSwatch(e.med)}${esc(sub.name)}: level <b>${levelsText(e.lv)}</b> <span class="d">· ${esc(sourceText(e))}</span></div>`;
+  if (zl.lv) html += `<div>${conSwatch(zl.med)}Zone: level <b>${levelsText(zl.lv)}</b>, most ${zl.med}</div>`;
+  const q = questSplit(zl);
+  if (q) html += `<div class="d">Quests${state.faction ? "" : ` <span class="fac ${q.side}">${q.side}</span>`}: ${countsHtml(q)}</div>`;
+  return html;
+}
+// the zone panel's section: how its mobs and quests sit against the player, and its places from low to high
+function levelSection(m) {
+  const L = state.level;
+  let html = `<h3>Levelling at ${L}</h3>`;
+  if (!LV) return html + `<p class="dim">Reading the levels…</p>`;
+  const zl = levelOf(m);
+  if (!zl || zl.sanctuary) return html + `<p class="dim">${m.kind === "city" ? "A capital" : "A sanctuary"}: nothing here to level on.</p>`;
+  if (zl.lv) html += `<p>${conSwatch(zl.med)}Mobs <b>${levelsText(zl.lv)}</b>, most of them ${zl.med}${zl.n ? "" : ` <span class="dim">(from its places' levels)</span>`}</p>`;
+  if (zl.mobs) { const s = LVL.split(zl.mobs, L); html += `${barHtml(s)}<p class="dim">${s.total} mobs: ${countsHtml(s)}</p>`; }
+  const sides = state.faction ? [state.faction] : ["A", "H"];
+  const qs = sides.map((f) => ({ f, s: LVL.split(zl.quests && zl.quests[f], L) })).filter((x) => x.s.total);
+  if (qs.length) for (const { f, s } of qs) html += `<p style="margin-top:8px">Quests <span class="fac ${f}">${facName[f]}</span> <span class="dim">${s.total}</span></p>${barHtml(s)}<p class="dim">${countsHtml(s)}</p>`;
+  else html += `<p class="dim">${zl.n ? `No ${state.faction ? facName[state.faction] + " " : ""}quests are filed under this zone.` : `${esc(m.name)} is new in Forever, so there are no quest or mob levels for it yet: its places carry the levels the game itself gives them.`}</p>`;
+  const seen = new Set(), places = [];
+  for (const s of m.subzones || []) {
+    const e = subLevel(m, s);
+    if (seen.has(s.name) || !e || !e.lv) continue;
+    seen.add(s.name); places.push({ s, e });
+  }
+  places.sort((a, b) => a.e.med - b.e.med || a.e.lv[1] - b.e.lv[1] || a.s.name.localeCompare(b.s.name));
+  const textColour = (level) => (conOf(level) === "grey" ? "#a8a8a8" : LVL.HEX[conOf(level)]);
+  if (places.length) html += `<h3>Places, low to high</h3><p class="dim">${zl.n ? "By the level most of each place's mobs are; the figures are the middle 80% of them." : "By the level the game gives each place."}</p>
+  <ul>${places.map(({ s, e }) => `<li class="row"><span class="n"><span class="lnk" data-sub="${s.at[0]},${s.at[1]}">${conSwatch(e.med)}${esc(s.name)}</span>${e.src === "near" || e.src === "band" ? `<small>${esc(sourceText(e))}</small>` : ""}</span><span class="v" style="color:${textColour(e.med)}">${levelsText(e.lv)}</span></li>`).join("")}</ul>`;
+  return html;
+}
+// the panel's opening section: the zones with the most quests worth doing, and the dungeons that suit
+function levellingAbout() {
+  const L = state.level, b = LVL.bands(L);
+  let html = `<h3>Levelling at ${L}</h3>
+  <p class="dim">Every place is coloured the way the game colours a level for you: <b style="color:${LVL.HEX.red}">red</b> ${bandText(b.red)}, <b style="color:${LVL.HEX.orange}">orange</b> ${bandText(b.orange)}, <b style="color:${LVL.HEX.yellow}">yellow</b> ${bandText(b.yellow)}${b.green ? `, <b style="color:${LVL.HEX.green}">green</b> ${bandText(b.green)}` : ""}${b.grey ? ` and <b style="color:#a8a8a8">grey</b> ${bandText(b.grey)}, worth no experience` : ""}. A subzone takes the colour of the level most of its mobs are; hover one for its spread.</p>`;
+  if (!LV) return html + `<p class="dim">Reading the levels…</p>`;
+  const rows = [], fresh = [];
+  for (const m of D.maps) {
+    if (m.kind !== "zone") continue;
+    const zl = levelOf(m);
+    if (!zl || zl.sanctuary) continue;
+    const s = questSplit(zl);
+    if (s && s.yellow) rows.push({ m, s, zl });
+    else if (!zl.quests && !zl.n && zl.lv && zl.lv[0] <= L + 2 && zl.lv[1] >= L - 2) fresh.push({ m, zl });
+  }
+  rows.sort((a, b) => LVL.worth(b.s) - LVL.worth(a.s) || b.s.yellow - a.s.yellow);
+  html += `<h3>Zones with quests for you</h3>`;
+  html += rows.length ? `<ul>${rows.slice(0, 10).map(({ m, s, zl }) => `<li><div class="row"><span class="n lnk" data-zone="${m.id}">${esc(m.name)}${state.faction ? "" : `<span class="fac ${s.side}">${s.side}</span>`}</span><span class="c">${zl.lv ? "mobs " + levelsText(zl.lv) : ""}</span></div>${barHtml(s)}<div class="dim">${countsHtml(s)}</div></li>`).join("")}</ul>`
+    : `<p class="dim">No zone has quests yellow to you${state.faction ? ` as ${facName[state.faction]}` : ""}.</p>`;
+  if (fresh.length) html += `<p class="dim" style="margin-top:6px">New in Forever, at your level, with no quest data yet: ${fresh.map(({ m, zl }) => `<span class="lnk" data-zone="${m.id}">${esc(m.name)}</span> (${levelsText(zl.lv)})`).join(", ")}.</p>`;
+  html += `<p class="dim">${state.faction ? `${facName[state.faction]}'s quests.` : `Pick a faction above to count only your side's quests; until then each zone shows the side with more for you.`} Ranked by the quests yellow to you, with orange ones at half and green at a quarter.</p>`;
+  const dungeons = D.instances.map((d) => ({ d, il: LV.instances[d.id] })).filter(({ il }) => il && il.med && ["yellow", "orange"].includes(conOf(il.med)))
+    .sort((a, b) => a.il.med - b.il.med);
+  if (dungeons.length) html += `<h3>Dungeons at your level</h3><ul>${dungeons.map(({ d, il }) => `<li class="row"><span class="n lnk" data-goto="${d.at[0]},${d.at[1]},${Math.max(state.view.z, 8)}">${conSwatch(il.med)}${esc(d.name)}</span><span class="c">${d.kind}</span><span class="v" style="color:${LVL.HEX[conOf(il.med)]}">${levelsText(il.lv)}</span></li>`).join("")}</ul>`;
+  html += `<p class="note">Mob levels are every creature you could fight in the vanilla world database (<a href="https://github.com/cmangos/classic-db" target="_blank" rel="noopener">CMaNGOS classic-db</a>), each subzone's the middle 80% of its own; quests are the quest log's own zones. Forever's new zones have neither, so they carry the level the Forever client gives each of their places. Where Forever has moved a camp or retuned a mob, the map will not know.</p>`;
+  return html;
+}
+function refreshPanel() {
+  if (!D) return;
+  const hidden = side.classList.contains("hidden"), top = side.scrollTop;
+  if (state.sel) showPanel(state.sel); else showAbout();
+  side.classList.toggle("hidden", hidden); side.scrollTop = top;
 }
 
 // ---- interaction -----------------------------------------------------------
@@ -656,6 +951,7 @@ function tipHtml(h) {
   const o = h.obj;
   if (h.type === "zone") {
     const bio = o.biomes.map((k) => biomesByKey.get(k).name).join(" · ");
+    if (state.level) return `<div class="t">${esc(o.name)}</div><div class="d">${o.levels ? `levels ${o.levels[0]}–${o.levels[1]} · ` : ""}${esc(o.territory || "")}</div>${levelTip(o, h.sub)}`;
     return `<div class="t">${esc(o.name)}</div><div class="d">${h.sub ? esc(h.sub.name) + " · " : ""}${o.levels ? `levels ${o.levels[0]}–${o.levels[1]} · ` : ""}${esc(o.territory || "")}</div>${bio ? `<div>${esc(bio)}</div>` : ""}`;
   }
   if (h.type === "node") {
@@ -670,7 +966,10 @@ function tipHtml(h) {
     return `<div class="t">${esc(o.name)}</div><div class="d">${esc(o.tag || o.roles.join(", "))} · ${zone ? esc(zone.name) : ""}</div><div>${accessText(o)}</div>`;
   }
   if (h.type === "poi") return `<div class="t">${esc(o.name)}</div><div class="d">${o.kind}</div>`;
-  if (h.type === "instance") return `<div class="t">${esc(o.name)}</div><div class="d">${o.kind}${o.players ? ` · ${o.players} players` : ""}</div>`;
+  if (h.type === "instance") {
+    const il = state.level && LV ? LV.instances[o.id] : null;
+    return `<div class="t">${esc(o.name)}</div><div class="d">${o.kind}${o.players ? ` · ${o.players} players` : ""}</div>${il && il.lv ? `<div>${conSwatch(il.med)}Mobs <b>${levelsText(il.lv)}</b>, most ${il.med}</div>` : ""}`;
+  }
   return "";
 }
 function accessText(n) {
@@ -724,6 +1023,7 @@ window.addEventListener("keydown", (e) => {
   else if (e.key === "-") zoomAt(W / 2, H / 2, 1 / 1.4);
   else if (e.key === "Escape") { select(null); state.plan = { from: null, to: null, result: null }; }
   else if (e.key === "/") { e.preventDefault(); $("q").focus(); }
+  else if (state.level && (e.key === "[" || e.key === "]")) setLevel(state.level + (e.key === "]" ? 1 : -1));
   else if (e.key.startsWith("Arrow")) { const d = 60 / state.view.z; if (e.key === "ArrowLeft") state.view.cx -= d; if (e.key === "ArrowRight") state.view.cx += d; if (e.key === "ArrowUp") state.view.cy -= d; if (e.key === "ArrowDown") state.view.cy += d; requestDraw(); writeHash(); }
 });
 $("zin").onclick = () => zoomAt(W / 2, H / 2, 1.5);
@@ -739,6 +1039,7 @@ function buildBiomeSelect() {
 function setBiome(key) {
   state.biomeFocus = key || null;
   $("biome").value = state.biomeFocus || "";
+  if (state.biomeFocus && state.level) { state.level = null; syncLevelUi(); } // one overlay at a time
   if (state.sel) showPanel(state.sel); else showAbout();
   requestDraw(); writeHash();
 }
@@ -781,6 +1082,7 @@ function wire(root) {
   root.querySelectorAll("[data-clearplan]").forEach((el) => { el.onclick = () => { state.plan = { from: null, to: null, result: null }; if (state.sel) showPanel(state.sel); else showAbout(); requestDraw(); }; });
   root.querySelectorAll("[data-legacy]").forEach((el) => { el.onclick = () => { state.legacyTransports = !state.legacyTransports; showAbout(); requestDraw(); }; });
   root.querySelectorAll("[data-goto]").forEach((el) => { el.onclick = () => { const [x, y, z] = el.dataset.goto.split(",").map(Number); flyTo(x, y, z); }; });
+  root.querySelectorAll("[data-levelling]").forEach((el) => { el.onclick = () => setLevelling(true); });
 }
 const biomeOff = (k) => state.biomeFocus && state.biomeFocus !== "all" && state.biomeFocus !== k;
 function biomeChips(keys) {
@@ -794,8 +1096,9 @@ function showAbout() {
   side.classList.remove("hidden");
   const focus = state.biomeFocus ? biomesByKey.get(state.biomeFocus) : null;
   let html = `<h2>Azeroth, forever</h2><div class="kind">WoW Forever · beta build ${esc(D.build)}</div>
-  <p>The world map at every scale, from the game's own art. Zoom in for the zone maps, then the cities.</p>
-  <h3>Biomes</h3>${legendHtml()}`;
+  <p>The world map at every scale, from the game's own art. Zoom in for the zone maps, then the cities.</p>`;
+  html += state.level ? levellingAbout() : `<h3>Levelling</h3><p class="dim"><span class="lnk" data-levelling>Turn on levelling</span> and give your level: every zone and subzone takes the colour its mobs would show you, grey to red, and the zones with the most quests for you are listed here.</p>`;
+  html += `<h3>Biomes</h3>${legendHtml()}`;
   if (focus) html += biomeDetail(focus);
   html += `<h3>Layers</h3>
   <p class="dim"><b style="color:#ffd25a">Flight masters</b> and <b style="color:#ffd25a">flight paths</b> show every taxi node with its fares and flight times (click one, then <i>plan a flight</i> to another). <b style="color:#6fd7ff">Boats</b>, <b style="color:#ff8f6f">zeppelins</b> and <b style="color:#ffd86f">skyships</b> are solid where the vessel really sails and dashed along the shared cables where the game carries it across the sea in an instant. <b style="color:#e0b95a">Banks</b> and <b style="color:#9fe36f">auction houses</b> appear from zone zoom in.</p>
@@ -832,12 +1135,14 @@ function showPanel(sel) {
     const effects = D.biomes.filter((b) => o.biomes.includes(b.key)).flatMap((b) => b.effects.map((e) => ({ ...e, biome: b })));
     let html = `<h2>${esc(o.name)}</h2><div class="kind">${o.kind}${o.levels ? ` · levels ${o.levels[0]}–${o.levels[1]}` : ""}${o.territory ? ` · ${esc(o.territory)}` : ""}</div>`;
     if (o.note) html += `<p class="note">${esc(o.note)}</p>`;
+    if (state.level) html += levelSection(o);
     html += `<h3>Biomes</h3>${o.biomes.length ? `<p>${biomeChips(o.biomes)}</p>` : `<p class="dim">${o.kind === "city" ? "Cities take the biome of the areas around them where the beta lists them; this one is in no group." : "Not in any biome group in the beta data."}</p>`}`;
     if (o.biomeSubzones.length) html += `<p class="dim">Exceptions inside: ${o.biomeSubzones.map((s) => `${esc(s.name)} also counts as ${esc(biomesByKey.get(s.biome).name)}`).join("; ")}.</p>`;
     if (effects.length) html += `<h3>Item effects that work here</h3><ul>${effects.map((e) => { const items = e.items.filter((i) => i.name); return `<li><div>${items.length ? items.map((i) => esc(i.name)).join(", ") : esc(e.name)} <span class="bchip" style="background:${e.biome.color};font-size:10px;padding:0 6px" data-biome="${e.biome.key}">${esc(e.biome.name)}</span></div><div class="dim">${esc(e.text)}</div></li>`; }).join("")}</ul>`;
     if (nodes.length) html += `<h3>Flight masters</h3><ul>${nodes.map((n) => `<li class="row"><span class="n lnk" data-node="${n.id}">${esc(n.name)}</span><span class="fac ${n.faction}">${n.faction}</span></li>`).join("")}</ul>`;
     if (banks.length || ahs.length) html += `<h3>Services</h3><ul>${banks.map((n) => `<li class="row"><span class="n">${esc(n.name)}</span><span class="c">bank</span></li>`).join("")}${ahs.map((n) => `<li class="row"><span class="n">${esc(n.name)}</span><span class="c">auctioneer</span></li>`).join("")}</ul>`;
-    if (o.subzones && o.subzones.length) html += `<h3>Places</h3><p class="dim">${o.subzones.map((s) => `<span class="lnk" data-sub="${s.at[0]},${s.at[1]}">${esc(s.name)}</span>`).join(" · ")}</p>`;
+    // with levelling on, the levelling section has listed the places already, by level
+    if (o.subzones && o.subzones.length && !(state.level && LV && levelOf(o) && !levelOf(o).sanctuary)) html += `<h3>Places</h3><p class="dim">${o.subzones.map((s) => `<span class="lnk" data-sub="${s.at[0]},${s.at[1]}">${esc(s.name)}</span>`).join(" · ")}</p>`;
     panelHtml(html);
   } else if (sel.type === "node") {
     const routes = (routesFrom.get(o.id) || []).map((r) => ({ r, to: nodesById.get(r.to) })).filter((x) => usable(x.to.faction)).sort((a, b) => a.r.seconds - b.r.seconds);
@@ -869,7 +1174,18 @@ function showPanel(sel) {
   } else if (sel.type === "poi") {
     panelHtml(`<h2>${esc(o.name)}</h2><div class="kind">${o.kind}</div>`);
   } else if (sel.type === "instance") {
-    panelHtml(`<h2>${esc(o.name)}</h2><div class="kind">${o.kind}${o.players ? ` · ${o.players} players` : ""}</div><p class="dim">Entrance as the game places it on the world map.</p>`);
+    let html = `<h2>${esc(o.name)}</h2><div class="kind">${o.kind}${o.players ? ` · ${o.players} players` : ""}</div><p class="dim">Entrance as the game places it on the world map.</p>`;
+    const il = state.level && LV ? LV.instances[o.id] : null;
+    if (il) {
+      html += `<h3>Levelling at ${state.level}</h3>`;
+      if (il.lv) html += `<p>${conSwatch(il.med)}Mobs inside <b>${levelsText(il.lv)}</b>, most of them ${il.med}</p>`;
+      const sides = state.faction ? [state.faction] : ["A", "H"];
+      let any = false;
+      for (const f of sides) { const s = LVL.split(il.quests && il.quests[f], state.level); if (s.total) { any = true; html += `<p style="margin-top:8px">Quests <span class="fac ${f}">${facName[f]}</span> <span class="dim">${s.total}</span></p>${barHtml(s)}<p class="dim">${countsHtml(s)}</p>`; } }
+      if (!any && il.quests && state.faction && il.quests[state.faction === "A" ? "H" : "A"]) html += `<p class="dim">Its quests are all ${state.faction === "A" ? "the Horde's" : "the Alliance's"}.</p>`;
+      html += `<p class="dim">The middle 80% of the creatures inside, bosses left out, from the vanilla world database; quests are those the quest log files under the dungeon.</p>`;
+    }
+    panelHtml(html);
   }
 }
 
@@ -952,6 +1268,7 @@ function writeHash() {
     const parts = [`v=${v.cx.toFixed(1)},${v.cy.toFixed(1)},${v.z.toFixed(2)}`, `l=${on}`];
     if (state.faction) parts.push(`f=${state.faction}`);
     if (state.biomeFocus) parts.push(`b=${state.biomeFocus}`);
+    if (state.level) parts.push(`lv=${state.level}`);
     history.replaceState(null, "", "#" + parts.join("&"));
   }, 200);
 }
@@ -961,6 +1278,8 @@ function readHash() {
   if (h.has("l")) { const on = new Set(h.get("l").split(",")); for (const l of LAYERS) state.layers[l.key] = on.has(l.key); buildLayers(); if (on.has("biomes") && !h.get("b")) state.biomeFocus = "all"; }
   if (h.get("f")) { state.faction = h.get("f"); $("faction").value = state.faction; }
   if (h.get("b") && (biomesByKey.has(h.get("b")) || h.get("b") === "all")) state.biomeFocus = h.get("b");
+  const lv = Number(h.get("lv"));
+  if (lv >= 1) { state.level = clamp(Math.round(lv), 1, LEVELLING.MAX); state.biomeFocus = null; }
   $("biome").value = state.biomeFocus || "";
 }
 
